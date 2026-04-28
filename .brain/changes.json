@@ -1,301 +1,302 @@
 [
   {
-    "file": "backend/src/controllers/videoController.js",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-24T14:52:22.712Z"
-  },
-  {
-    "file": "frontend/src/pages/RealisticStory.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-24T14:52:24.886Z"
-  },
-  {
-    "file": "frontend/src/pages/AvatarProductAds.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-24T14:52:28.125Z"
-  },
-  {
-    "file": "backend/src/routes/walletRoutes.js",
+    "file": ".git/index.lock",
     "change": "File created",
     "reason": "Detected by background watcher",
-    "time": "2026-04-27T04:50:46.648Z"
+    "time": "2026-04-28T07:56:48.425Z"
   },
   {
-    "file": "backend/src/controllers/webhookController.js",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T04:57:23.399Z"
-  },
-  {
-    "file": "backend/src/routes/walletRoutes.js",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T04:57:25.341Z"
-  },
-  {
-    "file": "frontend/src/App.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:00:18.060Z"
-  },
-  {
-    "file": "backend/src/app.js",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:00:20.094Z"
-  },
-  {
-    "file": "backend/src/config/twilio.js",
+    "file": ".git/index.lock",
     "change": "File deleted",
     "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:12:47.788Z"
+    "time": "2026-04-28T07:56:48.514Z"
   },
   {
-    "file": "backend/src/controllers/webhookController.js",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:20:16.150Z"
-  },
-  {
-    "file": "frontend/src/pages/InstagramAutomation.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:25:40.071Z"
-  },
-  {
-    "file": "backend/src/services/aiService.js",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:29:49.237Z"
-  },
-  {
-    "file": "frontend/src/components/AIGuideWidget.jsx",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:44:47.508Z"
-  },
-  {
-    "file": "frontend/src/components/AIGuideWidget.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:47:01.840Z"
-  },
-  {
-    "file": "frontend/src/components/AIGuideWidget.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:47:02.059Z"
-  },
-  {
-    "file": "frontend/src/App.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T05:47:04.621Z"
-  },
-  {
-    "file": "frontend/src/pages/Settings.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-27T06:08:57.436Z"
-  },
-  {
-    "file": "script",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:03:52.764Z"
-  },
-  {
-    "file": "script/create_frontend.js",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:04:33.218Z"
-  },
-  {
-    "file": "find_unused_files.js",
+    "file": ".git/logs/refs/heads/main",
     "change": "File deleted",
     "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:04:40.238Z"
+    "time": "2026-04-28T07:57:03.602Z"
   },
   {
-    "file": "generate_tree.js",
-    "change": "File deleted",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:04:50.155Z"
-  },
-  {
-    "file": "setup_adstudio.js",
-    "change": "File deleted",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:04:58.273Z"
-  },
-  {
-    "file": "setup_structure.js",
-    "change": "File deleted",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:05:09.442Z"
-  },
-  {
-    "file": "generate_tree.txt",
-    "change": "File deleted",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:05:21.973Z"
-  },
-  {
-    "file": "script/PROGRESS.md",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:05:34.175Z"
-  },
-  {
-    "file": ".gitignore",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:08:28.567Z"
-  },
-  {
-    "file": ".gitignore",
+    "file": ".git/refs/heads/main",
     "change": "File modified",
     "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:12:27.786Z"
-  },
-  {
-    "file": "frontend/src/pages/DataDeletion.jsx",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:18:05.901Z"
-  },
-  {
-    "file": "frontend/src/pages/DataDeletion.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:18:31.701Z"
-  },
-  {
-    "file": "frontend/src/App.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:18:33.829Z"
-  },
-  {
-    "file": "frontend/src/pages/LandingPage.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:18:36.116Z"
-  },
-  {
-    "file": "frontend/src/pages/TermsAndConditions.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:01.729Z"
-  },
-  {
-    "file": "frontend/src/pages/DataDeletion.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:04.292Z"
-  },
-  {
-    "file": "frontend/src/pages/DataDeletion.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:04.895Z"
-  },
-  {
-    "file": "frontend/src/pages/LandingPage.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:08.037Z"
-  },
-  {
-    "file": "frontend/src/pages/AboutUs.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:10.450Z"
-  },
-  {
-    "file": "frontend/src/pages/PrivacyPolicy.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:12.032Z"
-  },
-  {
-    "file": "frontend/src/pages/FAQ.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:14.052Z"
-  },
-  {
-    "file": "frontend/src/pages/Help.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:22:15.810Z"
-  },
-  {
-    "file": "frontend/src/App.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:23:48.312Z"
-  },
-  {
-    "file": "frontend/src/pages/LandingPage.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:23:51.291Z"
-  },
-  {
-    "file": "frontend/src/pages/LandingPage.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:23:51.421Z"
-  },
-  {
-    "file": "frontend/src/pages/PrivacyPolicy.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:50:32.025Z"
-  },
-  {
-    "file": "frontend/src/pages/Help.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:50:34.684Z"
-  },
-  {
-    "file": "frontend/src/pages/DataDeletion.jsx",
-    "change": "File modified",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:50:36.887Z"
-  },
-  {
-    "file": ".git",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:52:06.145Z"
-  },
-  {
-    "file": ".git/refs",
-    "change": "File created",
-    "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:52:06.433Z"
+    "time": "2026-04-28T07:57:03.688Z"
   },
   {
     "file": ".git/FETCH_HEAD",
-    "change": "File created",
+    "change": "File modified",
     "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:52:09.379Z"
+    "time": "2026-04-28T07:58:13.587Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:01:16.619Z"
+  },
+  {
+    "file": ".git/config",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:01:58.159Z"
+  },
+  {
+    "file": ".git/config",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:02:05.859Z"
+  },
+  {
+    "file": ".git/logs/refs/heads/main",
+    "change": "File deleted",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:02:11.854Z"
+  },
+  {
+    "file": ".git/HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:02:11.948Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:05:01.118Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:08:20.676Z"
   },
   {
     "file": ".git/config.lock",
     "change": "File created",
     "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:53:24.467Z"
+    "time": "2026-04-28T08:11:36.048Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/main",
+    "change": "File created",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:11:36.107Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:12:20.928Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:12:23.043Z"
+  },
+  {
+    "file": ".git/config.lock",
+    "change": "File created",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:12:26.960Z"
   },
   {
     "file": ".git/config.lock",
     "change": "File deleted",
     "reason": "Detected by background watcher",
-    "time": "2026-04-28T07:53:24.562Z"
- 
+    "time": "2026-04-28T08:12:27.022Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:15:24.333Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:15:25.666Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:18:26.349Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:18:27.617Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:26:17.261Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:26:18.881Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:30:34.521Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/HEAD.lock",
+    "change": "File created",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:30:35.607Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:30:35.762Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:33:36.212Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/HEAD.lock",
+    "change": "File created",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:33:37.500Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/HEAD.lock",
+    "change": "File deleted",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:33:37.693Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:36:38.050Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T08:36:39.409Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:03:51.840Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:03:53.127Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:06:57.660Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:06:58.689Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:15:39.333Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:15:40.471Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:26:43.504Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/HEAD.lock",
+    "change": "File created",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:26:44.854Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:26:44.932Z"
+  },
+  {
+    "file": "backend/src/server.js",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:29:20.515Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:29:45.535Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:29:46.851Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:38:36.638Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:38:38.194Z"
+  },
+  {
+    "file": "backend/package.json",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:38:42.095Z"
+  },
+  {
+    "file": ".git/FETCH_HEAD",
+    "change": "File modified",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:41:38.723Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/HEAD.lock",
+    "change": "File created",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:41:40.599Z"
+  },
+  {
+    "file": ".git/refs/remotes/origin/HEAD.lock",
+    "change": "File deleted",
+    "reason": "Detected by background watcher",
+    "time": "2026-04-28T11:41:40.776Z"
+  }
+]
