@@ -1,0 +1,12 @@
+{
+  "total_tokens": 1793,
+  "sessions": [
+    {
+      "date": "2026-04-24T14:00:54.701Z",
+      "provider": "Groq",
+      "promptTokens": 1474,
+      "completionTokens": 319,
+      "totalTokens": 1793
+    }
+  ]
+}

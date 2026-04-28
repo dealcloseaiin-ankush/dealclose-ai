@@ -1,0 +1,19 @@
+# Environment Variables (Security)
+.env
+.env.*
+*.env
+
+# Custom Scripts Folder
+script/
+
+# Node Modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build Outputs
+dist/
+build/
+
+# OS specific files
+.DS_Store
