@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // Your backend server URL
+  baseURL: 'https://dealclose-ai.onrender.com/api', // Your live Render backend URL
 });
 
 // Request interceptor for API calls to attach JWT token
