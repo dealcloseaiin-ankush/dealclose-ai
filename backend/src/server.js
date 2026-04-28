@@ -13,11 +13,13 @@ const app = require('./app');
 const port = process.env.PORT || 5000;
 
 // Pehle server start kar dete hain taaki Render "No open ports" ka error na de
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on port ${port}`);
 });
 
-mongoose.connect(process.env.MONGO_URI).then(() => {
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 5000 // 5 second timeout taaki app jaldi error throw kare aur hang na ho
+}).then(() => {
   console.log('Connected to MongoDB');
 }).catch(err => {
   console.error('Database connection error:', err);
