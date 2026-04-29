@@ -25,7 +25,12 @@ const app = express();
 
 // Middleware
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:5174'], // Allow your Vite frontend
+  origin: [
+    'http://localhost:5173', 
+    'http://localhost:5174',
+    'https://dealcloseai.in',
+    'https://www.dealcloseai.in'
+  ], // Allow your Vite frontend and custom domain
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 200
