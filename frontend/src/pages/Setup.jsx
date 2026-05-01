@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase'; // Centralized Supabase client
 
 export default function Setup() {
-  const navigate = useNavigate();
   const [previewUrl, setPreviewUrl] = useState('');
   const [businessDesc, setBusinessDesc] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
