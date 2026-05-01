@@ -15,6 +15,9 @@ export default function Setup() {
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
 
+  // Backend API URL (Vercel se lega, nahi toh local par 5000 use karega)
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
   // Google Login se wapas aane ke baad backend me user create/sync karne ka logic
   useEffect(() => {
     const syncUserWithBackend = async () => {
@@ -24,7 +27,7 @@ export default function Setup() {
         const { user } = session;
         try {
           // Backend ko bata rahe hain ki naya user aaya hai
-          const res = await fetch('http://localhost:5000/api/users/supabase-auth', {
+          const res = await fetch(`${backendUrl}/api/users/supabase-auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -90,7 +93,7 @@ export default function Setup() {
         businessDesc
       };
 
-      const res = await fetch('http://localhost:5000/api/users/settings', {
+      const res = await fetch(`${backendUrl}/api/users/settings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
