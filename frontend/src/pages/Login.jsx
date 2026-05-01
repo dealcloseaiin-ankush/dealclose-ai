@@ -32,7 +32,9 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/setup' // Login ke baad Setup page par bhejega
+        // Hum yahan exact live URL hardcode kar rahe hain taaki origin ka koi issue na aaye
+        // Local testing ke time aap isko 'http://localhost:5173/setup' kar sakte hain
+        redirectTo: 'https://www.dealcloseai.in/setup'
       }
     });
     if (error) {

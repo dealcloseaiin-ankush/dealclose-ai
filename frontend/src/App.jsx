@@ -53,11 +53,13 @@ export default function App() {
         <Route path="/help" element={<Help />} />
         <Route path="/delete-data" element={<DataDeletion />} />
         
+        {/* Setup Page ko ProtectedRoute se bahar nikal diya taaki Google Login ke baad bina token ke load ho sake */}
+        <Route path="/setup" element={<Setup />} />
+        
         {/* Dashboard Layout Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<MainLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="setup" element={<Setup />} />
             <Route path="insights" element={<AIInsights />} />
             <Route path="training" element={<AITraining />} />
             <Route path="catalog" element={<Catalog />} />
