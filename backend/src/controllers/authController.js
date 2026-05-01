@@ -16,7 +16,8 @@ exports.supabaseAuth = async (req, res) => {
       user = await User.create({ 
         email, 
         supabaseId, 
-        name,
+        name: name,
+        fullName: name || 'Google User', // Fix: MongoDB schema requires 'fullName'
         password: supabaseId || 'google-oauth-dummy-pass' 
       });
     }
