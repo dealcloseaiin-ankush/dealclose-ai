@@ -13,6 +13,7 @@ export default function Setup() {
   const [whatsappToken, setWhatsappToken] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
+  const [alreadySetup, setAlreadySetup] = useState(false); // Naya state loop rokne ke liye
 
   // Backend API URL (Vercel se lega, nahi toh local par 5000 use karega)
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -20,9 +21,11 @@ export default function Setup() {
   // Google Login se wapas aane ke baad backend me user create/sync karne ka logic
   useEffect(() => {
     const syncUserWithBackend = async () => {
+      console.log("🔗 [Chain Step 1] Getting Google Session...");
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session && session.user) {
+        console.log("🔗 [Chain Step 2] Google Session Found! Sending to Backend:", session.user.email);
         const { user } = session;
         try {
           // Backend ko bata rahe hain ki naya user aaya hai
@@ -36,15 +39,20 @@ export default function Setup() {
             })
           });
           
+          console.log("🔗 [Chain Step 3] Backend Response Status:", res.status);
           const data = await res.json();
+          console.log("🔗 [Chain Step 4] Backend Data Received:", data);
+
           if (res.ok) {
             // Backend ne jo token diya, usko save kar lenge taaki aage ke requests me use ho
             localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user)); // FIX: Dashboard guard ke liye user data save karna zaroori hai
             
-            // Fix: Agar user pehle se setup kar chuka hai (uske paas whatsapp token hai)
-            // toh usko wapas form dikhane ki jagah seedha Dashboard par bhej do
+            console.log("✅ [Chain Success] Token and User saved to LocalStorage!");
+
             if (data.user && data.user.whatsappConfig && data.user.whatsappConfig.accessToken) {
-              window.location.href = '/dashboard';
+              // Redirect loop se bachne ke liye auto-redirect ki jagah ek screen dikhayenge
+              setAlreadySetup(true);
             }
           }
         } catch (error) {
@@ -140,6 +148,20 @@ export default function Setup() {
   const handleRemoveUrl = (index) => {
     setBusinessUrls(businessUrls.filter((_, i) => i !== index));
   };
+
+  // Agar pehle se setup ho chuka hai, toh Form ki jagah Welcome Back screen dikhayenge
+  if (alreadySetup) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)] bg-[#050505] text-white flex-col gap-6 p-6 text-center">
+        <div className="w-24 h-24 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center text-5xl mb-4 shadow-[0_0_30px_rgba(34,197,94,0.3)]">✨</div>
+        <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Welcome Back!</h1>
+        <p className="text-gray-400 text-lg max-w-md">Your WhatsApp AI is already connected and running perfectly.</p>
+        <button onClick={() => window.location.href = '/dashboard'} className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold shadow-lg shadow-purple-500/30 transition-all transform hover:scale-105 mt-4">
+          Go to Dashboard
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] bg-[#050505] text-gray-100 font-sans">
