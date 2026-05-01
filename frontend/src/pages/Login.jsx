@@ -2,13 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Button from '../components/Button';
-import { createClient } from '@supabase/supabase-js';
-
-// Supabase Client Setup
-// Dhyan rakhein: In keys ko frontend ki .env file (VITE_SUPABASE_URL) me daalna best practice hai.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'YOUR_SUPABASE_URL';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '../lib/supabase'; // Centralized Supabase client
 
 export default function Login() {
   const [email, setEmail] = useState('ankush.bani@gmail.com');

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase'; // Centralized Supabase client
 
 export default function Setup() {
   const [url, setUrl] = useState('');
@@ -13,6 +14,38 @@ export default function Setup() {
   const [whatsappToken, setWhatsappToken] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
+
+  // Google Login se wapas aane ke baad backend me user create/sync karne ka logic
+  useEffect(() => {
+    const syncUserWithBackend = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session && session.user) {
+        const { user } = session;
+        try {
+          // Backend ko bata rahe hain ki naya user aaya hai
+          const res = await fetch('http://localhost:5000/api/users/supabase-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: user.email,
+              supabaseId: user.id,
+              name: user.user_metadata?.full_name || user.email.split('@')[0]
+            })
+          });
+          
+          const data = await res.json();
+          if (res.ok) {
+            // Backend ne jo token diya, usko save kar lenge taaki aage ke requests me use ho
+            localStorage.setItem('token', data.token);
+          }
+        } catch (error) {
+          console.error('Error syncing user with backend:', error);
+        }
+      }
+    };
+    syncUserWithBackend();
+  }, []);
 
   const handlePreview = (e) => {
     e.preventDefault();
