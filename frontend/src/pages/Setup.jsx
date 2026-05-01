@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase'; // Centralized Supabase client
 
 export default function Setup() {
-  const [url, setUrl] = useState('');
+  const navigate = useNavigate();
   const [previewUrl, setPreviewUrl] = useState('');
   const [businessDesc, setBusinessDesc] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [platforms, setPlatforms] = useState({ newpropertyhub: false, vyaparindia: false, kidsai: false });
+  const [businessUrls, setBusinessUrls] = useState(['']); // Dynamic Array for URLs
   const [aiRules, setAiRules] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [whatsappToken, setWhatsappToken] = useState('');
@@ -48,11 +49,11 @@ export default function Setup() {
       }
     };
     syncUserWithBackend();
-  }, []);
+  }, [backendUrl]);
 
-  const handlePreview = (e) => {
-    e.preventDefault();
-    let validUrl = url;
+  const handlePreview = (urlToPreview) => {
+    if (!urlToPreview) return;
+    let validUrl = urlToPreview;
     if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
       validUrl = 'https://' + validUrl;
     }
@@ -90,7 +91,8 @@ export default function Setup() {
         wabaId,
         ownerPhone,
         pinCode,
-        businessDesc
+        businessDesc,
+        businessUrls: businessUrls.filter(url => url.trim() !== '') // Khali URLs ko hata kar bhejenge
       };
 
       const res = await fetch(`${backendUrl}/api/users/settings`, {
@@ -106,6 +108,7 @@ export default function Setup() {
 
       if (res.ok) {
         alert('Setup saved successfully! Your AI Assistant is now configured.');
+        navigate('/dashboard');
       } else {
         alert(`Failed to save settings: ${data.message || 'Unknown error'}`);
       }
@@ -119,6 +122,18 @@ export default function Setup() {
     if(!ownerPhone) return alert("Enter phone number");
     setOtpSent(true);
     alert("OTP sent to your WhatsApp!");
+  };
+
+  const handleAddUrl = () => {
+    if (businessUrls.length < 5) setBusinessUrls([...businessUrls, '']);
+  };
+  const handleUrlChange = (index, value) => {
+    const newUrls = [...businessUrls];
+    newUrls[index] = value;
+    setBusinessUrls(newUrls);
+  };
+  const handleRemoveUrl = (index) => {
+    setBusinessUrls(businessUrls.filter((_, i) => i !== index));
   };
 
   return (
@@ -178,41 +193,42 @@ export default function Setup() {
             </div>
           </div>
 
-          {/* Multi-Platform Connectivity */}
+          {/* Dynamic Websites Section */}
           <div className="bg-[#111111] p-6 rounded-2xl border border-gray-800 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4 text-white">2. Connect Partner Platforms</h2>
-            <p className="text-sm text-gray-400 mb-4">AI will automatically post leads to these platforms.</p>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={platforms.newpropertyhub} onChange={e => setPlatforms({...platforms, newpropertyhub: e.target.checked})} className="w-5 h-5 accent-purple-600" /> <span className="font-bold">NewPropertyHub.in</span></label>
-              <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={platforms.vyaparindia} onChange={e => setPlatforms({...platforms, vyaparindia: e.target.checked})} className="w-5 h-5 accent-purple-600" /> <span className="font-bold">VyaparIndia.online</span></label>
-              <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={platforms.kidsai} onChange={e => setPlatforms({...platforms, kidsai: e.target.checked})} className="w-5 h-5 accent-purple-600" /> <span className="font-bold">KidsAI Studio</span></label>
-            </div>
-          </div>
-
-          {/* URL & Iframe Config */}
-          <div className="bg-[#111111] p-6 rounded-2xl border border-gray-800 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4 text-white">3. Link Your Website</h2>
-            <div className="flex gap-3">
-              <input 
-                type="text" 
-                value={url} 
-                onChange={(e) => setUrl(e.target.value)} 
-                placeholder="e.g., www.newpropertyhub.in" 
-                className="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"
-              />
-              <button 
-                onClick={handlePreview}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-colors"
-              >
-                Preview
-              </button>
+            <h2 className="text-xl font-semibold mb-4 text-white">2. Link Your Business Websites</h2>
+            <p className="text-sm text-gray-400 mb-4">Add up to 5 websites. Click Preview to see them on the mobile screen.</p>
+            <div className="space-y-3">
+              {businessUrls.map((siteUrl, index) => (
+                <div key={index} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={siteUrl} 
+                    onChange={(e) => handleUrlChange(index, e.target.value)} 
+                    placeholder="e.g., www.yourwebsite.com" 
+                    className="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"
+                  />
+                  <button onClick={() => handlePreview(siteUrl)} className="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-colors">
+                    Preview
+                  </button>
+                  {businessUrls.length > 1 && (
+                    <button onClick={() => handleRemoveUrl(index)} className="px-4 py-3 bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white font-semibold rounded-xl transition-colors">
+                      X
+                    </button>
+                  )}
+                </div>
+              ))}
+              {businessUrls.length < 5 && (
+                <button onClick={handleAddUrl} className="text-purple-400 text-sm font-bold mt-2 hover:text-purple-300">
+                  + Add Another Website
+                </button>
+              )}
             </div>
           </div>
 
           {/* Business Description for AI */}
           <div className="bg-[#111111] p-6 rounded-2xl border border-gray-800 shadow-lg">
             <h2 className="text-xl font-semibold mb-4 text-white flex items-center gap-2">
-              4. Train Your AI Agent
+              3. Train Your AI Agent (Optional for now)
             </h2>
             <textarea 
               rows="4" 
@@ -241,11 +257,15 @@ export default function Setup() {
                   </li>
                 ))}
               </ul>
-              <button onClick={handleSaveSetup} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all">
-                Save & Activate AI
-              </button>
             </div>
           )}
+
+          {/* Always Visible Save Button */}
+          <div className="pt-4 border-t border-gray-800 mt-4">
+            <button onClick={handleSaveSetup} className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-extrabold text-lg rounded-xl shadow-lg shadow-green-600/30 transition-all">
+              Save Setup & Go to Dashboard
+            </button>
+          </div>
         </div>
       </div>
 
