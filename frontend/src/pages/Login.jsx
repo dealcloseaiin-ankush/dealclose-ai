@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Button from '../components/Button';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase Client Setup
+// Dhyan rakhein: In keys ko frontend ki .env file (VITE_SUPABASE_URL) me daalna best practice hai.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'YOUR_SUPABASE_URL';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function Login() {
   const [email, setEmail] = useState('ankush.bani@gmail.com');
@@ -27,12 +34,37 @@ export default function Login() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/setup' // Login ke baad Setup page par bhejega
+      }
+    });
+    if (error) {
+      setError(error.message);
+      console.error(error);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center h-screen bg-[#050505]">
       <div className="p-10 bg-[#111] rounded-2xl shadow-2xl border border-gray-800 w-full max-w-md">
         <h1 className="text-3xl font-extrabold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 text-center">
           Welcome Back
         </h1>
+        
+        <button type="button" onClick={handleGoogleLogin} className="w-full mb-6 flex items-center justify-center gap-3 bg-white text-black p-3 rounded-lg font-bold hover:bg-gray-200 transition-colors">
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+          Continue with Google
+        </button>
+        
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex-1 h-px bg-gray-800"></div>
+          <span className="text-sm text-gray-500">OR</span>
+          <div className="flex-1 h-px bg-gray-800"></div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-gray-400 text-sm mb-1">Email</label>

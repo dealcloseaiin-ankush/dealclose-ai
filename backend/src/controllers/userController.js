@@ -78,20 +78,25 @@ exports.loginUser = async (req, res) => {
 // @route   POST /api/users/settings
 exports.updateSettings = async (req, res) => {
   try {
-    const { whatsappToken, phoneNumberId, wabaId } = req.body;
+    const { whatsappToken, phoneNumberId, wabaId, ownerPhone, pinCode, businessDesc } = req.body;
     
-    // Temporary logic for MVP: We update the first user found in DB
-    // (In production, we will use req.user.id from JWT token)
-    let user = await User.findOne();
+    // Get the currently logged-in user securely using the ID from the Auth token
+    let user = await User.findById(req.user._id);
     if (!user) {
-      user = new User({ fullName: "Test Admin", email: "admin@test.com", password: "123" });
+      return res.status(404).json({ message: "User not found. Please log in again." });
     }
 
-    user.whatsappConfig = {
-      accessToken: whatsappToken,
-      phoneNumberId: phoneNumberId,
-      wabaId: wabaId
-    };
+    if (whatsappToken || phoneNumberId || wabaId) {
+      user.whatsappConfig = {
+        accessToken: whatsappToken || user.whatsappConfig?.accessToken,
+        phoneNumberId: phoneNumberId || user.whatsappConfig?.phoneNumberId,
+        wabaId: wabaId || user.whatsappConfig?.wabaId
+      };
+    }
+
+    if (ownerPhone) user.ownerPhone = ownerPhone;
+    if (pinCode) user.servedPinCodes = [pinCode];
+    if (businessDesc) user.businessDescription = businessDesc;
 
     await user.save();
     res.status(200).json({ message: "Settings saved successfully", user });

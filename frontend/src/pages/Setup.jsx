@@ -10,6 +10,9 @@ export default function Setup() {
   const [platforms, setPlatforms] = useState({ newpropertyhub: false, vyaparindia: false, kidsai: false });
   const [aiRules, setAiRules] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [whatsappToken, setWhatsappToken] = useState('');
+  const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [wabaId, setWabaId] = useState('');
 
   const handlePreview = (e) => {
     e.preventDefault();
@@ -36,9 +39,44 @@ export default function Setup() {
     }, 2500);
   };
 
-  const handleSaveSetup = () => {
-    // This will send `previewUrl`, `businessDesc`, and `aiRules` to your backend userModel
-    alert('Setup saved successfully! Your AI Assistant is now trained and ready.');
+  const handleSaveSetup = async () => {
+    try {
+      // Token se User authenticate hoga
+      const token = localStorage.getItem('token'); 
+      if (!token) {
+        alert('You are not logged in. Please log in to save settings.');
+        return;
+      }
+
+      const settingsPayload = {
+        whatsappToken,
+        phoneNumberId,
+        wabaId,
+        ownerPhone,
+        pinCode,
+        businessDesc
+      };
+
+      const res = await fetch('http://localhost:5000/api/users/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Protect middleware ke liye
+        },
+        body: JSON.stringify(settingsPayload)
+      });
+      
+      const data = await res.json();
+
+      if (res.ok) {
+        alert('Setup saved successfully! Your AI Assistant is now configured.');
+      } else {
+        alert(`Failed to save settings: ${data.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error saving setup. Check console.');
+    }
   };
 
   const handleSendOtp = () => {
@@ -80,6 +118,26 @@ export default function Setup() {
               <div>
                 <label className="text-sm text-gray-400">Business Pincode (For Local Reach)</label>
                 <input type="text" placeholder="e.g. 400001" value={pinCode} onChange={e => setPinCode(e.target.value)} className="w-full mt-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white outline-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* WhatsApp API Configuration */}
+          <div className="bg-[#111111] p-6 rounded-2xl border border-gray-800 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4 text-white">1.5 Meta API Configuration</h2>
+            <p className="text-sm text-gray-400 mb-4">Enter your Meta Developer app details here to connect the Bot.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400">WhatsApp Access Token</label>
+                <input type="text" placeholder="EAAIxxxx..." value={whatsappToken} onChange={e => setWhatsappToken(e.target.value)} className="w-full mt-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white outline-none" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Phone Number ID (Bot Number ID)</label>
+                <input type="text" placeholder="e.g. 1234567890" value={phoneNumberId} onChange={e => setPhoneNumberId(e.target.value)} className="w-full mt-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white outline-none" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">WABA ID (Business Account ID)</label>
+                <input type="text" placeholder="e.g. 0987654321" value={wabaId} onChange={e => setWabaId(e.target.value)} className="w-full mt-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white outline-none" />
               </div>
             </div>
           </div>
