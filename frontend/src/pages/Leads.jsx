@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import LeadCard from '../components/LeadCard';
-import Button from '../components/Button';
 import { getLeads } from '../services/leadService';
 import { useAuth } from '../hooks/useAuth';
 
