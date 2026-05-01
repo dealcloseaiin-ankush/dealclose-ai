@@ -42,6 +42,12 @@ export default function Setup() {
           if (res.ok) {
             // Backend ne jo token diya, usko save kar lenge taaki aage ke requests me use ho
             localStorage.setItem('token', data.token);
+            
+            // Fix: Agar user pehle se setup kar chuka hai (uske paas whatsapp token hai)
+            // toh usko wapas form dikhane ki jagah seedha Dashboard par bhej do
+            if (data.user && data.user.whatsappConfig && data.user.whatsappConfig.accessToken) {
+              window.location.href = '/dashboard';
+            }
           }
         } catch (error) {
           console.error('Error syncing user with backend:', error);
@@ -108,7 +114,8 @@ export default function Setup() {
 
       if (res.ok) {
         alert('Setup saved successfully! Your AI Assistant is now configured.');
-        navigate('/dashboard');
+        // Fix: navigate() ki jagah window.location.href use karenge taaki page reload ho aur ProtectedRoute naya token padh le
+        window.location.href = '/dashboard';
       } else {
         alert(`Failed to save settings: ${data.message || 'Unknown error'}`);
       }
