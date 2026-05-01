@@ -22,8 +22,8 @@ exports.sendManualMessage = async (req, res) => {
     const userId = req.user._id; 
 
     const user = await User.findById(userId);
-    if (!user || !user.whatsappConfig.accessToken) {
-      return res.status(400).json({ message: 'WhatsApp configuration missing' });
+    if (!user || !user.whatsappConfig?.accessToken || !user.whatsappConfig?.phoneNumberId) {
+      return res.status(400).json({ message: 'WhatsApp configuration is incomplete. Please go to the Setup page and save your Access Token and Phone Number ID.' });
     }
 
     // Send physical message via Meta API
@@ -41,6 +41,7 @@ exports.sendManualMessage = async (req, res) => {
 
     res.status(201).json(newMsg);
   } catch (error) {
+    console.error("Error in sendManualMessage:", error.response ? error.response.data : error.message);
     res.status(500).json({ message: error.message });
   }
 };

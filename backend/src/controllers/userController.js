@@ -78,25 +78,24 @@ exports.loginUser = async (req, res) => {
 // @route   POST /api/users/settings
 exports.updateSettings = async (req, res) => {
   try {
-    const { whatsappToken, phoneNumberId, wabaId, ownerPhone, pinCode, businessDesc } = req.body;
+    const { whatsappToken, phoneNumberId, wabaId, ownerPhone, pinCode, businessDesc, businessUrls } = req.body;
     
     // Get the currently logged-in user securely using the ID from the Auth token
     let user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: "User not found. Please log in again." });
     }
-
-    if (whatsappToken || phoneNumberId || wabaId) {
-      user.whatsappConfig = {
-        accessToken: whatsappToken || user.whatsappConfig?.accessToken,
-        phoneNumberId: phoneNumberId || user.whatsappConfig?.phoneNumberId,
-        wabaId: wabaId || user.whatsappConfig?.wabaId
-      };
-    }
+    
+    // Ensure whatsappConfig object exists before assigning to it, and merge properties
+    user.whatsappConfig = user.whatsappConfig || {};
+    if (whatsappToken) user.whatsappConfig.accessToken = whatsappToken;
+    if (phoneNumberId) user.whatsappConfig.phoneNumberId = phoneNumberId;
+    if (wabaId) user.whatsappConfig.wabaId = wabaId;
 
     if (ownerPhone) user.ownerPhone = ownerPhone;
     if (pinCode) user.servedPinCodes = [pinCode];
     if (businessDesc) user.businessDescription = businessDesc;
+    if (businessUrls) user.businessUrls = businessUrls;
 
     await user.save();
     res.status(200).json({ message: "Settings saved successfully", user });
