@@ -11,8 +11,14 @@ exports.supabaseAuth = async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      // Agar naya user hai, toh create kar do
-      user = await User.create({ email, supabaseId, name });
+      // Agar naya user hai, toh create kar do. 
+      // Agar model me password required hai toh ye dummy password usko bypass kar dega.
+      user = await User.create({ 
+        email, 
+        supabaseId, 
+        name,
+        password: supabaseId || 'google-oauth-dummy-pass' 
+      });
     }
 
     // Humara apna Backend JWT token generate karke frontend ko wapas bhejenge
