@@ -156,9 +156,14 @@ export default function Setup() {
         <div className="w-24 h-24 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center text-5xl mb-4 shadow-[0_0_30px_rgba(34,197,94,0.3)]">✨</div>
         <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Welcome Back!</h1>
         <p className="text-gray-400 text-lg max-w-md">Your WhatsApp AI is already connected and running perfectly.</p>
-        <button onClick={() => window.location.href = '/dashboard'} className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold shadow-lg shadow-purple-500/30 transition-all transform hover:scale-105 mt-4">
-          Go to Dashboard
-        </button>
+        <div className="flex flex-col sm:flex-row gap-4 mt-4">
+          <button onClick={() => window.location.href = '/dashboard'} className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold shadow-lg shadow-purple-500/30 transition-all transform hover:scale-105">
+            Go to Dashboard
+          </button>
+          <button onClick={() => setAlreadySetup(false)} className="px-10 py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition-all">
+            Edit AI Settings
+          </button>
+        </div>
       </div>
     );
   }

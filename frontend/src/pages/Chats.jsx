@@ -43,6 +43,22 @@ export default function Chats() {
     return allMessages.filter(m => m.customerPhone === activeCustomer);
   }, [allMessages, activeCustomer]);
 
+  // Start a manual chat by entering a new number
+  const handleNewChat = () => {
+    const phone = window.prompt("Enter WhatsApp Number with country code (e.g., +919876543210):");
+    if (phone) {
+      let validPhone = phone.startsWith('+') ? phone : '+' + phone;
+      setActiveCustomer(validPhone);
+      
+      // Agar chat list me ye number nahi hai, toh ek temporary init message daal do
+      const isExisting = allMessages.some(m => m.customerPhone === validPhone);
+      if (!isExisting) {
+        const initMsg = { _id: Date.now(), customerPhone: validPhone, direction: 'system', messageText: 'Chat initialized with ' + validPhone, sentBy: 'system', timestamp: new Date().toISOString() };
+        setAllMessages(prev => [initMsg, ...prev]);
+      }
+    }
+  };
+
   const sendReply = async () => {
     if (!replyText.trim() || !activeCustomer) return;
 
@@ -72,7 +88,10 @@ export default function Chats() {
     <div className="flex h-[calc(100vh-4rem)] p-6 bg-gray-50">
       {/* Sidebar for Customers */}
       <div className="w-1/3 bg-white border-r rounded-l-lg p-4 overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4 border-b pb-2">Active Chats</h2>
+        <div className="flex justify-between items-center mb-4 border-b pb-2">
+          <h2 className="text-xl font-bold">Active Chats</h2>
+          <button onClick={handleNewChat} className="bg-blue-600 hover:bg-blue-500 text-white text-sm px-3 py-1.5 rounded font-bold transition-colors">+ New Chat</button>
+        </div>
         {loading ? <p>Loading chats...</p> : (
           customerList.map(phone => (
             <div 

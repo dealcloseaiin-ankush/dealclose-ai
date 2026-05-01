@@ -17,14 +17,22 @@ export default function Leads() {
   }, []);
 
   const handleAddLead = async () => {
+    const name = window.prompt("Enter Customer/Lead Name:");
+    if (!name) return;
+    
+    const phone = window.prompt("Enter WhatsApp Number (e.g. +91...):");
+    if (!phone) return;
+
     try {
       const newLeadData = {
-        name: `Sample Lead ${leads.length + 1}`,
-        phoneNumber: `+1555${Math.floor(1000000 + Math.random() * 9000000)}`,
-        createdBy: user._id 
+        name: name,
+        phoneNumber: phone,
+        createdBy: user?._id || 'manual'
       };
-      const createdLead = await createLead(newLeadData);
-      setLeads([createdLead, ...leads]);
+      // Jab backend API ready hogi tab actual createLead hit karenge. 
+      // Abhi frontend par turant dikhane ke liye mock ID de rahe hain
+      const newLead = { _id: Date.now().toString(), ...newLeadData, status: 'new', source: 'Manual Entry' };
+      setLeads([newLead, ...leads]);
     } catch (error) {
       console.error("Failed to create lead", error);
     }
