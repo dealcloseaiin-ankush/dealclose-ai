@@ -46,6 +46,7 @@ export default function App() {
         
         {/* Onboarding Page (Replaces Setup) */}
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/setup" element={<Onboarding />} /> {/* Supabase ke purane redirects handle karne ke liye */}
         
         {/* Dashboard Layout Routes */}
         <Route element={<ProtectedRoute />}>
