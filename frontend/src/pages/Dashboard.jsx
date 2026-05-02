@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../hooks/useAuth';
 
 function StatCard({ title, value, trend, trendUp, icon, color }) {
   return (
@@ -30,6 +31,15 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const COLORS = ['#10B981', '#3B82F6', '#EF4444']; // Green, Blue, Red
+  const { user } = useAuth() || {};
+  const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
+
+  // Mock Admin Data
+  const [clients] = useState([
+    { id: 1, name: 'ElectroShop', platformId: 'WA_10023', platforms: 'WhatsApp', aiLeft: 15, aiCost: '₹1.70', plan: '30-Day Free Trial', mrr: '₹0', status: 'Active' },
+    { id: 2, name: 'SneakerStore', platformId: 'IG_50089', platforms: 'Instagram', aiLeft: 1850, aiCost: '₹3.00', plan: 'AI Promo (₹299)', mrr: '₹299', status: 'Active' },
+    { id: 3, name: 'Tech Gadgets', platformId: 'WA_105+IG_203', platforms: 'WA + IG', aiLeft: 4200, aiCost: '₹16.40', plan: 'Omni Pro (₹498)', mrr: '₹498', status: 'Active' },
+  ]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -127,6 +137,44 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* SUPER ADMIN SECTION (Only visible to owners) */}
+      {isSuperAdmin && (
+        <div className="mt-12 bg-gradient-to-b from-[#111] to-[#0a0a0a] border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-6 border-b border-gray-800 bg-[#1a1a1a] flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><span className="text-purple-500">👑</span> Super Admin / SaaS Clients</h2>
+              <p className="text-sm text-gray-500">Manage active agencies and track AI usage costs.</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Total MRR</p>
+              <p className="text-2xl font-bold text-green-400">₹797</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left whitespace-nowrap">
+              <thead>
+                <tr className="bg-[#0a0a0a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
+                  <th className="p-5 font-semibold">Client Name</th>
+                  <th className="p-5 font-semibold">Plan & MRR</th>
+                  <th className="p-5 font-semibold">AI Usage Left</th>
+                  <th className="p-5 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {clients.map(client => (
+                  <tr key={client.id} className="hover:bg-gray-900/50 transition-colors">
+                    <td className="p-5 font-bold text-gray-200">{client.name} <br/><span className="text-xs text-gray-500 font-normal">{client.platforms}</span></td>
+                    <td className="p-5 text-blue-400 font-semibold">{client.plan} <br/><span className="text-xs text-gray-500">{client.mrr}/mo</span></td>
+                    <td className="p-5"><span className="text-purple-400 font-bold">{client.aiLeft}</span> <br/><span className="text-xs text-rose-400">Cost: {client.aiCost}</span></td>
+                    <td className="p-5"><span className="bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1 rounded-md text-xs font-bold">{client.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

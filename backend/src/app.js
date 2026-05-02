@@ -8,13 +8,16 @@ require('dotenv').config();
 const leadRoutes = require('./routes/leadRoutes');
 const callRoutes = require('./routes/callRoutes');
 const formRoutes = require('./routes/formRoutes');
-const userRoutes = require('./routes/userRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const whatsappTemplateRoutes = require('./routes/whatsappTemplateRoutes');
-const integrationRoutes = require('./routes/integrationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const walletRoutes = require('./routes/walletRoutes');
+const contactRoutes = require('./routes/contactRoutes');
+const campaignRoutes = require('./routes/campaignRoutes');
+const dispatchRoutes = require('./routes/dispatchRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 // Initialize Background Workers
 require('./workers/automationWorker');
@@ -45,13 +48,16 @@ app.use('/uploads', express.static('public/uploads'));
 app.use('/api/leads', leadRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/forms', formRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/users', settingsRoutes); // Handles both User Auth & Integrations/Settings
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
-app.use('/api/integrations', integrationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/contacts', contactRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/dispatch', dispatchRoutes);
+app.use('/api/ai', aiRoutes);
 
 // FAKE META DATA DELETION CALLBACK (To bypass Meta Dashboard Bug)
 app.post('/api/webhooks/data-deletion', (req, res) => {

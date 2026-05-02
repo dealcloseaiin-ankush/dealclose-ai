@@ -1,30 +1,49 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
+import { useInboxStore } from '../store/inboxStore';
 
 export default function Sidebar() {
   const location = useLocation();
   const { user } = useAuth() || { user: { role: 'owner', fullName: 'Admin User' } }; // Fallback for MVP
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
+  const { unreadCount } = useInboxStore();
   
-  const navItems = [
-    { name: 'Overview', path: '/dashboard', icon: '📊' },
-    { name: 'AI Insights', path: '/insights', icon: '💡' },
-    { name: 'AI Setup', path: '/setup', icon: '🤖', requireOwner: true },
-    { name: 'AI Training', path: '/training', icon: '🧠', requireOwner: true },
-    { name: 'Live Chats', path: '/chats', icon: '💬' },
-    { name: 'Leads CRM', path: '/leads', icon: '👥' },
-    { name: 'Catalog & Listings', path: '/catalog', icon: '🛍️' },
-    { name: 'Smart Groups', path: '/smart-groups', icon: '🎯' },
-    { name: 'Campaigns (Bulk)', path: '/campaigns', icon: '📢' },
-    { name: 'Omnichannel', path: '/automations', icon: '⚡' },
-    { name: 'Monthly Report', path: '/monthly-report', icon: '📅' },
-    { name: 'Meta Templates', path: '/templates', icon: '📝', requireOwner: true },
-    { name: 'Forms', path: '/forms', icon: '📋' },
-    { name: 'Voice Calls', path: '/calls', icon: '📞' },
-    { name: 'Wallet & Billing', path: '/wallet', icon: '💳', requireOwner: true },
-    { name: 'Staff Management', path: '/staff', icon: '👨‍💼', requireOwner: true },
-    { name: 'Integrations', path: '/settings', icon: '⚙️', requireOwner: true },
-    { name: 'Super Admin', path: '/admin', icon: '👑', requireOwner: true },
+  const navCategories = [
+    {
+      title: 'MAIN',
+      items: [
+        { name: 'Dashboard', path: '/dashboard', icon: '📊' },
+        { name: 'Inbox (Chats)', path: '/chats', icon: '💬', badge: unreadCount },
+        { name: 'Contacts', path: '/contacts', icon: '👥' },
+        { name: 'Campaigns', path: '/campaigns', icon: '📢' },
+        { name: 'Templates', path: '/templates', icon: '📄', requireOwner: true }
+      ]
+    },
+    {
+      title: 'AUTOMATION',
+      items: [
+        { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
+        { name: 'Automations', path: '/automations', icon: '🔁' },
+        { name: 'Instagram', path: '/instagram-automation', icon: '📸' }
+      ]
+    },
+    {
+      title: 'INTELLIGENCE',
+      items: [
+        { name: 'AI Agent', path: '/ai-agent', icon: '🧠', requireOwner: true },
+        { name: 'Order Dispatch', path: '/dispatch', icon: '📦' },
+        { name: 'Calls', path: '/calls', icon: '📞' },
+        { name: 'Analytics', path: '/monthly-report', icon: '📈' }
+      ]
+    },
+    {
+      title: 'TOOLS',
+      items: [
+        { name: 'Forms', path: '/forms', icon: '📋' },
+        { name: 'Wallet', path: '/wallet', icon: '💰', requireOwner: true },
+        { name: 'Settings', path: '/settings', icon: '⚙️', requireOwner: true }
+      ]
+    }
   ];
 
   return (
@@ -36,29 +55,40 @@ export default function Sidebar() {
       </div>
       
       <nav className="flex-1 overflow-y-auto py-6">
-        <ul className="space-y-1.5 px-4">
-          {navItems.map((item) => {
-            // If item requires owner role and user is not owner, skip rendering
-            if (item.requireOwner && !isOwner) return null;
-            
-            const isActive = location.pathname === item.path;
-            return (
-              <li key={item.name}>
-                <Link
-                  to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                    isActive 
-                      ? 'bg-gradient-to-r from-purple-500/10 to-transparent text-purple-400 font-bold border border-purple-500/20' 
-                      : 'hover:bg-gray-900 hover:text-white font-medium'
-                  }`}
-                >
-                  <span className="text-lg">{item.icon}</span>
-                  {item.name}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        {navCategories.map((category, idx) => (
+          <div key={idx} className="mb-6">
+            <p className="px-8 mb-2 text-xs font-extrabold text-gray-500 tracking-wider">{category.title}</p>
+            <ul className="space-y-1 px-4">
+              {category.items.map((item) => {
+                if (item.requireOwner && !isOwner) return null;
+                
+                const isActive = location.pathname === item.path;
+                return (
+                  <li key={item.name}>
+                    <Link
+                      to={item.path}
+                      className={`flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${
+                        isActive 
+                          ? 'bg-gradient-to-r from-purple-500/10 to-transparent text-purple-400 font-bold border border-purple-500/20' 
+                          : 'text-gray-400 hover:bg-gray-900 hover:text-gray-100 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg opacity-80">{item.icon}</span>
+                        {item.name}
+                      </div>
+                      {item.badge > 0 && (
+                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
       
       <div className="p-4 border-t border-gray-800">

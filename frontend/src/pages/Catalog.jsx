@@ -1,9 +1,14 @@
 import { useState } from 'react';
 
 export default function Catalog() {
+  const [activeTab, setActiveTab] = useState('products');
   const [items, setItems] = useState([
     { id: 1, name: 'Premium Wireless Headphones', price: '₹2,499', description: 'Noise cancelling bluetooth headphones.' },
     { id: 2, name: '2BHK Apartment (Rent)', price: '₹45,000/mo', description: 'Fully furnished flat in Andheri West.' }
+  ]);
+  const [properties] = useState([
+    { _id: '60d0fe4f5311236168a109ca', propertyType: '2BHK Apartment', location: 'Andheri West, Mumbai', price: '1.5 Cr', status: 'listed', customerPhone: '+919876543210' },
+    { _id: '60d0fe4f5311236168a109cb', propertyType: 'Commercial Shop', location: 'Connaught Place, Delhi', price: '50 Lakh', status: 'pending', customerPhone: '+919876543211' }
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', price: '', description: '' });
@@ -26,6 +31,16 @@ export default function Catalog() {
           <p className="text-gray-400">Manage your products, services, or real estate properties here. AI will use this data to answer customers.</p>
         </div>
         <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-purple-600/30">+ Add New Item</button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex space-x-4 mb-6 border-b border-gray-800 pb-px">
+        <button onClick={() => setActiveTab('products')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'products' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
+          General Products Catalog
+        </button>
+        <button onClick={() => setActiveTab('properties')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'properties' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
+          AI Auto-Listed Properties
+        </button>
       </div>
 
       {/* Add Item Modal */}
@@ -55,7 +70,8 @@ export default function Catalog() {
         </div>
       )}
 
-      {items.length === 0 ? (
+      {activeTab === 'products' ? (
+      items.length === 0 ? (
         <div className="bg-[#111] rounded-2xl border border-gray-800 p-16 text-center text-gray-500 shadow-xl">
           <p className="text-5xl mb-4">📦</p>
           <h2 className="text-2xl font-bold text-gray-300 mb-2">Your Catalog is Empty</h2>
@@ -77,6 +93,32 @@ export default function Catalog() {
                   <td className="p-5 font-bold text-white">{item.name}</td>
                   <td className="p-5 text-green-400 font-semibold">{item.price}</td>
                   <td className="p-5 text-gray-400 text-sm whitespace-normal">{item.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+      ) : (
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            <thead>
+              <tr className="bg-[#1a1a1a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
+                <th className="p-5 font-semibold">Property</th>
+                <th className="p-5 font-semibold">Location</th>
+                <th className="p-5 font-semibold">Price</th>
+                <th className="p-5 font-semibold">Customer (Owner)</th>
+                <th className="p-5 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {properties.map(prop => (
+                <tr key={prop._id} className="hover:bg-gray-900/50 transition-colors">
+                  <td className="p-5 font-medium text-gray-200">{prop.propertyType}</td>
+                  <td className="p-5 text-gray-400">{prop.location}</td>
+                  <td className="p-5 text-gray-400">{prop.price}</td>
+                  <td className="p-5 text-gray-400">{prop.customerPhone}</td>
+                  <td className="p-5"><span className="px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-md text-xs font-bold uppercase">{prop.status}</span></td>
                 </tr>
               ))}
             </tbody>
