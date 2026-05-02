@@ -20,8 +20,6 @@ export default function Sidebar() {
     { name: 'Monthly Report', path: '/monthly-report', icon: '📅' },
     { name: 'Meta Templates', path: '/templates', icon: '📝', requireOwner: true },
     { name: 'Forms', path: '/forms', icon: '📋' },
-    { name: 'Ad Studio', path: '/ad-studio', icon: '🎨' },
-    { name: 'Avatar Ads', path: '/avatar-ads', icon: '🧑‍💼' },
     { name: 'Voice Calls', path: '/calls', icon: '📞' },
     { name: 'Wallet & Billing', path: '/wallet', icon: '💳', requireOwner: true },
     { name: 'Staff Management', path: '/staff', icon: '👨‍💼', requireOwner: true },

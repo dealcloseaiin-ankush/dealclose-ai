@@ -23,14 +23,8 @@ import StaffManagement from './pages/StaffManagement';
 import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import Forms from './pages/Forms';
-import AdStudio from './modules/adstudio/AdStudio';
-import VideoGenerator from './modules/video/VideoGenerator';
-import AvatarProductAds from './pages/AvatarProductAds';
-import AdminOnboarding from './pages/AdminOnboarding';
 import InstagramAutomation from './pages/InstagramAutomation';
 import Properties from './pages/Properties';
-import RealisticStory from './pages/RealisticStory';
-import TwoDAnimation from './pages/TwoDAnimation';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import AboutUs from './pages/AboutUs';
@@ -77,14 +71,8 @@ export default function App() {
             <Route path="staff" element={<StaffManagement />} />
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="forms" element={<Forms />} />
-            <Route path="ad-studio" element={<AdStudio />} />
-            <Route path="video" element={<VideoGenerator />} />
-            <Route path="avatar-ads" element={<AvatarProductAds />} />
-            <Route path="admin/onboarding" element={<AdminOnboarding />} />
             <Route path="instagram-automation" element={<InstagramAutomation />} />
             <Route path="properties" element={<Properties />} />
-            <Route path="studio/realistic-story" element={<RealisticStory />} />
-            <Route path="studio/2d-animation" element={<TwoDAnimation />} />
           </Route>
         </Route>
       </Routes>

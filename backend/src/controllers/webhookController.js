@@ -232,25 +232,10 @@ exports.handleWhatsApp = async (req, res) => {
             if (isOwnerOrStaff) {
               console.log("[Admin Command] Received command from Owner/Staff:", incomingText);
               
-              // Check AI Credits
-              if (user.aiCredits <= 0) {
-                await whatsappService.sendTextMessage(
-                  user.whatsappConfig.accessToken, 
-                  user.whatsappConfig.phoneNumberId, 
-                  fromNumber, 
-                  `⚠️ *Alert:* Your 100 Free AI Credits are exhausted! Please upgrade to the ₹99 AI Promo Plan or recharge your wallet from the dashboard to continue using AI features.`
-                );
-                continue;
-              }
-
               const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
               
-              // Deduct Credit and track cost
-              user.aiCredits -= 1;
-              await user.save();
-              await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1); // Tracking via billing util
               
               await whatsappService.sendTextMessage(
                 user.whatsappConfig.accessToken, 
@@ -320,16 +305,22 @@ exports.handleWhatsApp = async (req, res) => {
             } else {
               // --- Fallback to AI ---
               
-              // Check AI Credits before replying to customer
-              if (user.aiCredits <= 0) {
+              // ADD YOUR PERMANENT FREE TESTING NUMBERS HERE (With country code, e.g., '919876543210')
+              const freeTestNumbers = ['919876543210', '918888888888'];
+              const isFreeTestUser = freeTestNumbers.includes(fromNumber);
+              
+              // Check AI Credits before replying to customer (Bypass for test users)
+              if (user.aiCredits <= 0 && !isFreeTestUser) {
                 // Fallback to Dumb Bot logic
                 responseMessage = "Thank you for your message! Our human team will get back to you shortly.";
                 repliedBy = 'dumb-bot-fallback';
               } else {
-                // Deduct Credit and track cost for Customer AI Reply
-                user.aiCredits -= 1;
-                await user.save();
-                await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1); // Tracking via billing util
+                // Deduct Credit and track cost ONLY if it's not a free test user
+                if (!isFreeTestUser) {
+                  user.aiCredits -= 1;
+                  await user.save();
+                  await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1); // Tracking via billing util
+                }
               
                 // Change prompt context for NewPropertyHub
                 const aiContext = "You are a real estate AI assistant for newpropertyhub.in. Be polite. Help users list properties, talk to brokers, extract property details, and arrange calls if they request it.";

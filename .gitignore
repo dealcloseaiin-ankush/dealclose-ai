@@ -20,3 +20,10 @@ build/
 
 # AI / Tooling Data
 .brain/
+generate_tree.js
+
+project_tree.txt
+frontend clean files/
+backend clean files/
+frontend_clean_files/
+backend_clean_files/
