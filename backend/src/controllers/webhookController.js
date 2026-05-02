@@ -17,7 +17,7 @@ exports.handleIncomingVoice = (req, res) => {
   const exotelResponse = [
     {
       "say": {
-        "text": "Hello, you've reached CloseDeal AI. How can I help you today?",
+        "text": "Hello, you've reached DealClose AI. How can I help you today?",
         "voice": "female"
       }
     },
@@ -241,7 +241,7 @@ exports.handleWhatsApp = async (req, res) => {
                 user.whatsappConfig.accessToken, 
                 user.whatsappConfig.phoneNumberId, 
                 fromNumber, 
-                `🤖 *CloseDeal Admin Bot:*\n\n${aiAdminResponse}`
+                `🤖 *DealClose Admin Bot:*\n\n${aiAdminResponse}`
               );
               continue; // Stop processing it as a normal customer message
             }
@@ -261,9 +261,9 @@ exports.handleWhatsApp = async (req, res) => {
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               const interactiveObj = {
                 type: "list",
-                header: { type: "text", text: "Welcome to CloseDeal Group" },
+                header: { type: "text", text: "Welcome to DealClose Group" },
                 body: { text: "Please select the business division you want to interact with today:" },
-                footer: { text: "Powered by CloseDeal AI" },
+                footer: { text: "Powered by DealClose AI" },
                 action: {
                   button: "Select Business",
                   sections: [

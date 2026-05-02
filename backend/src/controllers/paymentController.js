@@ -42,7 +42,7 @@ exports.verifyPayment = async (req, res) => {
       const updatedUser = await User.findByIdAndUpdate(userId, { $inc: { walletBalance: amount } }, { new: true });
       
       if (updatedUser) {
-        await notificationService.sendAlert(updatedUser, "Wallet Recharged", `Success! ₹${amount} added to your CloseDeal AI Wallet. New Balance: ₹${updatedUser.walletBalance}`);
+        await notificationService.sendAlert(updatedUser, "Wallet Recharged", `Success! ₹${amount} added to your DealClose AI Wallet. New Balance: ₹${updatedUser.walletBalance}`);
       }
       
       return res.status(200).json({ success: true, message: "Wallet Recharge Successful!" });

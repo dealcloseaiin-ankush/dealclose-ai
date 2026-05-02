@@ -5,8 +5,13 @@ const metaTemplateService = require('../services/metaTemplateService');
 // @route   GET /api/whatsapp/templates
 exports.getTemplates = async (req, res) => {
     try {
-        // Placeholder for auth. Later, this will be req.user.id from a JWT token.
-        const userId = "60d0fe4f5311236168a109ca"; 
+        // Authenticated user ID
+        const userId = req.user ? req.user._id : null;
+        
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized. Please login again.' });
+        }
+
         const user = await User.findById(userId);
 
         if (!user || !user.whatsappConfig?.wabaId || !user.whatsappConfig?.accessToken) {
@@ -30,7 +35,12 @@ exports.getTemplates = async (req, res) => {
 exports.createTemplate = async (req, res) => {
     try {
         const { templateData } = req.body; // e.g., { name: 'new_offer', components: [...], ... }
-        const userId = "60d0fe4f5311236168a109ca"; // Placeholder for auth
+        const userId = req.user ? req.user._id : null; 
+        
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized. Please login again.' });
+        }
+
         const user = await User.findById(userId);
 
         if (!user || !user.whatsappConfig?.wabaId || !user.whatsappConfig?.accessToken) {

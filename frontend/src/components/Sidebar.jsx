@@ -31,7 +31,7 @@ export default function Sidebar() {
     <aside className="w-64 bg-[#0a0a0a] border-r border-gray-800 h-screen flex flex-col text-gray-300 font-sans">
       <div className="h-20 flex items-center px-6 border-b border-gray-800">
         <Link to="/dashboard" className="text-2xl font-bold text-white flex items-center gap-2">
-          <span className="text-purple-500">⚡</span> CloseDeal AI
+          <span className="text-purple-500">⚡</span> DealClose AI
         </Link>
       </div>
       
