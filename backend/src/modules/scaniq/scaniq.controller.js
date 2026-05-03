@@ -1,5 +1,6 @@
 const Scan = require('./Scan.model');
 const visionService = require('./vision.service');
+const scraperService = require('./scraper.service');
 const crypto = require('crypto');
 
 // Helper: Generate random token for sharing results (e.g. scaniq.in/results/ab12cd34)
@@ -47,12 +48,22 @@ exports.scanUrl = async (req, res) => {
     const { url, platform = 'instagram', scanType = 'post' } = req.body;
     if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
 
-    // For now, returning a stub. In Phase 2 we will connect Apify here.
-    res.status(501).json({ 
-      success: false, 
-      message: 'URL scanning is coming soon! Please use the Screenshot Upload method for now.' 
+    const scan = await Scan.create({
+      inputType: 'url',
+      platform,
+      scanType,
+      originalUrl: url,
+      ipAddress: req.ip,
+      status: 'processing',
+      shareToken: generateShareToken()
     });
+
+    res.status(202).json({ success: true, scanId: scan._id, message: 'URL AI Analysis started' });
+
+    // Run Apify Scraper + OpenAI Vision in the background
+    processUrlScan(scan._id, url, platform, scanType);
   } catch (error) {
+    console.error('URL Scan Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
@@ -88,5 +99,34 @@ async function processScreenscan(scanId, imageUrl, platform, scanType) {
   } catch (err) {
     console.error("AI Analysis failed:", err);
     await Scan.findByIdAndUpdate(scanId, { status: 'failed', errorMessage: err.message || 'AI processing failed' });
+  }
+}
+
+// Background Processor Function for URLs
+async function processUrlScan(scanId, url, platform, scanType) {
+  const start = Date.now();
+  try {
+    // 1. Scrape post data using Apify
+    const scrapedData = await scraperService.scrape(url, platform);
+    
+    // 2. Extract image URL from the scraped data
+    const imageUrl = scrapedData.thumbnailUrl;
+    
+    // 3. Vision analysis
+    const analysis = await visionService.analyzeImage(imageUrl, platform, scanType, scrapedData);
+    
+    const processingTime = Math.round((Date.now() - start) / 1000);
+    await Scan.findByIdAndUpdate(scanId, {
+      scrapedData,
+      analysis,
+      status: 'completed',
+      processingTime
+    });
+  } catch (err) {
+    console.error("URL Analysis failed:", err);
+    await Scan.findByIdAndUpdate(scanId, { 
+      status: 'failed',
+      errorMessage: err.message || 'Could not fetch this post. Make sure it is public.'
+    });
   }
 }
