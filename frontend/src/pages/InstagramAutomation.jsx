@@ -1,68 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
 
 export default function InstagramAutomation() {
   const [activeTab, setActiveTab] = useState('general'); // 'general' or 'posts'
 
-  // Mock Data for Analytics
-  const stats = {
-    totalCommentsAnalyzed: 1240,
-    leadsExtracted: 85, // Phone numbers found silently
-    dmsSent: 320,
-    whatsappConversationsStarted: 42,
-    conversionRate: '34%' // Leads to WhatsApp conversion
-  };
-
-  // Mock Data for Config
-  const [config, setConfig] = useState({
-    aiSmartReply: true,
-    autoDmOnComment: true,
-    extractPhoneNumbers: true,
-    forceWhatsappRedirect: true
+  const [stats, setStats] = useState({
+    totalCommentsAnalyzed: 0,
+    leadsExtracted: 0,
+    dmsSent: 0,
+    whatsappConversationsStarted: 0,
+    conversionRate: '0%'
   });
 
-  // Mock Data for IG Leads
-  const [igLeads] = useState([
-    { id: 1, handle: '@sneaker_head99', trigger: 'Comment: "Price for size 9?"', intent: 'High', action: 'Sent DM with WA Link', status: 'Pending in DM' },
-    { id: 2, handle: '@rahul_sharma', trigger: 'Comment: "Call me 98765XXXXX"', intent: 'High', action: 'Direct WA Message Sent', status: 'Converted to WA' },
-    { id: 3, handle: '@priya_style', trigger: 'DM: "Do you have this in red?"', intent: 'Medium', action: 'AI Replied in DM', status: 'Chatting' },
-    { id: 4, handle: '@random_bot', trigger: 'Comment: "🔥🔥🔥"', intent: 'Low', action: 'Ignored', status: 'Dropped' }
-  ]);
+  const [config, setConfig] = useState({
+    aiSmartReply: false,
+    autoDmOnComment: false,
+    extractPhoneNumbers: false,
+    forceWhatsappRedirect: false
+  });
 
-  // Mock Data for Post-Specific Customization (E-commerce Focus)
-  const [recentPosts, setRecentPosts] = useState([
-    { 
-      id: 'ig_post_1', image: '👟', type: 'Reel', caption: 'New Nike Air Max Drop!', 
-      botMode: 'chatbot', // 'chatbot', 'hybrid', or 'off'
-      chatBotKeyword: 'LINK',
-      chatBotReply: 'Hey! Here is the link to buy Nike Air Max: vyaparindia.online/nike',
-      aiContext: 'Nike Air Max, Price Rs 4500, Link: vyaparindia.online/nike', 
-      stats: { totalComments: 130, chatBotReplied: 100, aiCaught: 0, pending: 30 } 
-    },
-    { 
-      id: 'ig_post_2', image: '👕', type: 'Post', caption: 'Summer Collection T-Shirts', 
-      botMode: 'chatbot', 
-      chatBotKeyword: 'PRICE',
-      chatBotReply: 'The price is Rs 999. Buy here: vyaparindia.online/tshirt',
-      aiContext: 'Cotton T-Shirt, Rs 999, Link: vyaparindia.online/tshirt', 
-      stats: { totalComments: 80, chatBotReplied: 45, aiCaught: 0, pending: 35 } 
-    },
-    { 
-      id: 'ig_post_3', image: '⌚', type: 'Reel', caption: 'Smartwatch Sale', 
-      botMode: 'off',
-      chatBotKeyword: '',
-      chatBotReply: '',
-      aiContext: '', 
-      stats: { totalComments: 12, chatBotReplied: 0, aiCaught: 0, pending: 12 } 
-    }
-  ]);
+  const [igLeads, setIgLeads] = useState([]);
+  const [recentPosts, setRecentPosts] = useState([]);
+  const [commentGroups, setCommentGroups] = useState([]);
 
-  // Mock Data for Smart Grouping (Unhandled Comments)
-  const [commentGroups, setCommentGroups] = useState([
-    { id: 1, theme: "Asking for Price / Cost", count: 20, samples: ["Price please", "Kitne ka hai?", "How much?", "Cost?"], replyText: "" },
-    { id: 2, theme: "Delivery Time / Shipping", count: 4, samples: ["Delivery kitne din me hogi?", "How many days to deliver?"], replyText: "" },
-    { id: 3, theme: "Product Availability / Stock", count: 3, samples: ["Out of stock kyu dikha raha hai?", "Size M hai?"], replyText: "" },
-    { id: 4, theme: "Unclear / Random Comments", count: 3, samples: ["Wow", "Nice pic", "🔥🔥🔥"], replyText: "" }
-  ]);
+  useEffect(() => {
+    const fetchIgData = async () => {
+      try {
+        const { data } = await api.get('/instagram/dashboard').catch(() => ({ data: {} }));
+        if (data.stats) setStats(data.stats);
+        if (data.config) setConfig(data.config);
+        if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
+        if (data.recentPosts) setRecentPosts(Array.isArray(data.recentPosts) ? data.recentPosts : []);
+        if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
+      } catch (error) {
+        console.error("Failed to fetch IG data", error);
+      }
+    };
+    fetchIgData();
+  }, []);
 
   const handleReplyChange = (id, text) => {
     setCommentGroups(groups => groups.map(g => g.id === id ? { ...g, replyText: text } : g));

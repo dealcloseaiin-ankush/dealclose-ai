@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function AIAgent() {
-  // Mock data for AI Training (Unanswered Queries)
-  const [queries, setQueries] = useState([
-    { id: 1, phone: '+919876543210', question: 'Do you offer cash on delivery for bulk orders?', status: 'unanswered' },
-    { id: 2, phone: '+918765432109', question: 'What is the warranty period for the smartwatch?', status: 'unanswered' }
-  ]);
+  const [queries, setQueries] = useState([]);
+
+  useEffect(() => {
+    const fetchQueries = async () => {
+      try {
+        const { data } = await api.get('/ai/faqs');
+        setQueries(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to load AI queries", error);
+      }
+    };
+    fetchQueries();
+  }, []);
 
   const copyDataForChatGPT = () => {
     const prompt = `I run an Instagram store named @sneaker_head99. My recent stats: Total posts: 15. Reels get 2000 views on average, Image posts get 200. Bio: "Best sneakers in town". Please act as an expert Instagram Growth Manager and provide 3 actionable tips to improve my profile and increase sales.`;
@@ -13,12 +23,17 @@ export default function AIAgent() {
     alert("Profile Data Copied! You can now paste this into ChatGPT or Claude for a deep analysis.");
   };
 
-  const handleProvideAnswer = (id, e) => {
+  const handleProvideAnswer = async (id, e) => {
     e.preventDefault();
     const answer = e.target.answer.value;
     if (!answer) return;
-    setQueries(queries.filter(q => q.id !== id));
-    alert("🧠 AI has learned this answer! It will now reply automatically to similar questions.");
+    try {
+      await api.put(`/ai/faqs/${id}/answer`, { answer });
+      setQueries(queries.filter(q => q._id !== id && q.id !== id));
+      toast.success("🧠 AI has learned this answer!");
+    } catch (error) {
+      toast.error("Failed to save answer.");
+    }
   };
 
   return (

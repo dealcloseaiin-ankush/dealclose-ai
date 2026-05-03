@@ -1,15 +1,25 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function CrmAnalytics() {
-  // Mock data for Funnel Chart
+export default function CrmAnalytics({ contacts = [] }) {
+  // Calculate real data from contacts prop
+  const stageCounts = { new: 0, contacted: 0, interested: 0, negotiating: 0, converted: 0 };
+  let totalValue = 0;
+
+  contacts.forEach(contact => {
+    const stage = contact.crmStage || 'new';
+    if (stageCounts[stage] !== undefined) stageCounts[stage]++;
+    totalValue += (contact.dealValue || 0);
+  });
+
   const funnelData = [
-    { name: 'New', value: 45 },
-    { name: 'Contacted', value: 30 },
-    { name: 'Interested', value: 15 },
-    { name: 'Negotiating', value: 8 },
-    { name: 'Converted', value: 5 }
-  ];
+    { name: 'New', value: stageCounts.new },
+    { name: 'Contacted', value: stageCounts.contacted },
+    { name: 'Interested', value: stageCounts.interested },
+    { name: 'Negotiating', value: stageCounts.negotiating },
+    { name: 'Converted', value: stageCounts.converted }
+  ].filter(data => data.value > 0); // Hide empty stages in chart
+
   const COLORS = ['#3b82f6', '#eab308', '#a855f7', '#f97316', '#22c55e'];
 
   return (
@@ -31,11 +41,11 @@ export default function CrmAnalytics() {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-center">
           <p className="text-gray-400 font-bold mb-2 uppercase text-sm tracking-wide">Total Value in Pipeline</p>
-          <p className="text-4xl font-extrabold text-sky-400">₹8,45,000</p>
+          <p className="text-4xl font-extrabold text-sky-400">₹{totalValue.toLocaleString('en-IN')}</p>
         </div>
         <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-center">
           <p className="text-gray-400 font-bold mb-2 uppercase text-sm tracking-wide">Avg Time to Close</p>
-          <p className="text-4xl font-extrabold text-green-400">4.2 Days</p>
+          <p className="text-4xl font-extrabold text-green-400">-- Days</p>
         </div>
       </div>
     </div>

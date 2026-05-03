@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function Chats() {
   const [allMessages, setAllMessages] = useState([]);
@@ -16,22 +17,16 @@ export default function Chats() {
     const fetchChats = async () => {
       setLoading(true);
       try {
-        // const { data } = await api.get('/chats');
-        // setAllMessages(data);
-        
-        // Using mock data for now
-        const mockData = [
-          { _id: 1, customerPhone: '+919876543210', direction: 'incoming', messageText: 'Hello, I want to buy your premium plan.', sentBy: 'customer', timestamp: new Date().toISOString() },
-          { _id: 2, customerPhone: '+919876543210', direction: 'outgoing', messageText: 'Sure! Let me check that for you.', sentBy: 'ai', timestamp: new Date().toISOString() },
-          { _id: 3, customerPhone: '+911234567890', direction: 'incoming', messageText: 'What is the price?', sentBy: 'customer', timestamp: new Date().toISOString() },
-        ];
-        setAllMessages(mockData);
-        if (mockData.length > 0) {
-          setActiveCustomer(mockData[0].customerPhone);
+        const { data } = await api.get('/chats');
+        const messages = Array.isArray(data) ? data : data.data || [];
+        setAllMessages(messages);
+        if (messages.length > 0) {
+          setActiveCustomer(messages[0].customerPhone);
         }
 
       } catch (error) {
         console.error("Failed to fetch chats", error);
+        toast.error("Failed to load chats data");
       } finally {
         setLoading(false);
       }
@@ -85,11 +80,17 @@ export default function Chats() {
     setReplyText("");
 
     try {
-      // Real API call to backend chatController
-      await api.post('/chats/send', { customerPhone: activeCustomer, messageText: replyText });
+      const res = await api.post('/chats/send', { customerPhone: activeCustomer, messageText: replyText });
+      
+      // Update optimistic message with real DB ID if backend returns it
+      if (res.data?.message) {
+        setAllMessages(prev => prev.map(m => m._id === newMessage._id ? res.data.message : m));
+      }
     } catch (error) {
-        console.error("Failed to send message", error);
-        // Optional: handle error, e.g., remove the optimistic message
+      console.error("Failed to send message", error);
+      toast.error("Failed to send message");
+      // Remove the optimistic message if API fails
+      setAllMessages(prev => prev.filter(m => m._id !== newMessage._id));
     }
   };
 

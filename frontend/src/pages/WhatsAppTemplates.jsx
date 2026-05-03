@@ -12,11 +12,7 @@ export default function WhatsAppTemplates() {
     setLoading(true);
     try {
       const { data } = await api.get('/whatsapp/templates');
-      // Fallback mock data if API is empty
-      setTemplates(data.length > 0 ? data : [
-        { id: '1', name: 'abandoned_cart_10', language: 'en_US', status: 'APPROVED', category: 'MARKETING' },
-        { id: '2', name: 'welcome_greeting', language: 'en_US', status: 'PENDING', category: 'UTILITY' }
-      ]);
+      setTemplates(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch templates", error);
     } finally {

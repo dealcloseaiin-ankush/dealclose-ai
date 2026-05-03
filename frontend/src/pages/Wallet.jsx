@@ -13,17 +13,9 @@ export default function Wallet() {
 
   const fetchWalletData = async () => {
     try {
-      // Jab backend route ban jayega tab ise uncomment karein:
-      // const { data } = await api.get('/users/wallet');
-      // setTransactions(data.transactions);
-      
-      // Temporary fallback until backend is linked:
-      setTransactions([
-        { id: 1, date: '2024-03-04', description: 'AI Call (3 min)', amount: -9.00 },
-        { id: 2, date: '2024-03-03', description: 'Credits Added', amount: 1000.00 },
-        { id: 3, date: '2024-03-02', description: 'WhatsApp Message', amount: -0.50 },
-      ]);
-      setAiCredits(85); // Mock 85 credits left out of 100
+      const { data } = await api.get('/users/wallet');
+      setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
+      setAiCredits(data.aiCredits || 0);
     } catch (error) {
       console.error("Failed to fetch wallet data", error);
     } finally {
