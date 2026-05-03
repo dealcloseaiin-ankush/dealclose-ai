@@ -1,5 +1,5 @@
 const Contact = require('../models/contactModel');
-const CrmActivity = require('../models/CrmActivityModel');
+const CrmActivity = require('../models/CrmActivitymodel');
 
 // @desc    Get all contacts grouped by CRM Stage (For Kanban Board)
 // @route   GET /api/crm/pipeline
