@@ -34,18 +34,18 @@ export default function Dashboard() {
   const { user } = useAuth() || {};
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
 
-  // Mock Admin Data
-  const [clients] = useState([
-    { id: 1, name: 'ElectroShop', platformId: 'WA_10023', platforms: 'WhatsApp', aiLeft: 15, aiCost: '₹1.70', plan: '30-Day Free Trial', mrr: '₹0', status: 'Active' },
-    { id: 2, name: 'SneakerStore', platformId: 'IG_50089', platforms: 'Instagram', aiLeft: 1850, aiCost: '₹3.00', plan: 'AI Promo (₹299)', mrr: '₹299', status: 'Active' },
-    { id: 3, name: 'Tech Gadgets', platformId: 'WA_105+IG_203', platforms: 'WA + IG', aiLeft: 4200, aiCost: '₹16.40', plan: 'Omni Pro (₹498)', mrr: '₹498', status: 'Active' },
-  ]);
+  const [clients, setClients] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await api.get('/leads/analytics');
         setData(response.data);
+        
+        if (isSuperAdmin) {
+           const clientsRes = await api.get('/users/clients').catch(() => ({ data: [] }));
+           setClients(Array.isArray(clientsRes.data) ? clientsRes.data : []);
+        }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
       } finally {
@@ -53,7 +53,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [isSuperAdmin]);
 
   if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
 

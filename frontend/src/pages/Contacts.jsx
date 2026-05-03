@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DataTable from '../components/ui/DataTable';
+import api from '../services/api';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
@@ -7,18 +8,28 @@ import Modal from '../components/ui/Modal';
 export default function Contacts() {
   const [activeTab, setActiveTab] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Mock Data
-  const [contacts] = useState([
-    { id: 1, name: 'Rahul Sharma', phone: '+919876543210', source: 'Instagram DM', status: 'interested', lastActive: '2 mins ago' },
-    { id: 2, name: 'Priya Verma', phone: '+918888888888', source: 'Website Form', status: 'new', lastActive: '1 hr ago' },
-    { id: 3, name: 'Amit Singh', phone: '+917777777777', source: 'Direct WhatsApp', status: 'lost', lastActive: '2 days ago' }
-  ]);
+  const [contacts, setContacts] = useState([]);
+  const [smartSegments, setSmartSegments] = useState([]);
 
-  const [smartSegments] = useState([
-    { id: 1, name: 'High Intent Electronics', count: 24, reason: 'Asked for prices but did not buy' },
-    { id: 2, name: 'Window Shoppers', count: 89, reason: 'Just browsed the catalog' }
-  ]);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [contactsRes, segmentsRes] = await Promise.all([
+          api.get('/contacts').catch(() => ({ data: [] })),
+          api.get('/contacts/segments').catch(() => ({ data: [] }))
+        ]);
+        setContacts(Array.isArray(contactsRes.data) ? contactsRes.data : []);
+        setSmartSegments(Array.isArray(segmentsRes.data) ? segmentsRes.data : []);
+      } catch (error) {
+        console.error("Failed to load contacts", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const columns = [
     { header: 'Name', accessor: 'name' },
@@ -34,6 +45,10 @@ export default function Contacts() {
     },
     { header: 'Last Active', accessor: 'lastActive' }
   ];
+
+  if (loading) {
+    return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>;
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-6 md:p-10 bg-[#050505] text-gray-100 font-sans">
