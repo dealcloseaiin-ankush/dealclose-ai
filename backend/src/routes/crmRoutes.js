@@ -1,0 +1,15 @@
+const express = require('express');
+const router = express.Router();
+const crmController = require('../controllers/crmController');
+const { protect } = require('../middleware/authMiddleware');
+
+// Saare CRM routes ko auth se protect kar rahe hain
+router.use(protect);
+
+// @route GET /api/crm/pipeline - Pipeline ka data fetch karne ke liye (Kanban Board)
+router.get('/pipeline', crmController.getPipeline);
+
+// @route PUT /api/crm/contacts/:id/stage - Drag & drop ke baad stage update karne ke liye
+router.put('/contacts/:id/stage', crmController.updateStage);
+
+module.exports = router;

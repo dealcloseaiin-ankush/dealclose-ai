@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../services/api'; // Axios instance for making backend calls
 
 export default function LandingPage() {
   const [faqOpen, setFaqOpen] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  
+  // New States for Smart Scanner Box
+  const [scanPlatform, setScanPlatform] = useState('instagram'); // instagram, facebook, youtube
+  const [scanCategory, setScanCategory] = useState('post'); // post, ad, profile
+  const [inputMode, setInputMode] = useState('screenshot'); // screenshot, url
+  const [urlInput, setUrlInput] = useState('');
 
   const faqs = [
     { q: 'How does the WhatsApp automation work?', a: 'We use the official Meta Cloud API. When a user abandons a cart on your Shopify or custom site, our AI waits 15 minutes and automatically sends a highly converting WhatsApp message.' },
@@ -44,6 +53,63 @@ export default function LandingPage() {
     }
   ];
 
+  // Handle File Upload and start Polling
+  const handleScreenshotUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setScanResult(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('platform', scanPlatform);
+    formData.append('scanType', scanCategory);
+
+    try {
+      // 1. Send file to backend
+      const res = await api.post('/scaniq/screenshot', formData);
+      const scanId = res.data.scanId;
+
+      // 2. Poll every 2.5 seconds to check if AI finished analyzing
+      const interval = setInterval(async () => {
+        const checkRes = await api.get(`/scaniq/${scanId}`);
+        if (checkRes.data.status === 'completed') {
+          clearInterval(interval);
+          setScanResult(checkRes.data.analysis);
+          setIsScanning(false);
+        } else if (checkRes.data.status === 'failed') {
+          clearInterval(interval);
+          alert('AI Analysis failed: ' + checkRes.data.errorMessage);
+          setIsScanning(false);
+        }
+      }, 2500);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Something went wrong. Please try again.');
+      setIsScanning(false);
+    }
+  };
+
+  // Handle URL Submission (Profile / Video Link)
+  const handleUrlSubmit = async (e) => {
+    e.preventDefault();
+    if (!urlInput) return;
+    
+    setIsScanning(true);
+    setScanResult(null);
+    
+    try {
+      // API call to our modular backend
+      const res = await api.post('/scaniq/url', { url: urlInput, platform: scanPlatform, scanType: scanCategory });
+      // Currently returns 501 Coming Soon, but UI is ready!
+      alert(res.data.message || "URL processing started!");
+    } catch (error) {
+      alert(error.response?.data?.message || 'Something went wrong.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   return (
     <div className="bg-[#030303] text-white min-h-screen font-sans selection:bg-purple-500/30 overflow-x-hidden">
       
@@ -54,6 +120,7 @@ export default function LandingPage() {
             <span className="text-blue-500">⚡</span> DealClose AI
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+            <a href="#scaniq" className="hover:text-green-400 transition-colors">Free AI Scanner</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
@@ -125,6 +192,142 @@ export default function LandingPage() {
               <h3 className="text-xl font-bold mb-3">AI Voice Calling</h3>
               <p className="text-gray-400 text-sm leading-relaxed">Initiate human-like phone calls to high-ticket leads. Our AI can negotiate, qualify, and book appointments for you.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Free AI Scanner Tool Section (ScanIQ) */}
+      <section id="scaniq" className="py-24 px-6 bg-[#080C10] border-y border-gray-800/50 relative overflow-hidden">
+        {/* Decorative Green Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-green-500/10 blur-[120px] rounded-full pointer-events-none"></div>
+        
+        <div className="max-w-5xl mx-auto relative z-10">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-sm font-bold text-green-400 mb-6">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              Free AI Tool
+            </div>
+            <h2 className="text-3xl md:text-5xl font-extrabold mb-4 text-white">Spy on Competitors & Go Viral 🚀</h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Upload a screenshot of a <b>Competitor's Ad</b> to see why it works, or paste your <b>Instagram Profile URL</b> for a complete AI audit. Get your Viral Score in 10 seconds.
+            </p>
+          </div>
+
+          <div className="bg-[#0D1117] border border-gray-800 rounded-3xl p-6 md:p-10 shadow-[0_0_50px_rgba(0,255,133,0.05)]">
+            {!scanResult ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div className="space-y-6">
+                  
+                  {/* Smart Selectors */}
+                  <div className="p-4 bg-[#161B22] rounded-2xl border border-gray-800 space-y-4">
+                    
+                    {/* Platform Selector */}
+                    <div className="flex bg-[#0a0a0a] p-1 rounded-lg border border-gray-700">
+                      <button onClick={() => setScanPlatform('instagram')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${scanPlatform === 'instagram' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}>📸 Instagram</button>
+                      <button onClick={() => setScanPlatform('facebook')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${scanPlatform === 'facebook' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>👍 Facebook</button>
+                      <button onClick={() => setScanPlatform('youtube')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${scanPlatform === 'youtube' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>▶ YouTube</button>
+                    </div>
+                    
+                    {/* Category Selector */}
+                    <div className="flex gap-2">
+                      <button onClick={() => setScanCategory('post')} className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-all ${scanCategory === 'post' ? 'bg-gray-800 border-gray-600 text-white' : 'bg-transparent border-gray-700 text-gray-500'}`}>Standard Post</button>
+                      <button onClick={() => setScanCategory('ad')} className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-all ${scanCategory === 'ad' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-transparent border-gray-700 text-gray-500'}`}>Competitor Ad</button>
+                      <button onClick={() => setScanCategory('profile')} className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-all ${scanCategory === 'profile' ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' : 'bg-transparent border-gray-700 text-gray-500'}`}>Full Profile Scan</button>
+                    </div>
+
+                    {/* Input Method Toggle */}
+                    <div className="flex justify-center gap-4 pt-2 border-t border-gray-800">
+                      <button onClick={() => setInputMode('screenshot')} className={`text-xs font-bold transition-all ${inputMode === 'screenshot' ? 'text-green-400 underline underline-offset-4' : 'text-gray-500 hover:text-gray-300'}`}>📎 Upload Screenshot</button>
+                      <button onClick={() => setInputMode('url')} className={`text-xs font-bold transition-all ${inputMode === 'url' ? 'text-green-400 underline underline-offset-4' : 'text-gray-500 hover:text-gray-300'}`}>🔗 Paste Link (URL)</button>
+                    </div>
+                  </div>
+                  
+                  {/* Dynamic Input Box based on inputMode */}
+                  {inputMode === 'screenshot' ? (
+                    <div className="relative group cursor-pointer">
+                      <div className={`absolute inset-0 bg-green-500/20 rounded-3xl blur-xl transition-all duration-500 ${isScanning ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-100'}`}></div>
+                      <label className={`relative flex flex-col items-center justify-center h-56 border-2 border-dashed rounded-3xl transition-colors cursor-pointer bg-[#0a0a0a] ${isScanning ? 'border-green-500' : 'border-gray-700 hover:border-green-500'}`}>
+                        {isScanning ? (
+                          <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-green-400 font-bold">AI is analyzing visually...</p>
+                            <p className="text-sm text-gray-500 mt-2">Checking hook, colors, and text</p>
+                          </div>
+                        ) : (
+                          <div className="text-center px-6">
+                            <p className="text-5xl mb-4">🖼️</p>
+                            <p className="text-white font-bold text-lg mb-2">Upload {scanCategory === 'ad' ? 'Ad Screenshot' : 'Screenshot'}</p>
+                            <div className="mt-4 px-6 py-2 bg-gray-800 text-white rounded-full text-sm font-bold inline-block hover:bg-gray-700 transition-colors">Browse File</div>
+                          </div>
+                        )}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotUpload} disabled={isScanning} />
+                      </label>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleUrlSubmit} className="relative group">
+                      <div className={`absolute inset-0 bg-green-500/20 rounded-3xl blur-xl transition-all duration-500 ${isScanning ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-100'}`}></div>
+                      <div className={`relative flex flex-col justify-center p-6 h-56 border-2 border-solid rounded-3xl transition-colors bg-[#0a0a0a] ${isScanning ? 'border-green-500' : 'border-gray-800'}`}>
+                        {isScanning ? (
+                          <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-green-400 font-bold">Scraping data from URL...</p>
+                            <p className="text-sm text-gray-500 mt-2">This usually takes 8-12 seconds</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <label className="text-white font-bold text-lg block">Paste {scanPlatform} Link</label>
+                            <input 
+                              type="url" 
+                              value={urlInput}
+                              onChange={(e) => setUrlInput(e.target.value)}
+                              placeholder={`https://${scanPlatform}.com/...`} 
+                              className="w-full bg-[#161B22] border border-gray-700 rounded-xl p-4 text-white focus:border-green-500 outline-none"
+                              required
+                            />
+                            <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all">
+                              Scan URL
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </form>
+                  )}
+
+                  <p className="text-center text-sm text-gray-500">🔒 5 free scans available per month. No credit card required.</p>
+                </div>
+                
+                {/* Dummy UI to show them what they will get */}
+                <div className="opacity-50 pointer-events-none hidden md:block">
+                  <h3 className="text-lg font-bold mb-4">You will receive:</h3>
+                  <div className="space-y-4">
+                    <div className="bg-[#161B22] p-4 rounded-xl border border-gray-800 flex items-center gap-4"><div className="w-12 h-12 rounded-full border-4 border-green-500 flex items-center justify-center text-green-500 font-bold">85</div> <span>Viral Potential Score</span></div>
+                    <div className="bg-[#161B22] p-4 rounded-xl border border-gray-800"><p className="text-green-400 font-bold mb-1">✅ Strengths Detected</p><p className="text-sm text-gray-400">High contrast hook, good facial expression.</p></div>
+                    <div className="bg-[#161B22] p-4 rounded-xl border border-gray-800"><p className="text-purple-400 font-bold mb-1">✍️ AI Caption Rewrite</p><p className="text-sm text-gray-400">"Stop making this 1 mistake..."</p></div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="animate-slide-up">
+                <div className="text-center mb-8">
+                  <h3 className="text-3xl font-extrabold text-white mb-2">Analysis Complete!</h3>
+                  <p className="text-gray-400">Here is your AI-generated report.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-[#161B22] border border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+                    <div className="w-32 h-32 rounded-full border-8 border-green-500 flex items-center justify-center mb-4">
+                      <span className="text-4xl font-black text-white">{scanResult.viralScore}</span>
+                    </div>
+                    <h4 className="text-xl font-bold text-green-400">{scanResult.viralLabel} Potential</h4>
+                    <p className="text-gray-400 text-sm mt-3">{scanResult.overallSummary}</p>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="bg-[#161B22] border border-gray-800 rounded-2xl p-5"><h4 className="text-green-400 font-bold mb-2">✅ Strengths</h4><ul className="list-disc pl-5 text-sm text-gray-300 space-y-1">{scanResult.strengths?.map((s,i) => <li key={i}>{s}</li>)}</ul></div>
+                    <div className="bg-[#161B22] border border-gray-800 rounded-2xl p-5"><h4 className="text-rose-400 font-bold mb-2">❌ Weaknesses</h4><ul className="list-disc pl-5 text-sm text-gray-300 space-y-1">{scanResult.weaknesses?.map((w,i) => <li key={i}>{w}</li>)}</ul></div>
+                  </div>
+                </div>
+                <div className="mt-8 text-center"><button onClick={() => setScanResult(null)} className="text-gray-400 hover:text-white underline">Scan Another Post</button></div>
+              </div>
+            )}
           </div>
         </div>
       </section>

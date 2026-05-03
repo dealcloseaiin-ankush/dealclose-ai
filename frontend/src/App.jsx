@@ -18,6 +18,7 @@ import Contacts from './pages/Contacts';
 import Calls from './pages/Calls';
 import Wallet from './pages/Wallet';
 import Settings from './pages/Settings';
+import CrmPage from './pages/CrmPage';
 import StaffManagement from './pages/StaffManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import Forms from './pages/Forms';
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="automations" element={<Automations />} />
             <Route path="templates" element={<WhatsAppTemplates />} />
             <Route path="contacts" element={<Contacts />} />
+            <Route path="crm" element={<CrmPage />} />
             <Route path="calls" element={<Calls />} />
             <Route path="wallet" element={<Wallet />} />
             <Route path="settings" element={<Settings />} />

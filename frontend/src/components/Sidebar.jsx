@@ -15,6 +15,7 @@ export default function Sidebar() {
         { name: 'Dashboard', path: '/dashboard', icon: '📊' },
         { name: 'Inbox (Chats)', path: '/chats', icon: '💬', badge: unreadCount },
         { name: 'Contacts', path: '/contacts', icon: '👥' },
+        { name: 'CRM', path: '/crm', icon: '🗂️' },
         { name: 'Campaigns', path: '/campaigns', icon: '📢' },
         { name: 'Templates', path: '/templates', icon: '📄', requireOwner: true }
       ]

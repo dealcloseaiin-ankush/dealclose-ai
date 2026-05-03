@@ -18,6 +18,10 @@ const contactRoutes = require('./routes/contactRoutes');
 const campaignRoutes = require('./routes/campaignRoutes');
 const dispatchRoutes = require('./routes/dispatchRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const crmRoutes = require('./routes/crmRoutes');
+
+// 📦 MODULAR FEATURES (Standalone Tools)
+const scaniqRoutes = require('./modules/scaniq/scaniq.routes');
 
 // Initialize Background Workers
 require('./workers/automationWorker');
@@ -58,6 +62,10 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/crm', crmRoutes);
+
+// Mount Modular Features
+app.use('/api/scaniq', scaniqRoutes);
 
 // FAKE META DATA DELETION CALLBACK (To bypass Meta Dashboard Bug)
 app.post('/api/webhooks/data-deletion', (req, res) => {
