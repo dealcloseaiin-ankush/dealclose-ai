@@ -26,23 +26,52 @@ exports.sendManualMessage = async (req, res) => {
       return res.status(400).json({ message: 'WhatsApp configuration is incomplete. Please go to the Setup page and save your Access Token and Phone Number ID.' });
     }
 
-    // Send physical message via Meta API
-    await whatsappService.sendTextMessage(
-      user.whatsappConfig.accessToken,
-      user.whatsappConfig.phoneNumberId,
-      customerPhone,
-      messageText
-    );
+    // 1. SMART PHONE NUMBER FORMATTING
+    // Saare spaces, +, aur extra characters hata do
+    let formattedPhone = customerPhone.replace(/\D/g, ''); 
+    
+    // Agar sirf 10 digit ka number hai, toh automatically '91' laga do
+    if (formattedPhone.length === 10) {
+      formattedPhone = '91' + formattedPhone;
+    }
 
-    // Save outgoing message so it appears in the Dashboard Chat UI
+    // 2. SAVE MESSAGE TO DB FIRST (Taaki gayab na ho)
     const newMsg = await Message.create({
-      userId, customerPhone, messageText, direction: 'outgoing', status: 'sent', sentBy: 'staff'
+      userId, 
+      customerPhone: formattedPhone, 
+      messageText, 
+      direction: 'outgoing', 
+      status: 'pending', 
+      sentBy: 'staff'
     });
 
-    res.status(201).json(newMsg);
+    // 3. TRY SENDING VIA META API
+    try {
+      await whatsappService.sendTextMessage(
+        user.whatsappConfig.accessToken,
+        user.whatsappConfig.phoneNumberId,
+        formattedPhone,
+        messageText
+      );
+      
+      // Agar success ho gaya, toh status 'sent' kardo
+      newMsg.status = 'sent';
+      await newMsg.save();
+      
+      return res.status(201).json(newMsg);
+    } catch (metaError) {
+      // Agar Meta ne reject kiya, toh exact error chat me likh do aur status 'failed' kardo
+      const exactError = metaError.response?.data?.error?.message || metaError.message;
+      newMsg.status = 'failed';
+      newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send: ${exactError}]`;
+      await newMsg.save();
+      
+      console.error("Meta API Error:", exactError);
+      return res.status(500).json({ message: `Meta API Error: ${exactError}` });
+    }
   } catch (error) {
-    console.error("Error in sendManualMessage:", error.response ? error.response.data : error.message);
-    res.status(500).json({ message: error.message });
+    console.error("Error in sendManualMessage:", error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 };
 

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { getTemplates, createTemplate } = require('../controllers/whatsappTemplateController');
-// const authMiddleware = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
-// router.use(authMiddleware); // Uncomment this line after creating auth middleware
+router.use(protect); // Secure these routes so user._id is available
 router.route('/')
     .get(getTemplates)
     .post(createTemplate);
