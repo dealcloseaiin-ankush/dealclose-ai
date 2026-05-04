@@ -67,7 +67,8 @@ exports.sendManualMessage = async (req, res) => {
       await newMsg.save();
       
       console.error("Meta API Error:", exactError);
-      return res.status(500).json({ message: `Meta API Error: ${exactError}` });
+      // Return 201 instead of 500 so the frontend adds the "failed" message to the UI seamlessly
+      return res.status(201).json(newMsg);
     }
   } catch (error) {
     console.error("Error in sendManualMessage:", error);

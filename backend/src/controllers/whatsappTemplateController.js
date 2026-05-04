@@ -15,7 +15,8 @@ exports.getTemplates = async (req, res) => {
         const user = await User.findById(userId);
 
         if (!user || !user.whatsappConfig?.wabaId || !user.whatsappConfig?.accessToken) {
-            return res.status(400).json({ message: 'WhatsApp Business Account ID (WABA ID) and Access Token are required in your profile.' });
+            // Instead of throwing an error, return an empty array to prevent frontend crashes
+            return res.status(200).json([]);
         }
 
         const templates = await metaTemplateService.getTemplatesFromMeta(
