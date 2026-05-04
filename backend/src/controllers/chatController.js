@@ -21,6 +21,11 @@ exports.sendManualMessage = async (req, res) => {
     const { customerPhone, messageText } = req.body;
     const userId = req.user._id; 
 
+    // SAFETY CHECK: Ensure phone number and message are not empty
+    if (!customerPhone || !messageText) {
+      return res.status(400).json({ message: 'Phone number and message text are required.' });
+    }
+
     const user = await User.findById(userId);
     if (!user || !user.whatsappConfig?.accessToken || !user.whatsappConfig?.phoneNumberId) {
       return res.status(400).json({ message: 'WhatsApp configuration is incomplete. Please go to the Setup page and save your Access Token and Phone Number ID.' });
