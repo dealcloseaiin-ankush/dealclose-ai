@@ -2,7 +2,7 @@ const rateLimit = require('express-rate-limit');
 
 // Limit: 5 scans per IP per 30 days
 const scanLimiter = rateLimit({
-  windowMs: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
+  windowMs: 14 * 24 * 60 * 60 * 1000, // 14 days in milliseconds (Fixed 32-bit integer overflow)
   max: 5,                             // 5 scans maximum
   keyGenerator: (req) => req.ip,      // Track by User's IP Address
   handler: (req, res) => {
