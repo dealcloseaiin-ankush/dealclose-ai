@@ -51,6 +51,7 @@ exports.sendManualMessage = async (req, res) => {
     });
 
     // 3. TRY SENDING VIA META API
+    console.log(`➡️ [Chat] Attempting to send message to Meta API for number: ${formattedPhone}`);
     try {
       await whatsappService.sendTextMessage(
         user.whatsappConfig.accessToken,
@@ -59,6 +60,7 @@ exports.sendManualMessage = async (req, res) => {
         messageText
       );
       
+      console.log(`✅ [Chat] Message successfully accepted by Meta for ${formattedPhone}`);
       // Agar success ho gaya, toh status 'sent' kardo
       newMsg.status = 'sent';
       await newMsg.save();
@@ -71,12 +73,12 @@ exports.sendManualMessage = async (req, res) => {
       newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send: ${exactError}]`;
       await newMsg.save();
       
-      console.error("Meta API Error:", exactError);
+      console.error(`❌ [Chat] Meta API Rejected the message. Reason: ${exactError}`);
       // Return 201 instead of 500 so the frontend adds the "failed" message to the UI seamlessly
       return res.status(201).json(newMsg);
     }
   } catch (error) {
-    console.error("Error in sendManualMessage:", error);
+    console.error("🚨 [Chat] CRITICAL BACKEND ERROR (Before reaching Meta):", error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
