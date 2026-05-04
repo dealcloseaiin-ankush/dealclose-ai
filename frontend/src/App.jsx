@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Onboarding from './pages/Onboarding';
+import ResultsPage from './pages/ResultsPage';
 import Catalog from './pages/Catalog';
 import OrderDispatch from './pages/OrderDispatch';
 import AIAgent from './pages/AIAgent';
@@ -44,6 +45,9 @@ export default function App() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/help" element={<Help />} />
         <Route path="/delete-data" element={<DataDeletion />} />
+        
+        {/* ScanIQ Public Shareable Results Page */}
+        <Route path="/scan/:scanId" element={<ResultsPage />} />
         
         {/* Onboarding Page (Replaces Setup) */}
         <Route path="/onboarding" element={<Onboarding />} />

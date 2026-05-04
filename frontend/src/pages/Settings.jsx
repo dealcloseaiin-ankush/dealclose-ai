@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
+import { Eye, EyeOff } from 'lucide-react'; // Icons for viewing tokens
 
 export default function Settings() {
   const [config, setConfig] = useState({
@@ -12,6 +13,35 @@ export default function Settings() {
   });
   
   const [igConnected, setIgConnected] = useState(false);
+  const [showWhatsappToken, setShowWhatsappToken] = useState(false);
+  const [showTwilioToken, setShowTwilioToken] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch saved settings on page load
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data } = await api.get('/users/settings');
+        const savedData = data.data || data; // Handle different backend response structures
+        
+        if (savedData) {
+          setConfig({
+            whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || '',
+            phoneNumberId: savedData.phoneNumberId || savedData.whatsappConfig?.phoneNumberId || '',
+            wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || '',
+            twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || '',
+            twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || '',
+            twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || ''
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load settings. It might be empty currently.', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Load Facebook SDK for 1-Click Instagram Login
   useEffect(() => {
@@ -67,16 +97,28 @@ export default function Settings() {
         <p className="text-gray-600 mt-2">Connect your Meta WhatsApp and Calling APIs. The system will use these credentials for all AI interactions, ensuring a flexible SaaS experience.</p>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-8">
+      {isLoading ? (
+        <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div></div>
+      ) : (
+        <form onSubmit={handleSave} className="space-y-8">
         {/* WhatsApp Meta Config */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h2 className="text-xl font-semibold text-green-600 mb-4 flex items-center">
              WhatsApp (Meta API)
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+              <div className="md:col-span-2 relative">
               <label className="block text-sm font-medium text-gray-700 mb-1">Permanent Access Token</label>
-              <input type="password" name="whatsappToken" value={config.whatsappToken} onChange={handleChange} placeholder="EAAL..." className="w-full p-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
+                <div className="relative">
+                  <input type={showWhatsappToken ? "text" : "password"} name="whatsappToken" value={config.whatsappToken} onChange={handleChange} placeholder="EAAL..." className="w-full p-2 border rounded-lg focus:ring-green-500 focus:border-green-500 pr-10" />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowWhatsappToken(!showWhatsappToken)} 
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  >
+                    {showWhatsappToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
@@ -123,9 +165,18 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Account SID</label>
               <input type="text" name="twilioSid" value={config.twilioSid} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
             </div>
-            <div>
+              <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1">Auth Token</label>
-              <input type="password" name="twilioAuthToken" value={config.twilioAuthToken} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                <div className="relative">
+                  <input type={showTwilioToken ? "text" : "password"} name="twilioAuthToken" value={config.twilioAuthToken} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 pr-10" />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowTwilioToken(!showTwilioToken)} 
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  >
+                    {showTwilioToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Twilio Phone Number</label>
@@ -137,7 +188,8 @@ export default function Settings() {
         <button type="submit" className="w-full md:w-auto px-8 py-3 bg-gray-900 text-white font-bold rounded-lg hover:bg-gray-800 transition-colors">
           Save Configurations
         </button>
-      </form>
+        </form>
+      )}
     </div>
   );
 }
