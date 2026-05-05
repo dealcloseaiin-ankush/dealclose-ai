@@ -34,3 +34,35 @@
 
 ---
 *Documented to maintain a clean track of structural architectural decisions.*
+
+PS C:\Users\Lenovo1\Desktop\ai-calling-agent> git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   .gitignore
+        modified:   backend/src/app.js
+        deleted:    backend/src/controllers/adController.js
+        modified:   backend/src/controllers/webhookController.js
+        deleted:    backend/src/models/videoModel.js
+        deleted:    backend/src/routes/adRoutes.js
+        deleted:    backend/src/services/videoService.js
+        deleted:    backend/src/utils/canvasRenderer.js
+        modified:   frontend/src/App.jsx
+        deleted:    frontend/src/assets/react.svg
+        deleted:    frontend/src/components/BackgroundPicker.jsx
+        modified:   frontend/src/components/Sidebar.jsx
+        deleted:    frontend/src/modules/adstudio/AdStudio.jsx
+        deleted:    frontend/src/modules/adstudio/CanvasEditor.jsx
+        deleted:    frontend/src/modules/adstudio/ExportPanel.jsx
+        deleted:    frontend/src/modules/adstudio/ProductUploader.jsx
+        deleted:    frontend/src/modules/adstudio/TemplateSelector.jsx
+        deleted:    frontend/src/modules/video/PromptEditor.jsx
+        deleted:    frontend/src/modules/video/VideoGenerator.jsx
+        deleted:    frontend/src/modules/video/VideoPreview.jsx
+        deleted:    frontend/src/pages/RealisticStory.jsx
+
+no changes added to commit (use "git add" and/or "git commit -a")
+PS C:\Users\Lenovo1\Desktop\ai-calling-agent> 
