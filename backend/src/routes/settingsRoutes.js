@@ -5,7 +5,7 @@ const authController = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
 // --- Auth Routes ---
-router.post('/supabase-auth', authController.supabaseAuth);
+router.post('/login', authController.supabaseAuth);
 
 // --- Settings & Integration Routes ---
 router.get('/settings', protect, settingsController.getSettings);

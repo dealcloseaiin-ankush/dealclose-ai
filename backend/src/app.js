@@ -34,7 +34,8 @@ const corsOptions = {
     'http://localhost:5173', 
     'http://localhost:5174',
     'https://dealcloseai.in',
-    'https://www.dealcloseai.in'
+    'https://www.dealcloseai.in',
+    process.env.FRONTEND_URL // Apni .env file mein FRONTEND_URL add karein (e.g. Vercel URL)
   ], // Allow your Vite frontend and custom domain
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
