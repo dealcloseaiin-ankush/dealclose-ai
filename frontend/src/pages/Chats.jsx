@@ -88,7 +88,7 @@ export default function Chats() {
       }
     } catch (error) {
       console.error("Failed to send message", error);
-      toast.error("Failed to send message");
+        toast.error(error.response?.data?.message || "Failed to send message");
       // Remove the optimistic message if API fails
       setAllMessages(prev => prev.filter(m => m._id !== newMessage._id));
     }

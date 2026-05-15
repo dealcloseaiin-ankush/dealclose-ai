@@ -28,8 +28,14 @@ exports.saveSettings = async (req, res) => {
       businessUrls: updates.businessUrls || [],
     };
 
-    // Meta / WhatsApp Config
-    if (updates.whatsappToken || updates.phoneNumberId || updates.wabaId) {
+    // Meta / WhatsApp Config - FIXED FRONTEND PAYLOAD MAPPING
+    if (updates.whatsappConfig) {
+      updateData.whatsappConfig = {
+        accessToken: updates.whatsappConfig.accessToken || '',
+        phoneNumberId: updates.whatsappConfig.phoneNumberId || '',
+        wabaId: updates.whatsappConfig.wabaId || ''
+      };
+    } else if (updates.whatsappToken || updates.phoneNumberId || updates.wabaId) {
       updateData.whatsappConfig = {
         accessToken: updates.whatsappToken,
         phoneNumberId: updates.phoneNumberId,
@@ -37,9 +43,20 @@ exports.saveSettings = async (req, res) => {
       };
     }
 
-    // Twilio Config
-    if (updates.twilioSid) {
+    // Twilio Config - FIXED FRONTEND PAYLOAD MAPPING
+    if (updates.twilioConfig) {
+      updateData.twilioConfig = { 
+        accountSid: updates.twilioConfig.sid || '', 
+        authToken: updates.twilioConfig.authToken || '', 
+        phoneNumber: updates.twilioConfig.phone || '' 
+      };
+    } else if (updates.twilioSid) {
       updateData.twilioConfig = { accountSid: updates.twilioSid, authToken: updates.twilioAuthToken, phoneNumber: updates.twilioPhone };
+    }
+
+    // Digital Card Config
+    if (updates.digitalCardConfig) {
+      updateData.digitalCardConfig = updates.digitalCardConfig;
     }
 
     const user = await User.findByIdAndUpdate(userId, updateData, { new: true, upsert: true });

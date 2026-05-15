@@ -17,17 +17,30 @@ exports.getChats = async (req, res) => {
 
 // @desc    Send a manual message from Staff via Dashboard
 exports.sendManualMessage = async (req, res) => {
+  console.log(`\n➡️ [DEBUG Chat Flow] 1. Request Received. User ID from token: ${req.user?._id}`);
   try {
     const { customerPhone, messageText } = req.body;
     const userId = req.user._id; 
 
+    console.log(`➡️ [DEBUG Chat Flow] 2. Payload details - Phone: ${customerPhone}, Message: "${messageText}"`);
+
     // SAFETY CHECK: Ensure phone number and message are not empty
     if (!customerPhone || !messageText) {
+      console.log(`❌ [DEBUG Chat Flow] Failed at Step 2: Missing phone or message.`);
       return res.status(400).json({ message: 'Phone number and message text are required.' });
     }
 
     const user = await User.findById(userId);
+    
+    console.log(`➡️ [DEBUG Chat Flow] 3. Database Check - User Found: ${user ? 'Yes' : 'No'}`);
+    if (user) {
+      console.log(`   - WhatsApp Config Exists: ${!!user.whatsappConfig}`);
+      console.log(`   - Access Token Present: ${!!user.whatsappConfig?.accessToken}`);
+      console.log(`   - Phone Number ID Present: ${!!user.whatsappConfig?.phoneNumberId}`);
+    }
+
     if (!user || !user.whatsappConfig?.accessToken || !user.whatsappConfig?.phoneNumberId) {
+      console.log(`❌ [DEBUG Chat Flow] Failed at Step 3: WhatsApp config is missing in DB for this user.`);
       return res.status(400).json({ message: 'WhatsApp configuration is incomplete. Please go to the Setup page and save your Access Token and Phone Number ID.' });
     }
 
@@ -40,6 +53,8 @@ exports.sendManualMessage = async (req, res) => {
       formattedPhone = '91' + formattedPhone;
     }
 
+    console.log(`➡️ [DEBUG Chat Flow] 4. Formatted Number: ${formattedPhone}`);
+
     // 2. SAVE MESSAGE TO DB FIRST (Taaki gayab na ho)
     const newMsg = await Message.create({
       userId, 
@@ -50,8 +65,10 @@ exports.sendManualMessage = async (req, res) => {
       sentBy: 'staff'
     });
 
+    console.log(`➡️ [DEBUG Chat Flow] 5. Message saved to DB with status 'pending' (ID: ${newMsg._id})`);
+
     // 3. TRY SENDING VIA META API
-    console.log(`➡️ [Chat] Attempting to send message to Meta API for number: ${formattedPhone}`);
+    console.log(`➡️ [DEBUG Chat Flow] 6. Calling Meta WhatsApp API now...`);
     try {
       await whatsappService.sendTextMessage(
         user.whatsappConfig.accessToken,
@@ -60,7 +77,7 @@ exports.sendManualMessage = async (req, res) => {
         messageText
       );
       
-      console.log(`✅ [Chat] Message successfully accepted by Meta for ${formattedPhone}`);
+      console.log(`✅ [DEBUG Chat Flow] 7. SUCCESS! Meta API accepted the message for ${formattedPhone}`);
       // Agar success ho gaya, toh status 'sent' kardo
       newMsg.status = 'sent';
       await newMsg.save();
@@ -73,7 +90,7 @@ exports.sendManualMessage = async (req, res) => {
       newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send: ${exactError}]`;
       await newMsg.save();
       
-      console.error(`❌ [Chat] Meta API Rejected the message. Reason: ${exactError}`);
+      console.error(`❌ [DEBUG Chat Flow] 7. ERROR: Meta API Rejected the message. Reason: ${exactError}`);
       // Return 201 instead of 500 so the frontend adds the "failed" message to the UI seamlessly
       return res.status(201).json(newMsg);
     }
