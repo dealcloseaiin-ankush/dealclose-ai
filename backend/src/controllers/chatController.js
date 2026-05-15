@@ -6,7 +6,8 @@ const whatsappService = require('../services/whatsappService');
 exports.getChats = async (req, res) => {
   try {
     // Ab auth middleware se asli user ID aayegi
-    const userId = req.user._id; 
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized. Please login again.' });
     
     const messages = await Message.find({ userId }).sort({ timestamp: 1 });
     res.json(messages);
@@ -17,10 +18,10 @@ exports.getChats = async (req, res) => {
 
 // @desc    Send a manual message from Staff via Dashboard
 exports.sendManualMessage = async (req, res) => {
-  console.log(`\n➡️ [DEBUG Chat Flow] 1. Request Received. User ID from token: ${req.user?._id}`);
+  const userId = req.user?._id || req.user?.id;
+  console.log(`\n➡️ [DEBUG Chat Flow] 1. Request Received. User ID from token: ${userId}`);
   try {
     const { customerPhone, messageText } = req.body;
-    const userId = req.user._id; 
 
     console.log(`➡️ [DEBUG Chat Flow] 2. Payload details - Phone: ${customerPhone}, Message: "${messageText}"`);
 
@@ -28,6 +29,11 @@ exports.sendManualMessage = async (req, res) => {
     if (!customerPhone || !messageText) {
       console.log(`❌ [DEBUG Chat Flow] Failed at Step 2: Missing phone or message.`);
       return res.status(400).json({ message: 'Phone number and message text are required.' });
+    }
+
+    if (!userId) {
+      console.log(`❌ [DEBUG Chat Flow] Failed: User ID is missing from Auth Token.`);
+      return res.status(401).json({ message: 'Session expired. Please login again.' });
     }
 
     // 1. SMART PHONE NUMBER FORMATTING
@@ -105,7 +111,8 @@ exports.updateChatStatus = async (req, res) => {
   try {
     const { customerPhone } = req.params;
     const { tags, isResolved } = req.body;
-    const userId = req.user._id;
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     // Updates all messages for this customer with the new status/tags
     // Note: In a real CRM, you'd have a separate 'Conversation' model.
