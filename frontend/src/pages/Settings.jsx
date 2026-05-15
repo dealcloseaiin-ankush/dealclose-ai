@@ -9,10 +9,16 @@ export default function Settings() {
     wabaId: '',
     twilioSid: '',
     twilioAuthToken: '',
-    twilioPhone: ''
+    twilioPhone: '',
+    instagramLink: '',
+    facebookLink: '',
+    youtubeLink: '',
+    googleReviewLink: '',
+    websiteLink: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
+  const [userId, setUserId] = useState('demo-business'); // Used for QR code link
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,7 +27,7 @@ export default function Settings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data } = await api.get('/users/settings');
+        const { data } = await api.get('/settings');
         const savedData = data.data || data; // Handle different backend response structures
         
         if (savedData) {
@@ -31,8 +37,14 @@ export default function Settings() {
             wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || '',
             twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || '',
             twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || '',
-            twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || ''
+            twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || '',
+            instagramLink: savedData.digitalCardConfig?.instagram || '',
+            facebookLink: savedData.digitalCardConfig?.facebook || '',
+            youtubeLink: savedData.digitalCardConfig?.youtube || '',
+            googleReviewLink: savedData.digitalCardConfig?.googleReview || '',
+            websiteLink: savedData.digitalCardConfig?.website || ''
           });
+          if (savedData._id) setUserId(savedData._id);
         }
       } catch (error) {
         console.error('Failed to load settings. It might be empty currently.', error);
@@ -83,7 +95,27 @@ export default function Settings() {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/users/settings', config);
+      // Transform data so backend overwrites (deletes) old keys completely
+      const payload = {
+        whatsappConfig: {
+          accessToken: config.whatsappToken,
+          phoneNumberId: config.phoneNumberId,
+          wabaId: config.wabaId
+        },
+        twilioConfig: {
+          sid: config.twilioSid,
+          authToken: config.twilioAuthToken,
+          phone: config.twilioPhone
+        },
+        digitalCardConfig: {
+          instagram: config.instagramLink,
+          facebook: config.facebookLink,
+          youtube: config.youtubeLink,
+          googleReview: config.googleReviewLink,
+          website: config.websiteLink
+        }
+      };
+      await api.post('/settings', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
     } catch (error) {
       alert('Error saving settings: ' + (error.response?.data?.message || error.message));
@@ -91,105 +123,142 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 mt-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Integrations & Settings</h1>
-        <p className="text-gray-600 mt-2">Connect your Meta WhatsApp and Calling APIs. The system will use these credentials for all AI interactions, ensuring a flexible SaaS experience.</p>
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div></div>
-      ) : (
-        <form onSubmit={handleSave} className="space-y-8">
-        {/* WhatsApp Meta Config */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-semibold text-green-600 mb-4 flex items-center">
-             WhatsApp (Meta API)
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2 relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Permanent Access Token</label>
-                <div className="relative">
-                  <input type={showWhatsappToken ? "text" : "password"} name="whatsappToken" value={config.whatsappToken} onChange={handleChange} placeholder="EAAL..." className="w-full p-2 border rounded-lg focus:ring-green-500 focus:border-green-500 pr-10" />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowWhatsappToken(!showWhatsappToken)} 
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                  >
-                    {showWhatsappToken ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number ID</label>
-              <input type="text" name="phoneNumberId" value={config.phoneNumberId} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">WABA ID (Business Account ID)</label>
-              <input type="text" name="wabaId" value={config.wabaId} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Instagram Integration */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-pink-600 flex items-center gap-2">
-               Instagram Business Account
-            </h2>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${igConnected ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-              {igConnected ? 'Connected ✅' : 'Not Connected'}
+    <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-4xl font-extrabold tracking-tight mb-2">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
+              Integrations & Settings
             </span>
-          </div>
-          <p className="text-sm text-gray-600 mb-4">Connect your Instagram to enable Auto-DMs, Comment tracking, and AI Profile Growth Audits.</p>
-          
-          {!igConnected ? (
-            <button onClick={handleInstagramConnect} type="button" className="px-6 py-3 bg-gradient-to-r from-pink-500 to-orange-400 hover:from-pink-600 hover:to-orange-500 text-white font-bold rounded-lg shadow-md transition-all">
-              Connect via Meta (Facebook)
-            </button>
-          ) : (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-               <p className="text-sm text-green-700 font-semibold">Your Instagram account is actively monitored by AI.</p>
-               <button type="button" onClick={() => setIgConnected(false)} className="mt-2 text-xs text-red-500 font-bold hover:underline">Disconnect</button>
-            </div>
-          )}
+          </h1>
+          <p className="text-gray-400 text-lg">Connect your Meta WhatsApp and Calling APIs. The system will use these credentials for all AI interactions.</p>
         </div>
 
-        {/* Twilio / Calling Config */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-semibold text-blue-600 mb-4 flex items-center">
-             Voice Calling (Twilio Provider)
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Account SID</label>
-              <input type="text" name="twilioSid" value={config.twilioSid} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+        {isLoading ? (
+          <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500"></div></div>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-8">
+          {/* WhatsApp Meta Config */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
+            <h2 className="text-xl font-semibold text-green-400 mb-6 flex items-center">
+               WhatsApp (Meta API)
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2 relative">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Permanent Access Token</label>
+                  <div className="relative">
+                    <input type={showWhatsappToken ? "text" : "password"} name="whatsappToken" value={config.whatsappToken} onChange={handleChange} placeholder="EAAL..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none pr-10" />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowWhatsappToken(!showWhatsappToken)} 
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none"
+                    >
+                      {showWhatsappToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Phone Number ID</label>
+                <input type="text" name="phoneNumberId" value={config.phoneNumberId} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" placeholder="e.g. 1234567890" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">WABA ID (Business Account ID)</label>
+                <input type="text" name="wabaId" value={config.wabaId} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" placeholder="e.g. 1234567890" />
+              </div>
             </div>
-              <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Auth Token</label>
+          </div>
+
+          {/* Instagram Integration */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-pink-400 flex items-center gap-2">
+                 Instagram Business Account
+              </h2>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${igConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
+                {igConnected ? 'Connected ✅' : 'Not Connected'}
+              </span>
+            </div>
+            <p className="text-sm text-gray-400 mb-6">Connect your Instagram to enable Auto-DMs, Comment tracking, and AI Profile Growth Audits.</p>
+            
+            {!igConnected ? (
+              <button onClick={handleInstagramConnect} type="button" className="px-6 py-3 bg-gradient-to-r from-pink-600 to-orange-500 hover:from-pink-500 hover:to-orange-400 text-white font-bold rounded-xl shadow-lg transition-all">
+                Connect via Meta (Facebook)
+              </button>
+            ) : (
+              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+                 <p className="text-sm text-green-400 font-semibold">Your Instagram account is actively monitored by AI.</p>
+                 <button type="button" onClick={() => setIgConnected(false)} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
+              </div>
+            )}
+          </div>
+
+          {/* Twilio / Calling Config */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
+            <h2 className="text-xl font-semibold text-blue-400 mb-6 flex items-center">
+               Voice Calling (Twilio Provider)
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Account SID</label>
+                <input type="text" name="twilioSid" value={config.twilioSid} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+              </div>
                 <div className="relative">
-                  <input type={showTwilioToken ? "text" : "password"} name="twilioAuthToken" value={config.twilioAuthToken} onChange={handleChange} className="w-full p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 pr-10" />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowTwilioToken(!showTwilioToken)} 
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                  >
-                    {showTwilioToken ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Twilio Phone Number</label>
-              <input type="text" name="twilioPhone" value={config.twilioPhone} onChange={handleChange} placeholder="+1234567890" className="w-full p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                <label className="block text-sm font-medium text-gray-400 mb-2">Auth Token</label>
+                  <div className="relative">
+                    <input type={showTwilioToken ? "text" : "password"} name="twilioAuthToken" value={config.twilioAuthToken} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none pr-10" />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowTwilioToken(!showTwilioToken)} 
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none"
+                    >
+                      {showTwilioToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Twilio Phone Number</label>
+                <input type="text" name="twilioPhone" value={config.twilioPhone} onChange={handleChange} placeholder="+1234567890" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <button type="submit" className="w-full md:w-auto px-8 py-3 bg-gray-900 text-white font-bold rounded-lg hover:bg-gray-800 transition-colors">
-          Save Configurations
-        </button>
-        </form>
-      )}
+          {/* QR Code & Digital Card Section */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-purple-500/30 relative overflow-hidden mt-8">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl"></div>
+            <h2 className="text-xl font-semibold text-purple-400 mb-6 flex items-center gap-2">
+               📱 Smart QR & Digital Business Card
+            </h2>
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="bg-white p-4 rounded-xl shadow-lg shrink-0">
+                {/* Using a free reliable API to generate QR Code without installing extra packages */}
+                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + '/card/' + userId)}`} alt="Business QR Code" className="w-32 h-32" />
+              </div>
+              <div className="flex-1">
+                <p className="text-gray-300 text-sm mb-4 leading-relaxed">Print this QR code and place it at your store counter or share it online. When customers scan it, they can leave their Name/Number (saved directly to your CRM) and easily follow your Instagram, Facebook, and Google profiles.</p>
+                
+                {/* Social Links Setup for QR Card */}
+                <div className="space-y-3 mb-6 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-sm font-bold text-gray-400 mb-2">Configure Digital Card Links</h3>
+                  <input type="text" name="instagramLink" value={config.instagramLink} onChange={handleChange} placeholder="Instagram Profile URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                  <input type="text" name="facebookLink" value={config.facebookLink} onChange={handleChange} placeholder="Facebook Page URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                  <input type="text" name="youtubeLink" value={config.youtubeLink} onChange={handleChange} placeholder="YouTube Channel URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                  <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                  <input type="text" name="websiteLink" value={config.websiteLink} onChange={handleChange} placeholder="Your Custom Website or Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                </div>
+
+                <a href={`/card/${userId}`} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
+                  Preview My Digital Card ↗
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" className="w-full md:w-auto px-8 py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 transition-colors shadow-lg shadow-green-600/20">
+            Save Configurations
+          </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

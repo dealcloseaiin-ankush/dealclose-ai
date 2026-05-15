@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
 import { useInboxStore } from '../store/inboxStore';
@@ -8,6 +9,13 @@ export default function Sidebar() {
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
   const { unreadCount } = useInboxStore();
   
+  // Mock Workspaces Data (In future, this will come from backend)
+  const workspaces = [
+    { id: 'ws_1', name: 'DealClose AI', role: 'Owner' },
+    { id: 'ws_2', name: 'Ganesha Traders', role: 'Admin' }
+  ];
+  const [activeWorkspace, setActiveWorkspace] = useState(workspaces[0]);
+
   const navCategories = [
     {
       title: 'MAIN',
@@ -15,9 +23,10 @@ export default function Sidebar() {
         { name: 'Dashboard', path: '/dashboard', icon: '📊' },
         { name: 'Inbox (Chats)', path: '/chats', icon: '💬', badge: unreadCount },
         { name: 'Contacts', path: '/contacts', icon: '👥' },
+        { name: 'Catalog', path: '/catalog', icon: '🛍️' },
         { name: 'CRM', path: '/crm', icon: '🗂️' },
         { name: 'Campaigns', path: '/campaigns', icon: '📢' },
-        { name: 'Templates', path: '/templates', icon: '📄', requireOwner: true }
+        { name: 'Templates', path: '/templates', icon: '📄' }
       ]
     },
     {
@@ -31,7 +40,7 @@ export default function Sidebar() {
     {
       title: 'INTELLIGENCE',
       items: [
-        { name: 'AI Agent', path: '/ai-agent', icon: '🧠', requireOwner: true },
+        { name: 'AI Agent', path: '/ai-agent', icon: '🧠' },
         { name: 'Order Dispatch', path: '/dispatch', icon: '📦' },
         { name: 'Calls', path: '/calls', icon: '📞' },
         { name: 'Analytics', path: '/monthly-report', icon: '📈' }
@@ -40,19 +49,34 @@ export default function Sidebar() {
     {
       title: 'TOOLS',
       items: [
+        { name: 'Staff & Team', path: '/staff', icon: '👨‍💼', requireOwner: true },
         { name: 'Forms', path: '/forms', icon: '📋' },
         { name: 'Wallet', path: '/wallet', icon: '💰', requireOwner: true },
-        { name: 'Settings', path: '/settings', icon: '⚙️', requireOwner: true }
+        { name: 'Settings', path: '/settings', icon: '⚙️' }
       ]
     }
   ];
 
   return (
     <aside className="w-64 bg-[#0a0a0a] border-r border-gray-800 h-screen flex flex-col text-gray-300 font-sans">
-      <div className="h-20 flex items-center px-6 border-b border-gray-800">
-        <Link to="/dashboard" className="text-2xl font-bold text-white flex items-center gap-2">
-          <span className="text-purple-500">⚡</span> DealClose AI
+      <div className="pt-6 pb-4 px-6 border-b border-gray-800">
+        <Link to="/dashboard" className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+          <span className="text-purple-500 text-2xl">⚡</span> DealClose
         </Link>
+        
+        {/* Workspace Switcher */}
+        <div>
+          <label className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider mb-1 block">Active Workspace</label>
+          <select 
+            className="w-full bg-[#111] border border-gray-700 text-white text-sm font-semibold rounded-lg p-2.5 outline-none focus:border-purple-500 cursor-pointer appearance-none shadow-sm"
+            value={activeWorkspace.id}
+            onChange={(e) => setActiveWorkspace(workspaces.find(w => w.id === e.target.value))}
+          >
+            {workspaces.map(ws => (
+              <option key={ws.id} value={ws.id}>{ws.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
       
       <nav className="flex-1 overflow-y-auto py-6">

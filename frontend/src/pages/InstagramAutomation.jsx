@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function InstagramAutomation() {
   const [activeTab, setActiveTab] = useState('general'); // 'general' or 'posts'
@@ -22,6 +23,8 @@ export default function InstagramAutomation() {
   const [igLeads, setIgLeads] = useState([]);
   const [recentPosts, setRecentPosts] = useState([]);
   const [commentGroups, setCommentGroups] = useState([]);
+  const [processingId, setProcessingId] = useState(null);
+  const [sendingBulkId, setSendingBulkId] = useState(null);
 
   useEffect(() => {
     const fetchIgData = async () => {
@@ -43,8 +46,19 @@ export default function InstagramAutomation() {
     setCommentGroups(groups => groups.map(g => g.id === id ? { ...g, replyText: text } : g));
   };
 
-  const sendBulkReply = (id, count) => {
-    alert(`Successfully sent Bulk AI Reply to ${count} users via Instagram API! 🚀`);
+  const sendBulkReply = async (id, count, text) => {
+    setSendingBulkId(id);
+    try {
+      await api.post('/instagram/comments/bulk-reply', { groupId: id, replyText: text });
+      toast.success(`Successfully sent Bulk AI Reply to ${count} users! 🚀`);
+      // Remove from UI after sending
+      setCommentGroups(groups => groups.filter(g => g.id !== id));
+    } catch (error) {
+      console.error("Bulk reply error:", error);
+      toast.error("Failed to send bulk replies. Check connection.");
+    } finally {
+      setSendingBulkId(null);
+    }
   };
 
   const generateAIReply = (id, theme) => {
@@ -64,11 +78,20 @@ export default function InstagramAutomation() {
     setRecentPosts(posts => posts.map(p => p.id === id ? { ...p, botMode: newMode } : p));
   };
 
-  const processPendingWithAI = (id) => {
-    alert("Processing pending comments with AI... AI will automatically read context and send DMs.");
-    setRecentPosts(posts => posts.map(p => 
-      p.id === id ? { ...p, botMode: 'hybrid', stats: { ...p.stats, aiCaught: p.stats.pending, pending: 0 } } : p
-    ));
+  const processPendingWithAI = async (id) => {
+    setProcessingId(id);
+    try {
+      await api.post(`/instagram/posts/${id}/process-ai`);
+      toast.success("AI is now processing pending comments! ⚡");
+      setRecentPosts(posts => posts.map(p => 
+        p.id === id ? { ...p, botMode: 'hybrid', stats: { ...p.stats, aiCaught: p.stats.pending, pending: 0 } } : p
+      ));
+    } catch (error) {
+      console.error("AI processing error:", error);
+      toast.error("Failed to trigger AI processing.");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   return (
@@ -274,8 +297,8 @@ export default function InstagramAutomation() {
                       
                       {/* The UPSELL Button */}
                       {post.botMode === 'chatbot' && post.stats.pending > 0 && (
-                        <button onClick={() => processPendingWithAI(post.id)} className="w-full mt-2 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-lg transition-all shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-                          Process remaining {post.stats.pending} comments with AI Smart Chat Bot ⚡
+                        <button onClick={() => processPendingWithAI(post.id)} disabled={processingId === post.id} className="w-full mt-2 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-lg transition-all shadow-[0_0_10px_rgba(168,85,247,0.3)] disabled:opacity-50">
+                          {processingId === post.id ? 'Processing...' : `Process remaining ${post.stats.pending} comments with AI Smart Chat Bot ⚡`}
                         </button>
                       )}
                     </div>
@@ -343,8 +366,8 @@ export default function InstagramAutomation() {
                     <button onClick={() => generateAIReply(group.id, group.theme)} className="flex items-center gap-2 text-sm text-purple-400 hover:bg-purple-500/10 px-4 py-2 rounded-lg font-bold border border-purple-500/30 transition-colors">
                       ✨ Draft with AI
                     </button>
-                    <button onClick={() => sendBulkReply(group.id, group.count)} disabled={!group.replyText} className="flex items-center gap-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-all">
-                      🚀 Send to {group.count} Users
+                  <button onClick={() => sendBulkReply(group.id, group.count, group.replyText)} disabled={!group.replyText || sendingBulkId === group.id} className="flex items-center gap-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-all">
+                    🚀 {sendingBulkId === group.id ? 'Sending...' : `Send to ${group.count} Users`}
                     </button>
                   </div>
                 </div>

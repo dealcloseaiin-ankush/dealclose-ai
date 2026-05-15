@@ -193,6 +193,61 @@ export default function LandingPage() {
               <p className="text-gray-400 text-sm leading-relaxed">Initiate human-like phone calls to high-ticket leads. Our AI can negotiate, qualify, and book appointments for you.</p>
             </div>
           </div>
+
+          {/* Platform Specific Deep Dive */}
+          <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* WhatsApp Automation Showcase */}
+            <div className="bg-gradient-to-br from-[#0a1a10] to-[#111] border border-green-500/30 rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-2xl group hover:border-green-500/60 transition-all">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-green-500/10 rounded-full blur-3xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-4xl">💬</span>
+                  <h3 className="text-2xl md:text-3xl font-bold text-white">WhatsApp Automation</h3>
+                </div>
+                <ul className="space-y-5">
+                  <li className="flex items-start gap-3">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <div><strong className="text-gray-200">Drag & Drop Flow Builder:</strong> <span className="text-gray-400 text-sm block mt-1">Create custom chat flows, delays, and condition-based routing without writing a single line of code.</span></div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <div><strong className="text-gray-200">B2B Smart Quotations:</strong> <span className="text-gray-400 text-sm block mt-1">AI reads customer lists/photos and automatically fetches matching rates from your uploaded Excel catalog.</span></div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <div><strong className="text-gray-200">Meta Template Manager:</strong> <span className="text-gray-400 text-sm block mt-1">Create, edit, and get WhatsApp message templates approved by Meta directly from your dashboard.</span></div>
+                  </li>
+                </ul>
+                <Link to="/register" className="inline-block mt-8 text-green-400 font-bold hover:text-green-300 transition-colors">Explore WhatsApp Tools →</Link>
+              </div>
+            </div>
+
+            {/* Instagram Automation Showcase */}
+            <div className="bg-gradient-to-br from-[#1a0a10] to-[#111] border border-pink-500/30 rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-2xl group hover:border-pink-500/60 transition-all">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-4xl">📸</span>
+                  <h3 className="text-2xl md:text-3xl font-bold text-white">Instagram Automation</h3>
+                </div>
+                <ul className="space-y-5">
+                  <li className="flex items-start gap-3">
+                    <span className="text-pink-500 mt-1">✓</span>
+                    <div><strong className="text-gray-200">AI Comment Clustering:</strong> <span className="text-gray-400 text-sm block mt-1">AI automatically groups complex, unanswered comments by intent so you can send bulk 1-click replies.</span></div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-pink-500 mt-1">✓</span>
+                    <div><strong className="text-gray-200">Auto-DM & Lead Extraction:</strong> <span className="text-gray-400 text-sm block mt-1">Instantly send DMs to commenters and silently extract phone numbers from chats into your CRM.</span></div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="text-pink-500 mt-1">✓</span>
+                    <div><strong className="text-gray-200">Per-Post AI Settings:</strong> <span className="text-gray-400 text-sm block mt-1">Toggle between exact-keyword matching or full AI-driven Smart Chatbots for specific posts and reels.</span></div>
+                  </li>
+                </ul>
+                <Link to="/register" className="inline-block mt-8 text-pink-400 font-bold hover:text-pink-300 transition-colors">Explore Instagram Tools →</Link>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

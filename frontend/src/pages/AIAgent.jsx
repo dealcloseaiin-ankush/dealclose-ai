@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 export default function AIAgent() {
   const [queries, setQueries] = useState([]);
+  const [trainingText, setTrainingText] = useState("");
 
   useEffect(() => {
     const fetchQueries = async () => {
@@ -32,8 +33,15 @@ export default function AIAgent() {
       setQueries(queries.filter(q => q._id !== id && q.id !== id));
       toast.success("🧠 AI has learned this answer!");
     } catch (error) {
+      console.error("Failed to save answer:", error);
       toast.error("Failed to save answer.");
     }
+  };
+
+  const handleSaveKnowledge = (e) => {
+    e.preventDefault();
+    // Here we will send trainingText to backend vector database later
+    toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
   };
 
   return (
@@ -44,6 +52,29 @@ export default function AIAgent() {
             AI Master Agent
           </h1>
           <p className="text-gray-400">View smart insights and train your AI to handle complex customer queries.</p>
+        </div>
+      </div>
+
+      {/* Custom Knowledge Base (Manual Training) */}
+      <div className="mb-10 bg-[#111] p-6 md:p-8 rounded-3xl border border-purple-500/30 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10">
+          <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">📚 Train AI (Knowledge Base)</h2>
+          <p className="text-gray-400 text-sm mb-6">Type your business rules, return policies, or paste text data here. AI will memorize this to answer customers.</p>
+          
+          <form onSubmit={handleSaveKnowledge}>
+            <textarea 
+              rows="4" 
+              value={trainingText}
+              onChange={(e) => setTrainingText(e.target.value)}
+              placeholder="e.g. We do not provide cash on delivery for orders above ₹10,000. Shop opens at 9 AM..." 
+              className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-purple-500 outline-none mb-4"
+            ></textarea>
+            <div className="flex gap-3">
+              <button type="button" className="px-6 py-2 bg-[#1a1a1a] hover:bg-gray-800 border border-gray-700 rounded-xl font-bold transition-colors">📄 Upload PDF / Doc</button>
+              <button type="submit" className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-colors shadow-lg shadow-purple-500/20">Save & Train AI</button>
+            </div>
+          </form>
         </div>
       </div>
 

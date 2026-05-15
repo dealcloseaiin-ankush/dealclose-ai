@@ -12,7 +12,7 @@ import ReactFlow, {
   MiniMap
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -120,6 +120,8 @@ export default function FlowBuilder() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#9ca3af' }, style: { stroke: '#9ca3af', strokeWidth: 2 } }, eds)), [setEdges]);
 
@@ -159,15 +161,53 @@ export default function FlowBuilder() {
 
   const handleSave = async () => {
     if (reactFlowInstance) {
+      setIsSaving(true);
+      try {
       const flowData = reactFlowInstance.toObject();
       console.log("Saving Flow:", flowData);
-      // Here you would normally send flowData to backend:
-      // await api.post('/api/flows', flowData);
+        await api.post('/whatsapp/flows', { name: 'Main Automation', flowData });
       toast.success("Automation Flow Saved & Published! 🚀");
+      } catch (error) {
+        console.error("Failed to save flow:", error);
+        toast.error("Failed to save automation flow.");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
   return (
+    <>
+    {/* Help Guide Modal */}
+    {isGuideOpen && (
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl p-8 w-full max-w-lg shadow-2xl relative">
+          <button onClick={() => setIsGuideOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+            <X size={24} />
+          </button>
+          <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+            <HelpCircle className="text-blue-500" /> How to use Flow Builder
+          </h2>
+          <p className="text-gray-400 text-sm mb-6">Build automation rules without coding by simply connecting blocks.</p>
+          
+          <div className="space-y-4 mb-6">
+            <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+              <p className="text-emerald-400 font-bold mb-1">1. Start with a Trigger</p>
+              <p className="text-sm text-gray-300">The first block is always a Trigger (e.g., "When Keyword is HI"). This decides WHEN the flow will run.</p>
+            </div>
+            <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+              <p className="text-blue-400 font-bold mb-1">2. Drag & Drop Actions</p>
+              <p className="text-sm text-gray-300">Drag items like "Send Message" or "Wait" from the left sidebar onto the dotted canvas.</p>
+            </div>
+            <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+              <p className="text-orange-400 font-bold mb-1">3. Connect the Dots</p>
+              <p className="text-sm text-gray-300">Click and drag from the bottom circle of one block to the top circle of another block to link them.</p>
+            </div>
+          </div>
+          <button onClick={() => setIsGuideOpen(false)} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors">Got it, let's build! 🚀</button>
+        </div>
+      </div>
+    )}
     <div className="flex h-[calc(100vh-4rem)] bg-[#050505] text-gray-100 font-sans">
       {/* Node Palette Sidebar */}
       <div className="w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col gap-4 z-10">
@@ -192,9 +232,12 @@ export default function FlowBuilder() {
 
       {/* Flow Canvas */}
       <div className="flex-1 relative" ref={reactFlowWrapper}>
-        <div className="absolute top-6 right-6 z-10">
-          <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg transition-colors">
-            <Save size={18} /> Save & Publish
+        <div className="absolute top-6 right-6 z-10 flex gap-3">
+          <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold shadow-lg transition-colors">
+            <HelpCircle size={18} /> How to Use?
+          </button>
+        <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg transition-colors shadow-green-600/20 disabled:opacity-50">
+          <Save size={18} /> {isSaving ? 'Saving...' : 'Save & Publish'}
           </button>
         </div>
         <ReactFlowProvider>
@@ -217,5 +260,6 @@ export default function FlowBuilder() {
         </ReactFlowProvider>
       </div>
     </div>
+    </>
   );
 }

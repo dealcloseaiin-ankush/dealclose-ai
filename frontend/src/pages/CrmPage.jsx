@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import KanbanBoard from '../components/crm/KanbanBoard';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { Search, Filter, Plus, FileDown, KanbanSquare, List, BarChart3 } from 'lucide-react';
+import { Search, Filter, Plus, FileDown, Printer, KanbanSquare, List, BarChart3 } from 'lucide-react';
 import ContactDrawer from '../components/crm/ContactDrawer';
 import CrmList from '../components/crm/CrmList';
 import CrmAnalytics from '../components/crm/CrmAnalytics';
+import { useAuth } from '../hooks/useAuth';
 
 export default function CrmPage() {
   const [pipelineData, setPipelineData] = useState(null);
@@ -13,6 +14,10 @@ export default function CrmPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('pipeline'); // pipeline, list, analytics
   const [selectedContact, setSelectedContact] = useState(null);
+  const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
+  
+  const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
+  const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
 
   useEffect(() => {
     fetchPipeline();
@@ -34,6 +39,27 @@ export default function CrmPage() {
     }
   };
 
+  // Function to Export Data to Excel (CSV)
+  const handleExportCSV = async () => {
+    try {
+      const response = await api.get('/leads/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'crm_leads_export.csv');
+      document.body.appendChild(link);
+      link.click();
+      toast.success("Excel/CSV Downloaded Successfully!");
+    } catch (error) {
+      console.error("Export Error:", error);
+      toast.error("Failed to export leads.");
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-950">
@@ -47,7 +73,21 @@ export default function CrmPage() {
       {/* Top Bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-2">CRM Pipeline</h1>
+          <div className="flex items-center gap-4 mb-2">
+            <h1 className="text-2xl font-bold text-white">CRM Pipeline</h1>
+            
+            {/* Team vs My Leads Filter (Only for Owners/Managers) */}
+            {isOwner && (
+              <div className="flex bg-[#111] p-1 rounded-lg border border-gray-800 text-xs font-bold">
+                <button onClick={() => setLeadFilter('me')} className={`px-3 py-1 rounded transition-colors ${leadFilter === 'me' ? 'bg-indigo-500 text-white' : 'text-gray-500 hover:text-white'}`}>
+                  My Leads
+                </button>
+                <button onClick={() => setLeadFilter('all')} className={`px-3 py-1 rounded transition-colors ${leadFilter === 'all' ? 'bg-indigo-500 text-white' : 'text-gray-500 hover:text-white'}`}>
+                  All Team Leads
+                </button>
+              </div>
+            )}
+          </div>
           
           {/* View Toggles */}
           <div className="flex bg-[#111] p-1 rounded-lg border border-gray-800 w-fit">
@@ -64,8 +104,11 @@ export default function CrmPage() {
         </div>
         
         <div className="flex gap-3 items-center">
-          <button className="bg-gray-800 hover:bg-gray-700 p-2 rounded-md border border-gray-700 transition-colors" title="Export CSV">
-            <FileDown size={18} className="text-gray-400" />
+          <button onClick={handlePrint} className="bg-gray-800 hover:bg-gray-700 p-2 rounded-md border border-gray-700 transition-colors" title="Print Leads">
+            <Printer size={18} className="text-gray-400" />
+          </button>
+          <button onClick={handleExportCSV} className="bg-gray-800 hover:bg-gray-700 p-2 rounded-md border border-gray-700 transition-colors" title="Download Excel">
+            <FileDown size={18} className="text-green-400" />
           </button>
           <button className="bg-sky-500 hover:bg-sky-600 px-4 py-2 rounded-md flex items-center gap-2 text-white shadow-lg transition-colors">
             <Plus size={16} /> 

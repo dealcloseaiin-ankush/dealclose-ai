@@ -10,6 +10,10 @@ export default function Catalog() {
     { _id: '60d0fe4f5311236168a109ca', propertyType: '2BHK Apartment', location: 'Andheri West, Mumbai', price: '1.5 Cr', status: 'listed', customerPhone: '+919876543210' },
     { _id: '60d0fe4f5311236168a109cb', propertyType: 'Commercial Shop', location: 'Connaught Place, Delhi', price: '50 Lakh', status: 'pending', customerPhone: '+919876543211' }
   ]);
+  const [pendingQuotes] = useState([
+    { id: 1, customer: 'Raju Hardware', items: 'Cement (50), Iron Rods (200kg)', matched: true, status: 'Needs Rate Approval' }
+  ]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', price: '', description: '' });
 
@@ -30,13 +34,20 @@ export default function Catalog() {
           <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 mb-2">Catalog & Listings</h1>
           <p className="text-gray-400">Manage your products, services, or real estate properties here. AI will use this data to answer customers.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-purple-600/30">+ Add New Item</button>
+        <div className="flex gap-3">
+          <button className="bg-[#111] hover:bg-gray-800 border border-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors">📥 Import Excel/CSV</button>
+          <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-purple-600/30">+ Add New Item</button>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="flex space-x-4 mb-6 border-b border-gray-800 pb-px">
         <button onClick={() => setActiveTab('products')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'products' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
           General Products Catalog
+        </button>
+        <button onClick={() => setActiveTab('quotes')} className={`pb-3 px-2 font-semibold transition-all duration-300 relative ${activeTab === 'quotes' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
+          B2B Smart Quotes
+          <span className="absolute top-0 right-0 -mt-1 -mr-3 bg-rose-500 text-white text-[10px] px-1.5 rounded-full">1</span>
         </button>
         <button onClick={() => setActiveTab('properties')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'properties' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
           AI Auto-Listed Properties
@@ -99,6 +110,33 @@ export default function Catalog() {
           </table>
         </div>
       )
+      ) : activeTab === 'quotes' ? (
+        <div className="space-y-6">
+          <div className="bg-[#111111] border border-blue-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl"></div>
+            <h2 className="text-xl font-bold text-white mb-2">Pending Quotation Approvals</h2>
+            <p className="text-gray-400 text-sm mb-6">AI has matched the customer's request with your Excel sheet. Enter your rates and approve the quote.</p>
+            
+            {pendingQuotes.map(quote => (
+              <div key={quote.id} className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-bold text-white text-lg">{quote.customer}</h3>
+                    <span className="bg-yellow-500/20 text-yellow-400 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{quote.status}</span>
+                  </div>
+                  <p className="text-gray-400 text-sm mb-2"><span className="text-gray-500">Requested Items:</span> {quote.items}</p>
+                  <div className="flex items-center gap-1 text-xs text-green-400 font-semibold">
+                    <span>✓</span> AI successfully matched items with Excel Catalog
+                  </div>
+                </div>
+                <div className="flex gap-3 w-full md:w-auto">
+                  <button className="flex-1 md:flex-none px-4 py-2 bg-[#0a0a0a] border border-gray-700 hover:bg-gray-800 rounded-lg text-white font-semibold transition-colors">Edit List</button>
+                  <button className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold shadow-lg shadow-blue-500/20 transition-colors">Enter Rates & Send</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
           <table className="w-full text-left border-collapse whitespace-nowrap">

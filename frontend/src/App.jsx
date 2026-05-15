@@ -31,6 +31,7 @@ import FAQ from './pages/FAQ';
 import Help from './pages/Help';
 import DataDeletion from './pages/DataDeletion';
 import AIGuideWidget from './components/AIGuideWidget';
+import DigitalCard from './pages/DigitalCard';
 
 export default function App() {
   return (
@@ -48,6 +49,9 @@ export default function App() {
         
         {/* ScanIQ Public Shareable Results Page */}
         <Route path="/scan/:scanId" element={<ResultsPage />} />
+        
+        {/* Public Digital Business Card (QR Code Destination) */}
+        <Route path="/card/:userId" element={<DigitalCard />} />
         
         {/* Onboarding Page (Replaces Setup) */}
         <Route path="/onboarding" element={<Onboarding />} />
