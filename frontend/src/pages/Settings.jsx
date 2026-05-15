@@ -22,12 +22,13 @@ export default function Settings() {
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFbSdkLoaded, setIsFbSdkLoaded] = useState(false);
 
   // Fetch saved settings on page load
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data } = await api.get('/settings');
+        const { data } = await api.get('/users/settings');
         const savedData = data.data || data; // Handle different backend response structures
         
         if (savedData) {
@@ -64,6 +65,7 @@ export default function Settings() {
         xfbml      : true,
         version    : 'v19.0'
       });
+      setIsFbSdkLoaded(true);
     };
     (function(d, s, id){
        var js, fjs = d.getElementsByTagName(s)[0];
@@ -75,6 +77,10 @@ export default function Settings() {
   }, []);
 
   const handleInstagramConnect = () => {
+    if (!isFbSdkLoaded || !window.FB) {
+      alert("Facebook System is still loading. Please wait a second and try again.");
+      return;
+    }
     window.FB.login((response) => {
       if (response.authResponse) {
         const accessToken = response.authResponse.accessToken;
@@ -115,7 +121,7 @@ export default function Settings() {
           website: config.websiteLink
         }
       };
-      await api.post('/settings', payload);
+      await api.post('/users/settings', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
     } catch (error) {
       alert('Error saving settings: ' + (error.response?.data?.message || error.message));
@@ -181,8 +187,13 @@ export default function Settings() {
             <p className="text-sm text-gray-400 mb-6">Connect your Instagram to enable Auto-DMs, Comment tracking, and AI Profile Growth Audits.</p>
             
             {!igConnected ? (
-              <button onClick={handleInstagramConnect} type="button" className="px-6 py-3 bg-gradient-to-r from-pink-600 to-orange-500 hover:from-pink-500 hover:to-orange-400 text-white font-bold rounded-xl shadow-lg transition-all">
-                Connect via Meta (Facebook)
+              <button 
+                onClick={handleInstagramConnect} 
+                type="button" 
+                disabled={!isFbSdkLoaded}
+                className={`px-6 py-3 font-bold rounded-xl shadow-lg transition-all ${isFbSdkLoaded ? 'bg-gradient-to-r from-pink-600 to-orange-500 hover:from-pink-500 hover:to-orange-400 text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
+              >
+                {isFbSdkLoaded ? 'Connect via Meta (Facebook)' : 'Loading Meta SDK...'}
               </button>
             ) : (
               <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">

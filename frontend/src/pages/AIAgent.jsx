@@ -9,7 +9,7 @@ export default function AIAgent() {
   useEffect(() => {
     const fetchQueries = async () => {
       try {
-        const { data } = await api.get('/ai/faqs');
+        const { data } = await api.get('/ai/training-data');
         setQueries(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Failed to load AI queries", error);
@@ -29,7 +29,7 @@ export default function AIAgent() {
     const answer = e.target.answer.value;
     if (!answer) return;
     try {
-      await api.put(`/ai/faqs/${id}/answer`, { answer });
+      await api.put(`/ai/training-data/${id}/answer`, { answer });
       setQueries(queries.filter(q => q._id !== id && q.id !== id));
       toast.success("🧠 AI has learned this answer!");
     } catch (error) {
