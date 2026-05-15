@@ -13,6 +13,7 @@ import Campaigns from './pages/Campaigns';
 import FlowBuilder from './pages/FlowBuilder';
 import MonthlyReport from './pages/MonthlyReport';
 import Automations from './pages/Automations';
+import TrackingAnalytics from './pages/TrackingAnalytics';
 import WhatsAppTemplates from './pages/WhatsAppTemplates';
 import Chats from './pages/Chats';
 import Contacts from './pages/Contacts';
@@ -32,6 +33,8 @@ import Help from './pages/Help';
 import DataDeletion from './pages/DataDeletion';
 import AIGuideWidget from './components/AIGuideWidget';
 import DigitalCard from './pages/DigitalCard';
+import AIVideoLanding from './pages/AIVideoLanding';
+import AIVideoDashboard from './pages/AIVideoDashboard';
 
 export default function App() {
   return (
@@ -46,6 +49,10 @@ export default function App() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/help" element={<Help />} />
         <Route path="/delete-data" element={<DataDeletion />} />
+        
+        {/* Secondary Landing Page for AI Video Product */}
+        <Route path="/ai-video" element={<AIVideoLanding />} />
+        <Route path="/ai-video/dashboard" element={<AIVideoDashboard />} />
         
         {/* ScanIQ Public Shareable Results Page */}
         <Route path="/scan/:scanId" element={<ResultsPage />} />
@@ -69,6 +76,7 @@ export default function App() {
             <Route path="monthly-report" element={<MonthlyReport />} />
             <Route path="chats" element={<Chats />} />
             <Route path="automations" element={<Automations />} />
+            <Route path="tracking-analytics" element={<TrackingAnalytics />} />
             <Route path="templates" element={<WhatsAppTemplates />} />
             <Route path="contacts" element={<Contacts />} />
             <Route path="crm" element={<CrmPage />} />

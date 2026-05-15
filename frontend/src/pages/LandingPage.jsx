@@ -120,6 +120,7 @@ export default function LandingPage() {
             <span className="text-blue-500">⚡</span> DealClose AI
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+            <Link to="/ai-video" className="text-pink-400 hover:text-pink-300 font-bold transition-colors flex items-center gap-1">🎥 AI Video Studio</Link>
             <a href="#scaniq" className="hover:text-green-400 transition-colors">Free AI Scanner</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
@@ -162,6 +163,12 @@ export default function LandingPage() {
           <a href="#features" className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-gray-800 text-white font-bold rounded-full transition-all text-lg w-full sm:w-auto">
             View Features
           </a>
+        </div>
+        
+        <div className="mt-10">
+          <Link to="/ai-video" className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-pink-500/10 border border-pink-500/30 text-sm font-bold text-pink-400 hover:bg-pink-500/20 transition-all hover:scale-105 shadow-[0_0_15px_rgba(236,72,153,0.1)]">
+            Try our new AI Video Studio 🎥 →
+          </Link>
         </div>
       </section>
 

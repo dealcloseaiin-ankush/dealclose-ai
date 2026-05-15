@@ -41,6 +41,7 @@ export default function Sidebar() {
       title: 'INTELLIGENCE',
       items: [
         { name: 'AI Agent', path: '/ai-agent', icon: '🧠' },
+        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: '📈' },
         { name: 'Order Dispatch', path: '/dispatch', icon: '📦' },
         { name: 'Calls', path: '/calls', icon: '📞' },
         { name: 'Analytics', path: '/monthly-report', icon: '📈' }
