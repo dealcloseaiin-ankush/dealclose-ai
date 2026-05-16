@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { Trash2, Edit } from 'lucide-react';
 
 export default function StaffManagement() {
-  const [staffList, setStaffList] = useState([
-    { id: 1, name: 'Rahul Sharma', phone: '+919876543210', role: 'sales', projects: 'Wholesale Leads' },
-    { id: 2, name: 'Priya Verma', phone: '+918765432109', role: 'support', projects: 'Customer Complaints' }
-  ]);
+  // Start with empty real staff list
+  const [staffList, setStaffList] = useState([]);
 
   const [editMode, setEditMode] = useState(null);
   const [formData, setFormData] = useState({ name: '', phone: '', role: 'sales', projects: '' });
@@ -70,7 +68,11 @@ export default function StaffManagement() {
 
         <div className="lg:col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {staffList.map(staff => (
+            {staffList.length === 0 ? (
+               <div className="col-span-2 bg-[#111] border border-gray-800 rounded-2xl p-10 text-center text-gray-500">
+                 No staff members added yet. Add your team to start routing leads!
+               </div>
+            ) : staffList.map(staff => (
               <div key={staff.id} className="bg-[#111] border border-gray-800 rounded-2xl p-5 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-lg text-white">{staff.name}</h3>

@@ -35,6 +35,7 @@ export default function Dashboard() {
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
 
   const [clients, setClients] = useState([]);
+  const [activeBusiness, setActiveBusiness] = useState('Main Business');
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
 
   useEffect(() => {
@@ -71,11 +72,17 @@ export default function Dashboard() {
       {/* Header */}
       <div className="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight mb-2">
+          <div className="flex items-center gap-4 mb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
               Overview Dashboard
             </span>
-          </h1>
+            </h1>
+            <select value={activeBusiness} onChange={(e) => setActiveBusiness(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
+              <option value="Main Business">🏢 Main Business</option>
+              <option value="Real Estate Branch">🏡 Real Estate Branch</option>
+            </select>
+          </div>
           <p className="text-gray-400 text-lg">Welcome back. Here is how your AI Agent is performing today.</p>
         </div>
         <Link to="/automations" className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/30 transition-all text-center">

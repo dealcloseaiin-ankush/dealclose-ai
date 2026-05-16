@@ -23,11 +23,8 @@ export default function Campaigns() {
     }
   ];
 
-  // Mock campaigns if store is empty
-  const displayData = campaigns.length > 0 ? campaigns : [
-    { name: 'Diwali Offer Blast', target: 'High Intent Electronics', platform: 'WhatsApp', status: 'Completed' },
-    { name: 'Cart Recovery (Drip)', target: 'Window Shoppers', platform: 'WhatsApp', status: 'Running' }
-  ];
+  // Show only real campaigns
+  const displayData = campaigns;
 
   const handleCreate = (e) => {
     e.preventDefault();
