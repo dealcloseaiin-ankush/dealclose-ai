@@ -34,6 +34,8 @@ exports.verifyWhatsAppWebhook = async (req, res) => {
 // @desc    Handle incoming WhatsApp messages & Delivery Status (Meta API)
 // @route   POST /api/webhooks/whatsapp 
 exports.handleWhatsApp = async (req, res) => {
+  console.log("\n================ [META WEBHOOK INCOMING] ================");
+  console.log("➡️ Raw Payload:", JSON.stringify(req.body, null, 2));
   try {
     const body = req.body;
 
@@ -45,10 +47,16 @@ exports.handleWhatsApp = async (req, res) => {
         const phoneNumberId = value.metadata.phone_number_id;
         const user = await User.findOne({ "whatsappConfig.phoneNumberId": phoneNumberId });
         
-        if (!user) continue;
+        if (!user) {
+          console.error(`❌ [Webhook Error] No user found with phoneNumberId: ${phoneNumberId}`);
+          continue;
+        } else {
+          console.log(`✅ [Webhook] User found: ${user.email} for Phone ID: ${phoneNumberId}`);
+        }
 
         // 1. CHECK FOR STATUS UPDATES
         if (value.statuses && value.statuses.length > 0) {
+          console.log(`➡️ [Webhook] Status update received: ${value.statuses[0].status} for message ID: ${value.statuses[0].id}`);
           const statusStr = value.statuses[0].status; 
           if (statusStr === 'sent') user.messageStats.sent += 1;
           if (statusStr === 'delivered') user.messageStats.delivered += 1;
@@ -60,6 +68,7 @@ exports.handleWhatsApp = async (req, res) => {
         if (value.messages && value.messages.length > 0) {
           const msg = value.messages[0];
           const fromNumber = msg.from;
+          console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
           
           if (msg.type === 'image') {
             const mediaId = msg.image.id;
@@ -100,7 +109,7 @@ exports.handleWhatsApp = async (req, res) => {
             if (isOwnerOrStaff) {
               const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
-              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose Admin Bot:*\n\n${aiAdminResponse}`);
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Admin:*\n\n${aiAdminResponse}`);
               continue; 
             }
 
@@ -110,7 +119,7 @@ exports.handleWhatsApp = async (req, res) => {
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               const interactiveObj = {
                 type: "list",
-                header: { type: "text", text: "Welcome to DealClose Group" },
+                header: { type: "text", text: "Welcome to DealClose AI" },
                 body: { text: "Please select the business division you want to interact with today:" },
                 footer: { text: "Powered by DealClose AI" },
                 action: {
@@ -151,7 +160,7 @@ exports.handleWhatsApp = async (req, res) => {
                   await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
                 }
               
-                const aiContext = "You are a real estate AI assistant for newpropertyhub.in. Be polite. Help users list properties, talk to brokers, extract property details, and arrange calls if they request it.";
+                const aiContext = "You are a helpful AI assistant for DealClose AI. Be polite. Help users, extract details, and arrange calls if they request it.";
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
