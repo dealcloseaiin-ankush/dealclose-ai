@@ -96,6 +96,9 @@ exports.sendManualMessage = async (req, res) => {
       await newMsg.save();
       
       console.error(`❌ [DEBUG Chat Flow] 7. ERROR: Meta API Rejected the message. Reason: ${exactError}`);
+      if (exactError.includes('24 hours') || exactError.includes('131047')) {
+        console.error(`🚨 [CRITICAL]: Meta blocked the message! The customer ${formattedPhone} MUST message you first to open the 24-hour session. Sending a message from Dashboard does NOT open the window!`);
+      }
       // Return 201 instead of 500 so the frontend adds the "failed" message to the UI seamlessly
       return res.status(201).json({ message: newMsg });
     }

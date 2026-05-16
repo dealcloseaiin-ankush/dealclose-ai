@@ -25,7 +25,7 @@ export default function CrmPage() {
 
   const fetchPipeline = async () => {
     try {
-      const res = await api.get('/api/crm/pipeline');
+      const res = await api.get('/crm/pipeline');
       setPipelineData(res.data.data);
       // Flatten data for list view
       const allContacts = [];

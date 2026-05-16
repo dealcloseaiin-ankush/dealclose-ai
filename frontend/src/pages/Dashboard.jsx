@@ -35,6 +35,7 @@ export default function Dashboard() {
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
 
   const [clients, setClients] = useState([]);
+  const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,6 +46,13 @@ export default function Dashboard() {
         if (isSuperAdmin) {
            const clientsRes = await api.get('/users/clients').catch(() => ({ data: [] }));
            setClients(Array.isArray(clientsRes.data) ? clientsRes.data : []);
+        }
+
+        // Fetch Real WhatsApp Message Stats from User Profile
+        const userRes = await api.get('/users/settings').catch(() => null);
+        const userData = userRes?.data?.data || userRes?.data;
+        if (userData?.messageStats) {
+          setMessageStats(userData.messageStats);
         }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
@@ -94,6 +102,27 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Real-time WhatsApp Delivery Stats */}
+      <div className="mb-10 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-xl">
+        <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+          <span className="text-green-500">📱</span> WhatsApp API Delivery Report
+        </h3>
+        <div className="grid grid-cols-3 gap-4 text-center divide-x divide-gray-800">
+          <div>
+            <p className="text-3xl font-bold text-blue-400">{messageStats.sent}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-bold">Total Sent</p>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-purple-400">{messageStats.delivered}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-bold">Delivered (Double Tick)</p>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-green-400">{messageStats.read}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-bold">Read (Blue Tick)</p>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -102,7 +131,7 @@ export default function Dashboard() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl"></div>
           <h3 className="text-lg font-bold text-white mb-6">AI Lead Categorization</h3>
           
-          <div className="h-64 w-full pt-4 relative z-10">
+          <div className="h-64 w-full pt-4 relative z-10" style={{ minWidth: '100%', minHeight: '250px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={data.graphData} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">

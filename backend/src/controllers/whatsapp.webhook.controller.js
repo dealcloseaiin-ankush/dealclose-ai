@@ -64,7 +64,9 @@ exports.handleWhatsApp = async (req, res) => {
           
           // Agar 24-hour rule ya kisi aur wajah se fail ho jaye
           if (statusStr === 'failed') {
-             console.error(`❌ [Webhook] Message Failed to send. Reason: ${value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown'}`);
+             const failReason = value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown';
+             console.error(`❌ [Webhook] Message Failed to send. Reason: ${failReason}`);
+             if (failReason.includes('24 hours')) console.error(`🔍 [DEBUG RULE]: Remember, the customer must message your number first to start the 24-hour clock.`);
              // Aap message ka status database me update kar sakte hain
              await Message.findOneAndUpdate(
                { customerPhone: value.statuses[0].recipient_id, status: 'sent' },
@@ -80,6 +82,7 @@ exports.handleWhatsApp = async (req, res) => {
           const msg = value.messages[0];
           const fromNumber = msg.from;
           console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
+          console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
           
           if (msg.type === 'image') {
             const mediaId = msg.image.id;

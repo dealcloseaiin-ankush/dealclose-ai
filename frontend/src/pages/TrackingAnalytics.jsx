@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Users, MousePointerClick, ShoppingCart, UserCheck } from 'lucide-react';
+import api from '../services/api';
 
 const KpiCard = ({ title, icon, stats, color, timeframe }) => {
-  const isPositive = stats.growth.startsWith('+');
+  const isPositive = stats.growth?.startsWith('+') || parseFloat(stats.growth) >= 0;
   const IconComponent = icon;
   return (
     <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-lg">
@@ -12,45 +13,72 @@ const KpiCard = ({ title, icon, stats, color, timeframe }) => {
         </div>
         <span className={`flex items-center gap-1 text-sm font-bold px-2 py-1 rounded-full ${isPositive ? 'text-emerald-400 bg-emerald-400/10' : 'text-rose-400 bg-rose-400/10'}`}>
           {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          {stats.growth}
+          {stats.growth || '0%'}
         </span>
       </div>
       <h3 className="text-gray-400 text-sm font-semibold mb-1">{title}</h3>
       <p className="text-3xl font-extrabold text-white">{stats.current}</p>
-      <p className="text-xs text-gray-500 mt-2">vs {stats.previous} last {timeframe.replace('ly', '')}</p>
+      <p className="text-xs text-gray-500 mt-2">vs {stats.previous || 0} last {timeframe.replace('ly', '')}</p>
     </div>
   );
 };
 
+// Default Empty Data for Real Live Implementation
+const defaultData = {
+  daily: {
+    visitors: { current: 0, previous: 0, growth: '0%' },
+    clicks: { current: 0, previous: 0, growth: '0%' },
+    carts: { current: 0, previous: 0, growth: '0%' },
+    leads: { current: 0, previous: 0, growth: '0%' },
+    chart: [0, 0, 0, 0, 0, 0, 0] 
+  },
+  weekly: {
+    visitors: { current: 0, previous: 0, growth: '0%' },
+    clicks: { current: 0, previous: 0, growth: '0%' },
+    carts: { current: 0, previous: 0, growth: '0%' },
+    leads: { current: 0, previous: 0, growth: '0%' },
+    chart: [0, 0, 0, 0, 0, 0, 0] 
+  },
+  monthly: {
+    visitors: { current: 0, previous: 0, growth: '0%' },
+    clicks: { current: 0, previous: 0, growth: '0%' },
+    carts: { current: 0, previous: 0, growth: '0%' },
+    leads: { current: 0, previous: 0, growth: '0%' },
+    chart: [0, 0, 0, 0, 0, 0, 0]
+  }
+};
+
 export default function TrackingAnalytics() {
   const [timeframe, setTimeframe] = useState('weekly'); // daily, weekly, monthly
+  const [loading, setLoading] = useState(true);
+  const [realData, setRealData] = useState(null);
 
-  // Mock Data Based on Timeframe
-  const data = {
-    daily: {
-      visitors: { current: 145, previous: 120, growth: '+20.8%' },
-      clicks: { current: 320, previous: 350, growth: '-8.5%' },
-      carts: { current: 24, previous: 18, growth: '+33.3%' },
-      leads: { current: 12, previous: 8, growth: '+50.0%' },
-      chart: [40, 55, 30, 80, 100, 145, 90] // Last 7 hours or 7 days
-    },
-    weekly: {
-      visitors: { current: 1250, previous: 980, growth: '+27.5%' },
-      clicks: { current: 3400, previous: 3100, growth: '+9.6%' },
-      carts: { current: 180, previous: 145, growth: '+24.1%' },
-      leads: { current: 85, previous: 60, growth: '+41.6%' },
-      chart: [800, 950, 1100, 1050, 1250, 1400, 1250] // Last 7 weeks
-    },
-    monthly: {
-      visitors: { current: 5400, previous: 4200, growth: '+28.5%' },
-      clicks: { current: 15200, previous: 13000, growth: '+16.9%' },
-      carts: { current: 650, previous: 500, growth: '+30.0%' },
-      leads: { current: 320, previous: 250, growth: '+28.0%' },
-      chart: [3000, 3200, 4100, 3900, 4800, 5400, 6000] // Last 7 months
-    }
-  };
+  useEffect(() => {
+    const fetchRealTrackingData = async () => {
+      setLoading(true);
+      try {
+        // Fetching real data from your tracking backend
+        const res = await api.get('/tracking/stats');
+        if (res.data && res.data.daily) {
+          setRealData(res.data);
+        } else {
+          setRealData(defaultData);
+        }
+      } catch (error) {
+        console.log("No real tracking data yet, showing live empty state.", error.message);
+        setRealData(defaultData);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRealTrackingData();
+  }, []);
 
-  const currentData = data[timeframe];
+  if (loading || !realData) {
+    return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div></div>;
+  }
+
+  const currentData = realData[timeframe];
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-6 md:p-10 bg-[#050505] text-gray-100 font-sans">
