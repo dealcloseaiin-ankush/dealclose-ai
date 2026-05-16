@@ -36,6 +36,9 @@ import DigitalCard from './pages/DigitalCard';
 import AIVideoLanding from './pages/AIVideoLanding';
 import AIVideoDashboard from './pages/AIVideoDashboard';
 
+// Placeholder component for Change Password until we build the real one
+const ChangePasswordPlaceholder = () => <div className="p-10 text-white text-center"><h1 className="text-3xl font-bold text-blue-400">Change Password</h1><p className="mt-4 text-gray-400">This feature is currently under development. Coming soon!</p></div>;
+
 export default function App() {
   return (
     <Router>
@@ -83,6 +86,7 @@ export default function App() {
             <Route path="calls" element={<Calls />} />
             <Route path="wallet" element={<Wallet />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="change-password" element={<ChangePasswordPlaceholder />} />
             <Route path="staff" element={<StaffManagement />} />
             <Route path="forms" element={<Forms />} />
             <Route path="instagram-automation" element={<InstagramAutomation />} />

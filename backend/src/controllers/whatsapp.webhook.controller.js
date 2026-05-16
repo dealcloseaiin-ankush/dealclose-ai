@@ -214,6 +214,24 @@ exports.handleWhatsApp = async (req, res) => {
                         responseMessage = "No problem! Let me know if you change your mind in the future.";
                         repliedBy = 'ai-tool-lead-lost';
                       }
+                    } else if (toolCall.function.name === "create_saas_account") {
+                      const accData = JSON.parse(toolCall.function.arguments);
+                      const tempPassword = Math.random().toString(36).slice(-8); // Generate 8-char random password
+                      
+                      let existingUser = await User.findOne({ email: accData.email });
+                      if (existingUser) {
+                        responseMessage = `An account with the email ${accData.email} already exists! You can log in directly at dealcloseai.in.`;
+                      } else {
+                        const newUser = await User.create({
+                          fullName: accData.fullName,
+                          email: accData.email,
+                          password: tempPassword,
+                          businessDescription: accData.businessDescription,
+                          aiCredits: 100 // Free trial credits
+                        });
+                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
+                      }
+                      repliedBy = 'ai-admin-onboard';
                     }
                   }
                 } else {
@@ -221,7 +239,7 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               } catch (aiError) {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
-                responseMessage = "Oops! My AI brain is disconnected. 🧠🔌\n\n*(System Error: Please add a valid OPENAI_API_KEY in your Render Environment Variables)*";
+                responseMessage = "Oops! DealClose AI is currently unable to connect to the network. 🧠🔌\n\nOur engineers are working on it. Please try again in a few minutes.";
                 repliedBy = 'ai-error';
               }
               } 

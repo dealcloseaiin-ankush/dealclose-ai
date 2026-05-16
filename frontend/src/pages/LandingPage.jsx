@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api'; // Axios instance for making backend calls
 
@@ -52,6 +52,24 @@ export default function LandingPage() {
       cta: "Get Pro Plan"
     }
   ];
+
+  // Inject Tracking Pixel for Self-Automation (Dogfooding)
+  useEffect(() => {
+    if (!document.getElementById('dealclose-tracker')) {
+      const script = document.createElement('script');
+      script.id = 'dealclose-tracker';
+      script.innerHTML = `
+        !function(e,t,n,a){var c=e.DealCloseTracker=e.DealCloseTracker||[];
+        c.init=function(e){c.apiKey=e};var r=t.createElement(n),
+        s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://dealclose-ai.onrender.com/api/pixel.js",
+        s.parentNode.insertBefore(r,s)}(window,document,"script");
+        
+        DealCloseTracker.init("SUPER_ADMIN_ID_HERE"); // Optional: Replace with your actual Admin User ID
+        DealCloseTracker.track("page_view");
+      `;
+      document.head.appendChild(script);
+    }
+  }, []);
 
   // Handle File Upload and start Polling
   const handleScreenshotUpload = async (e) => {

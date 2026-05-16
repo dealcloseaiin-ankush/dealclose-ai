@@ -213,6 +213,23 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
               required: ["reason", "productCategory"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "create_saas_account",
+            description: "ONLY USE THIS IF A USER WANTS TO SIGN UP OR BUY DEALCLOSE AI FOR THEIR BUSINESS. Ask for their Name, Email, Business Name, and Description, then use this tool to create their account.",
+            parameters: {
+              type: "object",
+              properties: {
+                fullName: { type: "string" },
+                email: { type: "string" },
+                businessName: { type: "string" },
+                businessDescription: { type: "string", description: "Short description of what their business does" }
+              },
+              required: ["fullName", "email", "businessName", "businessDescription"]
+            }
+          }
         }
       ],
       tool_choice: "auto"

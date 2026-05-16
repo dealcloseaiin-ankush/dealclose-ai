@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
-import { Eye, EyeOff } from 'lucide-react'; // Icons for viewing tokens
+import { Eye, EyeOff, Shield } from 'lucide-react'; // Icons for viewing tokens
 
 export default function Settings() {
   const [config, setConfig] = useState({
@@ -23,6 +23,9 @@ export default function Settings() {
   const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFbSdkLoaded, setIsFbSdkLoaded] = useState(false);
+  
+  const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [isChangingPass, setIsChangingPass] = useState(false);
 
   // Fetch saved settings on page load
   useEffect(() => {
@@ -128,6 +131,22 @@ export default function Settings() {
     }
   };
 
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passData.newPassword !== passData.confirmPassword) return alert("New passwords do not match!");
+    
+    setIsChangingPass(true);
+    try {
+      await api.post('/users/change-password', { oldPassword: passData.oldPassword, newPassword: passData.newPassword });
+      alert("Password changed successfully!");
+      setPassData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to change password. Please check your old password.");
+    } finally {
+      setIsChangingPass(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
       <div className="max-w-4xl mx-auto">
@@ -143,6 +162,7 @@ export default function Settings() {
         {isLoading ? (
           <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500"></div></div>
         ) : (
+          <>
           <form onSubmit={handleSave} className="space-y-8">
           {/* WhatsApp Meta Config */}
           <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
@@ -268,6 +288,34 @@ export default function Settings() {
             Save Configurations
           </button>
           </form>
+
+          {/* Security & Password Section (Separate Form) */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800 mt-12">
+            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+               <Shield className="text-blue-400" /> Security & Password
+            </h2>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-md">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Current Password</label>
+                <input type="password" required value={passData.oldPassword} onChange={e => setPassData({...passData, oldPassword: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+                <p className="text-xs text-gray-500 mt-1">Enter the temporary password if AI generated your account.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">New Password</label>
+                <input type="password" required minLength="6" value={passData.newPassword} onChange={e => setPassData({...passData, newPassword: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Confirm New Password</label>
+                <input type="password" required minLength="6" value={passData.confirmPassword} onChange={e => setPassData({...passData, confirmPassword: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+              </div>
+              
+              <button type="submit" disabled={isChangingPass} className="w-full py-3 mt-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-lg shadow-blue-600/20">
+                {isChangingPass ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
+          </div>
+          </>
+
         )}
       </div>
     </div>
