@@ -65,6 +65,7 @@ export default function WhatsAppTemplates() {
       fetchTemplates();
       alert("Template deleted successfully!");
     } catch (error) {
+      console.error("Delete failed:", error);
       alert("Failed to delete template. Make sure your backend supports DELETE /whatsapp/templates/:name");
     }
   };
