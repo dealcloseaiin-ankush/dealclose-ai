@@ -61,6 +61,17 @@ exports.handleWhatsApp = async (req, res) => {
           if (statusStr === 'sent') user.messageStats.sent += 1;
           if (statusStr === 'delivered') user.messageStats.delivered += 1;
           if (statusStr === 'read') user.messageStats.read += 1;
+          
+          // Agar 24-hour rule ya kisi aur wajah se fail ho jaye
+          if (statusStr === 'failed') {
+             console.error(`❌ [Webhook] Message Failed to send. Reason: ${value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown'}`);
+             // Aap message ka status database me update kar sakte hain
+             await Message.findOneAndUpdate(
+               { customerPhone: value.statuses[0].recipient_id, status: 'sent' },
+               { $set: { status: 'failed', messageText: `[⚠️ Failed: 24-Hour Window Closed]` } },
+               { sort: { timestamp: -1 } } // Update the latest message
+             );
+          }
           await user.save();
         }
 
