@@ -171,7 +171,10 @@ exports.handleWhatsApp = async (req, res) => {
                   await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
                 }
               
-                const aiContext = "You are a helpful AI assistant for DealClose AI. Be polite. Help users, extract details, and arrange calls if they request it.";
+              try {
+                // Har SaaS User ka apna personal AI context! 
+                const businessInfo = user.businessDescription || "a modern business";
+                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. Business details: ${businessInfo}. Be polite, help users, extract details, and arrange calls if they request it.`;
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
@@ -216,6 +219,11 @@ exports.handleWhatsApp = async (req, res) => {
                 } else {
                   responseMessage = aiMessage.content;
                 }
+              } catch (aiError) {
+                console.error("❌ [AI API Error]:", aiError.message || aiError);
+                responseMessage = "Oops! My AI brain is disconnected. 🧠🔌\n\n*(System Error: Please add a valid OPENAI_API_KEY in your Render Environment Variables)*";
+                repliedBy = 'ai-error';
+              }
               } 
             }
 

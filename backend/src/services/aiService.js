@@ -1,12 +1,14 @@
 const { OpenAI } = require('openai');
 
-// 🚀 MAGIC TRICK: Using Gemini API through OpenAI Compatibility Layer!
+// 🚀 SMART AI SWITCHER: Automatically switch between Gemini & OpenAI
+const useGemini = !!process.env.GEMINI_API_KEY;
+
 const openai = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || 'sk-dummy-key',
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  apiKey: useGemini ? process.env.GEMINI_API_KEY : (process.env.OPENAI_API_KEY || 'sk-dummy-key'),
+  baseURL: useGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined
 });
 
-const GEMINI_MODEL = "gemini-1.5-flash";
+const AI_MODEL = useGemini ? "gemini-1.5-flash" : "gpt-4o";
 
 /**
  * Generates a response from OpenAI's chat model.
@@ -31,7 +33,7 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
         { role: "system", content: finalContext },
         { role: "user", content: prompt }
       ],
-      model: GEMINI_MODEL,
+      model: AI_MODEL,
     });
     return completion.choices[0].message.content;
   } catch (error) {
@@ -63,7 +65,7 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
         { role: "system", content: finalContext },
         { role: "user", content: prompt }
       ],
-      model: GEMINI_MODEL, // Gemini 1.5 Flash supports Function Calling!
+      model: AI_MODEL, // Supports Function Calling!
       tools: [
         {
           type: "function",
