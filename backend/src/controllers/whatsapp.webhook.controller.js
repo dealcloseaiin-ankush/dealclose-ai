@@ -105,9 +105,18 @@ exports.handleWhatsApp = async (req, res) => {
             let selectedContext = interactiveType === 'list_reply' ? msg.interactive.list_reply.id : msg.interactive.button_reply.id;
             
             let responseMessage = "Got it! How can I help you today?";
-            if (selectedContext === 'menu_real_estate') responseMessage = "Welcome to our Real Estate division! 🏢 Are you looking to buy, sell, or rent a property?";
-            else if (selectedContext === 'menu_electronics') responseMessage = "Welcome to our Electronics Store! 💻 Are you looking for Mobiles, Laptops, or Accessories?";
-            else if (selectedContext === 'menu_support') responseMessage = "You have reached Customer Support. 🎧 Please describe your issue, and our team will assist you shortly.";
+            
+            // 🚀 DYNAMIC WORKSPACE ROUTING
+            // Yahan hum hardcoded names ('menu_real_estate') ki jagah unique IDs match kar rahe hain
+            if (selectedContext.startsWith('workspace_')) {
+              const workspaceId = selectedContext.replace('workspace_', ''); // e.g., '12345'
+              
+              // TODO: Future me hum DB se us workspaceId ki detail nikalenge
+              // aur us particular business ka welcome message bhejenge.
+              // Sath hi is chat/lead me tag laga denge ki ye is workspace ki hai.
+              
+              responseMessage = "You have selected this business profile. How can I assist you further today?";
+            }
 
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
             await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
@@ -131,9 +140,27 @@ exports.handleWhatsApp = async (req, res) => {
             
             const incomingTextLower = incomingText.toLowerCase();
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
+              
+              // 🚀 DYNAMIC MENU GENERATOR
+              // Agar user ne multiple businesses (workspaces) add kiye hain, toh unki list banayenge
+              let menuRows = [];
+              
+              if (user.workspaces && user.workspaces.length > 0) {
+                menuRows = user.workspaces.map(w => ({
+                  id: `workspace_${w._id}`, // Hidden ID bheji jayegi
+                  title: w.name.substring(0, 24), // Meta restricts title to 24 chars max
+                  description: (w.description || "View our services").substring(0, 72)
+                }));
+              } else {
+                // Fallback: Agar usne koi secondary business nahi banaya hai, toh uska main naam dikhayenge
+                menuRows = [
+                  { id: `workspace_default`, title: (user.businessName || "Main Business").substring(0, 24), description: "Explore our products and services" }
+                ];
+              }
+
               const interactiveObj = {
                 type: "list",
-                header: { type: "text", text: "Welcome to DealClose AI" },
+                header: { type: "text", text: `Welcome to ${user.fullName || 'Our Business'}` },
                 body: { text: "Please select the business division you want to interact with today:" },
                 footer: { text: "Powered by DealClose AI" },
                 action: {
@@ -141,11 +168,7 @@ exports.handleWhatsApp = async (req, res) => {
                   sections: [
                     {
                       title: "Our Divisions",
-                      rows: [
-                        { id: "menu_real_estate", title: "🏢 Real Estate", description: "Buy, sell, or rent properties" },
-                        { id: "menu_electronics", title: "💻 Electronics Store", description: "Mobiles, Laptops, Gadgets" },
-                        { id: "menu_support", title: "🎧 Customer Support", description: "Raise a complaint or query" }
-                      ]
+                      rows: menuRows
                     }
                   ]
                 }

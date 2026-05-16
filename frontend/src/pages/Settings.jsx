@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
-import { Eye, EyeOff, Shield } from 'lucide-react'; // Icons for viewing tokens
+import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase } from 'lucide-react'; // Icons for viewing tokens
 
 export default function Settings() {
   const [config, setConfig] = useState({
@@ -14,7 +14,8 @@ export default function Settings() {
     facebookLink: '',
     youtubeLink: '',
     googleReviewLink: '',
-    websiteLink: ''
+    websiteLink: '',
+    workspaces: [] // Store multiple businesses here
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -46,7 +47,8 @@ export default function Settings() {
             facebookLink: savedData.digitalCardConfig?.facebook || '',
             youtubeLink: savedData.digitalCardConfig?.youtube || '',
             googleReviewLink: savedData.digitalCardConfig?.googleReview || '',
-            websiteLink: savedData.digitalCardConfig?.website || ''
+            websiteLink: savedData.digitalCardConfig?.website || '',
+            workspaces: savedData.workspaces || [] // Fetch saved workspaces
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -101,6 +103,22 @@ export default function Settings() {
     setConfig({ ...config, [e.target.name]: e.target.value });
   };
 
+  // Workspace Management Functions
+  const handleWorkspaceChange = (index, field, value) => {
+    const updatedWorkspaces = [...config.workspaces];
+    updatedWorkspaces[index][field] = value;
+    setConfig({ ...config, workspaces: updatedWorkspaces });
+  };
+
+  const addWorkspace = () => {
+    setConfig({ ...config, workspaces: [...config.workspaces, { name: '', description: '' }] });
+  };
+
+  const removeWorkspace = (index) => {
+    const updatedWorkspaces = config.workspaces.filter((_, i) => i !== index);
+    setConfig({ ...config, workspaces: updatedWorkspaces });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     try {
@@ -122,7 +140,8 @@ export default function Settings() {
           youtube: config.youtubeLink,
           googleReview: config.googleReviewLink,
           website: config.websiteLink
-        }
+        },
+        workspaces: config.workspaces // Send workspaces to backend
       };
       await api.post('/users/settings', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
@@ -191,6 +210,41 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-gray-400 mb-2">WABA ID (Business Account ID)</label>
                 <input type="text" name="wabaId" value={config.wabaId} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" placeholder="e.g. 1234567890" />
               </div>
+            </div>
+          </div>
+
+          {/* Multiple Businesses (Workspaces) Config */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-blue-500/20">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-blue-400 flex items-center gap-2">
+                 <Briefcase size={20}/> Business Profiles (Workspaces)
+              </h2>
+              <button type="button" onClick={addWorkspace} className="flex items-center gap-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">
+                <Plus size={16} /> Add Business
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 mb-6">Add your different businesses, branches, or divisions here. These will automatically appear as a <b>Menu</b> when a customer messages you "Hi" on WhatsApp.</p>
+            
+            <div className="space-y-4">
+              {config.workspaces.length === 0 ? (
+                <div className="text-center p-6 border border-dashed border-gray-700 rounded-xl text-gray-500">No additional businesses added yet. Your default business profile will be used.</div>
+              ) : (
+                config.workspaces.map((workspace, index) => (
+                  <div key={index} className="flex flex-col md:flex-row gap-4 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800 relative group">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Business / Branch Name</label>
+                      <input type="text" required value={workspace.name} onChange={(e) => handleWorkspaceChange(index, 'name', e.target.value)} placeholder="e.g. DealClose Electronics" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 outline-none" maxLength={24} />
+                    </div>
+                    <div className="flex-[2]">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Short Description (Appears in Menu)</label>
+                      <input type="text" required value={workspace.description} onChange={(e) => handleWorkspaceChange(index, 'description', e.target.value)} placeholder="e.g. Buy latest laptops and mobiles" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 outline-none" maxLength={72} />
+                    </div>
+                    <button type="button" onClick={() => removeWorkspace(index)} className="md:mt-6 p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors h-fit" title="Remove Business">
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

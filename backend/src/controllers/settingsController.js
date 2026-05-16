@@ -36,6 +36,15 @@ exports.saveSettings = async (req, res) => {
     if (updates.pinCode !== undefined) updateData.servedPinCodes = [updates.pinCode];
     if (updates.businessDesc !== undefined) updateData.businessDescription = updates.businessDesc;
     if (updates.businessUrls !== undefined) updateData.businessUrls = updates.businessUrls;
+    
+    // Save multiple Workspaces/Businesses
+    if (updates.workspaces !== undefined) {
+      // Filter out any empty rows just to be safe
+      updateData.workspaces = updates.workspaces.filter(w => w.name && w.name.trim() !== '');
+      
+      // Note: Mongoose automatically generates a unique _id for each item 
+      // inside an array of subdocuments when we save it!
+    }
 
     // Merge existing whatsappConfig with new updates (Overwrites old data securely)
     const currentWaConfig = user.whatsappConfig || {};

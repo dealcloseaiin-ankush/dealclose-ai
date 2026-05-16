@@ -35,6 +35,7 @@ import AIGuideWidget from './components/AIGuideWidget';
 import DigitalCard from './pages/DigitalCard';
 import AIVideoLanding from './pages/AIVideoLanding';
 import AIVideoDashboard from './pages/AIVideoDashboard';
+import WhatsAppRules from './pages/WhatsAppRules';
 
 // Placeholder component for Change Password until we build the real one
 const ChangePasswordPlaceholder = () => <div className="p-10 text-white text-center"><h1 className="text-3xl font-bold text-blue-400">Change Password</h1><p className="mt-4 text-gray-400">This feature is currently under development. Coming soon!</p></div>;
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="staff" element={<StaffManagement />} />
             <Route path="forms" element={<Forms />} />
             <Route path="instagram-automation" element={<InstagramAutomation />} />
+            <Route path="whatsapp-rules" element={<WhatsAppRules />} />
           </Route>
         </Route>
       </Routes>

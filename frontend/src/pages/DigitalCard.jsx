@@ -60,6 +60,11 @@ export default function DigitalCard() {
 
         {/* Social Links & Ratings */}
         <div className="space-y-3 mb-8">
+          {cardLinks?.upiId && (
+            <a href={`upi://pay?pa=${cardLinks.upiId}&pn=Business&cu=INR`} className="flex items-center justify-center gap-2 w-full py-3 bg-emerald-600 rounded-xl font-bold hover:opacity-90 transition shadow-[0_0_15px_rgba(5,150,105,0.4)]">
+              💸 Pay securely via UPI
+            </a>
+          )}
           {cardLinks?.website && (
             <a href={cardLinks.website} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 rounded-xl font-bold hover:opacity-90 transition">
               🌐 Visit Our Website
