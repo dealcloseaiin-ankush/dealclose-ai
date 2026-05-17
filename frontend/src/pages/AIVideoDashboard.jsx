@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Image, Video, Music, LayoutTemplate, Play, Download, Loader2 } from 'lucide-react';
-import api from '../services/api';
 import toast from 'react-hot-toast';
 
 export default function AIVideoDashboard() {
@@ -10,25 +9,27 @@ export default function AIVideoDashboard() {
   const [loading, setLoading] = useState(false);
   const [generatedAsset, setGeneratedAsset] = useState(null);
 
-  // Mock API Call for Image Generation
+  // Mock Process for Image Generation (No backend required)
   const handleGenerateImage = async (e) => {
     e.preventDefault();
     if (!prompt) return toast.error("Please enter a prompt!");
     
     setLoading(true);
     try {
-      // Using the backend route we already set up in videoRoutes.js
-      const res = await api.post('/video/generate-image', { prompt, style: 'realistic' });
-      setGeneratedAsset({ type: 'image', url: res.data.url });
+      // Simulate AI Processing Delay for 3 seconds
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // Provide a high-quality placeholder image for demo
+      setGeneratedAsset({ type: 'image', url: 'https://images.unsplash.com/photo-1618331835717-801e976710b2?q=80&w=1000&auto=format&fit=crop' });
       toast.success("Image generated successfully!");
     } catch (error) {
+      console.error("Image Generation Error:", error);
       toast.error("Failed to generate image.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock API Call for Image to Video Animation
+  // Mock Process for Image to Video Animation
   const handleAnimateVideo = async (e) => {
     e.preventDefault();
     if (!generatedAsset || generatedAsset.type !== 'image') {
@@ -37,10 +38,13 @@ export default function AIVideoDashboard() {
     
     setLoading(true);
     try {
-      const res = await api.post('/video/animate-image', { imageUrl: generatedAsset.url, prompt });
-      setGeneratedAsset({ type: 'video', url: res.data.url });
+      // Simulate AI Processing Delay for 4 seconds
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      // Provide a placeholder demo video (free sample video)
+      setGeneratedAsset({ type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' });
       toast.success("Video animated successfully!");
     } catch (error) {
+      console.error("Video Animation Error:", error);
       toast.error("Failed to animate video.");
     } finally {
       setLoading(false);

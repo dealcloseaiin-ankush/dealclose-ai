@@ -54,6 +54,25 @@ export default function Automations() {
         <div className="mt-6 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-sm text-emerald-400 font-medium">
           ✅ Status: Ready to track! Your unique tracking ID is already inserted.
         </div>
+
+        {/* Setup Instructions */}
+        <div className="mt-10 pt-8 border-t border-gray-800">
+          <h3 className="text-xl font-bold text-white mb-6">How to install this tracker?</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-[#1a1a1a] p-5 rounded-xl border border-gray-800 hover:border-gray-600 transition-colors">
+              <h4 className="font-bold text-blue-400 mb-2 text-lg">🌐 Custom HTML Site</h4>
+              <p className="text-sm text-gray-400 leading-relaxed">Open your main HTML file (like <code className="text-pink-400 bg-gray-900 px-1 rounded">index.html</code>) and paste this code exactly before the closing <code className="text-pink-400 bg-gray-900 px-1 rounded">&lt;/head&gt;</code> tag.</p>
+            </div>
+            <div className="bg-[#1a1a1a] p-5 rounded-xl border border-gray-800 hover:border-gray-600 transition-colors">
+              <h4 className="font-bold text-green-400 mb-2 text-lg">🛍️ Shopify Store</h4>
+              <p className="text-sm text-gray-400 leading-relaxed">Go to your Shopify Admin: <strong>Online Store {'>'} Themes {'>'} Edit Code</strong>. Open <code className="text-pink-400 bg-gray-900 px-1 rounded">theme.liquid</code> and paste it inside the Head section.</p>
+            </div>
+            <div className="bg-[#1a1a1a] p-5 rounded-xl border border-gray-800 hover:border-gray-600 transition-colors">
+              <h4 className="font-bold text-purple-400 mb-2 text-lg">📝 WordPress</h4>
+              <p className="text-sm text-gray-400 leading-relaxed">Go to your WP Admin. Use a free plugin like <strong>"WPCode" (Insert Headers and Footers)</strong>, and paste this code in the Global Header section.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
