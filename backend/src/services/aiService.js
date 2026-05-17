@@ -61,6 +61,116 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
 };
 
 /**
+ * Generates a response for the Dashboard Onboarding Setup Assistant.
+ * Used to automatically configure user settings via Chat.
+ */
+exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
+  try {
+    const requestPayload = {
+      messages: [
+        { role: "system", content: systemContext },
+        { role: "user", content: prompt }
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "update_business_profile",
+            description: "Update the user's business profile details.",
+            parameters: {
+              type: "object",
+              properties: {
+                businessName: { type: "string", description: "The name of their business/store" },
+                businessDescription: { type: "string", description: "What their business does or sells" }
+              },
+              required: ["businessDescription"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "draft_whatsapp_template",
+            description: "Create a draft WhatsApp marketing template based on user's input.",
+            parameters: {
+              type: "object",
+              properties: {
+                templateName: { type: "string", description: "Lowercase, no spaces e.g., 'summer_sale'" },
+                messageBody: { type: "string", description: "The marketing text of the template." }
+              },
+              required: ["templateName", "messageBody"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "add_auto_reply_rule",
+            description: "Add a new auto-reply rule for the WhatsApp bot.",
+            parameters: {
+              type: "object",
+              properties: {
+                triggerWord: { type: "string", description: "The exact word the customer might text (e.g., 'menu')" },
+                replyMessage: { type: "string", description: "The automated reply to send." }
+              },
+              required: ["triggerWord", "replyMessage"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "update_ai_rules",
+            description: "Save the personal AI rules and fallback instructions decided by the business owner.",
+            parameters: {
+              type: "object",
+              properties: {
+                customRules: { type: "string", description: "Specific instructions like 'Never give discounts', 'Talk in Hinglish', etc." },
+                fallbackAction: { type: "string", description: "What to do if the AI doesn't know the answer (e.g., 'notify_owner', 'wait_for_human')" }
+              },
+              required: ["customRules", "fallbackAction"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "log_business_observation",
+            description: "Log an observation or missing knowledge gap the AI noticed to discuss with the owner.",
+            parameters: {
+              type: "object",
+              properties: {
+                observationText: { type: "string", description: "What the AI noticed (e.g., 'Customers are asking for return policy, but it is not in the system')" }
+              },
+              required: ["observationText"]
+            }
+          }
+        }
+      ],
+      tool_choice: "auto"
+    };
+
+    const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
+    let lastError;
+
+    for (const model of modelsToTry) {
+      try {
+        const completion = await openai.chat.completions.create({ ...requestPayload, model: model });
+        console.log(`✅ [AI Dashboard Service] Successfully responded using model: ${model}`);
+        return completion.choices[0].message;
+      } catch (err) {
+        console.log(`⚠️ [AI Dashboard Service] Model ${model} failed. Trying next...`);
+        lastError = err;
+      }
+    }
+    throw new Error('All AI models failed in dashboard tool calling: ' + lastError.message);
+  } catch (error) {
+    console.error('AI Dashboard Tool Service Error:', error);
+    throw new Error('Failed to generate AI dashboard response');
+  }
+};
+
+/**
  * Generates a response from OpenAI with Function Calling (Tools) capabilities.
  * Used for extracting Real Estate data or triggering Outbound calls.
  * @param {string} prompt The user's message.

@@ -204,6 +204,13 @@ exports.handleWhatsApp = async (req, res) => {
                 // AI completely disabled / No credits (Hardcoded standard message)
                 responseMessage = "Thank you for your message! Our human team will get back to you shortly. 🙏" + autoLinks;
                 repliedBy = 'system';
+                
+                // Send an Alert to the Business Owner if the limit just expired (and prevent spamming by setting to -1)
+                if (user.aiCredits === 0 && user.ownerPhone) {
+                  await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, "🚨 *AI Limit Exhausted*\n\nAapka DealClose AI ka free trial (50 messages) khatam ho gaya hai. AI ne aapke customers ko automatically reply karna band kar diya hai.\n\nPlease apne dashboard se recharge karein taaki AI aage kaam kar sake.");
+                  user.aiCredits = -1; 
+                  await user.save();
+                }
               } else if (!hasTrainingData) {
                 // AI is enabled but user hasn't trained it yet (No AI hallucination allowed)
                 responseMessage = "Thank you for reaching out! Our support team is currently reviewing your request and will assist you shortly. ⏳" + autoLinks;
@@ -211,6 +218,10 @@ exports.handleWhatsApp = async (req, res) => {
               } else {
                 if (!isFreeTestUser) {
                   user.aiCredits -= 1;
+                  if (user.aiCredits === 0 && user.ownerPhone) {
+                    await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, "🚨 *AI Limit Exhausted*\n\nAapka DealClose AI ka free trial (50 messages) khatam ho gaya hai. AI ne aapke customers ko automatically reply karna band kar diya hai.\n\nPlease apne dashboard se recharge karein taaki AI aage kaam kar sake.");
+                    user.aiCredits = -1; // Change to -1 so the alert doesn't fire on the next message
+                  }
                   await user.save();
                   try {
                     await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
@@ -222,7 +233,8 @@ exports.handleWhatsApp = async (req, res) => {
               try {
                 // Har SaaS User ka apna personal AI context! 
                 const businessInfo = user.businessDescription || "a modern business";
-                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. Business details: ${businessInfo}. Be polite, help users, extract details, and arrange calls if they request it.`;
+                const ownerRules = user.aiRules || "Be polite, helpful, and professional. Do not offer unapproved discounts.";
+                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
@@ -240,8 +252,17 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "escalate_to_owner") {
                       const callData = JSON.parse(toolCall.function.arguments);
-                      await User.findByIdAndUpdate(user._id, { $push: { trainingData: { question: callData.customerQuestion, status: 'unanswered', customerPhone: fromNumber } } });
-                      responseMessage = "That's a great question! I'm not entirely sure about that yet, but I've asked the team. They will get back to you shortly.";
+                      
+                      // Add to knowledge gap training data
+                      await User.findByIdAndUpdate(user._id, { $push: { trainingData: { question: callData.customerQuestion, status: 'unanswered', customerPhone: fromNumber } } });                      
+                      
+                      // Check what the owner wanted us to do (Fallback Rule)
+                      if (user.fallbackAction === 'notify_owner' && user.ownerPhone) {
+                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, `🚨 *AI Alert: Help Needed*\nCustomer (${fromNumber}) asked: "${callData.customerQuestion}".\nI didn't know the answer so I paused the chat. Please reply to them from the Dashboard!`);
+                        responseMessage = "That's a great question! I'm not entirely sure about that yet, but I've notified the business owner directly. They will get back to you shortly.";
+                      } else {
+                        responseMessage = "That's a great question! I've asked the team to look into it. They will get back to you shortly.";
+                      }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "check_order_status") {
                       responseMessage = "Let me check the dispatch system for your number. Your order is currently being processed and will be shipped soon!";
@@ -286,7 +307,7 @@ exports.handleWhatsApp = async (req, res) => {
                           email: accData.email,
                           password: tempPassword,
                           businessDescription: accData.businessDescription,
-                          aiCredits: 100 // Free trial credits
+                          aiCredits: 50 // 50 Free trial credits for customer chats
                         });
                         responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
                       }

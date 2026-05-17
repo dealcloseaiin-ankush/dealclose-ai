@@ -50,3 +50,85 @@ exports.trainAI = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
+
+// @desc    Handle Dashboard Setup Assistant Chat
+// @route   POST /api/ai/dashboard-assistant
+exports.handleDashboardAssistant = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca"; // Auth se aayega
+    const { message } = req.body;
+    
+    if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const systemContext = `You are DealClose AI Onboarding Expert.
+    The user's business name is '${user.businessName || 'Not Set'}'. 
+    The user currently has ${user.aiCredits || 0} AI Credits (Free Limit) remaining.
+    
+    YOUR PLATFORM KNOWLEDGE (What DealClose AI can do):
+    1. WhatsApp Chat Automation & Voice Calling
+    2. Meta Ad integration & Lead Extraction
+    3. Creating Marketing Templates (e.g., "Google/Insta Star Rating" templates to boost followers/reviews).
+    
+    YOUR JOB WITH THE OWNER:
+    1. If their credits are 50 or below, kindly inform them: "I will set up your entire business automation for free. You also get 50 free AI customer replies. After that, you'll need to upgrade to Premium/Recharge for me to continue chatting with your customers."
+    2. Ask them to define their personal AI Rules (e.g., "Do you want me to offer discounts?", "Should I talk in English or Hindi?").
+    3. Ask for a fallback plan: "If a customer asks a question I don't know the answer to, should I notify your personal WhatsApp number, or just say 'Please wait for our team'?"
+    4. Suggest features actively: Tell them they should set up a Star Rating/Instagram Follow template to grow their business.
+    5. Observe their business needs and log any knowledge gaps you notice.
+    
+    Use your tools to update rules, profile, or draft templates immediately when they agree. Talk like a friendly, intelligent human business partner.`;
+
+    const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext);
+
+    let responseMessage = "";
+    let actionTaken = null;
+
+    if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
+      for (const toolCall of aiMessage.tool_calls) {
+        const args = JSON.parse(toolCall.function.arguments);
+        
+        if (toolCall.function.name === "update_business_profile") {
+          if (args.businessName) user.businessName = args.businessName;
+          if (args.businessDescription) user.businessDescription = args.businessDescription;
+          await user.save();
+          responseMessage = "✅ I have updated your business profile successfully! What would you like to set up next? Auto-replies or WhatsApp templates?";
+          actionTaken = "profile_updated";
+        } 
+        else if (toolCall.function.name === "draft_whatsapp_template") {
+          responseMessage = `📝 I have drafted a template for you named *'${args.templateName}'*.\n\n*Preview:*\n${args.messageBody}\n\nWould you like to customize it further or save it?`;
+          actionTaken = { type: "template_drafted", data: args };
+        }
+        else if (toolCall.function.name === "add_auto_reply_rule") {
+          if (!user.autoReplies) user.autoReplies = [];
+          user.autoReplies.push({ triggerWord: args.triggerWord, replyMessage: args.replyMessage });
+          await user.save();
+          responseMessage = `⚡ Done! I've added an auto-reply. When someone says *'${args.triggerWord}'*, I will automatically reply with: '${args.replyMessage}'.`;
+          actionTaken = "auto_reply_added";
+        }
+        else if (toolCall.function.name === "update_ai_rules") {
+          user.aiRules = args.customRules;
+          user.fallbackAction = args.fallbackAction;
+          await user.save();
+          responseMessage = `🧠 Perfect! I have updated my brain. I will strictly follow these rules with your customers:\n- ${args.customRules}\n\nAnd if I get stuck, I will: ${args.fallbackAction}.`;
+          actionTaken = "rules_updated";
+        }
+        else if (toolCall.function.name === "log_business_observation") {
+          user.aiObservations = user.aiObservations || [];
+          user.aiObservations.push(args.observationText);
+          await user.save();
+          responseMessage = `📝 I have noted this down: "${args.observationText}". I will keep this in mind for your business setup!`;
+        }
+      }
+    } else {
+      responseMessage = aiMessage.content;
+    }
+
+    res.status(200).json({ success: true, reply: responseMessage, actionTaken });
+  } catch (error) {
+    console.error('Dashboard Assistant Error:', error);
+    res.status(500).json({ success: false, reply: 'Oops, something went wrong while processing your request.' });
+  }
+};
