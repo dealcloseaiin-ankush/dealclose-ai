@@ -58,8 +58,9 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
 };
 
 exports.searchAndCompareAd = async (query, userAdUrl) => {
+  const hasGemini = !!process.env.GEMINI_API_KEY;
   const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
-  if (!hasOpenAI) throw new Error("OpenAI API key is required for complex search analysis.");
+  if (!hasOpenAI && !hasGemini) throw new Error("OpenAI or Gemini API key is required for complex search analysis.");
 
   let searchData = "";
   try {
@@ -121,9 +122,12 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   }
   `;
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ 
+    apiKey: hasGemini ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY,
+    baseURL: hasGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined
+  });
   const aiResponse = await client.chat.completions.create({
-    model: 'gpt-4o', // using gpt-4o for heavy reasoning
+    model: hasGemini ? 'gemini-1.5-flash' : 'gpt-4o', 
     messages: [{ role: 'user', content: prompt }]
   });
 

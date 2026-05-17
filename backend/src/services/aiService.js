@@ -159,7 +159,7 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
           type: "function",
           function: {
             name: "request_star_review",
-            description: "Trigger an automated message asking the user for a 1 to 5 star rating once their issue is resolved or order is complete.",
+            description: "Trigger an automated message asking the user for a 1 to 5 star rating once their issue is resolved. This also automatically sends them your Instagram/YouTube links and a special Discount Offer for their next visit.",
             parameters: {
               type: "object",
               properties: {},

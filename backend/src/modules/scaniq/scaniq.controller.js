@@ -14,8 +14,8 @@ exports.scanScreenshot = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please upload a screenshot' });
     }
 
-    // Generate accessible image URL (Since we are using local multer upload for now)
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    // Get the Cloudinary secure URL directly from multer-storage-cloudinary
+    const imageUrl = req.file.path;
     const { platform = 'instagram', scanType = 'post' } = req.body;
 
     // 1. Create a Scan record in Database (Status: 'processing')

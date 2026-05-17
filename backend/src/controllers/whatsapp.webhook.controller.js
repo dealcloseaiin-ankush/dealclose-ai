@@ -188,9 +188,26 @@ exports.handleWhatsApp = async (req, res) => {
               const freeTestNumbers = ['919876543210', '918888888888'];
               const isFreeTestUser = freeTestNumbers.includes(fromNumber);
               
-              if (user.aiCredits <= 0 && !isFreeTestUser) {
-                responseMessage = "Thank you for your message! Our human team will get back to you shortly.";
+              const isAiEnabled = user.aiAgentEnabled !== false; // defaults to true
+              const hasTrainingData = user.businessDescription && user.businessDescription.trim().length > 10;
+              
+              // Auto-Review Links (Bina AI ke fallback message me links jodna)
+              const links = user.digitalCardConfig || {};
+              let autoLinks = "";
+              if (links.googleReview || links.instagram) {
+                autoLinks = "\n\n---\n*While you wait, connect with us:*";
+                if (links.googleReview) autoLinks += `\n⭐ Google Review: ${links.googleReview}`;
+                if (links.instagram) autoLinks += `\n📸 Instagram: ${links.instagram}`;
+              }
+
+              if (!isAiEnabled || (user.aiCredits <= 0 && !isFreeTestUser)) {
+                // AI completely disabled / No credits (Hardcoded standard message)
+                responseMessage = "Thank you for your message! Our human team will get back to you shortly. 🙏" + autoLinks;
                 repliedBy = 'dumb-bot-fallback';
+              } else if (!hasTrainingData) {
+                // AI is enabled but user hasn't trained it yet (No AI hallucination allowed)
+                responseMessage = "Thank you for reaching out! Our support team is currently reviewing your request and will assist you shortly. ⏳" + autoLinks;
+                repliedBy = 'untrained-fallback';
               } else {
                 if (!isFreeTestUser) {
                   user.aiCredits -= 1;
@@ -232,6 +249,17 @@ exports.handleWhatsApp = async (req, res) => {
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { new: true, upsert: true });
+                    } else if (toolCall.function.name === "request_star_review") {
+                      const links = user.digitalCardConfig || {};
+                      const discount = user.discountConfig || {};
+                      let msg = `Thank you for your time! We'd love your support. 🙏\n\n⭐ *Please leave us a 5-Star Review:*\n${links.googleReview || 'Link not configured'}\n\n📸 *Follow us on Instagram:*\n${links.instagram || 'Link not configured'}\n▶️ *Subscribe on YouTube:*\n${links.youtube || 'Link not configured'}\n`;
+                      
+                      if (discount.code && discount.percentage) {
+                        msg += `\n🎁 *Special Offer for You!*\nShow the referral code *${discount.code}* on your next visit within ${discount.validityDays || 30} days to get *${discount.percentage}% OFF* your purchase!`;
+                      }
+                      
+                      responseMessage = msg;
+                      repliedBy = 'ai-tool-review';
                     } else if (toolCall.function.name === "mark_lead_as_lost_and_share") {
                       const data = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: 'lost', notes: `Lost reason: ${data.reason}` });
@@ -270,8 +298,8 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               } catch (aiError) {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
-                responseMessage = "Oops! DealClose AI is currently unable to connect to the network. 🧠🔌\n\nOur engineers are working on it. Please try again in a few minutes.";
-                repliedBy = 'system';
+                responseMessage = "Thank you for reaching out! We are currently experiencing high message volumes. Our team will get back to you shortly! 🙏";
+                repliedBy = 'system-fallback';
               }
               } 
             }
