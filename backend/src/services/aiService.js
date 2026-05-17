@@ -8,7 +8,18 @@ const openai = new OpenAI({
   baseURL: useGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined
 });
 
-const AI_MODEL = useGemini ? "gemini-2.0-flash" : "gpt-4o";
+// 🌊 WATERFALL MODEL ARRAY: System upar se shuru karega aur jo pehla model active milega, usko use kar lega.
+const GEMINI_MODELS = [
+  "gemini-3.1-flash",
+  "gemini-3.0-flash",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-pro",
+  "gemini-1.5-flash"
+];
+
+const OPENAI_MODELS = ["gpt-4o"];
 
 /**
  * Generates a response from OpenAI's chat model.
@@ -28,14 +39,27 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
       finalContext += "\n\n[CRITICAL RULE]: You are chatting privately on WhatsApp. You can provide detailed answers, exact pricing, long catalog lists, and ask follow-up questions to close the sale.";
     }
 
-    const completion = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: finalContext },
-        { role: "user", content: prompt }
-      ],
-      model: AI_MODEL,
-    });
-    return completion.choices[0].message.content;
+    const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
+    let lastError;
+
+    // Loop through all models until one succeeds
+    for (const model of modelsToTry) {
+      try {
+        const completion = await openai.chat.completions.create({
+          messages: [
+            { role: "system", content: finalContext },
+            { role: "user", content: prompt }
+          ],
+          model: model,
+        });
+        console.log(`✅ [AI Service] Successfully responded using model: ${model}`);
+        return completion.choices[0].message.content;
+      } catch (err) {
+        console.log(`⚠️ [AI Service] Model ${model} is not active or failed. Trying next...`);
+        lastError = err;
+      }
+    }
+    throw new Error('All AI models failed to respond: ' + lastError.message);
   } catch (error) {
     console.error('AI Service Error:', error);
     throw new Error('Failed to generate AI response');
@@ -60,16 +84,6 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
       finalContext += "\n\n[CRITICAL RULE]: You are on WhatsApp. Be comprehensive, format nicely with bullet points, and act as a closer.";
     }
 
-    const completion = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: finalContext },
-        { role: "user", content: prompt }
-      ],
-      model: AI_MODEL, // Supports Function Calling!
-      tools: [
-        {
-          type: "function",
-          function: {
             name: "search_catalog",
             description: "Search the business catalog for products or properties requested by the customer. Returns item details, prices, and links.",
             parameters: {
@@ -233,8 +247,23 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
         }
       ],
       tool_choice: "auto"
-    });
-    return completion.choices[0].message;
+    };
+
+    const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
+    let lastError;
+
+    // Loop through all models for tool calling until one succeeds
+    for (const model of modelsToTry) {
+      try {
+        const completion = await openai.chat.completions.create({ ...requestPayload, model: model });
+        console.log(`✅ [AI Tool Service] Successfully responded using model: ${model}`);
+        return completion.choices[0].message;
+      } catch (err) {
+        console.log(`⚠️ [AI Tool Service] Model ${model} is not active or failed. Trying next...`);
+        lastError = err;
+      }
+    }
+    throw new Error('All AI models failed in tool calling: ' + lastError.message);
   } catch (error) {
     console.error('AI Tool Service Error:', error);
     throw new Error('Failed to generate AI tool response');
