@@ -35,7 +35,7 @@ export default function AIVideoDashboard() {
       toast.success("Image generated successfully!");
     } catch (error) {
       console.error("Image Generation Error:", error);
-      toast.error("Failed to generate image.");
+      toast.error(error.response?.data?.message || "Failed to generate image.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export default function AIVideoDashboard() {
       toast.success("Video animated successfully!");
     } catch (error) {
       console.error("Video Animation Error:", error);
-      toast.error("Failed to animate video.");
+      toast.error(error.response?.data?.message || "Failed to animate video.");
     } finally {
       setLoading(false);
     }

@@ -74,16 +74,19 @@ exports.generateImage = async (req, res) => {
     const { prompt, style } = req.body;
     if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
 
-    console.log("[Video Studio] Generating Image with Replicate (Flux Model)...");
+    console.log("[Video Studio] Generating Image with Replicate (SDXL Model)...");
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
+    // Using SDXL as it is more stable and robust for long/complex prompts
     const output = await replicate.run(
-      "black-forest-labs/flux-schnell",
+      "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
       {
         input: {
           prompt: prompt + ", cinematic, 8k, highly detailed, professional photography",
-          aspect_ratio: "16:9",
-          output_format: "webp"
+          width: 1024,
+          height: 768,
+          refine: "expert_ensemble_refiner",
+          apply_watermark: false
         }
       }
     );
@@ -92,7 +95,11 @@ exports.generateImage = async (req, res) => {
     res.status(200).json({ success: true, url: imageUrl });
   } catch (error) {
     console.error("Image Gen Error:", error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to generate image' });
+    let errorMsg = 'Failed to generate image';
+    if (error && error.message) {
+        errorMsg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+    }
+    res.status(500).json({ success: false, message: errorMsg });
   }
 };
 
@@ -113,7 +120,11 @@ exports.animateImage = async (req, res) => {
     res.status(200).json({ success: true, url: videoUrl });
   } catch (error) {
     console.error("Video Gen Error:", error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to animate video' });
+    let errorMsg = 'Failed to animate video';
+    if (error && error.message) {
+        errorMsg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+    }
+    res.status(500).json({ success: false, message: errorMsg });
   }
 };
 
