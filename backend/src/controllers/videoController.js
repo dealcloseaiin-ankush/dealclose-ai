@@ -83,8 +83,6 @@ exports.generateImage = async (req, res) => {
       {
         input: {
           prompt: prompt + ", cinematic, 8k, highly detailed, professional photography",
-          width: 1024,
-          height: 768,
           refine: "expert_ensemble_refiner",
           apply_watermark: false
         }

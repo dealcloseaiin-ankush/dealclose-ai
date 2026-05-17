@@ -34,7 +34,7 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
     if (hasGemini) {
       console.log("[Vision AI] Trying Gemini 1.5 Flash (Official SDK)...");
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
       const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
@@ -132,7 +132,7 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   try {
     if (hasGemini) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const result = await model.generateContent(prompt);
       aiResponseText = result.response.text();
     } else {
