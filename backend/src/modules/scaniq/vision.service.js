@@ -32,16 +32,23 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
 
   try {
     if (hasGemini) {
-      console.log("[Vision AI] Trying Gemini 1.5 Pro (Official SDK)...");
+      console.log("[Vision AI] Trying Gemini 2.0 Flash (Official SDK)...");
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
       
       const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
       const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
       
       const imagePart = { inlineData: { data: base64Data, mimeType: imageResp.headers['content-type'] || 'image/jpeg' } };
       
-      const result = await model.generateContent([prompt, imagePart]);
+      let result;
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        result = await model.generateContent([prompt, imagePart]);
+      } catch (e) {
+        console.log("Falling back to legacy Gemini Vision model...");
+        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.0-pro-vision-latest" });
+        result = await fallbackModel.generateContent([prompt, imagePart]);
+      }
       rawResponse = result.response.text();
     } else {
       throw new Error("Gemini key not found, skipping to OpenAI.");
@@ -132,8 +139,15 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   try {
     if (hasGemini) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-      const result = await model.generateContent(prompt);
+      let result;
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        result = await model.generateContent(prompt);
+      } catch (e) {
+        console.log("Falling back to legacy Gemini Pro model...");
+        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+        result = await fallbackModel.generateContent(prompt);
+      }
       aiResponseText = result.response.text();
     } else {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

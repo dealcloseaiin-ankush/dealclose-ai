@@ -8,7 +8,7 @@ const openai = new OpenAI({
   baseURL: useGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined
 });
 
-const AI_MODEL = useGemini ? "gemini-1.5-pro" : "gpt-4o";
+const AI_MODEL = useGemini ? "gemini-2.0-flash" : "gpt-4o";
 
 /**
  * Generates a response from OpenAI's chat model.
