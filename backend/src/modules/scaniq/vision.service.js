@@ -90,14 +90,18 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
       const response = await axios.get('https://serpapi.com/search.json', {
         params: { q: query, engine: "google", api_key: serpApiKey }
       });
-      // Top 5 organic results ki summary nikal rahe hain
-      searchData = JSON.stringify(response.data.organic_results?.slice(0, 5) || "No organic results found");
+      if (response.data.organic_results && response.data.organic_results.length > 0) {
+        searchData = JSON.stringify(response.data.organic_results.slice(0, 5));
+      } else {
+        searchData = "API Success, but no organic Google search results found.";
+      }
     } else {
-      searchData = "Live search disabled. Base your answer on your internal knowledge database.";
+      searchData = "SerpAPI Key is missing in the backend.";
     }
   } catch (error) {
-    console.error("[Vision Service] SerpAPI Error:", error.message);
-    searchData = "Failed to fetch live web data. Provide a general marketing analysis.";
+    const errMsg = error.response?.data?.error || error.message;
+    console.error("[Vision Service] SerpAPI Error:", errMsg);
+    searchData = `SerpAPI Failed: ${errMsg}`;
   }
 
   // 1.5. Meta Ad Library API se live Facebook/Instagram Ads lana
@@ -114,30 +118,45 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
           access_token: metaToken
         }
       });
-      metaAdsData = JSON.stringify(metaRes.data.data?.slice(0, 3) || "No Meta ads found");
+      if (metaRes.data.data && metaRes.data.data.length > 0) {
+        metaAdsData = JSON.stringify(metaRes.data.data.slice(0, 3));
+      } else {
+        metaAdsData = "API Success, but no active Meta ads found for this exact query.";
+      }
+    } else {
+      metaAdsData = "Meta API Token is missing in the backend.";
     }
   } catch (error) {
-    console.error("[Vision Service] Meta Ad API Error:", error.response?.data?.error?.message || error.message);
+    const errMsg = error.response?.data?.error?.message || error.message;
+    console.error("[Vision Service] Meta Ad API Error:", errMsg);
+    metaAdsData = `Meta API Failed: ${errMsg}. (Check your API Token permissions).`;
   }
 
   // 2. AI ko comparison aur analysis ke liye command (Prompt) dena
   const prompt = `
   You are an expert Ad Analyst and Marketer.
   The user searched for competitor ads or products using the query: "${query}".
-  Here are the top web search results for this query: ${searchData}
-  Here are the active Meta (Facebook/Instagram) Ads for this query: ${metaAdsData}
+  
+  --- LIVE DATA FED FROM APIs ---
+  Google Search Results: ${searchData}
+  Meta (Facebook/Instagram) Ads: ${metaAdsData}
+  -------------------------------
 
-  Analyze why these top results/competitors are viral, successful, and ranking high.
-  ${userAdUrl ? `The user also provided their own Ad/Product URL for comparison: "${userAdUrl}". Compare the user's ad to the top competitors. Explain the difference and how they can improve.` : 'Provide a breakdown of the top ads and give 3 tips on how the user can create a viral ad in this niche.'}
+  CRITICAL INSTRUCTIONS:
+  1. If the live data contains actual ads or URLs, you MUST explicitly mention their specific brand names, ad copies, or links in your analysis. Do not hallucinate generic brands if real data is provided.
+  2. If the live data says an API failed (e.g., Token missing, Permission error, or no ads found), you MUST explicitly inform the user about this exact reason in the "overallSummary" so they know why you can't show specific ads.
+  3. Analyze why these top results/competitors are viral and successful.
+
+  ${userAdUrl ? `The user also provided their own Ad/Product URL for comparison: "${userAdUrl}". Compare the user's ad to the top competitors.` : 'Provide a breakdown of the top ads.'}
   
   Return ONLY valid JSON format:
   {
     "viralScore": 95,
     "viralLabel": "High",
-    "overallSummary": "summary of the top competitors here...",
+    "overallSummary": "A detailed summary. Explicitly list the specific Meta/Instagram ads and Search URLs you found. If the API failed or found nothing, state the exact reason provided in the data.",
     "strengths": ["strength 1", "strength 2"],
     "weaknesses": ["weakness 1"],
-    "comparison": "Detailed comparison with user's ad (if provided) or general gap analysis.",
+    "comparison": "Detailed comparison with user's ad or gap analysis. Mention the specific competitors.",
     "actionableTips": ["Tip 1", "Tip 2"]
   }
   `;
