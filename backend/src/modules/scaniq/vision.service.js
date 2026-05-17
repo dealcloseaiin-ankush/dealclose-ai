@@ -132,5 +132,18 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   });
 
   const cleaned = aiResponse.choices[0].message.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleaned);
+  
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseError) {
+    console.error("[Vision Service] JSON Parse Error. AI Output was:", cleaned);
+    return {
+      viralScore: 0,
+      viralLabel: "Error",
+      overallSummary: "AI could not properly format the response. Please try scanning again.",
+      strengths: [],
+      weaknesses: ["Format mismatch from AI"],
+      actionableTips: ["Try adjusting the search query."]
+    };
+  }
 };

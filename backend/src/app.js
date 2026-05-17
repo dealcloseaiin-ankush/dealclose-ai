@@ -19,6 +19,7 @@ const campaignRoutes = require('./routes/campaignRoutes');
 const dispatchRoutes = require('./routes/dispatchRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const crmRoutes = require('./routes/crmRoutes');
+const videoRoutes = require('./routes/videoRoutes');
 
 // 📦 MODULAR FEATURES (Standalone Tools)
 const scaniqRoutes = require('./modules/scaniq/scaniq.routes');
@@ -64,6 +65,7 @@ app.use('/api/campaigns', campaignRoutes);
 app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/crm', crmRoutes);
+app.use('/api/video', videoRoutes);
 
 // Mount Modular Features
 app.use('/api/scaniq', scaniqRoutes);

@@ -1,6 +1,7 @@
 const videoService = require('../services/videoService');
 const Video = require('../models/videoModel');
 const MediaAsset = require('../models/mediaAssetModel');
+const Replicate = require('replicate');
 
 // --- AI API HELPER FUNCTIONS ---
 
@@ -93,47 +94,48 @@ exports.generateAudio = async (req, res) => {
 exports.generateImage = async (req, res) => {
   try {
     const { prompt, style } = req.body;
-    
-    // First: Check if a similar reusable image exists in Library to save cost
-    const existingAsset = await MediaAsset.findOne({ prompt, type: 'image', isPublic: true });
-    if (existingAsset) {
-      console.log("♻️ Reused Image from Library!");
-      return res.json({ message: "Image fetched from library", url: existingAsset.url, isReused: true });
-    }
+    if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
 
-    // Call Replicate: SDXL Model for High Quality Images
-    const output = await runReplicateModel(
-      "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", // SDXL Model ID
-      { prompt: prompt + (style ? ` in ${style} style` : ""), width: 1024, height: 1024 }
+    console.log("[Video Studio] Generating Image with Replicate (Flux Model)...");
+    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+
+    const output = await replicate.run(
+      "black-forest-labs/flux-schnell",
+      {
+        input: {
+          prompt: prompt + ", cinematic, 8k, highly detailed, professional photography",
+          aspect_ratio: "16:9",
+          output_format: "webp"
+        }
+      }
     );
     
-    // Output is an array of URLs
-    const imageUrl = output[0];
-    
-    // Save new image to reusable library
-    const asset = await MediaAsset.create({ type: 'image', url: imageUrl, prompt, style, isPublic: true });
-    res.json({ message: "New Image generated", url: imageUrl, assetId: asset._id, isReused: false });
+    const imageUrl = Array.isArray(output) ? output[0] : output;
+    res.status(200).json({ success: true, url: imageUrl });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Image Gen Error:", error);
+    res.status(500).json({ success: false, message: 'Failed to generate image' });
   }
 };
 
 exports.animateImage = async (req, res) => {
   try {
     const { imageUrl, prompt } = req.body;
-    
-    // Call Replicate: Stable Video Diffusion
-    const output = await runReplicateModel(
-      "3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438", // SVD Model ID
-      { input_image: imageUrl, video_length: "14_frames_with_svd" }
+    if (!imageUrl) return res.status(400).json({ success: false, message: 'Image URL is required' });
+
+    console.log("[Video Studio] Animating Image to Video (Stable Video Diffusion)...");
+    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+
+    const output = await replicate.run(
+      "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
+      { input: { cond_aug: 0.02, dec_add_noise: true, image: imageUrl } }
     );
-    const videoUrl = output;
-    
-    // Save motion video to reusable library
-    const asset = await MediaAsset.create({ type: 'video', url: videoUrl, prompt: prompt || 'motion', isPublic: true });
-    res.json({ message: "Motion Video generated", url: videoUrl, assetId: asset._id });
+
+    const videoUrl = Array.isArray(output) ? output[0] : output;
+    res.status(200).json({ success: true, url: videoUrl });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Video Gen Error:", error);
+    res.status(500).json({ success: false, message: 'Failed to animate video' });
   }
 };
 
