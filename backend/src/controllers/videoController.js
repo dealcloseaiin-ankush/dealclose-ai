@@ -92,7 +92,7 @@ exports.generateImage = async (req, res) => {
     res.status(200).json({ success: true, url: imageUrl });
   } catch (error) {
     console.error("Image Gen Error:", error);
-    res.status(500).json({ success: false, message: 'Failed to generate image' });
+    res.status(500).json({ success: false, message: error.message || 'Failed to generate image' });
   }
 };
 
@@ -113,7 +113,7 @@ exports.animateImage = async (req, res) => {
     res.status(200).json({ success: true, url: videoUrl });
   } catch (error) {
     console.error("Video Gen Error:", error);
-    res.status(500).json({ success: false, message: 'Failed to animate video' });
+    res.status(500).json({ success: false, message: error.message || 'Failed to animate video' });
   }
 };
 

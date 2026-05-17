@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
 const promptBuilder = require('./promptBuilder');
 const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) => {
   const prompt = promptBuilder.buildPrompt(platform, scanType, scrapedData);
@@ -31,12 +32,17 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
 
   try {
     if (hasGemini) {
-      console.log("[Vision AI] Trying Gemini 1.5 Flash...");
-      const geminiClient = new OpenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-      });
-      rawResponse = await callAI(geminiClient, 'gemini-1.5-flash');
+      console.log("[Vision AI] Trying Gemini 1.5 Flash (Official SDK)...");
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      
+      const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+      const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
+      
+      const imagePart = { inlineData: { data: base64Data, mimeType: imageResp.headers['content-type'] || 'image/jpeg' } };
+      
+      const result = await model.generateContent([prompt, imagePart]);
+      rawResponse = result.response.text();
     } else {
       throw new Error("Gemini key not found, skipping to OpenAI.");
     }
@@ -122,16 +128,24 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   }
   `;
 
-  const client = new OpenAI({ 
-    apiKey: hasGemini ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY,
-    baseURL: hasGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined
-  });
-  const aiResponse = await client.chat.completions.create({
-    model: hasGemini ? 'gemini-1.5-flash' : 'gpt-4o', 
-    messages: [{ role: 'user', content: prompt }]
-  });
+  let aiResponseText = "";
+  try {
+    if (hasGemini) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(prompt);
+      aiResponseText = result.response.text();
+    } else {
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const aiResponse = await client.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }] });
+      aiResponseText = aiResponse.choices[0].message.content;
+    }
+  } catch (aiErr) {
+    console.error("[Vision Service] AI Inference Error:", aiErr);
+    throw new Error("AI generation failed: " + aiErr.message);
+  }
 
-  const cleaned = aiResponse.choices[0].message.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = aiResponseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   
   try {
     return JSON.parse(cleaned);
