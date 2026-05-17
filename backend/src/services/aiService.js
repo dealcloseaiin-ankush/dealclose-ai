@@ -84,6 +84,15 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
       finalContext += "\n\n[CRITICAL RULE]: You are on WhatsApp. Be comprehensive, format nicely with bullet points, and act as a closer.";
     }
 
+    const requestPayload = {
+      messages: [
+        { role: "system", content: finalContext },
+        { role: "user", content: prompt }
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
             name: "search_catalog",
             description: "Search the business catalog for products or properties requested by the customer. Returns item details, prices, and links.",
             parameters: {
