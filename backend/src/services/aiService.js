@@ -10,12 +10,9 @@ const openai = new OpenAI({
 
 // 🌊 WATERFALL MODEL ARRAY: System upar se shuru karega aur jo pehla model active milega, usko use kar lega.
 const GEMINI_MODELS = [
-  "gemini-3.1-flash",
-  "gemini-3.0-flash",
   "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gemini-2.0-flash",
-  "gemini-1.5-pro",
   "gemini-1.5-flash"
 ];
 
