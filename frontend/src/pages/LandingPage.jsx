@@ -591,10 +591,10 @@ export default function LandingPage() {
       </footer>
 
       {/* Floating AI Chat Widget */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+      <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start">
         {/* Chat Window */}
         {isChatOpen && (
-          <div className="bg-[#111] border border-purple-500/30 rounded-2xl shadow-2xl w-80 sm:w-96 mb-4 overflow-hidden flex flex-col animate-slide-up origin-bottom-right">
+          <div className="bg-[#111] border border-purple-500/30 rounded-2xl shadow-2xl w-80 sm:w-96 mb-4 overflow-hidden flex flex-col animate-slide-up origin-bottom-left">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 flex justify-between items-center">
               <div className="flex items-center gap-2">
