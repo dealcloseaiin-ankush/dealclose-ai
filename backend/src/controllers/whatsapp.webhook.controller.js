@@ -58,9 +58,10 @@ exports.handleWhatsApp = async (req, res) => {
         if (value.statuses && value.statuses.length > 0) {
           console.log(`➡️ [Webhook] Status update received: ${value.statuses[0].status} for message ID: ${value.statuses[0].id}`);
           const statusStr = value.statuses[0].status; 
-          if (statusStr === 'sent') user.messageStats.sent += 1;
-          if (statusStr === 'delivered') user.messageStats.delivered += 1;
-          if (statusStr === 'read') user.messageStats.read += 1;
+          if (!user.messageStats) user.messageStats = { sent: 0, delivered: 0, read: 0 };
+          if (statusStr === 'sent') user.messageStats.sent = (user.messageStats.sent || 0) + 1;
+          if (statusStr === 'delivered') user.messageStats.delivered = (user.messageStats.delivered || 0) + 1;
+          if (statusStr === 'read') user.messageStats.read = (user.messageStats.read || 0) + 1;
           
           // Agar 24-hour rule ya kisi aur wajah se fail ho jaye
           if (statusStr === 'failed') {
@@ -178,7 +179,7 @@ exports.handleWhatsApp = async (req, res) => {
               continue; 
             }
 
-            const autoReplyRule = user.autoReplies.find(r => incomingText.toLowerCase() === r.triggerWord.toLowerCase());
+            const autoReplyRule = (user.autoReplies || []).find(r => incomingText.toLowerCase() === r.triggerWord.toLowerCase());
 
             if (autoReplyRule) {
               responseMessage = autoReplyRule.replyMessage;
@@ -194,7 +195,11 @@ exports.handleWhatsApp = async (req, res) => {
                 if (!isFreeTestUser) {
                   user.aiCredits -= 1;
                   await user.save();
-                  await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
+                  try {
+                    await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
+                  } catch (billingErr) {
+                    console.error("Billing deduction error:", billingErr.message);
+                  }
                 }
               
               try {
@@ -266,14 +271,18 @@ exports.handleWhatsApp = async (req, res) => {
               } catch (aiError) {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
                 responseMessage = "Oops! DealClose AI is currently unable to connect to the network. 🧠🔌\n\nOur engineers are working on it. Please try again in a few minutes.";
-                repliedBy = 'ai-error';
+                repliedBy = 'system';
               }
               } 
             }
 
             if (responseMessage) {
-              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy });
+              try {
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
+                await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy });
+              } catch (sendError) {
+                console.error("❌ [Send/Save Error]:", sendError.message);
+              }
             }
           }
         }
@@ -284,6 +293,7 @@ exports.handleWhatsApp = async (req, res) => {
     }
   } catch (error) {
     console.error('WhatsApp Webhook Error:', error);
-    return res.sendStatus(500);
+    // Return 200 instead of 500 to prevent Meta from infinitely retrying the webhook and spamming customers
+    return res.sendStatus(200);
   }
 };

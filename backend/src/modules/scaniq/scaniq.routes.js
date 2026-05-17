@@ -25,7 +25,10 @@ router.post('/screenshot', scanLimiter, upload.single('file'), scaniqController.
 // 2. Scan via URL (Protected by Rate Limiter)
 router.post('/url', scanLimiter, scaniqController.scanUrl);
 
-// 3. Get results of a scan (Polling)
+// 3. Search and Compare Ads (Protected by Rate Limiter)
+router.post('/search', scanLimiter, scaniqController.searchAd);
+
+// 4. Get results of a scan (Polling)
 router.get('/:scanId', scaniqController.getScanResult);
 
 module.exports = router;

@@ -10,8 +10,11 @@ export default function LandingPage() {
   // New States for Smart Scanner Box
   const [scanPlatform, setScanPlatform] = useState('instagram'); // instagram, facebook, youtube
   const [scanCategory, setScanCategory] = useState('post'); // post, ad, profile
-  const [inputMode, setInputMode] = useState('screenshot'); // screenshot, url
+  const [inputMode, setInputMode] = useState('screenshot'); // screenshot, url, search
   const [urlInput, setUrlInput] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userAdUrl, setUserAdUrl] = useState('');
 
   const faqs = [
     { q: 'How does the WhatsApp automation work?', a: 'We use the official Meta Cloud API. When a user abandons a cart on your Shopify or custom site, our AI waits 15 minutes and automatically sends a highly converting WhatsApp message.' },
@@ -123,6 +126,25 @@ export default function LandingPage() {
       alert(res.data.message || "URL processing started!");
     } catch (error) {
       alert(error.response?.data?.message || 'Something went wrong.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Handle Competitor Search & Compare Submission
+  const handleSearchCompare = async (e) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    
+    setIsScanning(true);
+    setScanResult(null);
+    
+    try {
+      // Expected backend route: POST /scaniq/search
+      const res = await api.post('/scaniq/search', { query: searchQuery, userAdUrl: userAdUrl });
+      setScanResult(res.data.analysis);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Something went wrong while searching.');
     } finally {
       setIsScanning(false);
     }
@@ -319,6 +341,7 @@ export default function LandingPage() {
                     <div className="flex justify-center gap-4 pt-2 border-t border-gray-800">
                       <button onClick={() => setInputMode('screenshot')} className={`text-xs font-bold transition-all ${inputMode === 'screenshot' ? 'text-green-400 underline underline-offset-4' : 'text-gray-500 hover:text-gray-300'}`}>📎 Upload Screenshot</button>
                       <button onClick={() => setInputMode('url')} className={`text-xs font-bold transition-all ${inputMode === 'url' ? 'text-green-400 underline underline-offset-4' : 'text-gray-500 hover:text-gray-300'}`}>🔗 Paste Link (URL)</button>
+                      <button onClick={() => setInputMode('search')} className={`text-xs font-bold transition-all ${inputMode === 'search' ? 'text-green-400 underline underline-offset-4' : 'text-gray-500 hover:text-gray-300'}`}>🔍 Search & Compare</button>
                     </div>
                   </div>
                   
@@ -343,7 +366,7 @@ export default function LandingPage() {
                         <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotUpload} disabled={isScanning} />
                       </label>
                     </div>
-                  ) : (
+                  ) : inputMode === 'url' ? (
                     <form onSubmit={handleUrlSubmit} className="relative group">
                       <div className={`absolute inset-0 bg-green-500/20 rounded-3xl blur-xl transition-all duration-500 ${isScanning ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-100'}`}></div>
                       <div className={`relative flex flex-col justify-center p-6 h-56 border-2 border-solid rounded-3xl transition-colors bg-[#0a0a0a] ${isScanning ? 'border-green-500' : 'border-gray-800'}`}>
@@ -366,6 +389,39 @@ export default function LandingPage() {
                             />
                             <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all">
                               Scan URL
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleSearchCompare} className="relative group">
+                      <div className={`absolute inset-0 bg-green-500/20 rounded-3xl blur-xl transition-all duration-500 ${isScanning ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-100'}`}></div>
+                      <div className={`relative flex flex-col justify-center p-6 h-auto min-h-[14rem] border-2 border-solid rounded-3xl transition-colors bg-[#0a0a0a] ${isScanning ? 'border-green-500' : 'border-gray-800'}`}>
+                        {isScanning ? (
+                          <div className="text-center py-4">
+                            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-green-400 font-bold">AI is searching live ads...</p>
+                            <p className="text-sm text-gray-500 mt-2">Comparing strategies and generating viral tips</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-white font-bold text-sm block mb-1">Top Brand / Product Search <span className="text-rose-500">*</span></label>
+                              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="e.g. Top 10 Nike running shoes ads" className="w-full bg-[#161B22] border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-green-500 outline-none" required />
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                <button type="button" onClick={() => setSearchQuery('Top 10 viral skincare ads')} className="text-[10px] bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-gray-300 transition-colors">🧴 Viral Skincare</button>
+                                <button type="button" onClick={() => setSearchQuery('Best Nike shoe ads 2024')} className="text-[10px] bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-gray-300 transition-colors">👟 Nike Shoes</button>
+                                <button type="button" onClick={() => setSearchQuery('Top real estate ads')} className="text-[10px] bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-gray-300 transition-colors">🏢 Real Estate</button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-white font-bold text-sm block mb-1">Your Ad/Product URL (Optional)</label>
+                              <input type="url" value={userAdUrl} onChange={(e) => setUserAdUrl(e.target.value)} placeholder="Paste your link to compare" className="w-full bg-[#161B22] border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-green-500 outline-none" />
+                              <p className="text-xs text-gray-500 mt-1">AI will tell you exactly what your ad is missing.</p>
+                            </div>
+                            <button type="submit" className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center justify-center gap-2">
+                              <span>✨</span> AI Analyze & Compare
                             </button>
                           </div>
                         )}
@@ -404,6 +460,26 @@ export default function LandingPage() {
                     <div className="bg-[#161B22] border border-gray-800 rounded-2xl p-5"><h4 className="text-green-400 font-bold mb-2">✅ Strengths</h4><ul className="list-disc pl-5 text-sm text-gray-300 space-y-1">{scanResult.strengths?.map((s,i) => <li key={i}>{s}</li>)}</ul></div>
                     <div className="bg-[#161B22] border border-gray-800 rounded-2xl p-5"><h4 className="text-rose-400 font-bold mb-2">❌ Weaknesses</h4><ul className="list-disc pl-5 text-sm text-gray-300 space-y-1">{scanResult.weaknesses?.map((w,i) => <li key={i}>{w}</li>)}</ul></div>
                   </div>
+                  
+                  {/* Render the comparison and tips if they exist (From Search mode) */}
+                  {(scanResult.comparison || scanResult.actionableTips) && (
+                    <div className="md:col-span-2 space-y-6 mt-2">
+                      {scanResult.comparison && (
+                        <div className="bg-[#161B22] border border-purple-500/30 rounded-2xl p-6 shadow-[0_0_20px_rgba(168,85,247,0.1)]">
+                          <h4 className="text-purple-400 font-bold mb-3 flex items-center gap-2"><span>⚖️</span> AI Competitive Comparison</h4>
+                          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{scanResult.comparison}</p>
+                        </div>
+                      )}
+                      {scanResult.actionableTips && (
+                        <div className="bg-[#161B22] border border-blue-500/30 rounded-2xl p-6 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+                          <h4 className="text-blue-400 font-bold mb-3 flex items-center gap-2"><span>💡</span> How to Beat Them (Actionable Tips)</h4>
+                          <ul className="list-decimal pl-5 text-sm text-gray-300 space-y-2">
+                            {scanResult.actionableTips.map((tip, i) => <li key={i}>{tip}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="mt-8 text-center"><button onClick={() => setScanResult(null)} className="text-gray-400 hover:text-white underline">Scan Another Post</button></div>
               </div>

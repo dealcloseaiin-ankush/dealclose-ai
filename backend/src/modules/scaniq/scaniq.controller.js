@@ -87,6 +87,23 @@ exports.getScanResult = async (req, res) => {
   }
 };
 
+// @desc    Handle Competitor Search & Compare (Method 3)
+// @route   POST /api/scaniq/search
+exports.searchAd = async (req, res) => {
+  try {
+    const { query, userAdUrl } = req.body;
+    if (!query) return res.status(400).json({ success: false, message: 'Search query is required' });
+
+    // Synchronous call (Frontend iski immediate wait kar raha hai)
+    const analysis = await visionService.searchAndCompareAd(query, userAdUrl);
+
+    res.status(200).json({ success: true, analysis });
+  } catch (error) {
+    console.error('Search & Compare Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server Error' });
+  }
+};
+
 // Background Processor Function
 async function processScreenscan(scanId, imageUrl, platform, scanType) {
   const start = Date.now();

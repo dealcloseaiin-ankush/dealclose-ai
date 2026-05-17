@@ -32,6 +32,63 @@ exports.supabaseAuth = async (req, res) => {
   }
 };
 
+// @desc    Register a New User (Standard Email/Password)
+// @route   POST /api/users/register
+exports.register = async (req, res) => {
+  try {
+    const { fullName, email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ success: false, message: 'Email is already registered. Please login.' });
+    }
+
+    const user = await User.create({
+      fullName: fullName || 'New User',
+      email,
+      password // Make sure your User model has a pre-save hook to hash this using bcrypt
+    });
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
+    res.status(201).json({ success: true, token, user });
+  } catch (error) {
+    console.error('Register Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error during registration' });
+  }
+};
+
+// @desc    Login User
+// @route   POST /api/users/login
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ success: false, message: 'Please provide email and password' });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found. Please register first.' });
+
+    // Bulletproof Password Check: Handles both Encrypted and Plain Text passwords
+    let isMatch = false;
+    if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'))) {
+      isMatch = await bcrypt.compare(password, user.password); // Compare Hashed
+    } else {
+      isMatch = (password === user.password); // Fallback: Compare Plain text
+    }
+
+    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid Password. Please try again.' });
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
+    res.status(200).json({ success: true, token, user });
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ success: false, message: 'Server error during login' });
+  }
+};
+
 // @desc    Change User Password
 // @route   POST /api/users/change-password
 exports.changePassword = async (req, res) => {

@@ -32,9 +32,8 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Hum yahan exact live URL hardcode kar rahe hain taaki origin ka koi issue na aaye
-        // Local testing ke time aap isko 'http://localhost:5173/onboarding' kar sakte hain
-        redirectTo: 'https://www.dealcloseai.in/onboarding'
+        // Ab ye seedha dashboard pe jayega, baar-bar details nahi mangega
+        redirectTo: window.location.origin + '/dashboard'
       }
     });
     if (error) {
