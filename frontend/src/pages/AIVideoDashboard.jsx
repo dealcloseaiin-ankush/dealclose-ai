@@ -32,7 +32,11 @@ export default function AIVideoDashboard() {
     try {
       const res = await api.post('/video/generate-image', { prompt });
       setGeneratedAsset({ type: 'image', url: res.data.url });
-      toast.success("Image generated successfully!");
+      if (res.data.isMock) {
+        toast.error("Replicate API Limit Reached! Showing a sample image instead.", { duration: 5000 });
+      } else {
+        toast.success("Image generated successfully!");
+      }
     } catch (error) {
       console.error("Image Generation Error:", error);
       toast.error(error.response?.data?.message || "Failed to generate image.");
@@ -61,12 +65,37 @@ export default function AIVideoDashboard() {
     try {
       const res = await api.post('/video/animate-image', { imageUrl: generatedAsset.url, prompt });
       setGeneratedAsset({ type: 'video', url: res.data.url });
-      toast.success("Video animated successfully!");
+      if (res.data.isMock) {
+        toast.error("Replicate API Limit Reached! Showing a sample video instead.", { duration: 5000 });
+      } else {
+        toast.success("Video animated successfully!");
+      }
     } catch (error) {
       console.error("Video Animation Error:", error);
       toast.error(error.response?.data?.message || "Failed to animate video.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle File Download securely avoiding CORS blocks
+  const handleDownload = async (url, fileType) => {
+    try {
+      toast.loading(`Downloading ${fileType}...`, { id: 'download-toast' });
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `DealClose-${fileType}-${Date.now()}.${fileType === 'video' ? 'mp4' : 'jpg'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Downloaded successfully!", { id: 'download-toast' });
+    } catch (err) {
+      console.error("Download Error:", err);
+      toast.error("Failed to download file.", { id: 'download-toast' });
     }
   };
 
@@ -227,7 +256,7 @@ export default function AIVideoDashboard() {
                 <>
                   <img src={generatedAsset.url} alt="AI Generated" className="w-full h-full object-cover" />
                   <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <button className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white" title="Download"><Download size={18}/></button>
+                    <button onClick={() => handleDownload(generatedAsset.url, 'image')} className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white transition-all hover:scale-110" title="Download"><Download size={18}/></button>
                   </div>
                 </>
               )}
@@ -236,7 +265,7 @@ export default function AIVideoDashboard() {
                 <>
                   <video src={generatedAsset.url} autoPlay loop muted controls className="w-full h-full object-cover" />
                   <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <button className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white" title="Download"><Download size={18}/></button>
+                    <button onClick={() => handleDownload(generatedAsset.url, 'video')} className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white transition-all hover:scale-110" title="Download"><Download size={18}/></button>
                   </div>
                 </>
               )}
