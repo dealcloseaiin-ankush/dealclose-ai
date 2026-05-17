@@ -9,8 +9,8 @@ export default function Automations() {
   const trackingCode = `<!-- DealClose AI Universal Tracker -->
 <script>
   !function(e,t,n,a){var c=e.DealCloseTracker=e.DealCloseTracker||[];
-  c.init=function(e){c.apiKey=e};var r=t.createElement(n),
-  s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://yourwebsite.com/api/pixel.js",
+  c.init=function(e){c.apiKey=e};c.track=function(){};var r=t.createElement(n),
+  s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://dealclose-ai.onrender.com/api/pixel.js",
   s.parentNode.insertBefore(r,s)}(window,document,"script");
   
   DealCloseTracker.init("${user?._id || 'YOUR_WORKSPACE_ID'}");

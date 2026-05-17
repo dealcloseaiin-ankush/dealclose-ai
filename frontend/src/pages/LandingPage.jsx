@@ -15,6 +15,11 @@ export default function LandingPage() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [userAdUrl, setUserAdUrl] = useState('');
+  
+  // States for Landing Page AI Chat Widget
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: 'Hi there! 👋 I am the DealClose AI assistant. Do you have any questions about our features or pricing?' }]);
 
   const faqs = [
     { q: 'How does the WhatsApp automation work?', a: 'We use the official Meta Cloud API. When a user abandons a cart on your Shopify or custom site, our AI waits 15 minutes and automatically sends a highly converting WhatsApp message.' },
@@ -63,11 +68,11 @@ export default function LandingPage() {
       script.id = 'dealclose-tracker';
       script.innerHTML = `
         !function(e,t,n,a){var c=e.DealCloseTracker=e.DealCloseTracker||[];
-        c.init=function(e){c.apiKey=e};var r=t.createElement(n),
+        c.init=function(e){c.apiKey=e};c.track=function(){};var r=t.createElement(n),
         s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://dealclose-ai.onrender.com/api/pixel.js",
         s.parentNode.insertBefore(r,s)}(window,document,"script");
         
-        DealCloseTracker.init("SUPER_ADMIN_ID_HERE"); // Optional: Replace with your actual Admin User ID
+        DealCloseTracker.init("SUPER_ADMIN_ID_HERE");
         DealCloseTracker.track("page_view");
       `;
       document.head.appendChild(script);
@@ -147,6 +152,26 @@ export default function LandingPage() {
       alert(error.response?.data?.message || 'Something went wrong while searching.');
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  // Handle Web Chat Submission
+  const handleWebChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    // Add user message
+    const newMsgs = [...chatMessages, { role: 'user', text: chatInput }];
+    setChatMessages(newMsgs);
+    setChatInput('');
+    
+    try {
+      // API call to our new WebChat backend endpoint
+      const res = await api.post('/ai/webchat', { message: chatInput });
+      setChatMessages([...newMsgs, { role: 'ai', text: res.data.reply }]);
+    } catch (error) {
+      console.error("Web Chat Error:", error);
+      setChatMessages([...newMsgs, { role: 'ai', text: "Sorry, my servers are a bit busy right now. Please try again in a moment! ⚡" }]);
     }
   };
 
@@ -564,6 +589,57 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Floating AI Chat Widget */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        {/* Chat Window */}
+        {isChatOpen && (
+          <div className="bg-[#111] border border-purple-500/30 rounded-2xl shadow-2xl w-80 sm:w-96 mb-4 overflow-hidden flex flex-col animate-slide-up origin-bottom-right">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">⚡</span>
+                <div>
+                  <h3 className="font-bold text-white leading-tight">DealClose Expert</h3>
+                  <p className="text-xs text-purple-200">Online | Replies instantly</p>
+                </div>
+              </div>
+              <button onClick={() => setIsChatOpen(false)} className="text-white/80 hover:text-white">✕</button>
+            </div>
+            
+            {/* Messages Area */}
+            <div className="h-80 p-4 overflow-y-auto flex flex-col gap-3 bg-[#0a0a0a]">
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'ai' ? 'bg-[#1a1a1a] text-gray-200 self-start rounded-tl-sm border border-gray-800' : 'bg-purple-600 text-white self-end rounded-tr-sm'}`}>
+                  {msg.text}
+                </div>
+              ))}
+            </div>
+            
+            {/* Input Area */}
+            <form onSubmit={handleWebChat} className="p-3 bg-[#111] border-t border-gray-800 flex gap-2">
+              <input 
+                type="text" 
+                value={chatInput} 
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask about DealClose AI..." 
+                className="flex-1 bg-[#1a1a1a] border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:border-purple-500 outline-none"
+              />
+              <button type="submit" className="bg-purple-600 text-white p-2 rounded-xl hover:bg-purple-500 transition-colors">
+                ➤
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Toggle Button */}
+        <button 
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className="w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:scale-110 transition-transform text-2xl relative"
+        >
+          {isChatOpen ? '✕' : '💬'}
+        </button>
+      </div>
       
     </div>
   );

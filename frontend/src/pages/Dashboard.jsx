@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../hooks/useAuth';
+import { AlertTriangle } from 'lucide-react';
 
 function StatCard({ title, value, trend, trendUp, icon, color }) {
   return (
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [clients, setClients] = useState([]);
   const [activeBusiness, setActiveBusiness] = useState('Main Business');
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
+  const [showTrainingPopup, setShowTrainingPopup] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,6 +56,13 @@ export default function Dashboard() {
         const userData = userRes?.data?.data || userRes?.data;
         if (userData?.messageStats) {
           setMessageStats(userData.messageStats);
+        }
+        
+        // Check if AI is active but missing training data
+        const hasCredits = userData?.aiCredits > 0 || isSuperAdmin;
+        const hasNoTraining = !userData?.businessDescription || userData.businessDescription.trim().length < 10;
+        if (hasCredits && hasNoTraining && userData?.aiAgentEnabled !== false) {
+          setShowTrainingPopup(true);
         }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
@@ -208,6 +217,30 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Smart AI Training Popup */}
+      {showTrainingPopup && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-purple-500/50 rounded-3xl p-8 max-w-lg w-full shadow-2xl relative text-center">
+            <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Train Your AI Agent! 🧠</h2>
+            <p className="text-gray-400 mb-8 leading-relaxed">
+              You have AI capabilities enabled, but you haven't told the AI what your business does! 
+              Without training data, the AI cannot reply to your customers. 
+            </p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowTrainingPopup(false)} className="flex-1 py-3 bg-[#1a1a1a] hover:bg-gray-800 text-white font-bold rounded-xl transition-colors">
+                Do it later
+              </button>
+              <Link to="/settings" className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30">
+                Train AI Now 🚀
+              </Link>
+            </div>
           </div>
         </div>
       )}

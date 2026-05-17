@@ -12,6 +12,7 @@ export default function Chats() {
   const [newChatPhone, setNewChatPhone] = useState('');
   const [newChatName, setNewChatName] = useState('');
   const [newChatSource, setNewChatSource] = useState('Manual Entry');
+  const [sendAutoOffer, setSendAutoOffer] = useState(false);
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -93,6 +94,12 @@ export default function Chats() {
     setNewChatPhone('');
     setNewChatName('');
     setNewChatSource('Manual Entry');
+    
+    if (sendAutoOffer) {
+      setTimeout(() => {
+        setReplyText("Thank you for connecting with us! 🙏\n\n⭐ Please leave us a 5-star review: [Your Link]\n📸 Follow us on Instagram: [Your Link]\n▶️ Subscribe on YouTube: [Your Link]\n\n🎁 *Special Offer:* Use code *WELCOME10* on your next order to get 10% OFF!");
+      }, 100);
+    }
   };
 
   const sendReply = async () => {
@@ -152,6 +159,12 @@ export default function Chats() {
                   <option value="Walk-in Customer">Walk-in Customer</option>
                   <option value="Website Form">Website Form</option>
                 </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer mt-2">
+                  <input type="checkbox" checked={sendAutoOffer} onChange={e => setSendAutoOffer(e.target.checked)} className="w-4 h-4 accent-green-500 rounded" />
+                  Load Rating & Discount Offer message
+                </label>
               </div>
               <div className="pt-4">
                 <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-colors">Start Chat</button>
@@ -232,6 +245,14 @@ export default function Chats() {
               </button>
               <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Attach Image or Document">
                 📎
+              </button>
+              <button 
+                onClick={() => setReplyText("Thank you for your visit! 🙏\n\n⭐ Please leave us a 5-star review: [Review Link]\n📸 Follow us on Instagram: [Instagram Link]\n▶️ Subscribe on YouTube: [YouTube Link]\n\n🎁 *Special Offer:* Use code *WELCOME10* on your next visit within 30 days to get 10% OFF!")}
+                disabled={!activeCustomer} 
+                className="p-3 text-yellow-500 hover:text-yellow-400 bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" 
+                title="Load Rating & Discount Offer"
+              >
+                ⭐
               </button>
           <input 
             type="text" 

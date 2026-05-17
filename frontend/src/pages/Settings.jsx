@@ -15,7 +15,12 @@ export default function Settings() {
     youtubeLink: '',
     googleReviewLink: '',
     websiteLink: '',
-    workspaces: [] // Store multiple businesses here
+    discountPercentage: '',
+    discountCode: '',
+    validityDays: '30',
+    workspaces: [], // Store multiple businesses here
+    aiAgentEnabled: true,
+    businessDescription: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -48,7 +53,12 @@ export default function Settings() {
             youtubeLink: savedData.digitalCardConfig?.youtube || '',
             googleReviewLink: savedData.digitalCardConfig?.googleReview || '',
             websiteLink: savedData.digitalCardConfig?.website || '',
-            workspaces: savedData.workspaces || [] // Fetch saved workspaces
+            discountPercentage: savedData.discountConfig?.percentage || '',
+            discountCode: savedData.discountConfig?.code || '',
+            validityDays: savedData.discountConfig?.validityDays || '30',
+            workspaces: savedData.workspaces || [], // Fetch saved workspaces
+            aiAgentEnabled: savedData.aiAgentEnabled !== false,
+            businessDescription: savedData.businessDescription || ''
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -124,6 +134,8 @@ export default function Settings() {
     try {
       // Transform data so backend overwrites (deletes) old keys completely
       const payload = {
+        aiAgentEnabled: config.aiAgentEnabled,
+        businessDescription: config.businessDescription,
         whatsappConfig: {
           accessToken: config.whatsappToken,
           phoneNumberId: config.phoneNumberId,
@@ -140,6 +152,11 @@ export default function Settings() {
           youtube: config.youtubeLink,
           googleReview: config.googleReviewLink,
           website: config.websiteLink
+        },
+        discountConfig: {
+          percentage: config.discountPercentage,
+          code: config.discountCode,
+          validityDays: config.validityDays
         },
         workspaces: config.workspaces // Send workspaces to backend
       };
@@ -185,6 +202,27 @@ export default function Settings() {
           <form onSubmit={handleSave} className="space-y-8">
           {/* WhatsApp Meta Config */}
           <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
+            
+            {/* NEW: AI Agent Configuration */}
+            <div className="bg-gradient-to-r from-purple-900/10 to-[#111] p-5 rounded-xl border border-purple-500/30 mb-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl"></div>
+              <div className="flex justify-between items-center mb-4 relative z-10">
+                <h2 className="text-lg font-semibold text-purple-400 flex items-center gap-2">
+                   <span className="text-xl">🧠</span> Smart AI Agent & Training
+                </h2>
+                <button type="button" onClick={() => setConfig({...config, aiAgentEnabled: !config.aiAgentEnabled})} className={`w-12 h-6 rounded-full transition-colors relative ${config.aiAgentEnabled ? 'bg-purple-600' : 'bg-gray-700'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${config.aiAgentEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                </button>
+              </div>
+              <p className="text-sm text-gray-400 mb-4 relative z-10">Turn this ON to let the AI automatically reply to your customers. Provide training data below so it knows how to answer accurately.</p>
+              
+              <div className="relative z-10">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Business Knowledge (AI Training Data) <span className="text-rose-500">*</span></label>
+                <textarea name="businessDescription" value={config.businessDescription} onChange={handleChange} rows="3" placeholder="e.g. We are 'Shoe Mart'. We sell premium sports shoes. Delivery takes 3 days. No refunds on sale items..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
+                <p className="text-xs text-gray-500 mt-1">AI needs at least 1-2 sentences of training data to work properly. Otherwise, it will fallback to human support.</p>
+              </div>
+            </div>
+
             <h2 className="text-xl font-semibold text-green-400 mb-6 flex items-center">
                WhatsApp (Meta API)
             </h2>
@@ -334,6 +372,31 @@ export default function Settings() {
                 <a href={`/card/${userId}`} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
                   Preview My Digital Card ↗
                 </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Automated Offers & Discounts */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-green-500/30 relative overflow-hidden mt-8">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-2xl"></div>
+            <h2 className="text-xl font-semibold text-green-400 mb-6 flex items-center gap-2">
+               🎁 Auto-Discount & Loyalty Offer
+            </h2>
+            <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+              When AI asks for a review/follow, or when you load the Offer message in Chats, it will automatically send this discount code to bring the customer back for their next visit.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Discount %</label>
+                <input type="number" name="discountPercentage" value={config.discountPercentage} onChange={handleChange} placeholder="e.g. 10" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Referral / Offer Code</label>
+                <input type="text" name="discountCode" value={config.discountCode} onChange={handleChange} placeholder="e.g. SAVE10" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Valid For (Days)</label>
+                <input type="number" name="validityDays" value={config.validityDays} onChange={handleChange} placeholder="e.g. 30" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" />
               </div>
             </div>
           </div>
