@@ -203,11 +203,11 @@ exports.handleWhatsApp = async (req, res) => {
               if (!isAiEnabled || (user.aiCredits <= 0 && !isFreeTestUser)) {
                 // AI completely disabled / No credits (Hardcoded standard message)
                 responseMessage = "Thank you for your message! Our human team will get back to you shortly. 🙏" + autoLinks;
-                repliedBy = 'dumb-bot-fallback';
+                repliedBy = 'system';
               } else if (!hasTrainingData) {
                 // AI is enabled but user hasn't trained it yet (No AI hallucination allowed)
                 responseMessage = "Thank you for reaching out! Our support team is currently reviewing your request and will assist you shortly. ⏳" + autoLinks;
-                repliedBy = 'untrained-fallback';
+                repliedBy = 'system';
               } else {
                 if (!isFreeTestUser) {
                   user.aiCredits -= 1;
@@ -231,21 +231,21 @@ exports.handleWhatsApp = async (req, res) => {
                       const leadData = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { userId: user._id, name: "New AI Lead", source: leadData.category, status: "interested", notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` }, { new: true, upsert: true });
                       responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`;
-                      repliedBy = 'ai-tool-lead';
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "trigger_outbound_call") {
                       const exotelNumber = process.env.EXOTEL_EXOPHONE; 
                       const webhookUrl = `${process.env.BASE_URL}/api/webhooks/voice`;
                       await callService.initiateCall(fromNumber, exotelNumber, webhookUrl);
                       responseMessage = "I am arranging a call for you right now. Please answer your phone in a few seconds.";
-                      repliedBy = 'ai-tool-call';
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "escalate_to_owner") {
                       const callData = JSON.parse(toolCall.function.arguments);
                       await User.findByIdAndUpdate(user._id, { $push: { trainingData: { question: callData.customerQuestion, status: 'unanswered', customerPhone: fromNumber } } });
                       responseMessage = "That's a great question! I'm not entirely sure about that yet, but I've asked the team. They will get back to you shortly.";
-                      repliedBy = 'ai-tool-escalate';
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "check_order_status") {
                       responseMessage = "Let me check the dispatch system for your number. Your order is currently being processed and will be shipped soon!";
-                      repliedBy = 'ai-tool-order';
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { new: true, upsert: true });
@@ -259,7 +259,7 @@ exports.handleWhatsApp = async (req, res) => {
                       }
                       
                       responseMessage = msg;
-                      repliedBy = 'ai-tool-review';
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "mark_lead_as_lost_and_share") {
                       const data = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: 'lost', notes: `Lost reason: ${data.reason}` });
@@ -268,10 +268,10 @@ exports.handleWhatsApp = async (req, res) => {
                       const otherSellers = await User.find(query).limit(2);
                       if (otherSellers.length > 0) {
                         responseMessage = `I understand you don't want to proceed with us. However, we have other verified local sellers in your area for ${data.productCategory} who might have better rates. Would you like me to share their Vyapar links with you?`;
-                        repliedBy = 'ai-tool-lead-share';
+                        repliedBy = 'ai';
                       } else {
                         responseMessage = "No problem! Let me know if you change your mind in the future.";
-                        repliedBy = 'ai-tool-lead-lost';
+                        repliedBy = 'ai';
                       }
                     } else if (toolCall.function.name === "create_saas_account") {
                       const accData = JSON.parse(toolCall.function.arguments);
@@ -290,7 +290,7 @@ exports.handleWhatsApp = async (req, res) => {
                         });
                         responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
                       }
-                      repliedBy = 'ai-admin-onboard';
+                      repliedBy = 'ai';
                     }
                   }
                 } else {
@@ -299,7 +299,7 @@ exports.handleWhatsApp = async (req, res) => {
               } catch (aiError) {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
                 responseMessage = "Thank you for reaching out! We are currently experiencing high message volumes. Our team will get back to you shortly! 🙏";
-                repliedBy = 'system-fallback';
+                repliedBy = 'system';
               }
               } 
             }

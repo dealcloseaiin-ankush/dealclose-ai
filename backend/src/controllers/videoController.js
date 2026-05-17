@@ -1,5 +1,3 @@
-const videoService = require('../services/videoService');
-const Video = require('../models/videoModel');
 const MediaAsset = require('../models/mediaAssetModel');
 const Replicate = require('replicate');
 
@@ -34,26 +32,6 @@ const runReplicateModel = async (modelVersion, inputParams) => {
 
   if (prediction.status === "failed") throw new Error("AI Generation failed on Replicate.");
   return prediction.output;
-};
-
-exports.generateVideo = async (req, res) => {
-  try {
-    const { prompt, style } = req.body;
-    // const userId = req.user.id; // Assuming auth middleware
-    
-    const video = await Video.create({
-      prompt,
-      status: 'processing',
-      // createdBy: userId
-    });
-
-    // Start async generation
-    videoService.startGeneration(video._id, prompt, style);
-
-    res.status(202).json({ message: 'Video generation started', videoId: video._id });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
 
 // --- NEW PIPELINE CONTROLLERS ---
