@@ -13,8 +13,6 @@ exports.extractTextFromImage = async (imageBuffer, mimeType) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // Reverted to gemini-1.5-flash for max stability
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = "Please carefully read this handwritten or printed list. Extract all items, quantities, and any mentioned prices. Return the result nicely formatted as a clean, structured list. If you cannot read it, politely say so.";
 
@@ -27,9 +25,24 @@ exports.extractTextFromImage = async (imageBuffer, mimeType) => {
       }
     ];
 
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    return response.text();
+    let result;
+    let lastError;
+    const GEMINI_MODELS = ["gemini-2.5-pro"];
+    
+    for (const modelName of GEMINI_MODELS) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent([prompt, ...imageParts]);
+        console.log(`[OCR AI] Successfully used model: ${modelName}`);
+        break;
+      } catch (e) {
+        console.log(`[OCR AI] Model ${modelName} failed, trying next...`);
+        lastError = e;
+      }
+    }
+    if (!result) throw lastError;
+    
+    return result.response.text();
   } catch (error) {
     console.error('Gemini Vision API Error:', error);
     throw error;
