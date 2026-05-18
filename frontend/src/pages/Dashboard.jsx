@@ -52,8 +52,8 @@ export default function Dashboard() {
         }
 
         // Fetch Real WhatsApp Message Stats from User Profile
-        const userRes = await api.get('/users/settings').catch(() => null);
-        const userData = userRes?.data?.data || userRes?.data;
+        const userRes = await api.get('/users/profile').catch(() => null);
+        const userData = userRes?.data?.user || userRes?.data;
         if (userData?.messageStats) {
           setMessageStats(userData.messageStats);
         }
@@ -147,8 +147,8 @@ export default function Dashboard() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl"></div>
           <h3 className="text-lg font-bold text-white mb-6">AI Lead Categorization</h3>
           
-          <div className="h-64 w-full pt-4 relative z-10" style={{ minWidth: '100%', minHeight: '250px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full pt-4 relative z-10">
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie data={data.graphData} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
                   {data.graphData.map((entry, index) => (

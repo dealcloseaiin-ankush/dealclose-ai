@@ -62,6 +62,31 @@ const MessageNode = () => {
   );
 };
 
+const AskQuestionNode = () => (
+  <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white">
+    <Handle type="target" position={Position.Top} className="w-3 h-3 bg-purple-500 border-none" />
+    <div className="font-bold mb-3 flex items-center gap-2 text-purple-400">⚡ Ask Question (Wait for Reply)</div>
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs text-gray-400 mb-1">Question to ask</p>
+        <textarea className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
+      </div>
+      <div>
+        <p className="text-xs text-gray-400 mb-1">Expected Replies (Branches)</p>
+        <div className="flex justify-between text-[10px] font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
+          <span className="text-green-400 text-center w-1/3 border-r border-gray-700">If "YES"</span>
+          <span className="text-rose-400 text-center w-1/3 border-r border-gray-700">If "NO"</span>
+          <span className="text-gray-400 text-center w-1/3">Any Other</span>
+        </div>
+      </div>
+    </div>
+    {/* Multiple Output Handles for different user replies */}
+    <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-3 h-3 bg-green-500 border-none" />
+    <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-3 h-3 bg-rose-500 border-none" />
+    <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-3 h-3 bg-gray-400 border-none" />
+  </div>
+);
+
 const DelayNode = () => (
   <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-gray-500 min-w-[220px] text-white">
     <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-none" />
@@ -100,7 +125,8 @@ const nodeTypes = {
   trigger: TriggerNode,
   message: MessageNode,
   delay: DelayNode,
-  condition: ConditionNode
+  condition: ConditionNode,
+  askQuestion: AskQuestionNode
 };
 
 const initialNodes = [
@@ -141,6 +167,7 @@ export default function FlowBuilder() {
       if (label.includes('Message')) type = 'message';
       else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
       else if (label.includes('Condition')) type = 'condition';
+      else if (label.includes('Question')) type = 'askQuestion';
 
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowWrapper.current.getBoundingClientRect().left,

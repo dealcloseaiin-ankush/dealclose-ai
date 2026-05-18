@@ -153,7 +153,7 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { new: true } // Returns the updated document
+      { returnDocument: 'after' } // Fixes mongoose deprecation warning
     );
 
     if (!updatedUser) return res.status(404).json({ success: false, message: 'User not found' });
