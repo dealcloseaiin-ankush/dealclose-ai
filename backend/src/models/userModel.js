@@ -87,6 +87,12 @@ const userSchema = new Schema({
     webhookVerifyToken: { type: String },
     wabaId: { type: String } // Required by Meta for Template Approvals
   },
+  // --- New AI-related fields ---
+  businessName: { type: String, default: '' },
+  businessDescription: { type: String, default: '' }, // AI Training Data
+  aiRules: { type: String, default: '' }, // Custom rules for AI
+  fallbackAction: { type: String, enum: ['notify_owner', 'wait_for_human'], default: 'notify_owner' }, // AI fallback
+  aiAgentEnabled: { type: Boolean, default: true }, // Master switch for AI
   autoReplies: [{
     triggerWord: { type: String },
     replyMessage: { type: String }
