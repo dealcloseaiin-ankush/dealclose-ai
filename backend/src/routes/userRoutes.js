@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getProfile, updateProfile } = require('../controllers/authController');
-const { protect } = require('../middlewares/authMiddleware'); // Assuming this middleware exists
+const { protect } = require('../middleware/authMiddleware'); 
 
 // @route   GET /api/users/profile
 router.get('/profile', protect, getProfile);
