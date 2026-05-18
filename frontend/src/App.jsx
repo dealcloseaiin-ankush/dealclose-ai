@@ -31,7 +31,6 @@ import AboutUs from './pages/AboutUs';
 import FAQ from './pages/FAQ';
 import Help from './pages/Help';
 import DataDeletion from './pages/DataDeletion';
-import AIGuideWidget from './components/AIGuideWidget';
 import DigitalCard from './pages/DigitalCard';
 import AIVideoLanding from './pages/AIVideoLanding';
 import AIVideoDashboard from './pages/AIVideoDashboard';
@@ -110,9 +109,6 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
-      
-      {/* Floating AI Setup Guide for Users */}
-      <AIGuideWidget />
     </Router>
   );
 }

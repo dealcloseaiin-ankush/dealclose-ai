@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api'; // Axios instance for making backend calls
+import AIGuideWidget from '../components/AIGuideWidget';
 
 export default function LandingPage() {
   const [faqOpen, setFaqOpen] = useState(null);
@@ -641,6 +642,9 @@ export default function LandingPage() {
         </button>
       </div>
       
+      {/* Meta Setup Guide Widget */}
+      <AIGuideWidget />
+
     </div>
   );
 }
