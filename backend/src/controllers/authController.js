@@ -155,13 +155,16 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { returnDocument: 'after', strict: false }
-    );
+      { new: true, strict: false }
+    ).lean(); // 🔥 ADDED .lean() -> Bypasses Mongoose Schema Hiding!
+
+    const verifyDb = await User.findById(userId).lean();
+    console.log(`🔍 [DB VERIFY SETTINGS] Database se wapas fetch karke check kiya -> aiRules: ${verifyDb.aiRules ? 'SAVED' : 'MISSING'} | businessDesc: ${verifyDb.businessDescription ? 'SAVED' : 'MISSING'}`);
 
     if (!updatedUser) return res.status(404).json({ success: false, message: 'User not found' });
 
-    console.log(`✅ [DB Save Success] BusinessDescription Length: ${updatedUser.businessDescription ? updatedUser.businessDescription.length : 0}`);
-    console.log(`✅ [DB Save Success] AI Rules Length: ${updatedUser.aiRules ? updatedUser.aiRules.length : 0}`);
+    console.log(`✅ [DB Save Success] BusinessDescription: ${updatedUser.businessDescription ? 'SAVED' : 'EMPTY'}`);
+    console.log(`✅ [DB Save Success] AI Rules: ${updatedUser.aiRules ? 'SAVED' : 'EMPTY'}`);
 
     res.status(200).json({ success: true, user: updatedUser, message: 'Settings updated successfully!' });
   } catch (error) {
@@ -175,7 +178,11 @@ exports.updateProfile = async (req, res) => {
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const user = await User.findById(userId).select('-password'); // Exclude password
+    
+    // 🔥 ADDED .lean() -> Forces database to return exactly what's inside MongoDB
+    const user = await User.findById(userId).select('-password').lean(); 
+    
+    console.log(`🔍 [Fetch Profile] Sending data to Dashboard/Settings. Rules Exist? ${user.aiRules ? 'YES' : 'NO'}`);
     res.status(200).json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching profile' });

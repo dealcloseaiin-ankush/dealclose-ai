@@ -62,7 +62,7 @@ exports.handleDashboardAssistant = async (req, res) => {
     
     if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).lean(); // 🔥 Added .lean()
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const systemContext = `You are DealClose AI Onboarding Expert.
@@ -92,12 +92,19 @@ exports.handleDashboardAssistant = async (req, res) => {
       for (const toolCall of aiMessage.tool_calls) {
         const args = JSON.parse(toolCall.function.arguments);
         
+        console.log(`\n🤖 [AI Tool Triggered] ${toolCall.function.name}`);
+        console.log(`📦 [AI Tool Arguments]`, args);
+
         const updateData = {};
 
         if (toolCall.function.name === "update_business_profile") {
           if (args.businessName) updateData.businessName = args.businessName;
           if (args.businessDescription) updateData.businessDescription = args.businessDescription;
-          await User.findByIdAndUpdate(userId, { $set: updateData }, { strict: false });
+          
+          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true, strict: false }).lean();
+          const verifyDb = await User.findById(userId).lean();
+          console.log(`🔍 [DB VERIFY PROFILE] Database se turant check kiya: BusinessDesc is ${verifyDb.businessDescription ? 'SAVED' : 'MISSING'}`);
+          console.log(`✅ [AI DB Success] Profile updated. DB Business Name: ${updated.businessName}`);
           responseMessage = "✅ I have updated your business profile successfully! What would you like to set up next? Auto-replies or WhatsApp templates?";
           actionTaken = "profile_updated";
         } 
@@ -106,16 +113,20 @@ exports.handleDashboardAssistant = async (req, res) => {
           actionTaken = { type: "template_drafted", data: args };
         }
         else if (toolCall.function.name === "add_auto_reply_rule") {
-          await User.findByIdAndUpdate(userId, { 
+          const updated = await User.findByIdAndUpdate(userId, { 
             $push: { autoReplies: { triggerWord: args.triggerWord, replyMessage: args.replyMessage } }
-          }, { strict: false });
+          }, { new: true, strict: false }).lean();
+          console.log(`✅ [AI DB Success] Auto-reply added. Total replies: ${updated.autoReplies?.length}`);
           responseMessage = `⚡ Done! I've added an auto-reply. When someone says *'${args.triggerWord}'*, I will automatically reply with: '${args.replyMessage}'.`;
           actionTaken = "auto_reply_added";
         }
         else if (toolCall.function.name === "update_ai_rules") {
           updateData.aiRules = args.customRules;
           updateData.fallbackAction = args.fallbackAction;
-          await User.findByIdAndUpdate(userId, { $set: updateData }, { strict: false });
+          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true, strict: false }).lean();
+          const verifyDb = await User.findById(userId).lean();
+          console.log(`🔍 [DB VERIFY RULES] Database se turant check kiya: aiRules is ${verifyDb.aiRules ? 'SAVED' : 'MISSING'}`);
+          console.log(`✅ [AI DB Success] Rules updated. Saved Rules: "${updated.aiRules}"`);
           responseMessage = `🧠 Perfect! I have updated my brain. I will strictly follow these rules with your customers:\n- ${args.customRules}\n\nAnd if I get stuck, I will: ${args.fallbackAction}.`;
           actionTaken = "rules_updated";
         }
