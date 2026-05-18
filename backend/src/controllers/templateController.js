@@ -5,7 +5,8 @@ const metaTemplateService = require('../services/metaTemplateService');
 // @route   GET /api/templates
 exports.getTemplates = async (req, res) => {
     try {
-        const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca";
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
         const user = await User.findById(userId);
 
         if (!user || !user.whatsappConfig?.wabaId || !user.whatsappConfig?.accessToken) {
@@ -28,7 +29,8 @@ exports.getTemplates = async (req, res) => {
 exports.createTemplate = async (req, res) => {
     try {
         const { templateData } = req.body;
-        const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca"; 
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
         const user = await User.findById(userId);
 
         const result = await metaTemplateService.submitTemplateToMeta(

@@ -6,7 +6,7 @@ const metaTemplateService = require('../services/metaTemplateService');
 exports.getTemplates = async (req, res) => {
     try {
         // Authenticated user ID
-        const userId = req.user ? req.user._id : null;
+        const userId = req.user?._id || req.user?.id;
         
         if (!userId) {
             return res.status(401).json({ message: 'Unauthorized. Please login again.' });
@@ -36,7 +36,7 @@ exports.getTemplates = async (req, res) => {
 exports.createTemplate = async (req, res) => {
     try {
         const { templateData } = req.body; // e.g., { name: 'new_offer', components: [...], ... }
-        const userId = req.user ? req.user._id : null; 
+        const userId = req.user?._id || req.user?.id; 
         
         if (!userId) {
             return res.status(401).json({ message: 'Unauthorized. Please login again.' });

@@ -4,8 +4,8 @@ const Contact = require('../models/contactModel');
 // @route   GET /api/contacts
 exports.getContacts = async (req, res) => {
   try {
-    // Temporarily using fallback ID for MVP. Will use req.user._id in production.
-    const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca";
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const contacts = await Contact.find({ userId }).sort({ createdAt: -1 });
     
     res.status(200).json({ success: true, count: contacts.length, data: contacts });
@@ -19,7 +19,8 @@ exports.getContacts = async (req, res) => {
 // @route   POST /api/contacts
 exports.addContact = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca";
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const { name, phone, tags } = req.body;
 
     const newContact = await Contact.create({

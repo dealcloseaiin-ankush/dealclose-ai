@@ -5,7 +5,8 @@ const aiService = require('../services/aiService');
 // @route   GET /api/ai/training-data
 exports.getTrainingData = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca";
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const user = await User.findById(userId);
     
     res.status(200).json({ success: true, data: user?.trainingData || [] });
@@ -55,7 +56,8 @@ exports.trainAI = async (req, res) => {
 // @route   POST /api/ai/dashboard-assistant
 exports.handleDashboardAssistant = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca"; // Auth se aayega
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const { message } = req.body;
     
     if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
@@ -90,10 +92,12 @@ exports.handleDashboardAssistant = async (req, res) => {
       for (const toolCall of aiMessage.tool_calls) {
         const args = JSON.parse(toolCall.function.arguments);
         
+        const updateData = {};
+
         if (toolCall.function.name === "update_business_profile") {
-          if (args.businessName) user.businessName = args.businessName;
-          if (args.businessDescription) user.businessDescription = args.businessDescription;
-          await user.save();
+          if (args.businessName) updateData.businessName = args.businessName;
+          if (args.businessDescription) updateData.businessDescription = args.businessDescription;
+          await User.findByIdAndUpdate(userId, { $set: updateData }, { strict: false });
           responseMessage = "✅ I have updated your business profile successfully! What would you like to set up next? Auto-replies or WhatsApp templates?";
           actionTaken = "profile_updated";
         } 
@@ -102,23 +106,21 @@ exports.handleDashboardAssistant = async (req, res) => {
           actionTaken = { type: "template_drafted", data: args };
         }
         else if (toolCall.function.name === "add_auto_reply_rule") {
-          if (!user.autoReplies) user.autoReplies = [];
-          user.autoReplies.push({ triggerWord: args.triggerWord, replyMessage: args.replyMessage });
-          await user.save();
+          await User.findByIdAndUpdate(userId, { 
+            $push: { autoReplies: { triggerWord: args.triggerWord, replyMessage: args.replyMessage } }
+          }, { strict: false });
           responseMessage = `⚡ Done! I've added an auto-reply. When someone says *'${args.triggerWord}'*, I will automatically reply with: '${args.replyMessage}'.`;
           actionTaken = "auto_reply_added";
         }
         else if (toolCall.function.name === "update_ai_rules") {
-          user.aiRules = args.customRules;
-          user.fallbackAction = args.fallbackAction;
-          await user.save();
+          updateData.aiRules = args.customRules;
+          updateData.fallbackAction = args.fallbackAction;
+          await User.findByIdAndUpdate(userId, { $set: updateData }, { strict: false });
           responseMessage = `🧠 Perfect! I have updated my brain. I will strictly follow these rules with your customers:\n- ${args.customRules}\n\nAnd if I get stuck, I will: ${args.fallbackAction}.`;
           actionTaken = "rules_updated";
         }
         else if (toolCall.function.name === "log_business_observation") {
-          user.aiObservations = user.aiObservations || [];
-          user.aiObservations.push(args.observationText);
-          await user.save();
+          await User.findByIdAndUpdate(userId, { $push: { aiObservations: args.observationText } }, { strict: false });
           responseMessage = `📝 I have noted this down: "${args.observationText}". I will keep this in mind for your business setup!`;
         }
       }

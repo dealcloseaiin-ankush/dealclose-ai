@@ -6,7 +6,9 @@ const whatsappService = require('../services/whatsappService');
 exports.updateDispatchStatus = async (req, res) => {
   try {
     const { orderId, customerPhone, status, trackingLink } = req.body;
-    const userId = req.user ? req.user._id : "60d0fe4f5311236168a109ca"; // Fallback for MVP
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
     const user = await User.findById(userId);
 
     if (!user || !user.whatsappConfig?.accessToken) {
