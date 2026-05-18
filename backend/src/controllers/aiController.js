@@ -101,12 +101,10 @@ exports.handleDashboardAssistant = async (req, res) => {
           if (args.businessName) updateData.businessName = args.businessName;
           if (args.businessDescription) updateData.businessDescription = args.businessDescription;
           
-          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true, strict: false });
-          const verifyDb = await User.findById(userId); // Re-fetch without .lean() to see if Mongoose returned it
-          console.log(`✅ [AI Assistant DB Update] Profile updated.
-            -> Saved Business Name: ${updated.businessName || 'N/A'}
-            -> Saved Business Desc: ${updated.businessDescription ? 'SAVED (Length: ' + updated.businessDescription.length + ')' : 'MISSING'}
-            -> DB Check after save (with .lean()): ${verifyDb.businessDescription ? 'STILL SAVED' : 'LOST AFTER FETCH'}`);
+          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after', strict: false });
+          const verifyDb = await User.findById(userId).lean();
+          console.log(`\n🔍 [DB VERIFY AFTER AI PROFILE UPDATE]
+            - Business Desc in DB: ${verifyDb.businessDescription ? '✅ SAVED' : '❌ MISSING'}`);
           responseMessage = "✅ I have updated your business profile successfully! What would you like to set up next? Auto-replies or WhatsApp templates?";
           actionTaken = "profile_updated";
         } 
@@ -116,24 +114,19 @@ exports.handleDashboardAssistant = async (req, res) => {
         } else if (toolCall.function.name === "add_auto_reply_rule") {
           const updated = await User.findByIdAndUpdate(userId, {
             $push: { autoReplies: { triggerWord: args.triggerWord, replyMessage: args.replyMessage } }
-          }, { new: true, strict: false });
-          const verifyDb = await User.findById(userId);
-          console.log(`✅ [AI Assistant DB Update] Auto-reply added.
-            -> Total replies after save: ${updated.autoReplies?.length || 0}
-            -> Last added rule trigger: "${args.triggerWord}"
-            -> DB Check after save (with .lean()): Total replies: ${verifyDb.autoReplies?.length || 0}`);
+          }, { returnDocument: 'after', strict: false });
+          console.log(`\n🔍 [DB VERIFY AFTER AI AUTOREPLY]
+            - Total Auto-Replies in DB: ${updated.autoReplies?.length || 0}`);
           responseMessage = `⚡ Done! I've added an auto-reply. When someone says *'${args.triggerWord}'*, I will automatically reply with: '${args.replyMessage}'.`;
           actionTaken = "auto_reply_added";
         }
         else if (toolCall.function.name === "update_ai_rules") {
           updateData.aiRules = args.customRules;
           updateData.fallbackAction = args.fallbackAction;
-          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true, strict: false });
-          const verifyDb = await User.findById(userId);
-          console.log(`✅ [AI Assistant DB Update] AI Rules updated.
-            -> Saved Rules: "${updated.aiRules}"
-            -> Saved Fallback: "${updated.fallbackAction}"
-            -> DB Check after save (with .lean()): Rules: ${verifyDb.aiRules ? 'SAVED' : 'MISSING'} | Fallback: ${verifyDb.fallbackAction || 'N/A'}`);
+          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after', strict: false });
+          const verifyDb = await User.findById(userId).lean();
+          console.log(`\n🔍 [DB VERIFY AFTER AI RULES UPDATE]
+            - AI Rules in DB: ${verifyDb.aiRules ? '✅ SAVED' : '❌ MISSING'}`);
           responseMessage = `🧠 Perfect! I have updated my brain. I will strictly follow these rules with your customers:\n- ${args.customRules}\n\nAnd if I get stuck, I will: ${args.fallbackAction}.`;
           actionTaken = "rules_updated";
         }

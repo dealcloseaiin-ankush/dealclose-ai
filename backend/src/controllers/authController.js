@@ -155,17 +155,16 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { new: true, strict: false } // new: true returns the modified document rather than the original
+      { returnDocument: 'after', strict: false }
     );
 
     // Re-fetch using .lean() to ensure we get the raw object for debugging, but still send the fully updated Mongoose doc to frontend
     const verifyDb = await User.findById(userId).lean(); 
-    console.log(`🔍 [DB VERIFY SETTINGS] Database se wapas fetch karke check kiya -> aiRules: ${verifyDb.aiRules ? 'SAVED' : 'MISSING'} | businessDesc: ${verifyDb.businessDescription ? 'SAVED' : 'MISSING'}`);
+    console.log(`\n🔍 [DB VERIFY AFTER SETTINGS SAVE]
+    - AI Rules in DB: ${verifyDb.aiRules ? '✅ SAVED' : '❌ MISSING'}
+    - Business Desc in DB: ${verifyDb.businessDescription ? '✅ SAVED' : '❌ MISSING'}`);
 
     if (!updatedUser) return res.status(404).json({ success: false, message: 'User not found or not updated' });
-
-    console.log(`✅ [DB Save Success] BusinessDescription: ${updatedUser.businessDescription ? 'SAVED' : 'EMPTY'}`);
-    console.log(`✅ [DB Save Success] AI Rules: ${updatedUser.aiRules ? 'SAVED' : 'EMPTY'}`);
 
     res.status(200).json({ success: true, user: updatedUser, message: 'Settings updated successfully!' });
   } catch (error) {
@@ -185,7 +184,9 @@ exports.getProfile = async (req, res) => {
 
     if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
     
-    console.log(`🔍 [Fetch Profile] Sending data to Dashboard/Settings. Rules Exist? ${user.aiRules ? 'YES' : 'NO'}`);
+    console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
+    - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
+    - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}`);
     res.status(200).json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching profile' });

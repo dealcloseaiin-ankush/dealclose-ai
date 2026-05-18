@@ -35,6 +35,11 @@ exports.saveSettings = async (req, res) => {
     if (updates.ownerPhone !== undefined) updateData.ownerPhone = updates.ownerPhone;
     if (updates.pinCode !== undefined) updateData.servedPinCodes = [updates.pinCode];
     if (updates.businessDesc !== undefined) updateData.businessDescription = updates.businessDesc;
+    if (updates.businessDescription !== undefined) updateData.businessDescription = updates.businessDescription;
+    if (updates.businessName !== undefined) updateData.businessName = updates.businessName;
+    if (updates.aiRules !== undefined) updateData.aiRules = updates.aiRules;
+    if (updates.fallbackAction !== undefined) updateData.fallbackAction = updates.fallbackAction;
+    if (updates.aiAgentEnabled !== undefined) updateData.aiAgentEnabled = updates.aiAgentEnabled;
     if (updates.businessUrls !== undefined) updateData.businessUrls = updates.businessUrls;
     
     // Save multiple Workspaces/Businesses
@@ -96,7 +101,11 @@ exports.saveSettings = async (req, res) => {
       updateData.digitalCardConfig = updates.digitalCardConfig;
     }
 
-    const updatedUser = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true, upsert: true });
+    const updatedUser = await User.findByIdAndUpdate(
+      userId, 
+      { $set: updateData }, 
+      { returnDocument: 'after', upsert: true, strict: false }
+    ).lean();
     res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {
     console.error('Save Settings Error:', error);
