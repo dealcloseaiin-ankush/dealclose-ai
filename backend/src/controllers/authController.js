@@ -112,3 +112,67 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Update User Profile (AI Prompt / Business Description)
+// @route   PUT /api/users/profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { 
+      businessName,
+      businessDescription, 
+      aiRules, 
+      fallbackAction,
+      whatsappConfig,
+      digitalCardConfig,
+      discountConfig,
+      ownerPhone,
+      aiAgentEnabled,
+      workspaces,
+      twilioConfig
+    } = req.body;
+
+    // Assuming you have an auth middleware that sets req.user
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+
+    // Build the update object dynamically and safely
+    const updateData = {};
+    if (businessName !== undefined) updateData.businessName = businessName;
+    if (businessDescription !== undefined) updateData.businessDescription = businessDescription;
+    if (aiRules !== undefined) updateData.aiRules = aiRules;
+    if (fallbackAction !== undefined) updateData.fallbackAction = fallbackAction;
+    if (whatsappConfig !== undefined) updateData.whatsappConfig = whatsappConfig;
+    if (digitalCardConfig !== undefined) updateData.digitalCardConfig = digitalCardConfig;
+    if (discountConfig !== undefined) updateData.discountConfig = discountConfig;
+    if (ownerPhone !== undefined) updateData.ownerPhone = ownerPhone;
+    if (aiAgentEnabled !== undefined) updateData.aiAgentEnabled = aiAgentEnabled;
+    if (workspaces !== undefined) updateData.workspaces = workspaces;
+    if (twilioConfig !== undefined) updateData.twilioConfig = twilioConfig;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true } // Returns the updated document
+    );
+
+    if (!updatedUser) return res.status(404).json({ success: false, message: 'User not found' });
+
+    res.status(200).json({ success: true, user: updatedUser, message: 'Settings updated successfully!' });
+  } catch (error) {
+    console.error('Update Profile Error:', error);
+    res.status(500).json({ success: false, message: 'Server error updating profile' });
+  }
+};
+
+// @desc    Get Current User Profile
+// @route   GET /api/users/profile
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const user = await User.findById(userId).select('-password'); // Exclude password
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching profile' });
+  }
+};
