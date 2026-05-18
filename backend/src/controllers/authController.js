@@ -155,7 +155,7 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { returnDocument: 'after', strict: false } // strict: false forces MongoDB to save new fields
+      { returnDocument: 'after', strict: false }
     );
 
     if (!updatedUser) return res.status(404).json({ success: false, message: 'User not found' });
