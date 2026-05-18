@@ -55,10 +55,7 @@ exports.scrapeFacebookAds = async (query) => {
     const run = await client.actor("drobile/facebook-ads-library-scraper").call({
         searchTerms: [query],
         country: "IN", // Searching in India by default
-        maxResults: 5, // Get top 5 ads
-        proxy: {
-            useApifyProxy: true
-        }
+        maxResults: 3 // Reduced to 3 to make it faster and removed proxy block
     });
     console.log(`[Scraper Debug] ✅ Apify Actor Run Finished. Run ID: ${run.id}. Fetching dataset...`);
 

@@ -161,7 +161,8 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
         metaAdsData = "Both Meta API and Apify Scraper failed/skipped due to missing tokens.";
       }
     } catch (apifyError) {
-      metaAdsData = `Meta API and Apify Scraper both failed.`;
+      console.error(`❌ [Vision Debug] Apify Scraper Fallback Error:`, apifyError.message || apifyError);
+      metaAdsData = `Meta API and Apify Scraper both failed. Apify Error Details: ${apifyError.message}`;
     }
   }
 
