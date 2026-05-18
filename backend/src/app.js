@@ -9,6 +9,7 @@ const leadRoutes = require('./routes/leadRoutes');
 const callRoutes = require('./routes/callRoutes');
 const formRoutes = require('./routes/formRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const userRoutes = require('./routes/userRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const whatsappTemplateRoutes = require('./routes/whatsappTemplateRoutes');
@@ -55,6 +56,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/users', settingsRoutes); // Handles both User Auth & Integrations/Settings
+app.use('/api/users', userRoutes); // Handles Profile & AI Training Rules
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
