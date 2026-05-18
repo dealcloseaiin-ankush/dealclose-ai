@@ -54,6 +54,7 @@ export default function Dashboard() {
         // Fetch Real WhatsApp Message Stats from User Profile
         const userRes = await api.get('/users/profile').catch(() => null);
         const userData = userRes?.data?.user || userRes?.data;
+        console.log("🔍 [Dashboard Debug] Fetched User Data from DB:", userData);
         if (userData?.messageStats) {
           setMessageStats(userData.messageStats);
         }
@@ -61,6 +62,7 @@ export default function Dashboard() {
         // Check if AI is active but missing training data
         const hasCredits = userData?.aiCredits > 0 || isSuperAdmin;
         const hasNoTraining = !userData?.businessDescription || userData.businessDescription.trim().length < 10;
+        console.log(`🔍 [Dashboard Popup Logic] hasCredits: ${hasCredits}, hasNoTraining: ${hasNoTraining}, AI_Prompt_Length: ${userData?.businessDescription?.length || 0}`);
         if (hasCredits && hasNoTraining && userData?.aiAgentEnabled !== false) {
           setShowTrainingPopup(true);
         }

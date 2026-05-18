@@ -241,7 +241,7 @@ exports.handleWhatsApp = async (req, res) => {
                   for (const toolCall of aiMessage.tool_calls) {
                     if (toolCall.function.name === "extract_lead_requirements") {
                       const leadData = JSON.parse(toolCall.function.arguments);
-                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { userId: user._id, name: "New AI Lead", source: leadData.category, status: "interested", notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` }, { new: true, upsert: true });
+                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { userId: user._id, name: "New AI Lead", source: leadData.category, status: "interested", notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` }, { returnDocument: 'after', upsert: true });
                       responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`;
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "trigger_outbound_call") {
@@ -269,7 +269,7 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);
-                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { new: true, upsert: true });
+                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { returnDocument: 'after', upsert: true });
                     } else if (toolCall.function.name === "request_star_review") {
                       const links = user.digitalCardConfig || {};
                       const discount = user.discountConfig || {};

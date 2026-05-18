@@ -117,6 +117,8 @@ exports.changePassword = async (req, res) => {
 // @route   PUT /api/users/profile
 exports.updateProfile = async (req, res) => {
   try {
+    console.log(`\n➡️ [Profile Update] Request received for user ID: ${req.user?._id || req.user?.id}`);
+
     const { 
       businessName,
       businessDescription, 
@@ -153,10 +155,13 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { returnDocument: 'after' } // Fixes mongoose deprecation warning
+      { returnDocument: 'after', strict: false } // strict: false forces MongoDB to save new fields
     );
 
     if (!updatedUser) return res.status(404).json({ success: false, message: 'User not found' });
+
+    console.log(`✅ [DB Save Success] BusinessDescription Length: ${updatedUser.businessDescription ? updatedUser.businessDescription.length : 0}`);
+    console.log(`✅ [DB Save Success] AI Rules Length: ${updatedUser.aiRules ? updatedUser.aiRules.length : 0}`);
 
     res.status(200).json({ success: true, user: updatedUser, message: 'Settings updated successfully!' });
   } catch (error) {
