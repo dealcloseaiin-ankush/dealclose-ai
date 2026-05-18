@@ -46,3 +46,39 @@ exports.scrapeInstagram = async (url) => {
         authorUsername: post.ownerUsername,
     };
 };
+
+exports.scrapeFacebookAds = async (query) => {
+    console.log(`\n[Scraper Debug] 🕷️ Scraping Facebook Ad Library for query: "${query}"`);
+
+    // Starts the Apify Actor: Facebook Ads Library Scraper
+    console.log(`[Scraper Debug] ⏳ Calling Apify Actor 'drobile/facebook-ads-library-scraper'...`);
+    const run = await client.actor("drobile/facebook-ads-library-scraper").call({
+        searchTerms: [query],
+        country: "IN", // Searching in India by default
+        maxResults: 5, // Get top 5 ads
+        proxy: {
+            useApifyProxy: true
+        }
+    });
+    console.log(`[Scraper Debug] ✅ Apify Actor Run Finished. Run ID: ${run.id}. Fetching dataset...`);
+
+    // Fetch the results from the dataset
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+
+    if (!items || items.length === 0) {
+        console.log(`❌ [Scraper Debug] Error: No ads found in dataset for query "${query}".`);
+        return []; // Return empty array if no ads found
+    }
+
+    console.log(`[Scraper Debug] 🎉 Found ${items.length} ads. Processing...`);
+    // Return a simplified version of the data
+    return items.map(ad => ({
+        pageName: ad.pageName,
+        adText: ad.adText,
+        adLink: ad.adSnapshotUrl,
+        imageUrl: ad.images?.[0]?.original_image_url || null,
+        videoUrl: ad.videos?.[0]?.video_url || null,
+        impressions: ad.impressionsMin,
+        startedRunning: ad.startDate
+    }));
+};

@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const promptBuilder = require('./promptBuilder');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const scraperService = require('./scraper.service');
 
 exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) => {
   const prompt = promptBuilder.buildPrompt(platform, scanType, scrapedData);
@@ -122,13 +123,15 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   // 1.5. Meta Ad Library API se live Facebook/Instagram Ads lana
   let metaAdsData = "";
   try {
-    console.log(`[Vision Debug] 🔵 Step 2: Requesting Meta Ad Library API...`);
-    const metaToken = process.env.META_AD_API_TOKEN;
-    if (metaToken) {
+    console.log(`[Vision Debug] 🔵 Step 2: Requesting Official Meta Ad Library API using Master Token...`);
+    // Naye token ka naam META_MASTER_TOKEN rakha gaya hai
+    const metaToken = process.env.META_MASTER_TOKEN || process.env.META_AD_API_TOKEN;
+    
+    if (metaToken && !metaToken.includes('DUMMY')) {
       const metaRes = await axios.get('https://graph.facebook.com/v19.0/ads_archive', {
         params: {
           search_terms: query,
-          ad_reached_countries: "['IN', 'US']", // Default searching in India and US
+          ad_reached_countries: "['IN', 'US']",
           ad_active_status: 'ACTIVE',
           fields: 'page_name,ad_creative_bodies,ad_creation_time',
           access_token: metaToken
@@ -142,13 +145,24 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
         metaAdsData = "API Success, but no active Meta ads found for this exact query.";
       }
     } else {
-      console.log(`[Vision Debug] ⚠️ Meta API Skipped: Token missing.`);
-      metaAdsData = "Meta API Token is missing in the backend.";
+      throw new Error("Meta Token is missing or DUMMY.");
     }
   } catch (error) {
     const errMsg = error.response?.data?.error?.message || error.message;
-    console.error("❌ [Vision Debug] Meta Ad API Error:", errMsg);
-    metaAdsData = `Meta API Failed: ${errMsg}. (Check your API Token permissions).`;
+    console.log(`❌ [Vision Debug] Meta API Failed (${errMsg}). Switching to Apify Scraper Fallback...`);
+    
+    // Fallback to Apify agar Meta API block karta hai
+    try {
+      const apifyToken = process.env.APIFY_TOKEN;
+      if (apifyToken && !apifyToken.includes('DUMMY')) {
+        const scrapedAds = await scraperService.scrapeFacebookAds(query);
+        metaAdsData = scrapedAds.length > 0 ? JSON.stringify(scrapedAds) : "Apify Scraper ran successfully, but no active ads were found.";
+      } else {
+        metaAdsData = "Both Meta API and Apify Scraper failed/skipped due to missing tokens.";
+      }
+    } catch (apifyError) {
+      metaAdsData = `Meta API and Apify Scraper both failed.`;
+    }
   }
 
   // 2. AI ko comparison aur analysis ke liye command (Prompt) dena
