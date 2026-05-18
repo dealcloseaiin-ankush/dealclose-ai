@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -36,17 +36,32 @@ import DigitalCard from './pages/DigitalCard';
 import AIVideoLanding from './pages/AIVideoLanding';
 import AIVideoDashboard from './pages/AIVideoDashboard';
 import WhatsAppRules from './pages/WhatsAppRules';
+import { useAuth } from './hooks/useAuth';
 
 // Placeholder component for Change Password until we build the real one
 const ChangePasswordPlaceholder = () => <div className="p-10 text-white text-center"><h1 className="text-3xl font-bold text-blue-400">Change Password</h1><p className="mt-4 text-gray-400">This feature is currently under development. Coming soon!</p></div>;
+
+// Smart Redirects for Logged In Users
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
+  return user ? <Navigate to="/dashboard" replace /> : children;
+};
+
+const RootRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
+  return user ? <Navigate to="/dashboard" replace /> : children;
+};
 
 export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/" element={<RootRoute><LandingPage /></RootRoute>} />
+        <Route path="/home" element={<LandingPage />} /> {/* Extra route for logged in users to view landing page */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} /> {/* This was correct, no change needed */}
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
         <Route path="/about" element={<AboutUs />} />

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../hooks/useAuth';
-import { AlertTriangle } from 'lucide-react';
+import DashboardAIAssistant from '../components/DashboardAIAssistant'; // Import the AI Chat Assistant
 
 function StatCard({ title, value, trend, trendUp, icon, color }) {
   return (
@@ -36,9 +36,9 @@ export default function Dashboard() {
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
 
   const [clients, setClients] = useState([]);
-  const [activeBusiness, setActiveBusiness] = useState('Main Business');
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
-  const [showTrainingPopup, setShowTrainingPopup] = useState(false);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [activeBusinessId, setActiveBusinessId] = useState('main_business');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,17 +55,20 @@ export default function Dashboard() {
         const userRes = await api.get('/users/profile').catch(() => null);
         const userData = userRes?.data?.user || userRes?.data;
         console.log("🔍 [Dashboard Debug] Fetched User Data from DB:", userData);
-        if (userData?.messageStats) {
-          setMessageStats(userData.messageStats);
+        if (userData) {
+          if (userData.messageStats) {
+            setMessageStats(userData.messageStats);
+          }
+          // Set the dropdown options
+          const mainBusiness = { _id: 'main_business', name: userData.businessName || 'Main Business' };
+          const otherWorkspaces = userData.workspaces || [];
+          setWorkspaces([mainBusiness, ...otherWorkspaces]);
         }
         
         // Check if AI is active but missing training data
         const hasCredits = userData?.aiCredits > 0 || isSuperAdmin;
         const hasNoTraining = !userData?.businessDescription || userData.businessDescription.trim().length < 10;
         console.log(`🔍 [Dashboard Popup Logic] hasCredits: ${hasCredits}, hasNoTraining: ${hasNoTraining}, AI_Prompt_Length: ${userData?.businessDescription?.length || 0}`);
-        if (hasCredits && hasNoTraining && userData?.aiAgentEnabled !== false) {
-          setShowTrainingPopup(true);
-        }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
       } finally {
@@ -78,7 +81,7 @@ export default function Dashboard() {
   if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
+    <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans relative">
       
       {/* Header */}
       <div className="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
@@ -89,9 +92,10 @@ export default function Dashboard() {
               Overview Dashboard
             </span>
             </h1>
-            <select value={activeBusiness} onChange={(e) => setActiveBusiness(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
-              <option value="Main Business">🏢 Main Business</option>
-              <option value="Real Estate Branch">🏡 Real Estate Branch</option>
+            <select value={activeBusinessId} onChange={(e) => setActiveBusinessId(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
             </select>
           </div>
           <p className="text-gray-400 text-lg">Welcome back. Here is how your AI Agent is performing today.</p>
@@ -223,29 +227,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Smart AI Training Popup */}
-      {showTrainingPopup && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-purple-500/50 rounded-3xl p-8 max-w-lg w-full shadow-2xl relative text-center">
-            <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={32} />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Train Your AI Agent! 🧠</h2>
-            <p className="text-gray-400 mb-8 leading-relaxed">
-              You have AI capabilities enabled, but you haven't told the AI what your business does! 
-              Without training data, the AI cannot reply to your customers. 
-            </p>
-            <div className="flex gap-4">
-              <button onClick={() => setShowTrainingPopup(false)} className="flex-1 py-3 bg-[#1a1a1a] hover:bg-gray-800 text-white font-bold rounded-xl transition-colors">
-                Do it later
-              </button>
-              <Link to="/settings" className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30">
-                Train AI Now 🚀
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* AI Chat Assistant - Replaces the old popup */}
+      <DashboardAIAssistant />
+
     </div>
   );
 }
