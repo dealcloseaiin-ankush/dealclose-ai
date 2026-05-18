@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { Bot, Send, ChevronDown, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -29,19 +29,8 @@ const DashboardAIAssistant = () => {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      
-      const response = await axios.post(`${apiUrl}/api/ai/dashboard-assistant`, 
-        { message: userMessage.content },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
+      // Use the global 'api' instance which automatically points to the live server and attaches the token
+      const response = await api.post('/ai/dashboard-assistant', { message: userMessage.content });
       const data = response.data;
 
       if (data.success) {
