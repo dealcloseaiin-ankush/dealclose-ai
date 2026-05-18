@@ -6,6 +6,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) => {
   const prompt = promptBuilder.buildPrompt(platform, scanType, scrapedData);
   
+  console.log(`[Vision Debug] 👁️ analyzeImage called for ${platform} ${scanType}. Image URL length: ${imageUrl.length}`);
+
   const hasGemini = !!process.env.GEMINI_API_KEY;
   const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
 
@@ -35,6 +37,7 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
       console.log("[Vision AI] Trying Gemini 1.5 Flash (Official SDK)...");
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
       
+      console.log(`[Vision Debug] 📥 Downloading image to buffer for Gemini...`);
       const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
       const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
       
@@ -46,12 +49,13 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
       
       for (const modelName of GEMINI_MODELS) {
         try {
+          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${modelName}...`);
           const model = genAI.getGenerativeModel({ model: modelName });
           result = await model.generateContent([prompt, imagePart]);
-          console.log(`[Vision AI] Successfully used model: ${modelName}`);
+          console.log(`[Vision Debug] ✅ Successfully generated response using: ${modelName}`);
           break;
         } catch (e) {
-          console.log(`[Vision AI] Model ${modelName} failed, trying next...`);
+          console.log(`⚠️ [Vision Debug] Model ${modelName} failed. Reason: ${e.message}. Trying next...`);
           lastError = e;
         }
       }
@@ -82,31 +86,43 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
   if (!hasOpenAI && !hasGemini) throw new Error("OpenAI or Gemini API key is required for complex search analysis.");
 
+  console.log(`\n[Vision Debug] 🕵️‍♂️ Starting 'searchAndCompareAd' Pipeline for query: "${query}"`);
+
   let searchData = "";
   try {
     // 1. SerpAPI se live data lana (Google Search)
+    console.log(`[Vision Debug] 🌐 Step 1: Requesting SerpAPI (Google Search)...`);
     const serpApiKey = process.env.SERP_API_KEY;
     if (serpApiKey) {
       const response = await axios.get('https://serpapi.com/search.json', {
         params: { q: query, engine: "google", api_key: serpApiKey }
       });
       if (response.data.organic_results && response.data.organic_results.length > 0) {
-        searchData = JSON.stringify(response.data.organic_results.slice(0, 5));
+        console.log(`[Vision Debug] ✅ SerpAPI Success: Found ${response.data.organic_results.length} organic results.`);
+        // AI ko sirf Title, Link aur snippet bhejenge taaki wo confuse na ho aur URLs zaroor de
+        searchData = JSON.stringify(response.data.organic_results.slice(0, 5).map(res => ({
+          title: res.title,
+          link: res.link,
+          snippet: res.snippet
+        })));
       } else {
+        console.log(`[Vision Debug] ⚠️ SerpAPI Success, but 0 results found.`);
         searchData = "API Success, but no organic Google search results found.";
       }
     } else {
+      console.log(`[Vision Debug] ⚠️ SerpAPI Skipped: Key missing.`);
       searchData = "SerpAPI Key is missing in the backend.";
     }
   } catch (error) {
     const errMsg = error.response?.data?.error || error.message;
-    console.error("[Vision Service] SerpAPI Error:", errMsg);
+    console.error("❌ [Vision Debug] SerpAPI Error:", errMsg);
     searchData = `SerpAPI Failed: ${errMsg}`;
   }
 
   // 1.5. Meta Ad Library API se live Facebook/Instagram Ads lana
   let metaAdsData = "";
   try {
+    console.log(`[Vision Debug] 🔵 Step 2: Requesting Meta Ad Library API...`);
     const metaToken = process.env.META_AD_API_TOKEN;
     if (metaToken) {
       const metaRes = await axios.get('https://graph.facebook.com/v19.0/ads_archive', {
@@ -119,20 +135,24 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
         }
       });
       if (metaRes.data.data && metaRes.data.data.length > 0) {
+        console.log(`[Vision Debug] ✅ Meta API Success: Found ${metaRes.data.data.length} ads.`);
         metaAdsData = JSON.stringify(metaRes.data.data.slice(0, 3));
       } else {
+        console.log(`[Vision Debug] ⚠️ Meta API Success, but 0 active ads found for this query.`);
         metaAdsData = "API Success, but no active Meta ads found for this exact query.";
       }
     } else {
+      console.log(`[Vision Debug] ⚠️ Meta API Skipped: Token missing.`);
       metaAdsData = "Meta API Token is missing in the backend.";
     }
   } catch (error) {
     const errMsg = error.response?.data?.error?.message || error.message;
-    console.error("[Vision Service] Meta Ad API Error:", errMsg);
+    console.error("❌ [Vision Debug] Meta Ad API Error:", errMsg);
     metaAdsData = `Meta API Failed: ${errMsg}. (Check your API Token permissions).`;
   }
 
   // 2. AI ko comparison aur analysis ke liye command (Prompt) dena
+  console.log(`[Vision Debug] 🧠 Step 3: Sending Combined Data (Google + Meta) to AI...`);
   const prompt = `
   You are an expert Ad Analyst and Marketer.
   The user searched for competitor ads or products using the query: "${query}".
@@ -143,7 +163,7 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   -------------------------------
 
   CRITICAL INSTRUCTIONS:
-  1. If the live data contains actual ads or URLs, you MUST explicitly mention their specific brand names, ad copies, or links in your analysis. Do not hallucinate generic brands if real data is provided.
+  1. If the live data contains actual ads or URLs, you MUST explicitly include their EXACT clickable URLs (starting with https://) and brand names in your analysis. Users want to see the links, not just read text summaries!
   2. If the live data says an API failed (e.g., Token missing, Permission error, or no ads found), you MUST explicitly inform the user about this exact reason in the "overallSummary" so they know why you can't show specific ads.
   3. Analyze why these top results/competitors are viral and successful.
 
@@ -153,7 +173,7 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   {
     "viralScore": 95,
     "viralLabel": "High",
-    "overallSummary": "A detailed summary. Explicitly list the specific Meta/Instagram ads and Search URLs you found. If the API failed or found nothing, state the exact reason provided in the data.",
+    "overallSummary": "A detailed summary. You MUST include the exact exact clickable URLs (Links) you found so the user can click them. If the Meta API failed, state the exact reason.",
     "strengths": ["strength 1", "strength 2"],
     "weaknesses": ["weakness 1"],
     "comparison": "Detailed comparison with user's ad or gap analysis. Mention the specific competitors.",
@@ -171,33 +191,38 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
       
       for (const modelName of GEMINI_MODELS) {
         try {
+          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${modelName}...`);
           const model = genAI.getGenerativeModel({ model: modelName });
           result = await model.generateContent(prompt);
-          console.log(`[Vision AI] Successfully used model: ${modelName}`);
+          console.log(`[Vision Debug] ✅ AI Analysis completed using: ${modelName}`);
           break;
         } catch (e) {
-          console.log(`[Vision AI] Model ${modelName} failed, trying next...`);
+          console.log(`⚠️ [Vision Debug] Model ${modelName} failed. Reason: ${e.message}. Trying next...`);
           lastError = e;
         }
       }
       if (!result) throw lastError;
       aiResponseText = result.response.text();
     } else {
+      console.log(`[Vision Debug] 🤖 Triggering OpenAI GPT-4o...`);
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const aiResponse = await client.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }] });
       aiResponseText = aiResponse.choices[0].message.content;
+      console.log(`[Vision Debug] ✅ AI Analysis completed using: GPT-4o`);
     }
   } catch (aiErr) {
-    console.error("[Vision Service] AI Inference Error:", aiErr);
+    console.error("❌ [Vision Debug] AI Inference Error:", aiErr);
     throw new Error("AI generation failed: " + aiErr.message);
   }
 
+  console.log(`[Vision Debug] 🧹 Step 4: Parsing JSON output...`);
   const cleaned = aiResponseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   
   try {
+    console.log(`[Vision Debug] 🎉 Pipeline complete! Returning valid JSON.`);
     return JSON.parse(cleaned);
   } catch (parseError) {
-    console.error("[Vision Service] JSON Parse Error. AI Output was:", cleaned);
+    console.error("❌ [Vision Debug] JSON Parse Error. AI returned invalid JSON:", cleaned);
     return {
       viralScore: 0,
       viralLabel: "Error",

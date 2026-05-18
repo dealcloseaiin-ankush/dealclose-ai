@@ -10,6 +10,8 @@ const generateShareToken = () => crypto.randomBytes(6).toString('hex');
 // @route   POST /api/scaniq/screenshot
 exports.scanScreenshot = async (req, res) => {
   try {
+    console.log(`\n[ScanIQ Debug] 📸 Received new Screenshot Scan request.`);
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload a screenshot' });
     }
@@ -19,6 +21,7 @@ exports.scanScreenshot = async (req, res) => {
     const { platform = 'instagram', scanType = 'post' } = req.body;
 
     // 1. Create a Scan record in Database (Status: 'processing')
+    console.log(`[ScanIQ Debug] 🛠️ Step 1: Creating DB record for screenshot scan...`);
     const scan = await Scan.create({
       inputType: 'screenshot',
       platform,
@@ -33,6 +36,7 @@ exports.scanScreenshot = async (req, res) => {
     res.status(202).json({ success: true, scanId: scan._id, message: 'AI Analysis started' });
 
     // 3. Run OpenAI Vision processing in the background
+    console.log(`[ScanIQ Debug] 🚀 Step 2: Triggering background processor for screenshot (ScanID: ${scan._id})...`);
     processScreenscan(scan._id, imageUrl, platform, scanType);
 
   } catch (error) {
@@ -46,8 +50,11 @@ exports.scanScreenshot = async (req, res) => {
 exports.scanUrl = async (req, res) => {
   try {
     const { url, platform = 'instagram', scanType = 'post' } = req.body;
+    console.log(`\n[ScanIQ Debug] 🔗 Received new URL Scan request. URL: ${url}`);
+
     if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
 
+    console.log(`[ScanIQ Debug] 🛠️ Step 1: Creating DB record for URL scan...`);
     const scan = await Scan.create({
       inputType: 'url',
       platform,
@@ -61,6 +68,7 @@ exports.scanUrl = async (req, res) => {
     res.status(202).json({ success: true, scanId: scan._id, message: 'URL AI Analysis started' });
 
     // Run Apify Scraper + OpenAI Vision in the background
+    console.log(`[ScanIQ Debug] 🚀 Step 2: Triggering background processor for URL (ScanID: ${scan._id})...`);
     processUrlScan(scan._id, url, platform, scanType);
   } catch (error) {
     console.error('URL Scan Error:', error);
@@ -92,11 +100,15 @@ exports.getScanResult = async (req, res) => {
 exports.searchAd = async (req, res) => {
   try {
     const { query, userAdUrl } = req.body;
+    console.log(`\n[ScanIQ Debug] 🔍 Received new Search & Compare request. Query: "${query}"`);
+
     if (!query) return res.status(400).json({ success: false, message: 'Search query is required' });
 
     // Synchronous call (Frontend iski immediate wait kar raha hai)
+    console.log(`[ScanIQ Debug] 🚀 Step 1: Calling Vision Service for Search & Compare...`);
     const analysis = await visionService.searchAndCompareAd(query, userAdUrl);
 
+    console.log(`[ScanIQ Debug] ✅ Process Complete! Returning analysis to frontend.`);
     res.status(200).json({ success: true, analysis });
   } catch (error) {
     console.error('Search & Compare Error:', error);
@@ -108,13 +120,16 @@ exports.searchAd = async (req, res) => {
 async function processScreenscan(scanId, imageUrl, platform, scanType) {
   const start = Date.now();
   try {
+    console.log(`[ScanIQ Background] ⏳ Starting Vision AI analysis for ${platform} ${scanType}...`);
     // Call our modular Vision Service
     const analysis = await visionService.analyzeImage(imageUrl, platform, scanType);
     
+    console.log(`[ScanIQ Background] 💾 Saving AI results to database...`);
     const processingTime = Math.round((Date.now() - start) / 1000);
     await Scan.findByIdAndUpdate(scanId, { analysis, status: 'completed', processingTime });
+    console.log(`[ScanIQ Background] 🎉 Process completed successfully in ${processingTime}s!`);
   } catch (err) {
-    console.error("AI Analysis failed:", err);
+    console.error("❌ [ScanIQ Background Error] AI Analysis failed:", err);
     await Scan.findByIdAndUpdate(scanId, { status: 'failed', errorMessage: err.message || 'AI processing failed' });
   }
 }
@@ -124,14 +139,19 @@ async function processUrlScan(scanId, url, platform, scanType) {
   const start = Date.now();
   try {
     // 1. Scrape post data using Apify
+    console.log(`[ScanIQ Background] 🌐 Step 1: Scraping post data from Apify...`);
     const scrapedData = await scraperService.scrape(url, platform);
+    console.log(`[ScanIQ Background] ✅ Step 1 Complete. Scraped Data keys:`, Object.keys(scrapedData));
     
     // 2. Extract image URL from the scraped data
     const imageUrl = scrapedData.thumbnailUrl;
     
     // 3. Vision analysis
+    console.log(`[ScanIQ Background] 👁️ Step 2: Sending scraped image and data to Vision AI...`);
     const analysis = await visionService.analyzeImage(imageUrl, platform, scanType, scrapedData);
+    console.log(`[ScanIQ Background] ✅ Step 2 Complete. AI Analysis generated.`);
     
+    console.log(`[ScanIQ Background] 💾 Step 3: Saving all data to Database...`);
     const processingTime = Math.round((Date.now() - start) / 1000);
     await Scan.findByIdAndUpdate(scanId, {
       scrapedData,
@@ -139,8 +159,9 @@ async function processUrlScan(scanId, url, platform, scanType) {
       status: 'completed',
       processingTime
     });
+    console.log(`[ScanIQ Background] 🎉 Process completed successfully in ${processingTime}s!`);
   } catch (err) {
-    console.error("URL Analysis failed:", err);
+    console.error("❌ [ScanIQ Background Error] URL Analysis failed:", err);
     await Scan.findByIdAndUpdate(scanId, { 
       status: 'failed',
       errorMessage: err.message || 'Could not fetch this post. Make sure it is public.'

@@ -13,23 +13,27 @@ exports.scrape = async (url, platform) => {
 };
 
 exports.scrapeInstagram = async (url) => {
-    console.log(`[Scraper] Extracting data from Instagram URL: ${url}`);
+    console.log(`\n[Scraper Debug] 🕷️ Extracting data from Instagram URL: ${url}`);
     
     // Starts the Apify Actor: Instagram Scraper
+    console.log(`[Scraper Debug] ⏳ Calling Apify Actor 'apify/instagram-scraper'...`);
     const run = await client.actor("apify/instagram-scraper").call({
         directUrls: [url],
         resultsType: "posts",
         resultsLimit: 1,
     });
+    console.log(`[Scraper Debug] ✅ Apify Actor Run Finished. Run ID: ${run.id}. Fetching dataset...`);
 
     // Fetch the results from the dataset
     const { items } = await client.dataset(run.defaultDatasetId).listItems();
     const post = items[0];
 
     if (!post) {
+        console.log(`❌ [Scraper Debug] Error: Post not found in dataset.`);
         throw new Error('Post not found. It might be deleted or from a private account.');
     }
 
+    console.log(`[Scraper Debug] 🎉 Post data extracted successfully! Author: ${post.ownerUsername}`);
     // Return only the data we need for the AI Prompt
     return {
         caption: post.caption || '',
