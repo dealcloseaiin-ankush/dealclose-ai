@@ -42,7 +42,7 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
       
       let result;
       let lastError;
-      const GEMINI_MODELS = ["gemini-2.5-pro"];
+      const GEMINI_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash"];
       
       for (const modelName of GEMINI_MODELS) {
         try {
@@ -167,7 +167,7 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
       let result;
       let lastError;
-      const GEMINI_MODELS = ["gemini-2.5-pro"];
+      const GEMINI_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash"];
       
       for (const modelName of GEMINI_MODELS) {
         try {

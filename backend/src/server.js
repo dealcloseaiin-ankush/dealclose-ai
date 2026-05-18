@@ -10,6 +10,9 @@ if (!process.env.OPENAI_API_KEY) {
 const mongoose = require('mongoose');
 const app = require('./app');
 
+// Fix for Express Rate Limit 'trust proxy' error on Render/Heroku
+app.set('trust proxy', 1);
+
 const port = process.env.PORT || 5000;
 
 // Pehle server start kar dete hain taaki Render "No open ports" ka error na de
