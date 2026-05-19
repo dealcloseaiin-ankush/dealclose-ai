@@ -20,7 +20,8 @@ export default function Settings() {
     validityDays: '30',
     workspaces: [], // Store multiple businesses here
     aiAgentEnabled: true,
-    businessDescription: ''
+    businessDescription: '',
+    businessName: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -59,7 +60,8 @@ export default function Settings() {
             validityDays: savedData.discountConfig?.validityDays || '30',
             workspaces: savedData.workspaces || [], // Fetch saved workspaces
             aiAgentEnabled: savedData.aiAgentEnabled !== false,
-            businessDescription: savedData.businessDescription || ''
+            businessDescription: savedData.businessDescription || '',
+            businessName: savedData.businessName || ''
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -167,6 +169,7 @@ export default function Settings() {
       const payload = {
         aiAgentEnabled: config.aiAgentEnabled,
         businessDescription: config.businessDescription,
+        businessName: config.businessName,
         whatsappConfig: {
           accessToken: config.whatsappToken,
           phoneNumberId: config.phoneNumberId,
@@ -248,6 +251,11 @@ export default function Settings() {
               <p className="text-sm text-gray-400 mb-4 relative z-10">Turn this ON to let the AI automatically reply to your customers. Provide training data below so it knows how to answer accurately.</p>
               
               <div className="relative z-10">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Main Business Name</label>
+                  <input type="text" name="businessName" value={config.businessName} onChange={handleChange} placeholder="e.g. DealClose AI" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
+                </div>
+
                 <label className="block text-sm font-medium text-gray-300 mb-2">Business Knowledge (AI Training Data) <span className="text-rose-500">*</span></label>
                 <textarea name="businessDescription" value={config.businessDescription} onChange={handleChange} rows="3" placeholder="e.g. We are 'Shoe Mart'. We sell premium sports shoes. Delivery takes 3 days. No refunds on sale items..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
                 <p className="text-xs text-gray-500 mt-1">AI needs at least 1-2 sentences of training data to work properly. Otherwise, it will fallback to human support.</p>
@@ -412,7 +420,7 @@ export default function Settings() {
                 onChange={(e) => setSelectedCardId(e.target.value)} 
                 className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
               >
-                <option value="main">Main Business (Default)</option>
+                <option value="main">{config.businessName || 'Main Business'} (Default)</option>
                 {config.workspaces.map((ws, index) => (
                   <option key={index} value={`ws_${index}`}>{ws.name || `Workspace ${index + 1}`}</option>
                 ))}
