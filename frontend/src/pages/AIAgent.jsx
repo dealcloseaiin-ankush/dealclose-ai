@@ -14,8 +14,8 @@ export default function AIAgent() {
         setQueries(Array.isArray(data.data) ? data.data : []);
         
         // Page load hone par purana saved knowledge box me dikhana
-        if (data.aiRules || data.businessDescription) {
-          setTrainingText(data.aiRules || data.businessDescription);
+        if (data.aiRules) {
+          setTrainingText(data.aiRules);
         }
       } catch (error) {
         console.error("Failed to load AI queries", error);
