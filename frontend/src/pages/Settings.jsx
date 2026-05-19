@@ -75,7 +75,7 @@ export default function Settings() {
   useEffect(() => {
     window.fbAsyncInit = function() {
       window.FB.init({
-        appId      : 'YOUR_META_APP_ID', // TODO: Yahan apni Meta App ID dalein
+        appId      : import.meta.env.VITE_META_APP_ID || 'YOUR_META_APP_ID',
         cookie     : true,
         xfbml      : true,
         version    : 'v19.0'

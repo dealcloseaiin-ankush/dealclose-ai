@@ -10,7 +10,13 @@ export default function AIAgent() {
     const fetchQueries = async () => {
       try {
         const { data } = await api.get('/ai/training-data');
-        setQueries(Array.isArray(data) ? data : []);
+        // Backend ab { success: true, data: [...], aiRules: '...' } bhej raha hai
+        setQueries(Array.isArray(data.data) ? data.data : []);
+        
+        // Page load hone par purana saved knowledge box me dikhana
+        if (data.aiRules || data.businessDescription) {
+          setTrainingText(data.aiRules || data.businessDescription);
+        }
       } catch (error) {
         console.error("Failed to load AI queries", error);
       }
@@ -38,10 +44,16 @@ export default function AIAgent() {
     }
   };
 
-  const handleSaveKnowledge = (e) => {
+  const handleSaveKnowledge = async (e) => {
     e.preventDefault();
-    // Here we will send trainingText to backend vector database later
-    toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
+    try {
+      // Asli API call jo backend ko data bhejegi
+      await api.post('/ai/train', { aiRules: trainingText });
+      toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
+    } catch (error) {
+      console.error("Failed to save knowledge:", error);
+      toast.error("Failed to train AI. Please try again.");
+    }
   };
 
   return (

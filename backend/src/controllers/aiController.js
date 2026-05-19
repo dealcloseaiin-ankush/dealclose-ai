@@ -62,15 +62,20 @@ exports.trainAI = async (req, res) => {
     const { question, answer, aiRules, businessDescription, fallbackAction } = req.body;
     let updateQuery = {};
 
+    // MongoDB strict update rules ke liye $set aur $push ko alag kiya gaya hai
+    let setQuery = {};
+
     // Agar specific Q&A aaya hai
     if (question && answer) {
       updateQuery.$push = { trainingData: { question, answer, status: 'answered' } };
     }
     
     // Agar AI Rules ya Business Description update hua hai
-    if (aiRules !== undefined) updateQuery.aiRules = aiRules;
-    if (businessDescription !== undefined) updateQuery.businessDescription = businessDescription;
-    if (fallbackAction !== undefined) updateQuery.fallbackAction = fallbackAction;
+    if (aiRules !== undefined) setQuery.aiRules = aiRules;
+    if (businessDescription !== undefined) setQuery.businessDescription = businessDescription;
+    if (fallbackAction !== undefined) setQuery.fallbackAction = fallbackAction;
+
+    if (Object.keys(setQuery).length > 0) updateQuery.$set = setQuery;
 
     if (Object.keys(updateQuery).length > 0) {
        await User.findByIdAndUpdate(userId, updateQuery, { strict: false });

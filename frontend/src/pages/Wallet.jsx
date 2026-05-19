@@ -33,7 +33,7 @@ export default function Wallet() {
       
       // 2. Razorpay Window Open karein
       const options = {
-        key: "YOUR_RAZORPAY_KEY_ID_HERE", // Replace this temporarily or pass from frontend .env
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "YOUR_RAZORPAY_KEY_ID_HERE",
         amount: order.amount,
         currency: "INR",
         name: "CloseDeal AI",
