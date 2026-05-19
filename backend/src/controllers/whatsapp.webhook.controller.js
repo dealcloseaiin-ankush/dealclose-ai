@@ -6,6 +6,7 @@ const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const callService = require('../services/callService');
 const billing = require('../utils/billing');
+const metaAdsService = require('../services/metaAdsService');
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
@@ -282,6 +283,12 @@ exports.handleWhatsApp = async (req, res) => {
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { returnDocument: 'after', upsert: true });
+                      
+                      // 🎯 META CONVERSIONS API SYNC
+                      if ((statusData.status.toLowerCase() === 'converted' || statusData.status.toLowerCase() === 'won') && user.metaAdsConfig?.pixelId && user.metaAdsConfig?.accessToken) {
+                         // Sync this converted lead back to Meta!
+                         await metaAdsService.sendConversionEvent(user.metaAdsConfig.pixelId, user.metaAdsConfig.accessToken, fromNumber, 'Purchase');
+                      }
                     } else if (toolCall.function.name === "request_star_review") {
                       const links = user.digitalCardConfig || {};
                       const discount = user.discountConfig || {};
