@@ -21,7 +21,8 @@ export default function Settings() {
     workspaces: [], // Store multiple businesses here
     aiAgentEnabled: true,
     businessDescription: '',
-    businessName: ''
+    businessName: '',
+    aiRules: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -61,7 +62,8 @@ export default function Settings() {
             workspaces: savedData.workspaces || [], // Fetch saved workspaces
             aiAgentEnabled: savedData.aiAgentEnabled !== false,
             businessDescription: savedData.businessDescription || '',
-            businessName: savedData.businessName || ''
+            businessName: savedData.businessName || '',
+            aiRules: savedData.aiRules || ''
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -169,6 +171,7 @@ export default function Settings() {
       const payload = {
         aiAgentEnabled: config.aiAgentEnabled,
         businessDescription: config.businessDescription,
+        aiRules: config.aiRules,
         businessName: config.businessName,
         whatsappConfig: {
           accessToken: config.whatsappToken,
@@ -259,6 +262,12 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">Business Knowledge (AI Training Data) <span className="text-rose-500">*</span></label>
                 <textarea name="businessDescription" value={config.businessDescription} onChange={handleChange} rows="3" placeholder="e.g. We are 'Shoe Mart'. We sell premium sports shoes. Delivery takes 3 days. No refunds on sale items..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
                 <p className="text-xs text-gray-500 mt-1">AI needs at least 1-2 sentences of training data to work properly. Otherwise, it will fallback to human support.</p>
+                
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Custom AI Rules (AI Brain)</label>
+                  <textarea name="aiRules" value={config.aiRules} onChange={handleChange} rows="2" placeholder="e.g. Always ask for budget first. Talk in Hinglish." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
+                  <p className="text-xs text-gray-500 mt-1">These are the strict instructions for your main business bot.</p>
+                </div>
               </div>
             </div>
 
