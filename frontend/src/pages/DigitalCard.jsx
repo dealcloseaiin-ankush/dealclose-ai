@@ -34,7 +34,7 @@ export default function DigitalCard() {
       }
     };
     getLinks();
-  }, []);
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
