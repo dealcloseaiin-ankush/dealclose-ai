@@ -245,18 +245,45 @@ export default function Settings() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl"></div>
               <div className="flex justify-between items-center mb-4 relative z-10">
                 <h2 className="text-lg font-semibold text-purple-400 flex items-center gap-2">
-                   <span className="text-xl">🧠</span> Smart AI Agent & Training
+                   <span className="text-xl">🏢</span> Main Business Profile & AI
                 </h2>
                 <button type="button" onClick={() => setConfig({...config, aiAgentEnabled: !config.aiAgentEnabled})} className={`w-12 h-6 rounded-full transition-colors relative ${config.aiAgentEnabled ? 'bg-purple-600' : 'bg-gray-700'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${config.aiAgentEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
                 </button>
               </div>
-              <p className="text-sm text-gray-400 mb-4 relative z-10">Turn this ON to let the AI automatically reply to your customers. Provide training data below so it knows how to answer accurately.</p>
+              <p className="text-sm text-gray-400 mb-4 relative z-10">This is your primary business profile. Turn the switch ON to let AI auto-reply to your customers.</p>
               
               <div className="relative z-10">
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">Main Business Name</label>
                   <input type="text" name="businessName" value={config.businessName} onChange={handleChange} placeholder="e.g. DealClose AI" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
+                </div>
+
+                {/* Social Links for Main Business */}
+                <div className="mb-6 p-4 bg-[#1a1a1a] border border-gray-800 rounded-xl">
+                  <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Main Business Links</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                        <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">ig.com/</span>
+                        <input type="text" value={getUsername(config.instagramLink, 'https://instagram.com/')} onChange={(e) => handleSocialLinkChange('instagramLink', 'https://instagram.com/', e)} placeholder="username" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                        <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">fb.com/</span>
+                        <input type="text" value={getUsername(config.facebookLink, 'https://facebook.com/')} onChange={(e) => handleSocialLinkChange('facebookLink', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                        <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">yt.com/@</span>
+                        <input type="text" value={getUsername(config.youtubeLink, 'https://youtube.com/@')} onChange={(e) => handleSocialLinkChange('youtubeLink', 'https://youtube.com/@', e)} placeholder="channel" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                      </div>
+                    </div>
+                    <input type="text" name="websiteLink" value={config.websiteLink} onChange={handleChange} placeholder="Website / Catalog URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none" />
+                    <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none md:col-span-2" />
+                  </div>
                 </div>
 
                 <label className="block text-sm font-medium text-gray-300 mb-2">Business Knowledge (AI Training Data) <span className="text-rose-500">*</span></label>
@@ -466,43 +493,11 @@ export default function Settings() {
                     <p className="text-gray-300 text-sm mb-4 leading-relaxed">
                       {isMainCard 
                         ? "Print this QR code and place it at your store counter or share it online. When customers scan it, they can leave their Name/Number (saved directly to your CRM) and easily follow your main profiles."
-                        : `This QR code is specific to ${activeWs?.name || 'this workspace'}. When scanned, it will show the specific links configured below for this branch.`}
+                        : `This QR code is specific to ${activeWs?.name || 'this workspace'}. When scanned, it will show the links configured for this branch.`}
                     </p>
                     
-                    {/* Social Links Setup for QR Card */}
-                    <div className="space-y-3 mb-6 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
-                      <h3 className="text-sm font-bold text-gray-400 mb-2">Configure Digital Card Links</h3>
-                      
-                      <div>
-                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
-                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">instagram.com/</span>
-                          <input type="text" value={getUsername(isMainCard ? config.instagramLink : activeWs?.instagram, 'https://instagram.com/')} onChange={(e) => isMainCard ? handleSocialLinkChange('instagramLink', 'https://instagram.com/', e) : handleWorkspaceSocialChange(wsIndex, 'instagram', 'https://instagram.com/', e)} placeholder="your_username" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
-                        </div>
-                        {(isMainCard ? config.instagramLink : activeWs?.instagram) && <a href={isMainCard ? config.instagramLink : activeWs?.instagram} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {isMainCard ? config.instagramLink : activeWs?.instagram} ↗</a>}
-                      </div>
-
-                      <div>
-                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
-                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">facebook.com/</span>
-                          <input type="text" value={getUsername(isMainCard ? config.facebookLink : activeWs?.facebook, 'https://facebook.com/')} onChange={(e) => isMainCard ? handleSocialLinkChange('facebookLink', 'https://facebook.com/', e) : handleWorkspaceSocialChange(wsIndex, 'facebook', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
-                        </div>
-                        {(isMainCard ? config.facebookLink : activeWs?.facebook) && <a href={isMainCard ? config.facebookLink : activeWs?.facebook} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {isMainCard ? config.facebookLink : activeWs?.facebook} ↗</a>}
-                      </div>
-
-                      <div>
-                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
-                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">youtube.com/@</span>
-                          <input type="text" value={getUsername(isMainCard ? config.youtubeLink : activeWs?.youtube, 'https://youtube.com/@')} onChange={(e) => isMainCard ? handleSocialLinkChange('youtubeLink', 'https://youtube.com/@', e) : handleWorkspaceSocialChange(wsIndex, 'youtube', 'https://youtube.com/@', e)} placeholder="channel_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
-                        </div>
-                        {(isMainCard ? config.youtubeLink : activeWs?.youtube) && <a href={isMainCard ? config.youtubeLink : activeWs?.youtube} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {isMainCard ? config.youtubeLink : activeWs?.youtube} ↗</a>}
-                      </div>
-
-                      <input type="text" name={isMainCard ? "googleReviewLink" : undefined} value={isMainCard ? config.googleReviewLink : activeWs?.googleReview || ''} onChange={(e) => isMainCard ? handleChange(e) : handleWorkspaceChange(wsIndex, 'googleReview', e.target.value)} placeholder="Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
-                      <input type="text" name={isMainCard ? "websiteLink" : undefined} value={isMainCard ? config.websiteLink : activeWs?.website || ''} onChange={(e) => isMainCard ? handleChange(e) : handleWorkspaceChange(wsIndex, 'website', e.target.value)} placeholder="Your Custom Website or Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
-                    </div>
-
-                    <a href={qrUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
-                      Preview Selected Digital Card ↗
+                    <a href={qrUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-4 mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
+                      Preview {isMainCard ? 'Main Business' : activeWs?.name} Digital Card ↗
                     </a>
                   </div>
                 </div>
