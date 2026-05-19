@@ -5,13 +5,17 @@ import toast from 'react-hot-toast';
 export default function AIAgent() {
   const [queries, setQueries] = useState([]);
   const [trainingText, setTrainingText] = useState("");
+  const [workspaces, setWorkspaces] = useState([]);
+  const [selectedBrain, setSelectedBrain] = useState('main');
+  const [mainRules, setMainRules] = useState('');
 
   useEffect(() => {
     const fetchQueries = async () => {
       try {
         const { data } = await api.get('/ai/training-data');
-        // Backend ab { success: true, data: [...], aiRules: '...' } bhej raha hai
         setQueries(Array.isArray(data.data) ? data.data : []);
+        setWorkspaces(data.workspaces || []);
+        setMainRules(data.aiRules || '');
         
         // Page load hone par purana saved knowledge box me dikhana
         if (data.aiRules) {
@@ -44,11 +48,20 @@ export default function AIAgent() {
     }
   };
 
+  const handleBrainSwitch = (wsId) => {
+    setSelectedBrain(wsId);
+    if (wsId === 'main') {
+      setTrainingText(mainRules);
+    } else {
+      const ws = workspaces.find(w => w._id === wsId);
+      setTrainingText(ws?.aiRules || '');
+    }
+  };
+
   const handleSaveKnowledge = async (e) => {
     e.preventDefault();
     try {
-      // Asli API call jo backend ko data bhejegi
-      await api.post('/ai/train', { aiRules: trainingText });
+      await api.post('/ai/train', { aiRules: trainingText, workspaceId: selectedBrain });
       toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
     } catch (error) {
       console.error("Failed to save knowledge:", error);
@@ -74,6 +87,20 @@ export default function AIAgent() {
           <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">📚 Train AI (Knowledge Base)</h2>
           <p className="text-gray-400 text-sm mb-6">Type your business rules, return policies, or paste text data here. AI will memorize this to answer customers.</p>
           
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Select Business to Train</label>
+            <select 
+              value={selectedBrain} 
+              onChange={(e) => handleBrainSwitch(e.target.value)} 
+              className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
+            >
+              <option value="main">Main Business (Default)</option>
+              {workspaces.map((ws) => (
+                <option key={ws._id} value={ws._id}>{ws.name || 'Workspace'}</option>
+              ))}
+            </select>
+          </div>
+
           <form onSubmit={handleSaveKnowledge}>
             <textarea 
               rows="4" 

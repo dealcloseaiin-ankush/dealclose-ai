@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import api from '../services/api';
 
 export default function DigitalCard() {
   const { userId } = useParams();
+  const location = useLocation();
   const [formData, setFormData] = useState({ name: '', phoneNumber: '' });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cardLinks, setCardLinks] = useState(null);
+  const [businessName, setBusinessName] = useState('Our Business');
 
   // Mocking the fetch of the specific business profile links
   // Once Workspaces are implemented, this will fetch that specific workspace's links
@@ -16,7 +18,17 @@ export default function DigitalCard() {
       try {
         const { data } = await api.get('/settings');
         const savedData = data.data || data;
-        if (savedData?.digitalCardConfig) setCardLinks(savedData.digitalCardConfig);
+        
+        const queryParams = new URLSearchParams(location.search);
+        const wsIndex = queryParams.get('ws');
+        
+        if (wsIndex !== null && savedData.workspaces && savedData.workspaces[wsIndex]) {
+          setCardLinks(savedData.workspaces[wsIndex]);
+          setBusinessName(savedData.workspaces[wsIndex].name || 'Our Business');
+        } else {
+          if (savedData?.digitalCardConfig) setCardLinks(savedData.digitalCardConfig);
+          setBusinessName(savedData?.businessName || 'Our Business');
+        }
       } catch (err) { 
         console.error("Error loading links", err); 
       }
@@ -54,7 +66,7 @@ export default function DigitalCard() {
           <div className="w-24 h-24 bg-gray-800 rounded-full mx-auto mb-4 border-4 border-gray-700 flex items-center justify-center text-4xl">
             🏢
           </div>
-          <h1 className="text-2xl font-bold">Welcome to Our Business</h1>
+          <h1 className="text-2xl font-bold">Welcome to {businessName}</h1>
           <p className="text-gray-400 text-sm mt-2">Connect with us and leave your details below!</p>
         </div>
 

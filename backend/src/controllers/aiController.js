@@ -21,7 +21,8 @@ exports.getTrainingData = async (req, res) => {
       data: user?.trainingData || [],
       aiRules: user?.aiRules || '',
       businessDescription: user?.businessDescription || '',
-      fallbackAction: user?.fallbackAction || 'notify_owner'
+      fallbackAction: user?.fallbackAction || 'notify_owner',
+      workspaces: user?.workspaces || []
     });
   } catch (error) {
     console.error('AI Training Data Error:', error);
@@ -80,7 +81,7 @@ exports.trainAI = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
-    const { question, answer, aiRules, businessDescription, fallbackAction } = req.body;
+    const { question, answer, aiRules, businessDescription, fallbackAction, workspaceId } = req.body;
     let updateQuery = {};
 
     // MongoDB strict update rules ke liye $set aur $push ko alag kiya gaya hai
@@ -91,16 +92,29 @@ exports.trainAI = async (req, res) => {
       updateQuery.$push = { trainingData: { question, answer, status: 'answered' } };
     }
     
-    // Agar AI Rules ya Business Description update hua hai
-    if (aiRules !== undefined) setQuery.aiRules = aiRules;
-    if (businessDescription !== undefined) setQuery.businessDescription = businessDescription;
-    if (fallbackAction !== undefined) setQuery.fallbackAction = fallbackAction;
-
-    if (Object.keys(setQuery).length > 0) updateQuery.$set = setQuery;
-
-    if (Object.keys(updateQuery).length > 0) {
-       await User.findByIdAndUpdate(userId, updateQuery, { strict: false });
-       console.log('✅ [DEBUG] AI Brain / Rules successfully saved to MongoDB!');
+    if (workspaceId && workspaceId !== 'main') {
+      // Update Specific Workspace
+      if (aiRules !== undefined) setQuery["workspaces.$.aiRules"] = aiRules;
+      if (businessDescription !== undefined) setQuery["workspaces.$.businessDescription"] = businessDescription;
+      
+      if (Object.keys(setQuery).length > 0) {
+        await User.updateOne(
+          { _id: userId, "workspaces._id": workspaceId },
+          { $set: setQuery }
+        );
+        console.log(`✅ [DEBUG] AI Brain / Rules successfully saved to Workspace ${workspaceId}!`);
+      }
+    } else {
+      // Update Main Business
+      if (aiRules !== undefined) setQuery.aiRules = aiRules;
+      if (businessDescription !== undefined) setQuery.businessDescription = businessDescription;
+      if (fallbackAction !== undefined) setQuery.fallbackAction = fallbackAction;
+  
+      if (Object.keys(setQuery).length > 0) updateQuery.$set = setQuery;
+      if (Object.keys(updateQuery).length > 0) {
+         await User.findByIdAndUpdate(userId, updateQuery, { strict: false });
+         console.log('✅ [DEBUG] AI Brain / Rules successfully saved to Main Business!');
+      }
     }
 
     res.status(200).json({ success: true, message: 'AI rules and training data saved successfully!' });
