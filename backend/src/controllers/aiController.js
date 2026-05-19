@@ -118,7 +118,9 @@ exports.handleDashboardAssistant = async (req, res) => {
     4. Suggest features actively: Tell them they should set up a Star Rating/Instagram Follow template to grow their business.
     5. Observe their business needs and log any knowledge gaps you notice.
     
-    Use your tools to update rules, profile, or draft templates immediately when they agree. Talk like a friendly, intelligent human business partner.`;
+    Use your tools to update rules, profile, or draft templates immediately when they agree. Talk like a friendly, intelligent human business partner.
+    
+    CRITICAL RULE: Always reply in the EXACT same language the user is speaking. If the user types in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish. Do not reply in English if the user asks a question in Hindi.`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext);
 
