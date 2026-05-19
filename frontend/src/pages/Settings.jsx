@@ -268,18 +268,28 @@ export default function Settings() {
                 <div className="text-center p-6 border border-dashed border-gray-700 rounded-xl text-gray-500">No additional businesses added yet. Your default business profile will be used.</div>
               ) : (
                 config.workspaces.map((workspace, index) => (
-                  <div key={index} className="flex flex-col md:flex-row gap-4 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800 relative group">
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Business / Branch Name</label>
-                      <input type="text" required value={workspace.name} onChange={(e) => handleWorkspaceChange(index, 'name', e.target.value)} placeholder="e.g. DealClose Electronics" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 outline-none" maxLength={24} />
+                  <div key={index} className="flex flex-col gap-4 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800 relative group">
+                    <div className="flex flex-col md:flex-row gap-4 w-full">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Business / Branch Name</label>
+                        <input type="text" required value={workspace.name} onChange={(e) => handleWorkspaceChange(index, 'name', e.target.value)} placeholder="e.g. DealClose Electronics" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 outline-none" maxLength={24} />
+                      </div>
+                      <div className="flex-[2]">
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Short Description (Appears in Menu)</label>
+                        <input type="text" required value={workspace.description} onChange={(e) => handleWorkspaceChange(index, 'description', e.target.value)} placeholder="e.g. Buy latest laptops and mobiles" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 outline-none" maxLength={72} />
+                      </div>
+                      <button type="button" onClick={() => removeWorkspace(index)} className="md:mt-6 p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors h-fit" title="Remove Business">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
-                    <div className="flex-[2]">
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Short Description (Appears in Menu)</label>
-                      <input type="text" required value={workspace.description} onChange={(e) => handleWorkspaceChange(index, 'description', e.target.value)} placeholder="e.g. Buy latest laptops and mobiles" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-blue-500 outline-none" maxLength={72} />
+                    
+                    {/* Specific Social/Web Links for this Workspace */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 pt-4 border-t border-gray-800">
+                      <input type="text" value={workspace.instagram || ''} onChange={(e) => handleWorkspaceChange(index, 'instagram', e.target.value)} placeholder="Instagram Profile Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                      <input type="text" value={workspace.facebook || ''} onChange={(e) => handleWorkspaceChange(index, 'facebook', e.target.value)} placeholder="Facebook Page Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                      <input type="text" value={workspace.website || ''} onChange={(e) => handleWorkspaceChange(index, 'website', e.target.value)} placeholder="Website / Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                      <input type="text" value={workspace.googleReview || ''} onChange={(e) => handleWorkspaceChange(index, 'googleReview', e.target.value)} placeholder="Google Review Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                     </div>
-                    <button type="button" onClick={() => removeWorkspace(index)} className="md:mt-6 p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors h-fit" title="Remove Business">
-                      <Trash2 size={18} />
-                    </button>
                   </div>
                 ))
               )}

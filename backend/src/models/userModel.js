@@ -72,7 +72,12 @@ const userSchema = new Schema({
   },
   workspaces: [{ 
     name: { type: String }, 
-    description: { type: String } // E.g., "Real Estate", "Electronics" for Cross-Selling
+    description: { type: String }, // E.g., "Real Estate", "Electronics" for Cross-Selling
+    // Social links for each specific workspace
+    instagram: { type: String },
+    facebook: { type: String },
+    website: { type: String },
+    googleReview: { type: String }
   }],
   savedMedia: [{
     mediaId: { type: String },

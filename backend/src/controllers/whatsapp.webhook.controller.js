@@ -234,7 +234,7 @@ exports.handleWhatsApp = async (req, res) => {
                 // Har SaaS User ka apna personal AI context! 
                 const businessInfo = user.businessDescription || "a modern business";
                 const ownerRules = user.aiRules || "Be polite, helpful, and professional. Do not offer unapproved discounts.";
-                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
+                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons. Use it frequently to ask quick multiple-choice questions and guide users through setups/onboarding effortlessly without making them type.\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
@@ -312,6 +312,22 @@ exports.handleWhatsApp = async (req, res) => {
                         responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
                       }
                       repliedBy = 'ai';
+                    } else if (toolCall.function.name === "send_whatsapp_menu") {
+                      const menuData = JSON.parse(toolCall.function.arguments);
+                      const buttons = menuData.options.slice(0, 3).map((opt, idx) => ({
+                        type: "reply",
+                        reply: { id: `ai_btn_${idx}`, title: opt.substring(0, 20) }
+                      }));
+                      
+                      await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, {
+                        type: "button",
+                        body: { text: menuData.messageText },
+                        action: { buttons }
+                      });
+                      
+                      responseMessage = null; // Prevent sending duplicate text
+                      repliedBy = 'ai';
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
                     }
                   }
                 } else {

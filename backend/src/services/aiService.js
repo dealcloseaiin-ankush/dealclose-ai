@@ -357,6 +357,21 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
               required: ["fullName", "email", "businessName", "businessDescription"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "send_whatsapp_menu",
+            description: "Send an interactive WhatsApp menu (buttons) to quickly ask multiple-choice onboarding questions without making the user type.",
+            parameters: {
+              type: "object",
+              properties: {
+                messageText: { type: "string", description: "The question you are asking (e.g. 'Do you want to setup your business now?')" },
+                options: { type: "array", items: { type: "string" }, description: "List of 2 to 3 short options (max 20 chars). E.g., ['Yes, start setup', 'Tell me more']" }
+              },
+              required: ["messageText", "options"]
+            }
+          }
         }
       ],
       tool_choice: "auto"
