@@ -21,6 +21,10 @@ exports.supabaseAuth = async (req, res) => {
         fullName: name || 'Google User', // Fix: MongoDB schema requires 'fullName'
         password: supabaseId || 'google-oauth-dummy-pass' 
       });
+    } else if (!user.role) {
+      // Agar purana user hai jisme role add nahi tha, usko owner bana do
+      user.role = 'owner';
+      await user.save();
     }
 
     // Humara apna Backend JWT token generate karke frontend ko wapas bhejenge
@@ -70,6 +74,12 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ success: false, message: 'User not found. Please register first.' });
+
+    // Agar purana user hai jisme role add nahi tha, usko Auto-update kar do
+    if (!user.role) {
+      user.role = 'owner';
+      await user.save();
+    }
 
     // Bulletproof Password Check: Handles both Encrypted and Plain Text passwords
     let isMatch = false;
@@ -192,6 +202,8 @@ exports.getProfile = async (req, res) => {
     console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
     - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
     - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}`);
+
+    if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
     res.status(200).json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching profile' });

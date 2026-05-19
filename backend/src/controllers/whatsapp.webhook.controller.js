@@ -262,7 +262,7 @@ exports.handleWhatsApp = async (req, res) => {
                       await callService.initiateCall(fromNumber, exotelNumber, webhookUrl);
                       responseMessage = "I am arranging a call for you right now. Please answer your phone in a few seconds.";
                       repliedBy = 'ai';
-                    } else if (toolCall.function.name === "escalate_to_owner") {
+                    } else if (toolCall.function.name === "escalate_to_staff") {
                       const callData = JSON.parse(toolCall.function.arguments);
                       
                       // Add to knowledge gap training data

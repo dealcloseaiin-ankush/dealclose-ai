@@ -53,7 +53,7 @@ export default function Sidebar() {
     {
       title: 'TOOLS',
       items: [
-        { name: 'Staff & Team', path: '/staff', icon: '👨‍💼', requireOwner: true },
+        { name: 'Staff & Team', path: '/staff', icon: '👨‍💼' }, // 'requireOwner' hata diya, ab sabko dikhega
         { name: 'Forms', path: '/forms', icon: '📋' },
         { name: 'Wallet', path: '/wallet', icon: '💰', requireOwner: true },
         { name: 'Settings', path: '/settings', icon: '⚙️' }

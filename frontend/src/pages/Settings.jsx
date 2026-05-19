@@ -22,7 +22,8 @@ export default function Settings() {
     aiAgentEnabled: true,
     businessDescription: '',
     businessName: '',
-    aiRules: ''
+    aiRules: '',
+    ownerPhone: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -63,7 +64,8 @@ export default function Settings() {
             aiAgentEnabled: savedData.aiAgentEnabled !== false,
             businessDescription: savedData.businessDescription || '',
             businessName: savedData.businessName || '',
-            aiRules: savedData.aiRules || ''
+            aiRules: savedData.aiRules || '',
+            ownerPhone: savedData.ownerPhone || ''
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -173,6 +175,7 @@ export default function Settings() {
         businessDescription: config.businessDescription,
         aiRules: config.aiRules,
         businessName: config.businessName,
+        ownerPhone: config.ownerPhone,
         whatsappConfig: {
           accessToken: config.whatsappToken,
           phoneNumberId: config.phoneNumberId,
@@ -254,9 +257,15 @@ export default function Settings() {
               <p className="text-sm text-gray-400 mb-4 relative z-10">This is your primary business profile. Turn the switch ON to let AI auto-reply to your customers.</p>
               
               <div className="relative z-10">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Main Business Name</label>
-                  <input type="text" name="businessName" value={config.businessName} onChange={handleChange} placeholder="e.g. DealClose AI" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Main Business Name</label>
+                    <input type="text" name="businessName" value={config.businessName} onChange={handleChange} placeholder="e.g. DealClose AI" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Owner WhatsApp (For AI Alerts) <span className="text-rose-500">*</span></label>
+                    <input type="text" name="ownerPhone" value={config.ownerPhone} onChange={handleChange} placeholder="e.g. 919876543210" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" required />
+                  </div>
                 </div>
 
                 {/* Social Links for Main Business */}

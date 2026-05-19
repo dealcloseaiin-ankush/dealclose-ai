@@ -124,6 +124,32 @@ exports.trainAI = async (req, res) => {
   }
 };
 
+// @desc    Answer a pending training question
+// @route   PUT /api/ai/training-data/:id/answer
+exports.answerTrainingQuestion = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    
+    const { id } = req.params;
+    const { answer } = req.body;
+
+    if (!answer) return res.status(400).json({ success: false, message: 'Answer is required' });
+
+    await User.updateOne(
+      { _id: userId, "trainingData._id": id },
+      { $set: { "trainingData.$.answer": answer, "trainingData.$.status": "answered" } }
+    );
+
+    // FUTURE TODO: We can write code here to automatically send this answer back to the customer on WhatsApp too!
+
+    res.status(200).json({ success: true, message: 'Question answered and AI trained successfully' });
+  } catch (error) {
+    console.error('Answer Training Question Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 // @desc    Handle Dashboard Setup Assistant Chat
 // @route   POST /api/ai/dashboard-assistant
 exports.handleDashboardAssistant = async (req, res) => {
