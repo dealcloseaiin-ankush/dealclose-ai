@@ -129,6 +129,36 @@ export default function Settings() {
     setConfig({ ...config, workspaces: updatedWorkspaces });
   };
 
+  // --- Smart Social Links Helpers ---
+  const getUsername = (url, prefix) => {
+    if (!url) return '';
+    let val = url.trim();
+    val = val.replace(/^https?:\/\/(www\.)?/, '');
+    const domainPrefix = prefix.replace(/^https?:\/\/(www\.)?/, '');
+    if (val.startsWith(domainPrefix)) val = val.substring(domainPrefix.length);
+    return val.replace(/^\//, '');
+  };
+
+  const handleSocialLinkChange = (field, prefix, e) => {
+    let val = e.target.value.trim();
+    val = val.replace(/^https?:\/\/(www\.)?/, '');
+    const domainPrefix = prefix.replace(/^https?:\/\/(www\.)?/, '');
+    if (val.startsWith(domainPrefix)) val = val.substring(domainPrefix.length);
+    val = val.replace(/^\//, '');
+    const fullUrl = val ? `${prefix}${val}` : '';
+    setConfig({ ...config, [field]: fullUrl });
+  };
+
+  const handleWorkspaceSocialChange = (index, field, prefix, e) => {
+    let val = e.target.value.trim();
+    val = val.replace(/^https?:\/\/(www\.)?/, '');
+    const domainPrefix = prefix.replace(/^https?:\/\/(www\.)?/, '');
+    if (val.startsWith(domainPrefix)) val = val.substring(domainPrefix.length);
+    val = val.replace(/^\//, '');
+    const fullUrl = val ? `${prefix}${val}` : '';
+    handleWorkspaceChange(index, field, fullUrl);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     try {
@@ -285,8 +315,14 @@ export default function Settings() {
                     
                     {/* Specific Social/Web Links for this Workspace */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 pt-4 border-t border-gray-800">
-                      <input type="text" value={workspace.instagram || ''} onChange={(e) => handleWorkspaceChange(index, 'instagram', e.target.value)} placeholder="Instagram Profile Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
-                      <input type="text" value={workspace.facebook || ''} onChange={(e) => handleWorkspaceChange(index, 'facebook', e.target.value)} placeholder="Facebook Page Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
+                        <span className="px-2 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">ig.com/</span>
+                        <input type="text" value={getUsername(workspace.instagram, 'https://instagram.com/')} onChange={(e) => handleWorkspaceSocialChange(index, 'instagram', 'https://instagram.com/', e)} placeholder="username" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
+                      </div>
+                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
+                        <span className="px-2 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">fb.com/</span>
+                        <input type="text" value={getUsername(workspace.facebook, 'https://facebook.com/')} onChange={(e) => handleWorkspaceSocialChange(index, 'facebook', 'https://facebook.com/', e)} placeholder="pagename" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
+                      </div>
                       <input type="text" value={workspace.website || ''} onChange={(e) => handleWorkspaceChange(index, 'website', e.target.value)} placeholder="Website / Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                       <input type="text" value={workspace.googleReview || ''} onChange={(e) => handleWorkspaceChange(index, 'googleReview', e.target.value)} placeholder="Google Review Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                     </div>
@@ -372,9 +408,31 @@ export default function Settings() {
                 {/* Social Links Setup for QR Card */}
                 <div className="space-y-3 mb-6 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
                   <h3 className="text-sm font-bold text-gray-400 mb-2">Configure Digital Card Links</h3>
-                  <input type="text" name="instagramLink" value={config.instagramLink} onChange={handleChange} placeholder="Instagram Profile URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
-                  <input type="text" name="facebookLink" value={config.facebookLink} onChange={handleChange} placeholder="Facebook Page URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
-                  <input type="text" name="youtubeLink" value={config.youtubeLink} onChange={handleChange} placeholder="YouTube Channel URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                  
+                  <div>
+                    <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                      <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">instagram.com/</span>
+                      <input type="text" value={getUsername(config.instagramLink, 'https://instagram.com/')} onChange={(e) => handleSocialLinkChange('instagramLink', 'https://instagram.com/', e)} placeholder="your_username" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                    </div>
+                    {config.instagramLink && <a href={config.instagramLink} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {config.instagramLink} ↗</a>}
+                  </div>
+
+                  <div>
+                    <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                      <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">facebook.com/</span>
+                      <input type="text" value={getUsername(config.facebookLink, 'https://facebook.com/')} onChange={(e) => handleSocialLinkChange('facebookLink', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                    </div>
+                    {config.facebookLink && <a href={config.facebookLink} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {config.facebookLink} ↗</a>}
+                  </div>
+
+                  <div>
+                    <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                      <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">youtube.com/@</span>
+                      <input type="text" value={getUsername(config.youtubeLink, 'https://youtube.com/@')} onChange={(e) => handleSocialLinkChange('youtubeLink', 'https://youtube.com/@', e)} placeholder="channel_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                    </div>
+                    {config.youtubeLink && <a href={config.youtubeLink} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {config.youtubeLink} ↗</a>}
+                  </div>
+
                   <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
                   <input type="text" name="websiteLink" value={config.websiteLink} onChange={handleChange} placeholder="Your Custom Website or Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
                 </div>
