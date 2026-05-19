@@ -20,8 +20,15 @@ exports.getSettings = async (req, res) => {
 // @route   POST /api/users/settings
 exports.saveSettings = async (req, res) => {
   try {
+    console.log(`\n➡️ [DEBUG Settings Update] Request received!`);
+    console.log(`➡️ [DEBUG] Auth Header:`, req.headers.authorization ? 'Present' : 'Missing');
+    console.log(`➡️ [DEBUG] req.user object:`, req.user);
+
     const userId = req.user?._id || req.user?.id; 
-    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+    if (!userId) {
+      console.log('❌ [DEBUG Settings Update] Failed: Unauthorized Session. No user ID.');
+      return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+    }
 
     const updates = req.body;
     console.log("➡️ [Settings Update] Payload Received:", JSON.stringify(updates));

@@ -117,7 +117,9 @@ exports.changePassword = async (req, res) => {
 // @route   PUT /api/users/profile
 exports.updateProfile = async (req, res) => {
   try {
-    console.log(`\n➡️ [Profile Update] Request received for user ID: ${req.user?._id || req.user?.id}`);
+    console.log(`\n➡️ [DEBUG Profile Update] Request received!`);
+    console.log(`➡️ [DEBUG] Auth Header:`, req.headers.authorization ? 'Present' : 'Missing');
+    console.log(`➡️ [DEBUG] req.user object:`, req.user);
 
     const { 
       businessName,
@@ -136,7 +138,10 @@ exports.updateProfile = async (req, res) => {
     // Assuming you have an auth middleware that sets req.user
     const userId = req.user?._id || req.user?.id;
 
-    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+    if (!userId) {
+       console.log('❌ [DEBUG Profile Update] Failed: Unauthorized Session. User not found in request.');
+       return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+    }
 
     // Build the update object dynamically and safely
     const updateData = {};

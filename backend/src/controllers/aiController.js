@@ -5,8 +5,15 @@ const aiService = require('../services/aiService');
 // @route   GET /api/ai/training-data
 exports.getTrainingData = async (req, res) => {
   try {
+    console.log('\n➡️ [DEBUG] GET /api/ai/training-data Called');
+    console.log('➡️ [DEBUG] Headers Auth:', req.headers.authorization ? 'Present' : 'Missing');
+    console.log('➡️ [DEBUG] req.user object:', req.user);
+
     const userId = req.user?._id || req.user?.id;
-    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!userId) {
+      console.log('❌ [DEBUG] Unauthorized Error! User ID not found in req.user');
+      return res.status(401).json({ success: false, message: 'Unauthorized. Token missing or invalid.' });
+    }
     const user = await User.findById(userId);
     
     res.status(200).json({ success: true, data: user?.trainingData || [] });
