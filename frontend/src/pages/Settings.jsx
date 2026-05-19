@@ -23,7 +23,9 @@ export default function Settings() {
     businessDescription: '',
     businessName: '',
     aiRules: '',
-    ownerPhone: ''
+    ownerPhone: '',
+    metaPixelId: '',
+    metaAccessToken: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -65,7 +67,9 @@ export default function Settings() {
             businessDescription: savedData.businessDescription || '',
             businessName: savedData.businessName || '',
             aiRules: savedData.aiRules || '',
-            ownerPhone: savedData.ownerPhone || ''
+            ownerPhone: savedData.ownerPhone || '',
+            metaPixelId: savedData.metaAdsConfig?.pixelId || '',
+            metaAccessToken: savedData.metaAdsConfig?.accessToken || ''
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -197,6 +201,10 @@ export default function Settings() {
           percentage: config.discountPercentage,
           code: config.discountCode,
           validityDays: config.validityDays
+        },
+        metaAdsConfig: {
+          pixelId: config.metaPixelId,
+          accessToken: config.metaAccessToken
         },
         workspaces: config.workspaces // Send workspaces to backend
       };
@@ -333,6 +341,25 @@ export default function Settings() {
                 <input type="text" name="wabaId" value={config.wabaId} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" placeholder="e.g. 1234567890" />
               </div>
             </div>
+          </div>
+
+          {/* Meta Ads Conversions API Config */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-blue-500/20 mt-8">
+            <h2 className="text-xl font-semibold text-blue-400 mb-6 flex items-center gap-2">
+               🎯 Meta Ads Conversions API
+            </h2>
+            <p className="text-sm text-gray-400 mb-6">Connect your Meta Pixel to automatically send "Converted" WhatsApp leads back to Facebook. This reduces ad costs and improves targeting.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Meta Pixel ID</label>
+                <input type="text" name="metaPixelId" value={config.metaPixelId} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" placeholder="e.g. 123456789012345" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Conversions API Access Token</label>
+                <input type="password" name="metaAccessToken" value={config.metaAccessToken} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" placeholder="EAAL..." />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-4">You can generate these in your Facebook Business Manager &gt; Events Manager &gt; Settings.</p>
           </div>
 
           {/* Multiple Businesses (Workspaces) Config */}
