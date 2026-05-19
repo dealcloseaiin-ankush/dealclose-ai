@@ -10,8 +10,12 @@ const messageSchema = new Schema({
   sentBy: { type: String, enum: ['ai', 'auto-reply', 'staff', 'customer'], required: true }, // Kisne bheja
   timestamp: { type: Date, default: Date.now },
   tags: [{ type: String }], // For CRM categorization like 'inquiry', 'complaint'
-  isResolved: { type: Boolean, default: false } // To mark chats as settled/closed
+  isResolved: { type: Boolean, default: false }, // To mark chats as settled/closed
+  expiresAt: { type: Date } // Auto-delete old/junk messages to save DB space
 });
+
+// TTL Index: MongoDB will automatically delete the document when current time > expiresAt
+messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Message = mongoose.model('Message', messageSchema);
 

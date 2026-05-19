@@ -15,6 +15,7 @@ router.get('/whatsapp', whatsappController.verifyWhatsAppWebhook);
 router.post('/whatsapp', whatsappController.handleWhatsApp);
 
 // Instagram
+router.get('/instagram', instagramController.verifyInstagramWebhook);
 router.post('/instagram', instagramController.handleInstagramWebhook);
 
 // Universal (Shopify, Vyapar, etc.)
