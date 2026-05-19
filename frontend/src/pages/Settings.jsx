@@ -29,6 +29,7 @@ export default function Settings() {
   const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFbSdkLoaded, setIsFbSdkLoaded] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState('main');
   
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPass, setIsChangingPass] = useState(false);
@@ -315,13 +316,19 @@ export default function Settings() {
                     
                     {/* Specific Social/Web Links for this Workspace */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 pt-4 border-t border-gray-800">
-                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
-                        <span className="px-2 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">ig.com/</span>
-                        <input type="text" value={getUsername(workspace.instagram, 'https://instagram.com/')} onChange={(e) => handleWorkspaceSocialChange(index, 'instagram', 'https://instagram.com/', e)} placeholder="username" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
+                      <div>
+                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
+                          <span className="px-2 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">ig.com/</span>
+                          <input type="text" value={getUsername(workspace.instagram, 'https://instagram.com/')} onChange={(e) => handleWorkspaceSocialChange(index, 'instagram', 'https://instagram.com/', e)} placeholder="username" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
+                        </div>
+                        {workspace.instagram && <a href={workspace.instagram} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 hover:underline mt-1 inline-block">Preview: {workspace.instagram} ↗</a>}
                       </div>
-                      <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
-                        <span className="px-2 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">fb.com/</span>
-                        <input type="text" value={getUsername(workspace.facebook, 'https://facebook.com/')} onChange={(e) => handleWorkspaceSocialChange(index, 'facebook', 'https://facebook.com/', e)} placeholder="pagename" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
+                      <div>
+                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
+                          <span className="px-2 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">fb.com/</span>
+                          <input type="text" value={getUsername(workspace.facebook, 'https://facebook.com/')} onChange={(e) => handleWorkspaceSocialChange(index, 'facebook', 'https://facebook.com/', e)} placeholder="pagename" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
+                        </div>
+                        {workspace.facebook && <a href={workspace.facebook} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 hover:underline mt-1 inline-block">Preview: {workspace.facebook} ↗</a>}
                       </div>
                       <input type="text" value={workspace.website || ''} onChange={(e) => handleWorkspaceChange(index, 'website', e.target.value)} placeholder="Website / Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                       <input type="text" value={workspace.googleReview || ''} onChange={(e) => handleWorkspaceChange(index, 'googleReview', e.target.value)} placeholder="Google Review Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
@@ -397,51 +404,81 @@ export default function Settings() {
             <h2 className="text-xl font-semibold text-purple-400 mb-6 flex items-center gap-2">
                📱 Smart QR & Digital Business Card
             </h2>
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="bg-white p-4 rounded-xl shadow-lg shrink-0">
-                {/* Using a free reliable API to generate QR Code without installing extra packages */}
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + '/card/' + userId)}`} alt="Business QR Code" className="w-32 h-32" />
-              </div>
-              <div className="flex-1">
-                <p className="text-gray-300 text-sm mb-4 leading-relaxed">Print this QR code and place it at your store counter or share it online. When customers scan it, they can leave their Name/Number (saved directly to your CRM) and easily follow your Instagram, Facebook, and Google profiles.</p>
-                
-                {/* Social Links Setup for QR Card */}
-                <div className="space-y-3 mb-6 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
-                  <h3 className="text-sm font-bold text-gray-400 mb-2">Configure Digital Card Links</h3>
-                  
-                  <div>
-                    <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
-                      <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">instagram.com/</span>
-                      <input type="text" value={getUsername(config.instagramLink, 'https://instagram.com/')} onChange={(e) => handleSocialLinkChange('instagramLink', 'https://instagram.com/', e)} placeholder="your_username" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
-                    </div>
-                    {config.instagramLink && <a href={config.instagramLink} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {config.instagramLink} ↗</a>}
-                  </div>
-
-                  <div>
-                    <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
-                      <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">facebook.com/</span>
-                      <input type="text" value={getUsername(config.facebookLink, 'https://facebook.com/')} onChange={(e) => handleSocialLinkChange('facebookLink', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
-                    </div>
-                    {config.facebookLink && <a href={config.facebookLink} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {config.facebookLink} ↗</a>}
-                  </div>
-
-                  <div>
-                    <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
-                      <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">youtube.com/@</span>
-                      <input type="text" value={getUsername(config.youtubeLink, 'https://youtube.com/@')} onChange={(e) => handleSocialLinkChange('youtubeLink', 'https://youtube.com/@', e)} placeholder="channel_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
-                    </div>
-                    {config.youtubeLink && <a href={config.youtubeLink} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {config.youtubeLink} ↗</a>}
-                  </div>
-
-                  <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
-                  <input type="text" name="websiteLink" value={config.websiteLink} onChange={handleChange} placeholder="Your Custom Website or Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
-                </div>
-
-                <a href={`/card/${userId}`} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
-                  Preview My Digital Card ↗
-                </a>
-              </div>
+            
+            <div className="mb-6 relative z-10">
+              <label className="block text-sm font-medium text-gray-400 mb-2">Select Business to Configure & View QR</label>
+              <select 
+                value={selectedCardId} 
+                onChange={(e) => setSelectedCardId(e.target.value)} 
+                className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
+              >
+                <option value="main">Main Business (Default)</option>
+                {config.workspaces.map((ws, index) => (
+                  <option key={index} value={`ws_${index}`}>{ws.name || `Workspace ${index + 1}`}</option>
+                ))}
+              </select>
             </div>
+
+            {(() => {
+              const isMainCard = selectedCardId === 'main';
+              const wsIndex = isMainCard ? -1 : parseInt(selectedCardId.replace('ws_', ''));
+              const activeWs = wsIndex >= 0 ? config.workspaces[wsIndex] : null;
+              const qrUrl = isMainCard 
+                ? `${window.location.origin}/card/${userId}` 
+                : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
+              
+              return (
+                <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+                  <div className="bg-white p-4 rounded-xl shadow-lg shrink-0">
+                    {/* Using a free reliable API to generate QR Code without installing extra packages */}
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`} alt="Business QR Code" className="w-32 h-32" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                      {isMainCard 
+                        ? "Print this QR code and place it at your store counter or share it online. When customers scan it, they can leave their Name/Number (saved directly to your CRM) and easily follow your main profiles."
+                        : `This QR code is specific to ${activeWs?.name || 'this workspace'}. When scanned, it will show the specific links configured below for this branch.`}
+                    </p>
+                    
+                    {/* Social Links Setup for QR Card */}
+                    <div className="space-y-3 mb-6 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+                      <h3 className="text-sm font-bold text-gray-400 mb-2">Configure Digital Card Links</h3>
+                      
+                      <div>
+                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">instagram.com/</span>
+                          <input type="text" value={getUsername(isMainCard ? config.instagramLink : activeWs?.instagram, 'https://instagram.com/')} onChange={(e) => isMainCard ? handleSocialLinkChange('instagramLink', 'https://instagram.com/', e) : handleWorkspaceSocialChange(wsIndex, 'instagram', 'https://instagram.com/', e)} placeholder="your_username" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                        </div>
+                        {(isMainCard ? config.instagramLink : activeWs?.instagram) && <a href={isMainCard ? config.instagramLink : activeWs?.instagram} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {isMainCard ? config.instagramLink : activeWs?.instagram} ↗</a>}
+                      </div>
+
+                      <div>
+                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">facebook.com/</span>
+                          <input type="text" value={getUsername(isMainCard ? config.facebookLink : activeWs?.facebook, 'https://facebook.com/')} onChange={(e) => isMainCard ? handleSocialLinkChange('facebookLink', 'https://facebook.com/', e) : handleWorkspaceSocialChange(wsIndex, 'facebook', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                        </div>
+                        {(isMainCard ? config.facebookLink : activeWs?.facebook) && <a href={isMainCard ? config.facebookLink : activeWs?.facebook} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {isMainCard ? config.facebookLink : activeWs?.facebook} ↗</a>}
+                      </div>
+
+                      <div>
+                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
+                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">youtube.com/@</span>
+                          <input type="text" value={getUsername(isMainCard ? config.youtubeLink : activeWs?.youtube, 'https://youtube.com/@')} onChange={(e) => isMainCard ? handleSocialLinkChange('youtubeLink', 'https://youtube.com/@', e) : handleWorkspaceSocialChange(wsIndex, 'youtube', 'https://youtube.com/@', e)} placeholder="channel_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
+                        </div>
+                        {(isMainCard ? config.youtubeLink : activeWs?.youtube) && <a href={isMainCard ? config.youtubeLink : activeWs?.youtube} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline mt-1 inline-block">Preview: {isMainCard ? config.youtubeLink : activeWs?.youtube} ↗</a>}
+                      </div>
+
+                      <input type="text" name={isMainCard ? "googleReviewLink" : undefined} value={isMainCard ? config.googleReviewLink : activeWs?.googleReview || ''} onChange={(e) => isMainCard ? handleChange(e) : handleWorkspaceChange(wsIndex, 'googleReview', e.target.value)} placeholder="Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                      <input type="text" name={isMainCard ? "websiteLink" : undefined} value={isMainCard ? config.websiteLink : activeWs?.website || ''} onChange={(e) => isMainCard ? handleChange(e) : handleWorkspaceChange(wsIndex, 'website', e.target.value)} placeholder="Your Custom Website or Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-purple-500 outline-none" />
+                    </div>
+
+                    <a href={qrUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
+                      Preview Selected Digital Card ↗
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Automated Offers & Discounts */}
