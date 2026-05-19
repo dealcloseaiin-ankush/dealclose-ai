@@ -341,6 +341,18 @@ export default function Settings() {
                       <input type="text" value={workspace.website || ''} onChange={(e) => handleWorkspaceChange(index, 'website', e.target.value)} placeholder="Website / Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                       <input type="text" value={workspace.googleReview || ''} onChange={(e) => handleWorkspaceChange(index, 'googleReview', e.target.value)} placeholder="Google Review Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                     </div>
+
+                    {/* Separate AI Brain for this Workspace */}
+                    <div className="mt-4 pt-4 border-t border-gray-800 space-y-3">
+                       <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Business Knowledge (AI Training)</label>
+                          <textarea value={workspace.businessDescription || ''} onChange={(e) => handleWorkspaceChange(index, 'businessDescription', e.target.value)} rows="2" placeholder="e.g. We sell 2BHK flats in Mumbai..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none"></textarea>
+                       </div>
+                       <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Custom AI Rules</label>
+                          <textarea value={workspace.aiRules || ''} onChange={(e) => handleWorkspaceChange(index, 'aiRules', e.target.value)} rows="2" placeholder="e.g. Always ask for budget first. Talk in Hinglish." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none"></textarea>
+                       </div>
+                    </div>
                   </div>
                 ))
               )}

@@ -73,7 +73,10 @@ const userSchema = new Schema({
   workspaces: [{ 
     name: { type: String }, 
     description: { type: String }, // E.g., "Real Estate", "Electronics" for Cross-Selling
-    // Social links for each specific workspace
+    // --- Separate AI Brain for each Workspace ---
+    businessDescription: { type: String, default: '' }, // AI Training Data
+    aiRules: { type: String, default: '' }, // Custom rules for AI
+    // --- Social links for each specific workspace ---
     instagram: { type: String },
     facebook: { type: String },
     website: { type: String },

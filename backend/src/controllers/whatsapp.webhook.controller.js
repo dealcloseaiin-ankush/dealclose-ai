@@ -232,8 +232,20 @@ exports.handleWhatsApp = async (req, res) => {
               
               try {
                 // Har SaaS User ka apna personal AI context! 
-                const businessInfo = user.businessDescription || "a modern business";
-                const ownerRules = user.aiRules || "Be polite, helpful, and professional. Do not offer unapproved discounts.";
+                let businessInfo = user.businessDescription || "a modern business";
+                let ownerRules = user.aiRules || "Be polite, helpful, and professional.";
+                
+                // Check if customer ne koi specific business select kiya tha
+                const lead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+                if (lead && lead.lastSelectedWorkspaceId) {
+                  const selectedWs = user.workspaces.find(ws => ws._id.toString() === lead.lastSelectedWorkspaceId);
+                  if (selectedWs) {
+                    console.log(`🧠 [AI Context] Using Workspace Brain: ${selectedWs.name}`);
+                    businessInfo = selectedWs.businessDescription || businessInfo;
+                    ownerRules = selectedWs.aiRules || ownerRules;
+                  }
+                }
+
                 const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons. Use it frequently to ask quick multiple-choice questions and guide users through setups/onboarding effortlessly without making them type.\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
