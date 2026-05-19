@@ -16,7 +16,13 @@ exports.getTrainingData = async (req, res) => {
     }
     const user = await User.findById(userId);
     
-    res.status(200).json({ success: true, data: user?.trainingData || [] });
+    res.status(200).json({ 
+      success: true, 
+      data: user?.trainingData || [],
+      aiRules: user?.aiRules || '',
+      businessDescription: user?.businessDescription || '',
+      fallbackAction: user?.fallbackAction || 'notify_owner'
+    });
   } catch (error) {
     console.error('AI Training Data Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -48,11 +54,30 @@ exports.handleWebChat = async (req, res) => {
 // @route   POST /api/ai/train
 exports.trainAI = async (req, res) => {
   try {
-    const { question, answer } = req.body;
+    console.log('\n➡️ [DEBUG] POST /api/ai/train Called! Payload:', req.body);
     
-    // For now, we return a success message. 
-    // In production, this will update the AI System Prompt or Vector DB.
-    res.status(200).json({ success: true, message: 'AI trained successfully with new FAQ.' });
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    
+    const { question, answer, aiRules, businessDescription, fallbackAction } = req.body;
+    let updateQuery = {};
+
+    // Agar specific Q&A aaya hai
+    if (question && answer) {
+      updateQuery.$push = { trainingData: { question, answer, status: 'answered' } };
+    }
+    
+    // Agar AI Rules ya Business Description update hua hai
+    if (aiRules !== undefined) updateQuery.aiRules = aiRules;
+    if (businessDescription !== undefined) updateQuery.businessDescription = businessDescription;
+    if (fallbackAction !== undefined) updateQuery.fallbackAction = fallbackAction;
+
+    if (Object.keys(updateQuery).length > 0) {
+       await User.findByIdAndUpdate(userId, updateQuery, { strict: false });
+       console.log('✅ [DEBUG] AI Brain / Rules successfully saved to MongoDB!');
+    }
+
+    res.status(200).json({ success: true, message: 'AI rules and training data saved successfully!' });
   } catch (error) {
     console.error('AI Training Error:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
