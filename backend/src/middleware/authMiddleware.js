@@ -14,14 +14,19 @@ const protect = async (req, res, next) => {
 
       // Logged-in User ko request object me daalna (Password hata kar)
       req.user = await User.findById(decoded.id).select('-password');
+      
+      if (!req.user) {
+        console.log('❌ [Auth Middleware] Token is valid but user not found in DB.');
+        return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
+      }
+      
       next();
     } catch (error) {
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      console.error('❌ [Auth Middleware] Token verification failed:', error.message);
+      return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
     }
-  }
-
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+  } else {
+    return res.status(401).json({ success: false, message: 'Not authorized, no token' });
   }
 };
 
