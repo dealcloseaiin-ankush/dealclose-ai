@@ -20,6 +20,7 @@ export default function Settings() {
     validityDays: '30',
     workspaces: [], // Store multiple businesses here
     aiAgentEnabled: true,
+    acceptCollabs: false,
     businessDescription: '',
     businessName: '',
     aiRules: '',
@@ -64,6 +65,7 @@ export default function Settings() {
             validityDays: savedData.discountConfig?.validityDays || '30',
             workspaces: savedData.workspaces || [], // Fetch saved workspaces
             aiAgentEnabled: savedData.aiAgentEnabled !== false,
+            acceptCollabs: savedData.acceptCollabs || false,
             businessDescription: savedData.businessDescription || '',
             businessName: savedData.businessName || '',
             aiRules: savedData.aiRules || '',
@@ -176,6 +178,7 @@ export default function Settings() {
       // Transform data so backend overwrites (deletes) old keys completely
       const payload = {
         aiAgentEnabled: config.aiAgentEnabled,
+        acceptCollabs: config.acceptCollabs,
         businessDescription: config.businessDescription,
         aiRules: config.aiRules,
         businessName: config.businessName,
@@ -260,6 +263,14 @@ export default function Settings() {
                 </h2>
                 <button type="button" onClick={() => setConfig({...config, aiAgentEnabled: !config.aiAgentEnabled})} className={`w-12 h-6 rounded-full transition-colors relative ${config.aiAgentEnabled ? 'bg-purple-600' : 'bg-gray-700'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${config.aiAgentEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                </button>
+              </div>
+              <div className="flex justify-between items-center mb-6 relative z-10 border-t border-purple-500/20 pt-4 mt-2">
+                <h2 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                   🤝 Accept Free Collaborations (For Influencers)
+                </h2>
+                <button type="button" onClick={() => setConfig({...config, acceptCollabs: !config.acceptCollabs})} className={`w-12 h-6 rounded-full transition-colors relative ${config.acceptCollabs ? 'bg-green-600' : 'bg-gray-700'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${config.acceptCollabs ? 'translate-x-7' : 'translate-x-1'}`}></div>
                 </button>
               </div>
               <p className="text-sm text-gray-400 mb-4 relative z-10">This is your primary business profile. Turn the switch ON to let AI auto-reply to your customers.</p>

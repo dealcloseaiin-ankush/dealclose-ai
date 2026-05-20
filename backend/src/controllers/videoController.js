@@ -201,16 +201,16 @@ exports.swapFaceInVideo = async (req, res) => {
 // 2. Auto Product Ad Pipeline (Script -> Image -> Video -> Audio)
 exports.createProductAdPipeline = async (req, res) => {
   try {
-    const { productImages, productDescription, brandName } = req.body;
+    const { productImages, productDescription, brandName, targetLanguage = 'Hindi' } = req.body;
     
     // AI Pipeline Logic (To be integrated with real APIs):
-    // Step 1: LLM generates ad script & voiceover text
+    // Step 1: LLM generates ad script & voiceover text in the user's preferred local language (e.g., ${targetLanguage})
     // Step 2: Image generation AI enhances the product image (e.g., adds cinematic background)
     // Step 3: RunwayML / SVD converts the enhanced image into a panning/motion video
-    // Step 4: ElevenLabs generates voiceover & merges with video
+    // Step 4: ElevenLabs generates voiceover in ${targetLanguage} & merges with video
     
     const finalAdVideoUrl = "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4"; // Mock
-    res.json({ message: "AI Product Ad generated successfully", url: finalAdVideoUrl, script: "Mock generated script for " + brandName });
+    res.json({ message: "AI Product Ad generated successfully", url: finalAdVideoUrl, script: `Mock generated ${targetLanguage} script for ` + brandName });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

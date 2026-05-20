@@ -1,4 +1,5 @@
 const Lead = require('../models/leadModel');
+const aiService = require('../services/aiService');
 
 // @desc    Get all leads
 // @route   GET /api/leads
@@ -90,6 +91,83 @@ exports.getLeadAnalytics = async (req, res) => {
       stats: { totalLeads, converted, conversionRate, totalInvestment, costPerLead },
       graphData
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    AI Market Analysis & Suggestions for Influencers/Agencies
+// @route   GET /api/leads/market-insights
+exports.getMarketInsights = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
+
+    // Get the last 50 interested/won deals (brands approaching the influencer)
+    const recentLeads = await Lead.find({ 
+      userId, 
+      source: { $regex: /Instagram/i } 
+    }).sort({ createdAt: -1 }).limit(50);
+
+    if (recentLeads.length < 5) {
+      return res.status(200).json({ 
+        message: "Not enough data yet. Let the AI talk to at least 5 brands to generate market insights." 
+      });
+    }
+
+    // Create a summarized string of recent deals
+    const dealHistory = recentLeads.map(lead => `- Status: ${lead.status}, Notes: ${lead.notes}`).join('\n');
+
+    const aiContext = `You are a top-tier Business Strategist and Influencer Marketing Expert.
+    Below is the raw data of the last 50 brand collaboration requests and leads this influencer/business has received via Instagram DMs:
+    
+    ${dealHistory}
+    
+    Analyze this data and provide a strategic report.
+    Include:
+    1. The average market rate brands are offering for Stories vs Reels vs Posts.
+    2. The current demand trend (e.g., what kind of ads/promotions are brands asking for the most).
+    3. Specific, actionable suggestions on how the influencer can increase their charges (e.g., 'Brands are looking for UGC content, if you add X to your pitch, you can increase your rate by 20%').
+    
+    Format your response in professional but easy-to-read Markdown format. Be encouraging and strategic.`;
+
+    const insightReport = await aiService.generateAIResponse("Generate Market Strategy Report based on my recent leads.", aiContext);
+
+    res.status(200).json({ success: true, insights: insightReport });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Analyze Post-Campaign Performance (Comments/Likes Summary)
+// @route   POST /api/leads/analyze-campaign
+exports.analyzeCampaignROI = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
+
+    const { brandName, views, likes, commentsArray } = req.body;
+
+    if (!commentsArray || commentsArray.length === 0) {
+      return res.status(400).json({ message: "Comments data is required for analysis." });
+    }
+
+    const aiContext = `You are an AI Social Media Analyst.
+    An influencer just finished a campaign for the brand "${brandName}".
+    Performance Stats: Views: ${views}, Likes: ${likes}.
+    
+    Here are the raw comments from the audience:
+    ${JSON.stringify(commentsArray)}
+    
+    Your task is to summarize this data for the influencer. DO NOT just list the comments. 
+    Provide the "Saar" (Summary):
+    1. Overall audience sentiment (Positive, Negative, Mixed).
+    2. Did the audience like the product/brand? 
+    3. A short success statement the influencer can send to the brand as proof of ROI (e.g., "The audience loved the packaging, many asked for purchase links").`;
+
+    const analysisReport = await aiService.generateAIResponse("Analyze this campaign's comments and performance.", aiContext);
+
+    res.status(200).json({ success: true, analysis: analysisReport });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

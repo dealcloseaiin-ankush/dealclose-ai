@@ -6,6 +6,10 @@ const { protect } = require('../middleware/authMiddleware');
 // Saare CRM routes ko auth se protect kar rahe hain
 router.use(protect);
 
+// @route GET /api/crm/market-insights - AI based trend analysis
+const leadController = require('../controllers/leadController');
+router.get('/market-insights', leadController.getMarketInsights);
+
 // @route GET /api/crm/pipeline - Pipeline ka data fetch karne ke liye (Kanban Board)
 router.get('/pipeline', crmController.getPipeline);
 

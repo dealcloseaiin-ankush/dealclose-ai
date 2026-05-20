@@ -2,6 +2,7 @@ const aiService = require('../services/aiService');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel'); // Lead model import kiya gaya
+const whatsappService = require('../services/whatsappService'); // For Owner Notifications
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/instagram
@@ -54,10 +55,24 @@ exports.handleInstagramWebhook = async (req, res) => {
               // 🛑 STAGE 1: GATEKEEPER / SPAM FILTER BOT (0 Cost - Saves AI Limits)
               const incomingTextLower = incomingText.toLowerCase();
               
-              if (['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
-                const menuMessage = `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`;
+              if (['hi', 'hello', 'hey', 'menu', 'start'].includes(incomingTextLower)) {
+                const menuMessage = `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion (Paid Ads) 💰\n2️⃣ Collaboration (Other Creators) 🤝\n3️⃣ Just a Fan saying Hi! ❤️\n4️⃣ Other Queries`;
                 await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: menuMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                 console.log(`🤖 [IG Basic Bot]: Sent Menu to ${senderId}`);
+                continue; // 🚫 Stops here, does NOT call OpenAI
+              }
+
+              if (incomingTextLower === '3' || incomingTextLower.includes('fan message')) {
+                const fanMessage = `Thank you so much for the love and support! ❤️ Your message has been saved to the Fan Inbox. The creator reads these when free!`;
+                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: fanMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                console.log(`🤖 [IG Basic Bot]: Sent Fan Response to ${senderId}`);
+                continue; // 🚫 Stops here, does NOT call OpenAI
+              }
+
+              if (incomingTextLower === '4' || incomingTextLower.includes('other queries')) {
+                const generalMessage = `Your query has been recorded. Our team will review it shortly.`;
+                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: generalMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                console.log(`🤖 [IG Basic Bot]: Sent General Response to ${senderId}`);
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
 
@@ -83,17 +98,18 @@ exports.handleInstagramWebhook = async (req, res) => {
                 continue; // 🚫 Stops here, saves AI token!
               }
 
-              if (incomingTextLower === '3' || incomingTextLower.includes('general')) {
-                const generalMessage = `Your query has been recorded. Our team will review it shortly.`;
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: generalMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
-                console.log(`🤖 [IG Basic Bot]: Sent General Response to ${senderId}`);
-                continue; // 🚫 Stops here, does NOT call OpenAI
-              }
-
               // 🟢 STAGE 2: AI INFLUENCER MANAGER (Only triggers for Brands or Complex text)
               const isAiEnabled = user.aiAgentEnabled !== false;
               if (isAiEnabled) {
                 try {
+                  // 🧠 CHECK IF PAST CLIENT (MEMORY)
+                  const existingLead = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
+                  let relationshipContext = "";
+                  
+                  if (existingLead && (existingLead.status === 'converted' || existingLead.status === 'won' || existingLead.status === 'completed')) {
+                    relationshipContext = `CRITICAL NOTE: This brand is a PAST CLIENT. They have worked with the influencer before. Gently ask them how the ROI/results were for the previous campaign, and pitch a repeat collaboration because repeat campaigns require less setup time and you can offer them a better long-term relationship.`;
+                  }
+
                   // 🧠 INFLUENCER MANAGER AI CONTEXT
                   let businessInfo = user.businessDescription || "an Instagram Creator";
                   let ownerRules = user.aiRules || "Be professional and negotiate politely.";
@@ -101,11 +117,15 @@ exports.handleInstagramWebhook = async (req, res) => {
                   const aiContext = `You are a professional Talent Manager AI for an influencer. 
                   Influencer Details/Media Kit: ${businessInfo}.
                   Rules: ${ownerRules}.
+                  ${relationshipContext}
                   
-                  IMPORTANT: If the user's message is just "1", it means they selected "Brand Promotion" from the main menu. You should start the conversation by asking for their brand name, product details, and budget.
+                  IMPORTANT: 
+                  - If user message is "1", they are a Brand (Paid Ads). Ask for Brand Name, deliverables, and Budget.
+                  - If user message is "2", they are another Creator (Collab). Ask for their Instagram Handle and Idea.
                   Your goal is to handle incoming promotion requests in a BALANCED tone. Be polite and approachable, but value the influencer's worth.
-                  If they agree to the influencer's base pricing, use the 'extract_brand_deal' tool to save the deal to the CRM. 
-                  Do not agree to extremely low prices. Be polite and professional.`;
+                  2. Negotiate smartly. If they offer 10k and the rate is 15k, try to settle at a middle ground like 13k if they can't go higher.
+                  3. When a final agreement is reached, use the 'extract_brand_deal' tool. 
+                  4. In the tool JSON, make sure to explicitly include 'igHandle', 'brandName', and 'dealType' (either 'Brand' or 'Collab').`;
 
                   const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
                   let responseMessage = null;
@@ -116,17 +136,25 @@ exports.handleInstagramWebhook = async (req, res) => {
                       if (toolCall.function.name === "extract_brand_deal" || toolCall.function.name === "extract_lead_requirements") {
                         const dealData = JSON.parse(toolCall.function.arguments);
                         
+                        const sourceText = dealData.dealType === 'Collab' ? 'Instagram DM (Collab)' : 'Instagram DM (Promotion)';
+                        
                         await Lead.findOneAndUpdate(
                           { phoneNumber: `IG_${senderId}` }, 
                           { 
                             userId: user._id, 
-                            name: dealData.brandName || "New Brand Deal", 
-                            source: 'Instagram DM (Promotion)', 
+                            name: dealData.brandName || dealData.igHandle || "New Deal", 
+                            source: sourceText, 
                             status: 'interested', 
-                            notes: `Deliverables: ${dealData.itemName || dealData.deliverables} | Offered Budget: ${dealData.budget} | Notes: ${dealData.notes || 'N/A'}` 
+                            notes: `IG Handle: @${dealData.igHandle || senderId}\nDeal Type: ${dealData.dealType || 'Brand'}\nBrand Name: ${dealData.brandName || 'N/A'}\nDeliverables: ${dealData.itemName || dealData.deliverables}\nBudget: ${dealData.budget || 'Barter'}\nNegotiation: ${dealData.notes || 'N/A'}` 
                           }, 
                           { upsert: true }
                         );
+                        
+                        // 🚨 INSTANT WHATSAPP NOTIFICATION TO INFLUENCER (OWNER)
+                        if (user.ownerPhone && user.whatsappConfig?.accessToken) {
+                          const alertMsg = `🎉 *New Brand Deal Finalized by AI!*\n\n*Brand:* ${dealData.brandName || "New Brand"}\n*Budget:* ${dealData.budget}\n*Deliverables:* ${dealData.itemName || dealData.deliverables}\n\n*Negotiation Summary:*\n${dealData.notes}\n\nPlease log in to your Influencer Dashboard to Accept or Reject this deal.`;
+                          await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, alertMsg);
+                        }
                         
                         responseMessage = `Thank you! I have noted down the details (Budget: ${dealData.budget}). I will forward this to the influencer and we will get back to you shortly to finalize the collaboration!`;
                       }

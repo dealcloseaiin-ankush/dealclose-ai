@@ -1,5 +1,6 @@
 const Contact = require('../models/contactModel');
 const CrmActivity = require('../models/CrmActivitymodel');
+const { automationQueue } = require('../workers/automationWorker');
 
 // @desc    Get all contacts grouped by CRM Stage (For Kanban Board)
 // @route   GET /api/crm/pipeline
@@ -77,7 +78,13 @@ exports.updateStage = async (req, res) => {
       metadata: { oldStage, newStage }
     });
 
-    // TODO: Phase 2 - Trigger automation/webhook if set up (e.g. sync to Zoho)
+    // 🚀 INFLUENCER RETENTION AUTOMATION
+    // Jab deal convert ya complete ho jaye, 15 din baad ROI/Repeat pitch ka auto-followup set karein
+    if (newStage === 'converted' || newStage === 'completed') {
+      console.log(`[CRM] Scheduling Post-Campaign ROI check for contact ${contact._id}`);
+      // Schedule for 15 days later (15 * 24 * 60 * 60 * 1000) - Using 1 minute for testing purposes
+      await automationQueue.add('campaign_followup', { contactId: contact._id, userId }, { delay: 60 * 1000 });
+    }
 
     res.status(200).json({ success: true, message: 'Stage updated successfully', data: contact });
   } catch (error) {

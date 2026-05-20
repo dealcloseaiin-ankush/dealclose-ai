@@ -36,29 +36,29 @@ export default function LandingPage() {
   // Dynamic Pricing Structure for Scalability
   const pricingPlans = [
     {
-      name: "Basic Automation",
-      badge: "30-Day Free Trial",
+      name: "Core CRM Foundation",
+      badge: "Free Forever",
       price: "₹0",
-      period: "for 1st month",
-      features: ["100% Free Basic Chatbot", "WhatsApp OR Instagram", "Keyword-based replies", "Renews at ₹199/mo per platform"],
-      cta: "Start Free Trial"
+      period: "/mo",
+      features: ["Manual Kanban CRM & Lists", "Digital Business Card & QR", "Lead Capture Forms", "Manual WhatsApp/IG Chats", "Basic Staff Management"],
+      cta: "Start for Free"
     },
     {
-      name: "AI Starter Offer",
-      badge: "1st Month Promo",
-      price: "₹99",
+      name: "B2B WhatsApp Pro",
+      badge: "14-Day Free Trial",
+      price: "₹299",
       period: "/mo",
-      features: ["Smart AI Chatbot (Limited)", "Handles custom customer queries", "Missed opportunity recovery", "Renews at ₹299/mo (AI Add-on)"],
-      cta: "Claim ₹99 Offer",
+      features: ["Cart Abandonment Recovery", "Drag & Drop Flow Builder", "Bulk Order Dispatch (Excel)", "Auto-Followups (Rule-based)"],
+      cta: "Start WhatsApp Trial",
       highlight: true
     },
     {
-      name: "Omnichannel Pro",
-      badge: "Standard",
-      price: "₹498",
+      name: "Influencer Manager AI",
+      badge: "14-Day Free Trial",
+      price: "₹999",
       period: "/mo",
-      features: ["Base (₹199) + AI Pro (₹299)", "WhatsApp AND Instagram Engine", "Unlimited custom flows", "Priority AI Voice Calls"],
-      cta: "Get Pro Plan"
+      features: ["Full AI Deal Negotiation", "Extract Budgets & Deliverables", "Market Insights (ROI)", "IG Keyword Chatbot (₹99/mo Base)"],
+      cta: "Start Instagram Trial"
     }
   ];
 
@@ -517,8 +517,8 @@ export default function LandingPage() {
       {/* Pricing Section */}
       <section id="pricing" className="py-24 px-6 max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">Simple, transparent pricing</h2>
-          <p className="text-gray-400">Start for free, upgrade when you need more power.</p>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">Modular Pricing for Every Need</h2>
+          <p className="text-gray-400">Choose the exact channel you need. B2B or Influencer, we've got you covered.</p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -541,6 +541,9 @@ export default function LandingPage() {
               </Link>
             </div>
           ))}
+        </div>
+        <div className="mt-12 text-center">
+          <p className="text-gray-400 text-sm">Need Omnichannel AI, Voice Calling, or Ad Analytics? <Link to="/pricing" className="text-blue-400 hover:text-blue-300 font-bold underline">View our modular Add-ons</Link></p>
         </div>
       </section>
 

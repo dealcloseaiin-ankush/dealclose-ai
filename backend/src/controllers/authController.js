@@ -141,6 +141,7 @@ exports.updateProfile = async (req, res) => {
       discountConfig,
       ownerPhone,
       aiAgentEnabled,
+      acceptCollabs,
       workspaces,
       twilioConfig
     } = req.body;
@@ -164,6 +165,7 @@ exports.updateProfile = async (req, res) => {
     if (discountConfig !== undefined) updateData.discountConfig = discountConfig;
     if (ownerPhone !== undefined) updateData.ownerPhone = ownerPhone;
     if (aiAgentEnabled !== undefined) updateData.aiAgentEnabled = aiAgentEnabled;
+    if (acceptCollabs !== undefined) updateData.acceptCollabs = acceptCollabs;
     if (workspaces !== undefined) updateData.workspaces = workspaces;
     if (twilioConfig !== undefined) updateData.twilioConfig = twilioConfig;
 
