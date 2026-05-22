@@ -145,11 +145,16 @@ exports.handleWhatsApp = async (req, res) => {
             
             // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
             const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
-            const isAiPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
+            const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
             
-            if (isAiPaused) {
+            if (isCurrentlyPaused) {
               console.log(`⏸️ [Webhook] Human has taken over the chat for ${fromNumber}. AI is currently paused. Skipping AI reply.`);
               continue; // Yahan se nikal jayega aur koi auto-reply nahi karega
+            } else if (currentLeadCheck && currentLeadCheck.isAiPaused) {
+              // 🔥 NEW: The pause has expired. Let's reset the flag so the AI can resume normally.
+              // This makes the system state clean and prevents any future confusion.
+              console.log(`▶️ [Webhook] AI pause has expired for ${fromNumber}. Resuming AI and resetting the flag.`);
+              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: false, aiPausedUntil: null } });
             }
 
             const incomingTextLower = incomingText.toLowerCase();

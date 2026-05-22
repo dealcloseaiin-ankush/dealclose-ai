@@ -22,6 +22,7 @@ exports.getTrainingData = async (req, res) => {
       aiRules: user?.aiRules || '',
       businessDescription: user?.businessDescription || '',
       fallbackAction: user?.fallbackAction || 'notify_owner',
+      businessName: user?.businessName || 'Main Business',
       workspaces: user?.workspaces || []
     });
   } catch (error) {
