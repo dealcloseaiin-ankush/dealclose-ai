@@ -35,7 +35,7 @@ export default function Sidebar() {
     {
       title: 'AUTOMATION',
       items: [
-        { name: 'Flow Builder', path: '/flow-builder', icon: '🤖', comingSoon: true },
+        { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
         { name: 'Automations', path: '/automations', icon: '🔁', comingSoon: true },
         { name: 'Instagram', path: '/instagram-automation', icon: '📸', comingSoon: true }
       ]
