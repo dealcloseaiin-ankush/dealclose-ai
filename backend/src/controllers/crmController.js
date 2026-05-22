@@ -25,7 +25,9 @@ exports.getPipeline = async (req, res) => {
 
     // 🚀 NEW: AUTO-SYNC OLD CHATS TO CRM
     try {
-      const distinctPhones = await Message.distinct('customerPhone', { userId });
+      const mongoose = require('mongoose');
+      const userIdObj = new mongoose.Types.ObjectId(userId);
+      const distinctPhones = await Message.distinct('customerPhone', { userId: userIdObj });
       console.log(`📱 [CRM Debug] Found ${distinctPhones.length} distinct phone numbers in Chat History.`);
       for (const phone of distinctPhones) {
         if (!phone) continue;
@@ -36,6 +38,7 @@ exports.getPipeline = async (req, res) => {
           if (!leadExists && !contactExists) {
             await Lead.create({
               userId,
+              createdBy: userId,
               phoneNumber: phone,
               name: `User ${phone.slice(-4)}`,
               source: 'WhatsApp (Old Chat)',

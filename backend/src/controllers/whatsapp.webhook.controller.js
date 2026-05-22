@@ -94,7 +94,7 @@ exports.handleWhatsApp = async (req, res) => {
             console.log(`[Webhook Debug] Attempting to save Lead ${fromNumber} for user ${user._id}`);
             const savedLead = await Lead.findOneAndUpdate(
               { phoneNumber: fromNumber, userId: user._id },
-              { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new' } },
+              { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new', createdBy: user._id } },
               { upsert: true, new: true }
             );
             console.log(`✅ [Webhook Debug] Lead saved/verified in CRM (ID: ${savedLead._id})`);
@@ -306,6 +306,7 @@ exports.handleWhatsApp = async (req, res) => {
                       
                       const updateFields = { 
                         userId: user._id, 
+                        createdBy: user._id,
                         source: leadData.category || 'WhatsApp AI', 
                         status: "interested", 
                         notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` 

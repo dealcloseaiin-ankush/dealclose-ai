@@ -1,4 +1,6 @@
 const Lead = require('../models/leadModel');
+const Contact = require('../models/contactModel');
+const Message = require('../models/messageModel');
 const aiService = require('../services/aiService');
 const mongoose = require('mongoose');
 
@@ -71,6 +73,29 @@ exports.getLeadAnalytics = async (req, res) => {
 
     console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}`);
     const userIdObj = new mongoose.Types.ObjectId(userId);
+
+    // 🚀 NEW: AUTO-SYNC OLD CHATS BEFORE FETCHING ANALYTICS (Ensures Dashboard is always accurate)
+    try {
+      const distinctPhones = await Message.distinct('customerPhone', { userId: userIdObj });
+      for (const phone of distinctPhones) {
+        if (!phone) continue;
+        try {
+          const leadExists = await Lead.findOne({ phoneNumber: phone, userId });
+          const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
+          
+          if (!leadExists && !contactExists) {
+            await Lead.create({
+              userId,
+              createdBy: userId,
+              phoneNumber: phone,
+              name: `User ${phone.slice(-4)}`,
+              source: 'WhatsApp (Old Chat)',
+              status: 'new'
+            });
+          }
+        } catch (innerErr) { }
+      }
+    } catch (syncErr) { }
 
     const totalLeads = await Lead.countDocuments({ userId });
     const converted = await Lead.countDocuments({ userId, status: 'converted' });
