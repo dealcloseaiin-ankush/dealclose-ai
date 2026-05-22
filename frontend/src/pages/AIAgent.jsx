@@ -1,0 +1,178 @@
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+import toast from 'react-hot-toast';
+
+export default function AIAgent() {
+  const [queries, setQueries] = useState([]);
+  const [trainingText, setTrainingText] = useState("");
+  const [workspaces, setWorkspaces] = useState([]);
+  const [selectedBrain, setSelectedBrain] = useState('main');
+  const [mainRules, setMainRules] = useState('');
+
+  useEffect(() => {
+    const fetchQueries = async () => {
+      try {
+        const { data } = await api.get('/ai/training-data');
+        setQueries(Array.isArray(data.data) ? data.data : []);
+        setWorkspaces(data.workspaces || []);
+        setMainRules(data.aiRules || '');
+        
+        // Page load hone par purana saved knowledge box me dikhana
+        if (data.aiRules) {
+          setTrainingText(data.aiRules);
+        }
+      } catch (error) {
+        console.error("Failed to load AI queries", error);
+      }
+    };
+    fetchQueries();
+  }, []);
+
+  const copyDataForChatGPT = () => {
+    const prompt = `I run an Instagram store named @sneaker_head99. My recent stats: Total posts: 15. Reels get 2000 views on average, Image posts get 200. Bio: "Best sneakers in town". Please act as an expert Instagram Growth Manager and provide 3 actionable tips to improve my profile and increase sales.`;
+    navigator.clipboard.writeText(prompt);
+    alert("Profile Data Copied! You can now paste this into ChatGPT or Claude for a deep analysis.");
+  };
+
+  const handleProvideAnswer = async (id, e) => {
+    e.preventDefault();
+    const answer = e.target.answer.value;
+    if (!answer) return;
+    try {
+      await api.put(`/ai/training-data/${id}/answer`, { answer });
+      setQueries(queries.filter(q => q._id !== id && q.id !== id));
+      toast.success("🧠 AI has learned this answer!");
+    } catch (error) {
+      console.error("Failed to save answer:", error);
+      toast.error("Failed to save answer.");
+    }
+  };
+
+  const handleBrainSwitch = (wsId) => {
+    setSelectedBrain(wsId);
+    if (wsId === 'main') {
+      setTrainingText(mainRules);
+    } else {
+      const ws = workspaces.find(w => w._id === wsId);
+      setTrainingText(ws?.aiRules || '');
+    }
+  };
+
+  const handleSaveKnowledge = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/ai/train', { aiRules: trainingText, workspaceId: selectedBrain });
+      toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
+    } catch (error) {
+      console.error("Failed to save knowledge:", error);
+      toast.error("Failed to train AI. Please try again.");
+    }
+  };
+
+  return (
+    <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 mb-2">
+            AI Master Agent
+          </h1>
+          <p className="text-gray-400">View smart insights and train your AI to handle complex customer queries.</p>
+        </div>
+      </div>
+
+      {/* Custom Knowledge Base (Manual Training) */}
+      <div className="mb-10 bg-[#111] p-6 md:p-8 rounded-3xl border border-purple-500/30 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10">
+          <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">📚 Train AI (Knowledge Base)</h2>
+          <p className="text-gray-400 text-sm mb-6">Type your business rules, return policies, or paste text data here. AI will memorize this to answer customers.</p>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Select Business to Train</label>
+            <select 
+              value={selectedBrain} 
+              onChange={(e) => handleBrainSwitch(e.target.value)} 
+              className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
+            >
+              <option value="main">Main Business (Default)</option>
+              {workspaces.map((ws) => (
+                <option key={ws._id} value={ws._id}>{ws.name || 'Workspace'}</option>
+              ))}
+            </select>
+          </div>
+
+          <form onSubmit={handleSaveKnowledge}>
+            <textarea 
+              rows="4" 
+              value={trainingText}
+              onChange={(e) => setTrainingText(e.target.value)}
+              placeholder="e.g. We do not provide cash on delivery for orders above ₹10,000. Shop opens at 9 AM..." 
+              className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-purple-500 outline-none mb-4"
+            ></textarea>
+            <div className="flex gap-3">
+              <button type="button" className="px-6 py-2 bg-[#1a1a1a] hover:bg-gray-800 border border-gray-700 rounded-xl font-bold transition-colors">📄 Upload PDF / Doc</button>
+              <button type="submit" className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-colors shadow-lg shadow-purple-500/20">Save & Train AI</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Top Section: AI Training (Urgent Actions) */}
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">🧠 Teach Your AI (Pending Questions)</h2>
+        <div className="space-y-4 max-w-5xl">
+          {queries.length === 0 ? (
+            <div className="bg-[#111] p-8 rounded-2xl border border-gray-800 text-center text-green-500 font-medium shadow-lg">
+              <p className="text-3xl mb-2">🎉</p>
+              Your AI knows everything right now! No unanswered questions.
+            </div>
+          ) : (
+            queries.map((q) => (
+              <div key={q.id} className="bg-[#111] p-6 rounded-2xl border border-rose-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <p className="text-sm text-gray-400">Customer {q.phone} asked:</p>
+                    <span className="bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Needs Answer</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white">"{q.question}"</h3>
+                </div>
+                <form onSubmit={(e) => handleProvideAnswer(q.id, e)} className="flex w-full md:w-auto gap-3">
+                  <input type="text" name="answer" placeholder="Type answer for AI..." className="flex-1 md:w-64 bg-[#1a1a1a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none text-sm" required />
+                  <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold text-sm transition-colors whitespace-nowrap">Teach & Reply</button>
+                </form>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Section: AI Insights */}
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">📊 Performance Insights</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-[#111] p-6 rounded-2xl border border-orange-500/30 shadow-lg">
+            <h3 className="text-orange-400 font-bold mb-2 flex items-center gap-2">🔥 Trending Query</h3>
+            <p className="text-white font-medium mb-4">"75% of users asked about 'Cash on Delivery' today."</p>
+            <p className="text-sm text-gray-400">AI Advice: Consider adding a clear COD policy message to your welcome menu.</p>
+          </div>
+
+          <div className="bg-[#111] p-6 rounded-2xl border border-green-500/30 shadow-lg">
+            <h3 className="text-green-400 font-bold mb-2 flex items-center gap-2">📈 High Intent Lead</h3>
+            <p className="text-white font-medium mb-4">"The product 'Summer Collection Tshirt' is getting high attention."</p>
+            <p className="text-sm text-gray-400">AI Advice: Run a promotional WhatsApp campaign for this item to close pending leads.</p>
+          </div>
+          
+          <div className="bg-gradient-to-br from-[#1a1120] to-[#111] p-6 rounded-2xl border border-pink-500/30 shadow-lg">
+            <h3 className="text-pink-400 font-bold mb-2 flex items-center gap-2">📸 IG Growth Audit</h3>
+            <p className="text-white font-medium mb-4">Your Instagram bio lacks a strong Call-To-Action (CTA).</p>
+            <button onClick={copyDataForChatGPT} className="w-full bg-pink-600/20 border border-pink-500/50 hover:bg-pink-600 text-pink-300 hover:text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors mt-2">
+              Export Deep Analysis
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
