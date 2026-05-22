@@ -29,6 +29,14 @@ const leadSchema = new Schema({
     type: String,
     default: 'manual',
   },
+  notes: {
+    type: String,
+    default: '',
+  },
+  dealValue: {
+    type: Number,
+    default: 0,
+  },
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',

@@ -1,8 +1,44 @@
-import React from 'react';
-import { X, MessageSquare, Phone, MoreHorizontal, Bot, User, Calendar, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, MessageSquare, Phone, MoreHorizontal, Bot, User, Calendar, Tag, Save } from 'lucide-react';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 export default function ContactDrawer({ contact, isOpen, onClose }) {
+  const [formData, setFormData] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (contact && isOpen) {
+      setFormData({
+        crmStage: contact.crmStage || contact.status || 'new',
+        dealValue: contact.dealValue || 0,
+        notes: contact.notes || ''
+      });
+    }
+  }, [contact, isOpen]);
+
   if (!isOpen || !contact) return null;
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await api.put(`/crm/contacts/${contact._id}/stage`, {
+        newStage: formData.crmStage,
+        dealValue: Number(formData.dealValue),
+        notes: formData.notes
+      });
+      toast.success('Lead updated successfully! Refresh to see changes.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update lead');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <>
@@ -35,10 +71,14 @@ export default function ContactDrawer({ contact, isOpen, onClose }) {
           <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-gray-800 space-y-4">
             <div className="flex justify-between items-center pb-4 border-b border-gray-800/50">
               <span className="text-sm text-gray-500 font-semibold">Stage</span>
-              <select className="bg-[#0a0a0a] border border-gray-700 text-white text-sm rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 capitalize">
-                <option value={contact.crmStage}>{contact.crmStage}</option>
+              <select name="crmStage" value={formData.crmStage} onChange={handleChange} className="bg-[#0a0a0a] border border-gray-700 text-white text-sm rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 capitalize">
+                <option value="new">New Lead</option>
+                <option value="contacted">Contacted</option>
+                <option value="interested">Interested</option>
                 <option value="negotiating">Negotiating</option>
                 <option value="converted">Converted</option>
+                <option value="lost">Lost</option>
+                <option value="ignored">Ignored</option>
               </select>
             </div>
             
@@ -52,13 +92,24 @@ export default function ContactDrawer({ contact, isOpen, onClose }) {
             </div>
 
             <div className="flex justify-between items-center pb-4 border-b border-gray-800/50">
-              <span className="text-sm text-gray-500 font-semibold">Deal Value</span>
-              <span className="text-sm font-bold text-white">₹{contact.dealValue?.toLocaleString() || 0}</span>
+              <span className="text-sm text-gray-500 font-semibold">Deal Value (₹)</span>
+              <input type="number" name="dealValue" value={formData.dealValue} onChange={handleChange} className="bg-[#0a0a0a] border border-gray-700 text-white text-sm font-bold rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 w-32 text-right" />
+            </div>
+
+            <div className="flex flex-col pb-4 border-b border-gray-800/50">
+              <span className="text-sm text-gray-500 font-semibold mb-2">Notes & Requirements</span>
+              <textarea name="notes" value={formData.notes} onChange={handleChange} rows="3" className="bg-[#0a0a0a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-sky-500 w-full resize-none" placeholder="Add custom notes here..."></textarea>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500 font-semibold">Assigned To</span>
               <span className="flex items-center gap-1 text-sm text-sky-400 bg-sky-500/10 px-2 py-1 rounded-md"><User size={14}/> {contact.assignedAgent || 'Unassigned'}</span>
+            </div>
+            
+            <div className="pt-2">
+              <button onClick={handleSave} disabled={isSaving} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                <Save size={18} /> {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
 
