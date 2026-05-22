@@ -187,12 +187,18 @@ exports.handleWhatsApp = async (req, res) => {
               let menuRows = [];
               
               if (user.workspaces && user.workspaces.length > 0) {
-                menuRows = user.workspaces.map(w => ({
-                  id: `workspace_${w._id}`, // Hidden ID bheji jayegi
-                  title: w.name.substring(0, 24), // Meta restricts title to 24 chars max
-                  description: (w.description || "View our services").substring(0, 72)
-                }));
-              } else {
+                // Safe Filter: Only map valid workspaces that have a name
+                const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
+                if (validWs.length > 0) {
+                  menuRows = validWs.map(w => ({
+                    id: `workspace_${w._id}`, 
+                    title: w.name.substring(0, 24), 
+                    description: (w.description || "View our services").substring(0, 72)
+                  }));
+                }
+              } 
+              
+              if (menuRows.length === 0) {
                 // Fallback: Agar usne koi secondary business nahi banaya hai, toh uska main naam dikhayenge
                 menuRows = [
                   { id: `workspace_default`, title: (user.businessName || "Main Business").substring(0, 24), description: "Explore our products and services" }

@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const leadSchema = new Schema({
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
   name: {
     type: String,
     required: true,
@@ -17,7 +22,7 @@ const leadSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['new', 'contacted', 'interested', 'not_interested', 'converted'],
+    enum: ['new', 'contacted', 'interested', 'negotiating', 'not_interested', 'converted', 'lost', 'ignored'],
     default: 'new',
   },
   source: {
