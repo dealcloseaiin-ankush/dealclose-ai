@@ -89,6 +89,13 @@ exports.handleWhatsApp = async (req, res) => {
           console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
           console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
           
+          // 🚀 NEW: AUTO-ADD EVERY SENDER TO CRM (So it shows on your board immediately)
+          await Lead.findOneAndUpdate(
+            { phoneNumber: fromNumber, userId: user._id },
+            { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new' } },
+            { upsert: true, new: true }
+          );
+
           if (msg.type === 'image') {
             const mediaId = msg.image.id;
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "I received your image! Let me read the list using AI for you... ⏳");
@@ -143,6 +150,15 @@ exports.handleWhatsApp = async (req, res) => {
 
             await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer' });
             
+            // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
+            const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+            const isAiPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
+            
+            if (isAiPaused) {
+              console.log(`⏸️ [Webhook] Human has taken over the chat for ${fromNumber}. AI is currently paused. Skipping AI reply.`);
+              continue; // Yahan se nikal jayega aur koi auto-reply nahi karega
+            }
+
             const incomingTextLower = incomingText.toLowerCase();
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               
@@ -250,7 +266,13 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 }
 
-                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons. Use it frequently to ask quick multiple-choice questions and guide users through setups/onboarding effortlessly without making them type.\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
+                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk. If asked about unrelated topics, steer back to business immediately or ignore.\n3. When asking multiple-choice questions, ALWAYS use the 'send_whatsapp_menu' tool (max 3 options) instead of typing options in text. This saves user time and API tokens. Ask one question at a time.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
+                
+                // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
+                if (user.aiCredits > 0 && user.aiCredits <= 200) {
+                  aiContext += "\n\n⚠️ LOW BUDGET MODE ACTIVE: You must provide short and concise answers (1-2 sentences max) to save processing time and API cost.";
+                }
+                
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {

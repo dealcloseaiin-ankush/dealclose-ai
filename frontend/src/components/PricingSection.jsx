@@ -28,15 +28,15 @@ const PricingSection = () => {
     {
       name: "Pro AI",
       description: "Supercharge your sales with AI intelligence.",
-      priceMonthly: "₹2,499",
-      priceAnnual: "₹1,999",
+      priceMonthly: "₹499",
+      priceAnnual: "₹399",
       features: [
-        "Choose 1: WhatsApp + AI OR Insta + AI",
-        "ChatGPT-4 Powered Smart Replies",
-        "Auto Lead & Order Extraction",
-        "Fallback to Human (Smart Handoff)",
-        "1 Admin + 3 Staff Members",
-        "Upload PDF/Docs for AI Training"
+        "1000 AI Chat Replies included",
+        "GPT-4o Mini & Gemini 2.5 Pro",
+        "Auto-Menu & Fast Reply Mode",
+        "Fair Usage Cost Protection",
+        "Smart Lead Extraction",
+        "Upload PDF/Docs to Train AI"
       ],
       missingFeatures: [
         "Omnichannel (WhatsApp + Insta together)",

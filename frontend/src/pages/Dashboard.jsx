@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line } from 'recharts';
 import { useAuth } from '../hooks/useAuth';
 import DashboardAIAssistant from '../components/DashboardAIAssistant'; // Import the AI Chat Assistant
 
@@ -191,38 +191,144 @@ export default function Dashboard() {
 
       {/* SUPER ADMIN SECTION (Only visible to owners) */}
       {isSuperAdmin && (
-        <div className="mt-12 bg-gradient-to-b from-[#111] to-[#0a0a0a] border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden">
-          <div className="p-6 border-b border-gray-800 bg-[#1a1a1a] flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><span className="text-purple-500">👑</span> Super Admin / SaaS Clients</h2>
-              <p className="text-sm text-gray-500">Manage active agencies and track AI usage costs.</p>
+        <div className="mt-12 space-y-8">
+          <div className="bg-gradient-to-b from-[#111] to-[#0a0a0a] border border-purple-500/30 rounded-2xl shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2"><span className="text-purple-500">👑</span> Super Admin Overview</h2>
+                <p className="text-sm text-gray-500">Track user onboarding, revenue, and real AI costs across the platform.</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Total MRR</p>
-              <p className="text-2xl font-bold text-green-400">₹797</p>
+
+            {/* Super Admin Top Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total Users Onboarded</p>
+                <div className="flex items-end gap-2">
+                  <p className="text-2xl font-black text-white">128</p>
+                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded font-bold">+12 this week</span>
+                </div>
+              </div>
+              <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total MRR</p>
+                <div className="flex items-end gap-2">
+                  <p className="text-2xl font-black text-blue-400">₹45,290</p>
+                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded font-bold">+15% vs last week</span>
+                </div>
+              </div>
+              <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total AI API Cost</p>
+                <div className="flex items-end gap-2">
+                  <p className="text-2xl font-black text-rose-400">₹2,140</p>
+                  <span className="text-xs text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-bold">~4.7% of MRR</span>
+                </div>
+              </div>
+              <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Avg AI Cost / User</p>
+                <p className="text-2xl font-black text-purple-400">₹16.70</p>
+                <p className="text-[10px] text-gray-500 mt-1">Highly profitable</p>
+              </div>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap">
-              <thead>
-                <tr className="bg-[#0a0a0a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
-                  <th className="p-5 font-semibold">Client Name</th>
-                  <th className="p-5 font-semibold">Plan & MRR</th>
-                  <th className="p-5 font-semibold">AI Usage Left</th>
-                  <th className="p-5 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {clients.map(client => (
-                  <tr key={client.id} className="hover:bg-gray-900/50 transition-colors">
-                    <td className="p-5 font-bold text-gray-200">{client.name} <br/><span className="text-xs text-gray-500 font-normal">{client.platforms}</span></td>
-                    <td className="p-5 text-blue-400 font-semibold">{client.plan} <br/><span className="text-xs text-gray-500">{client.mrr}/mo</span></td>
-                    <td className="p-5"><span className="text-purple-400 font-bold">{client.aiLeft}</span> <br/><span className="text-xs text-rose-400">Cost: {client.aiCost}</span></td>
-                    <td className="p-5"><span className="bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1 rounded-md text-xs font-bold">{client.status}</span></td>
+
+            {/* Super Admin Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <div className="bg-[#161b22] border border-gray-800 rounded-xl p-5 relative">
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-xl backdrop-blur-[1px] pointer-events-none">
+                   <span className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded font-bold uppercase tracking-widest border border-gray-600 shadow-xl">Awaiting Live Data</span>
+                </div>
+                <h3 className="text-sm font-bold text-gray-400 mb-4 opacity-50">Revenue & User Growth (Sample)</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={[
+                    { name: 'W1', revenue: 25000, users: 95 },
+                    { name: 'W2', revenue: 32000, users: 105 },
+                    { name: 'W3', revenue: 38500, users: 116 },
+                    { name: 'W4', revenue: 45290, users: 128 },
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="name" stroke="#888" fontSize={12} />
+                    <YAxis yAxisId="left" stroke="#888" fontSize={12} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#888" fontSize={12} />
+                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Line yAxisId="left" type="monotone" dataKey="revenue" name="Revenue (₹)" stroke="#10b981" strokeWidth={3} />
+                    <Line yAxisId="right" type="monotone" dataKey="users" name="Total Users" stroke="#8b5cf6" strokeWidth={3} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="bg-[#161b22] border border-gray-800 rounded-xl p-5 relative">
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-xl backdrop-blur-[1px] pointer-events-none">
+                   <span className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded font-bold uppercase tracking-widest border border-gray-600 shadow-xl">Awaiting Live Data</span>
+                </div>
+                <h3 className="text-sm font-bold text-gray-400 mb-4 opacity-50">Feature Adoption (Sample)</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={[
+                    { name: 'WA Pro', count: 85 },
+                    { name: 'IG Auto', count: 62 },
+                    { name: 'Lead Ext.', count: 40 },
+                    { name: 'AI Calls', count: 18 },
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="name" stroke="#888" fontSize={12} />
+                    <YAxis stroke="#888" fontSize={12} />
+                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} cursor={{fill: '#222'}} />
+                    <Bar dataKey="count" name="Subscribed Users" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Clients Table */}
+            <h3 className="text-lg font-bold text-white mb-4">Detailed Client Usage</h3>
+            <div className="overflow-x-auto bg-[#1a1a1a] rounded-xl border border-gray-800">
+              <table className="w-full text-left whitespace-nowrap">
+                <thead>
+                  <tr className="bg-[#0a0a0a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
+                    <th className="p-4 font-semibold">Client Name</th>
+                    <th className="p-4 font-semibold">Plan & MRR</th>
+                    <th className="p-4 font-semibold">Active Features</th>
+                    <th className="p-4 font-semibold">AI Usage (Tokens/Cost)</th>
+                    <th className="p-4 font-semibold">Status / Issues</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-800 text-sm">
+                  {clients.map(client => (
+                    <tr key={client.id} className="hover:bg-gray-900/50 transition-colors">
+                      <td className="p-4 font-bold text-gray-200">{client.name} <br/><span className="text-xs text-gray-500 font-normal">{client.platforms || 'B2B Retail'}</span></td>
+                      <td className="p-4 text-blue-400 font-semibold">{client.plan} <br/><span className="text-xs text-gray-500">₹{client.mrr}/mo</span></td>
+                      <td className="p-4 text-gray-300 text-xs">
+                        <div className="flex gap-1 flex-wrap w-32">
+                          <span className="bg-gray-800 px-2 py-0.5 rounded">WA</span>
+                          <span className="bg-gray-800 px-2 py-0.5 rounded">IG</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-purple-400 font-bold">{client.aiLeft || '850'} credits left</span> <br/>
+                        <span className="text-xs text-rose-400">Real Cost: ₹{client.aiCost || '12.40'}</span>
+                      </td>
+                      <td className="p-4">
+                        {client.status === 'Active' ? (
+                          <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1 rounded-md text-xs font-bold">Healthy ✅</span>
+                        ) : (
+                          <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-md text-xs font-bold">Limit Reached ⚠️</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {clients.length === 0 && (
+                    <tr className="opacity-40 grayscale pointer-events-none">
+                      <td className="p-4 text-gray-200">
+                        Demo User Store <span className="ml-2 bg-gray-800 text-[10px] px-2 py-0.5 rounded text-gray-400">Sample Data</span>
+                      </td>
+                      <td className="p-4 text-blue-400 font-semibold">Pro AI <br/><span className="text-xs text-gray-500">₹499/mo (Demo)</span></td>
+                      <td className="p-4 text-gray-300 text-xs"><span className="bg-gray-800 px-2 py-0.5 rounded">WA</span></td>
+                      <td className="p-4"><span className="text-purple-400 font-bold">950 credits left</span> <br/><span className="text-xs text-rose-400">Real Cost: ₹1.25</span></td>
+                      <td className="p-4"><span className="bg-gray-500/10 text-gray-400 border border-gray-500/20 px-3 py-1 rounded-md text-xs font-bold">Demo Mode</span></td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

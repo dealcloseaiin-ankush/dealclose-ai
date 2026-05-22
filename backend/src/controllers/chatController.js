@@ -1,5 +1,6 @@
 const Message = require('../models/messageModel');
 const User = require('../models/userModel');
+const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 
 // @desc    Get all chat history for a user (Grouped by customer)
@@ -58,6 +59,16 @@ exports.sendManualMessage = async (req, res) => {
     });
 
     console.log(`➡️ [DEBUG Chat Flow] 4. Message saved to DB (ID: ${newMsg._id})`);
+
+    // 🚀 NEW: PAUSE AI FOR THIS CUSTOMER (HUMAN TAKEOVER)
+    // Agar human ne reply kiya hai, toh AI ko agle 24 ghante ke liye shant (pause) kar do
+    const pauseUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+    await Lead.findOneAndUpdate(
+      { phoneNumber: formattedPhone, userId: userId },
+      { $set: { isAiPaused: true, aiPausedUntil: pauseUntil } },
+      { upsert: true }
+    );
+    console.log(`⏸️ [DEBUG Chat Flow] AI Paused for customer ${formattedPhone} for 24 hours.`);
 
     const user = await User.findById(userId);
     
@@ -126,6 +137,30 @@ exports.updateChatStatus = async (req, res) => {
     );
 
     res.status(200).json({ message: "Chat status updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Toggle AI on/off for a specific customer chat
+// @route   POST /api/chats/toggle-ai
+exports.toggleAiForChat = async (req, res) => {
+  try {
+    const { customerPhone, isAiPaused } = req.body;
+    const userId = req.user?._id || req.user?.id;
+    
+    if (!userId || !customerPhone) return res.status(400).json({ message: 'Missing parameters' });
+    
+    // Agar Pause karna hai toh 10 saal ke liye pause kardo (Effectively Manual Off)
+    const pauseUntil = isAiPaused ? new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000) : null;
+    
+    await Lead.findOneAndUpdate(
+      { phoneNumber: customerPhone.replace(/\D/g, ''), userId: userId },
+      { $set: { isAiPaused: isAiPaused, aiPausedUntil: pauseUntil } },
+      { upsert: true }
+    );
+    
+    res.status(200).json({ success: true, isAiPaused, message: isAiPaused ? "AI has been paused for this chat." : "AI has been resumed for this chat." });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
