@@ -195,9 +195,6 @@ export default function Catalog() {
         <div className="space-y-6">
           <div className="bg-[#111111] border border-blue-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl"></div>
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
-               <span className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded font-bold uppercase tracking-widest border border-gray-600 shadow-xl">Feature in Development</span>
-            </div>
             <h2 className="text-xl font-bold text-white mb-2">Pending Quotation Approvals</h2>
             <p className="text-gray-400 text-sm mb-6">AI has matched the customer's request with your Excel sheet. Enter your rates and approve the quote.</p>
             
@@ -223,9 +220,6 @@ export default function Catalog() {
         </div>
       ) : (
         <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
-             <span className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded font-bold uppercase tracking-widest border border-gray-600 shadow-xl">Feature in Development</span>
-          </div>
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
               <tr className="bg-[#1a1a1a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
