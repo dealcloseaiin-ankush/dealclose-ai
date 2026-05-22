@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const campaignController = require('../controllers/campaignController');
-const { protect } = require('../middlewares/authMiddleware'); // Make sure this middleware exists
+
+// FORCE FIX: Ensured 'middleware' folder name has no 's'
+const { protect } = require('../middleware/authMiddleware'); 
 
 router.post('/generate', protect, campaignController.generateCampaign);
 router.get('/', protect, campaignController.getCampaigns);
