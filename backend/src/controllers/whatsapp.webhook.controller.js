@@ -90,11 +90,15 @@ exports.handleWhatsApp = async (req, res) => {
           console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
           
           // 🚀 NEW: AUTO-ADD EVERY SENDER TO CRM (So it shows on your board immediately)
-          await Lead.findOneAndUpdate(
-            { phoneNumber: fromNumber, userId: user._id },
-            { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new' } },
-            { upsert: true, new: true }
-          );
+          try {
+            await Lead.findOneAndUpdate(
+              { phoneNumber: fromNumber, userId: user._id },
+              { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new' } },
+              { upsert: true, new: true }
+            );
+          } catch (leadErr) {
+            console.error("❌ [Webhook] Error auto-saving Lead to CRM:", leadErr.message);
+          }
 
           if (msg.type === 'image') {
             const mediaId = msg.image.id;
@@ -123,11 +127,20 @@ exports.handleWhatsApp = async (req, res) => {
             if (selectedContext.startsWith('workspace_')) {
               const workspaceId = selectedContext.replace('workspace_', ''); // e.g., '12345'
               
-              // TODO: Future me hum DB se us workspaceId ki detail nikalenge
-              // aur us particular business ka welcome message bhejenge.
-              // Sath hi is chat/lead me tag laga denge ki ye is workspace ki hai.
+              // Save the selected business division in DB
+              await Lead.findOneAndUpdate(
+                { phoneNumber: fromNumber, userId: user._id },
+                { $set: { lastSelectedWorkspaceId: workspaceId } }
+              );
               
-              responseMessage = "You have selected this business profile. How can I assist you further today?";
+              const currentLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+              
+              // 🔥 SMART AUTOMATION: Ask for name automatically WITHOUT using AI (0 Cost)
+              if (currentLead && currentLead.name && currentLead.name.startsWith('User ')) {
+                responseMessage = "Thank you for choosing this division! 🏢\n\nBefore we proceed, could you please reply with your *Full Name* and *City*? (e.g., Rahul Sharma, Delhi)";
+              } else {
+                responseMessage = `Welcome back, ${currentLead.name.split(' ')[0]}! How can I assist you further today?`;
+              }
             }
 
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
@@ -266,7 +279,11 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 }
 
-                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk. If asked about unrelated topics, steer back to business immediately or ignore.\n3. When asking multiple-choice questions, ALWAYS use the 'send_whatsapp_menu' tool (max 3 options) instead of typing options in text. This saves user time and API tokens. Ask one question at a time.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
+                // CHECK IF WE ALREADY KNOW THE CUSTOMER'S NAME
+                const isNameKnown = lead && lead.name && !lead.name.startsWith('User ');
+                const customerNameContext = isNameKnown ? lead.name : "Unknown";
+
+                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk. If asked about unrelated topics, steer back to business immediately or ignore.\n3. When asking multiple-choice questions, ALWAYS use the 'send_whatsapp_menu' tool (max 3 options) instead of typing options in text. This saves user time and API tokens. Ask one question at a time.\n4. LEAD CAPTURE: If the user provides their name and city, ALWAYS use the 'update_customer_profile' tool to save it in the database immediately.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
                 
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
                 if (user.aiCredits > 0 && user.aiCredits <= 200) {
@@ -279,7 +296,15 @@ exports.handleWhatsApp = async (req, res) => {
                   for (const toolCall of aiMessage.tool_calls) {
                     if (toolCall.function.name === "extract_lead_requirements") {
                       const leadData = JSON.parse(toolCall.function.arguments);
-                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { userId: user._id, name: "New AI Lead", source: leadData.category, status: "interested", notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` }, { returnDocument: 'after', upsert: true });
+                      
+                      const updateFields = { 
+                        userId: user._id, 
+                        source: leadData.category || 'WhatsApp AI', 
+                        status: "interested", 
+                        notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` 
+                      };
+                      
+                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { $set: updateFields }, { returnDocument: 'after', upsert: true });
                       responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`;
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "trigger_outbound_call") {
@@ -304,6 +329,19 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "check_order_status") {
                       responseMessage = "Let me check the dispatch system for your number. Your order is currently being processed and will be shipped soon!";
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "update_customer_profile") {
+                      const profileData = JSON.parse(toolCall.function.arguments);
+                      // Keeping the unique ID with the name as requested by you to prevent duplicate name issues
+                      const uniqueSuffix = fromNumber.slice(-4);
+                      const newName = `${profileData.fullName} (ID: ${uniqueSuffix})`;
+                      
+                      await Lead.findOneAndUpdate(
+                        { phoneNumber: fromNumber, userId: user._id }, 
+                        { $set: { name: newName } }
+                      );
+                      
+                      responseMessage = `Thanks, ${profileData.fullName}! I've updated your profile. How can I help you today?`;
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);

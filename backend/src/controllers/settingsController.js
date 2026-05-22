@@ -43,7 +43,7 @@ exports.saveSettings = async (req, res) => {
     if (updates.pinCode !== undefined) updateData.servedPinCodes = [updates.pinCode];
     if (updates.businessDesc !== undefined) updateData.businessDescription = updates.businessDesc;
     if (updates.businessDescription !== undefined) updateData.businessDescription = updates.businessDescription;
-    if (updates.businessName !== undefined) updateData.businessName = updates.businessName;
+    if (updates.businessName !== undefined) updateData.businessName = updates.businessName.trim() === '' ? 'Main Business' : updates.businessName;
     if (updates.aiRules !== undefined) updateData.aiRules = updates.aiRules;
     if (updates.fallbackAction !== undefined) updateData.fallbackAction = updates.fallbackAction;
     if (updates.aiAgentEnabled !== undefined) updateData.aiAgentEnabled = updates.aiAgentEnabled;

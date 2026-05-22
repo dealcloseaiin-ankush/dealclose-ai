@@ -72,6 +72,8 @@ exports.getLeadAnalytics = async (req, res) => {
     const converted = await Lead.countDocuments({ userId, status: 'converted' });
     const interested = await Lead.countDocuments({ userId, status: 'interested' });
     const ignored = await Lead.countDocuments({ userId, status: 'ignored' });
+    const newLeads = await Lead.countDocuments({ userId, status: 'new' });
+    const lost = await Lead.countDocuments({ userId, status: 'lost' });
     
     // Calculations
     const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : 0;
@@ -82,9 +84,10 @@ exports.getLeadAnalytics = async (req, res) => {
     const costPerLead = totalLeads > 0 ? (totalInvestment / totalLeads).toFixed(2) : 0;
 
     const graphData = [
-      { name: 'Converted', value: converted },
+      { name: 'New (Chatting)', value: newLeads },
       { name: 'Interested', value: interested },
-      { name: 'Ignored', value: ignored }
+      { name: 'Converted', value: converted },
+      { name: 'Lost/Ignored', value: ignored + lost }
     ];
 
     res.status(200).json({

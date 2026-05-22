@@ -24,17 +24,21 @@ exports.getPipeline = async (req, res) => {
       const distinctPhones = await Message.distinct('customerPhone', { userId });
       for (const phone of distinctPhones) {
         if (!phone) continue;
-        const leadExists = await Lead.findOne({ phoneNumber: phone, userId });
-        const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
-        
-        if (!leadExists && !contactExists) {
-          await Lead.create({
-            userId,
-            phoneNumber: phone,
-            name: `User ${phone.slice(-4)}`,
-            source: 'WhatsApp (Old Chat)',
-            status: 'new'
-          });
+        try {
+          const leadExists = await Lead.findOne({ phoneNumber: phone, userId });
+          const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
+          
+          if (!leadExists && !contactExists) {
+            await Lead.create({
+              userId,
+              phoneNumber: phone,
+              name: `User ${phone.slice(-4)}`,
+              source: 'WhatsApp (Old Chat)',
+              status: 'new'
+            });
+          }
+        } catch (innerErr) {
+          console.error(`[CRM Sync] Skipping phone ${phone} due to error:`, innerErr.message);
         }
       }
     } catch (syncErr) {

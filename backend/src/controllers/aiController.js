@@ -96,7 +96,7 @@ exports.trainAI = async (req, res) => {
       updateQuery.$push = { trainingData: { question, answer, status: 'answered' } };
     }
     
-    if (workspaceId && workspaceId !== 'main') {
+    if (workspaceId && workspaceId !== 'main' && workspaceId !== 'main_business') {
       // Update Specific Workspace
       if (aiRules !== undefined) setQuery["workspaces.$.aiRules"] = aiRules;
       if (businessDescription !== undefined) setQuery["workspaces.$.businessDescription"] = businessDescription;
