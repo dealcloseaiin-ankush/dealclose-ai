@@ -60,7 +60,10 @@ app.use('/api/users', userRoutes); // Handles Profile & AI Training Rules
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
+
+// 👇 YAHAN PAR HAI AAPKA IMAGE UPLOAD ROUTE 👇
 app.use('/api/upload', uploadRoutes);
+
 app.use('/api/wallet', walletRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/campaigns', campaignRoutes);

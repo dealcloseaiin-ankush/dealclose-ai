@@ -1,3 +1,4 @@
+import DashboardAIAssistant from '../components/DashboardAIAssistant';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api'; // Assuming api service is set up
@@ -8,6 +9,8 @@ export default function WhatsAppTemplates() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [form, setForm] = useState({ name: '', category: 'MARKETING', language: 'en_US', headerType: 'NONE', headerText: '', headerMediaUrl: '', body: '', footerText: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [headerMediaFile, setHeaderMediaFile] = useState(null);
+  const [headerMediaPreview, setHeaderMediaPreview] = useState('');
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -25,18 +28,45 @@ export default function WhatsAppTemplates() {
     fetchTemplates();
   }, []);
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setHeaderMediaFile(file);
+      setHeaderMediaPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmitToMeta = async () => {
     if(!form.name || !form.body) return alert("Template name and body are required!");
     
     setSubmitting(true);
     try {
+      let finalMediaUrl = form.headerMediaUrl;
+      
+      // 1. Upload to Cloudinary via Backend if an image is selected
+      if (form.headerType === 'IMAGE' && headerMediaFile) {
+        const formData = new FormData();
+        formData.append('file', headerMediaFile);
+        
+        try {
+          const uploadRes = await api.post('/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          finalMediaUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+        } catch (uploadErr) {
+          console.error("Upload error", uploadErr);
+          alert("Image upload failed! Please ensure backend /upload API is configured.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       // Build Meta Components Array
       const components = [];
       if(form.headerType === 'TEXT' && form.headerText) {
         components.push({ type: "HEADER", format: "TEXT", text: form.headerText });
       } else if (form.headerType === 'IMAGE') {
-        // For images, Meta usually requires an example handle or URL for review
-        components.push({ type: "HEADER", format: "IMAGE", example: { header_handle: [form.headerMediaUrl || "https://example.com/image.jpg"] } });
+        components.push({ type: "HEADER", format: "IMAGE", example: { header_handle: [finalMediaUrl || "https://example.com/image.jpg"] } });
       }
 
       components.push({ type: "BODY", text: form.body });
@@ -142,7 +172,15 @@ export default function WhatsAppTemplates() {
                 <input type="text" value={form.headerText} onChange={e => setForm({...form, headerText: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none" placeholder="Bold short title (e.g. MEGA SALE!)" maxLength={60}/>
               )}
               {form.headerType === 'IMAGE' && (
-                <input type="text" value={form.headerMediaUrl} onChange={e => setForm({...form, headerMediaUrl: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none" placeholder="Paste Image URL for Preview & Meta Review..." />
+              <div className="mt-2">
+                <input type="file" accept="image/*" onChange={handleImageChange} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-500/10 file:text-green-400 hover:file:bg-green-500/20" />
+                {headerMediaPreview && (
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-1">Selected Image Preview:</p>
+                    <img src={headerMediaPreview} alt="Preview" className="h-32 w-auto rounded border border-gray-700 object-cover" />
+                  </div>
+                )}
+              </div>
               )}
             </div>
 
@@ -186,7 +224,7 @@ export default function WhatsAppTemplates() {
               {/* The Message Bubble */}
               <div className="bg-white text-gray-800 p-3 rounded-lg rounded-tl-none shadow-sm max-w-[90%] break-words">
                 {form.headerType === 'IMAGE' && (
-                  <img src={form.headerMediaUrl || "https://developers.facebook.com/docs/whatsapp/images/thumb.png"} alt="Header" className="w-full h-32 object-cover rounded-t-md mb-2 bg-gray-200" />
+                <img src={headerMediaPreview || "https://developers.facebook.com/docs/whatsapp/images/thumb.png"} alt="Header" className="w-full h-32 object-cover rounded-t-md mb-2 bg-gray-200" />
                 )}
                 {form.headerType === 'TEXT' && form.headerText && (
                   <div className="font-bold text-[15px] mb-1">{form.headerText}</div>
@@ -205,6 +243,9 @@ export default function WhatsAppTemplates() {
             </div>
           </div>
         </div>
+      
+      {/* 👇 AI Chatbot Widget (Naya Template Banate Time) 👇 */}
+      <DashboardAIAssistant />
       </div>
     );
   }
