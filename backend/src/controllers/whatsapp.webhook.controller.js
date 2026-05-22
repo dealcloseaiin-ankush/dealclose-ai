@@ -91,11 +91,13 @@ exports.handleWhatsApp = async (req, res) => {
           
           // 🚀 NEW: AUTO-ADD EVERY SENDER TO CRM (So it shows on your board immediately)
           try {
-            await Lead.findOneAndUpdate(
+            console.log(`[Webhook Debug] Attempting to save Lead ${fromNumber} for user ${user._id}`);
+            const savedLead = await Lead.findOneAndUpdate(
               { phoneNumber: fromNumber, userId: user._id },
               { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new' } },
               { upsert: true, new: true }
             );
+            console.log(`✅ [Webhook Debug] Lead saved/verified in CRM (ID: ${savedLead._id})`);
           } catch (leadErr) {
             console.error("❌ [Webhook] Error auto-saving Lead to CRM:", leadErr.message);
           }

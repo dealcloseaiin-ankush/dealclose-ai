@@ -8,7 +8,9 @@ const { automationQueue } = require('../workers/automationWorker');
 // @route   GET /api/crm/pipeline
 exports.getPipeline = async (req, res) => {
   try {
-    const userId = req.user._id; // Auth middleware se aayega
+    const userId = req.user?._id || req.user?.id; // BUG FIX: Token me 'id' hota hai, '_id' nahi
+    
+    console.log(`\n🔍 [CRM Debug] Fetching pipeline for user: ${userId}`);
 
     const leads = await Lead.find({ userId })
       .sort({ updatedAt: -1 })
@@ -19,9 +21,12 @@ exports.getPipeline = async (req, res) => {
       .sort({ updatedAt: -1 })
       .lean();
       
+    console.log(`📊 [CRM Debug] Found ${leads.length} Leads and ${contacts.length} Contacts in DB.`);
+
     // 🚀 NEW: AUTO-SYNC OLD CHATS TO CRM
     try {
       const distinctPhones = await Message.distinct('customerPhone', { userId });
+      console.log(`📱 [CRM Debug] Found ${distinctPhones.length} distinct phone numbers in Chat History.`);
       for (const phone of distinctPhones) {
         if (!phone) continue;
         try {
@@ -36,6 +41,7 @@ exports.getPipeline = async (req, res) => {
               source: 'WhatsApp (Old Chat)',
               status: 'new'
             });
+            console.log(`✅ [CRM Debug] Auto-created new Lead for missing phone: ${phone}`);
           }
         } catch (innerErr) {
           console.error(`[CRM Sync] Skipping phone ${phone} due to error:`, innerErr.message);
@@ -93,7 +99,7 @@ exports.getPipeline = async (req, res) => {
 // @route   PUT /api/crm/contacts/:id/stage
 exports.updateStage = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?._id || req.user?.id;
     const { id } = req.params;
     const { newStage, reason } = req.body;
 

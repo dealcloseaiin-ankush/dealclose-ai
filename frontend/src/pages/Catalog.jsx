@@ -18,6 +18,9 @@ export default function Catalog() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', price: '', description: '' });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // 🚀 DEBUGGING: Fetch actual catalog from backend
   useEffect(() => {
@@ -37,17 +40,40 @@ export default function Catalog() {
     fetchCatalog();
   }, []);
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleAddItem = async (e) => {
     e.preventDefault();
     if (!formData.name) return;
     
     console.log("➡️ [DEBUG] Attempting to save new catalog item:", formData);
+    setSubmitting(true);
+    
     try {
+      let finalImageUrl = '';
+      // Upload Image to Cloudinary first if selected
+      if (imageFile) {
+        const uploadData = new FormData();
+        uploadData.append('file', imageFile);
+        const uploadRes = await api.post('/upload', uploadData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        finalImageUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+      }
+
       // Fallback local state update for MVP
-      const newItem = { ...formData, _id: Date.now().toString() };
+      const newItem = { ...formData, imageUrl: finalImageUrl, _id: Date.now().toString() };
       // await api.post('/catalog', formData); // Future backend call
       setItems([...items, newItem]);
       
+      setImageFile(null);
+      setImagePreview('');
       setIsModalOpen(false);
       setFormData({ name: '', price: '', description: '' });
       toast.success("Item added to AI Brain!");
@@ -55,6 +81,8 @@ export default function Catalog() {
     } catch (error) {
       console.error("❌ [DEBUG] Failed to save item:", error);
       toast.error("Failed to add item. Check console.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -93,6 +121,15 @@ export default function Catalog() {
             <h2 className="text-2xl font-bold text-white mb-6">Add New Catalog Item</h2>
             <form onSubmit={handleAddItem} className="space-y-4">
               <div>
+                <label className="block text-sm text-gray-400 mb-1">Product Image</label>
+                <input type="file" accept="image/*" onChange={handleImageChange} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-500/10 file:text-purple-400 hover:file:bg-purple-500/20 w-full" />
+                {imagePreview && (
+                  <div className="mt-3">
+                    <img src={imagePreview} alt="Preview" className="h-24 w-24 rounded-lg border border-gray-700 object-cover" />
+                  </div>
+                )}
+              </div>
+              <div>
                 <label className="block text-sm text-gray-400 mb-1">Item / Property Name</label>
                 <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder="e.g., Running Shoes / 3BHK Flat" />
               </div>
@@ -105,7 +142,9 @@ export default function Catalog() {
                 <textarea required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder="Details about this item..."></textarea>
               </div>
               <div className="pt-4">
-                <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30">Save to Catalog</button>
+                <button type="submit" disabled={submitting} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50">
+                  {submitting ? 'Uploading & Saving...' : 'Save to Catalog'}
+                </button>
               </div>
             </form>
           </div>
@@ -126,6 +165,7 @@ export default function Catalog() {
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
               <tr className="bg-[#1a1a1a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
+                <th className="p-5 font-semibold w-24">Image</th>
                 <th className="p-5 font-semibold">Item Name</th>
                 <th className="p-5 font-semibold">Price</th>
                 <th className="p-5 font-semibold w-1/2">AI Context / Description</th>
@@ -134,6 +174,13 @@ export default function Catalog() {
             <tbody className="divide-y divide-gray-800">
               {items.map(item => (
                 <tr key={item._id || item.id} className="hover:bg-gray-900/50 transition-colors">
+                  <td className="p-5">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded object-cover border border-gray-700" />
+                    ) : (
+                      <div className="w-12 h-12 rounded bg-gray-800 flex items-center justify-center text-xl">📦</div>
+                    )}
+                  </td>
                   <td className="p-5 font-bold text-white">{item.name}</td>
                   <td className="p-5 text-green-400 font-semibold">{item.price}</td>
                   <td className="p-5 text-gray-400 text-sm whitespace-normal">{item.description}</td>

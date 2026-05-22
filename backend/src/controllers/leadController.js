@@ -1,5 +1,6 @@
 const Lead = require('../models/leadModel');
 const aiService = require('../services/aiService');
+const mongoose = require('mongoose');
 
 // @desc    Get all leads
 // @route   GET /api/leads
@@ -65,8 +66,11 @@ exports.exportLeads = async (req, res) => {
 // @route   GET /api/leads/analytics
 exports.getLeadAnalytics = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : null;
+    const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: "Not authorized" });
+
+    console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}`);
+    const userIdObj = new mongoose.Types.ObjectId(userId);
 
     const totalLeads = await Lead.countDocuments({ userId });
     const converted = await Lead.countDocuments({ userId, status: 'converted' });
@@ -74,6 +78,8 @@ exports.getLeadAnalytics = async (req, res) => {
     const ignored = await Lead.countDocuments({ userId, status: 'ignored' });
     const newLeads = await Lead.countDocuments({ userId, status: 'new' });
     const lost = await Lead.countDocuments({ userId, status: 'lost' });
+    
+    console.log(`📊 [Lead Analytics Debug] Found -> New: ${newLeads}, Interested: ${interested}, Converted: ${converted}, Lost/Ignored: ${lost + ignored}`);
     
     // Calculations
     const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : 0;
@@ -90,9 +96,34 @@ exports.getLeadAnalytics = async (req, res) => {
       { name: 'Lost/Ignored', value: ignored + lost }
     ];
 
+    // 🚀 NEW: Lead Source Breakdown (Bar Chart)
+    const leadsBySource = await Lead.aggregate([
+      { $match: { userId: userIdObj } },
+      { $group: { _id: '$source', count: { $sum: 1 } } },
+      { $project: { name: '$_id', leads: '$count', _id: 0 } },
+      { $sort: { leads: -1 } }
+    ]);
+
+    // 🚀 NEW: Daily Lead Trend (Line Chart for last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const dailyLeadsData = await Lead.aggregate([
+        { $match: { userId: userIdObj, createdAt: { $gte: sevenDaysAgo } } },
+        {
+            $group: {
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                count: { $sum: 1 }
+            }
+        },
+        { $sort: { _id: 1 } },
+        { $project: { date: '$_id', leads: '$count', _id: 0 } }
+    ]);
+
     res.status(200).json({
       stats: { totalLeads, converted, conversionRate, totalInvestment, costPerLead },
-      graphData
+      graphData,
+      leadsBySource,
+      dailyLeads: dailyLeadsData
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

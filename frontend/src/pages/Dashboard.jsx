@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line, AreaChart, Area } from 'recharts';
 import { useAuth } from '../hooks/useAuth';
 import DashboardAIAssistant from '../components/DashboardAIAssistant'; // Import the AI Chat Assistant
 
@@ -31,7 +31,7 @@ function StatCard({ title, value, trend, trendUp, icon, color }) {
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const COLORS = ['#10B981', '#3B82F6', '#EF4444']; // Green, Blue, Red
+  const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']; // Blue, Green, Amber, Red
   const { user } = useAuth() || {};
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
 
@@ -146,23 +146,64 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
         
         {/* Lead Categorization Chart */}
-        <div className="lg:col-span-2 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl"></div>
           <h3 className="text-lg font-bold text-white mb-6">AI Lead Categorization</h3>
           
           <div className="w-full pt-4 relative z-10">
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={data.graphData} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                <Pie data={data.graphData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={false}>
                   {data.graphData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '10px', color: '#fff' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', color: '#fff' }} />
+                <Legend iconType="circle" />
               </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Daily Lead Trend Chart */}
+        <div className="lg:col-span-2 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
+          <h3 className="text-lg font-bold text-white mb-6">New Leads (Last 7 Days)</h3>
+          <div className="w-full pt-4 relative z-10">
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={data.dailyLeads} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                <XAxis dataKey="date" stroke="#888" fontSize={12} tickFormatter={(str) => str.substring(5)} />
+                <YAxis stroke="#888" fontSize={12} />
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '10px' }} />
+                <Area type="monotone" dataKey="leads" name="New Leads" stroke="#3b82f6" fillOpacity={1} fill="url(#colorLeads)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Lead Source Breakdown */}
+        <div className="lg:col-span-2 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl"></div>
+          <h3 className="text-lg font-bold text-white mb-6">Lead Sources Breakdown</h3>
+          <div className="w-full pt-4 relative z-10">
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data.leadsBySource} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                <XAxis dataKey="name" stroke="#888" fontSize={12} />
+                <YAxis stroke="#888" fontSize={12} />
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '10px' }} cursor={{fill: '#1a1a1a'}} />
+                <Bar dataKey="leads" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
