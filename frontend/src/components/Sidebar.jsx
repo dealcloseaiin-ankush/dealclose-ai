@@ -26,28 +26,28 @@ export default function Sidebar() {
         { name: 'Dashboard', path: '/dashboard', icon: '📊' },
         { name: 'Inbox (Chats)', path: '/chats', icon: '💬', badge: unreadCount },
         { name: 'Contacts', path: '/contacts', icon: '👥' },
-        { name: 'Catalog', path: '/catalog', icon: '🛍️' },
+        { name: 'Catalog', path: '/catalog', icon: '🛍️', comingSoon: true },
         { name: 'CRM', path: '/crm', icon: '🗂️' },
-        { name: 'Campaigns', path: '/campaigns', icon: '📢' },
+        { name: 'Campaigns', path: '/campaigns', icon: '📢', comingSoon: true },
         { name: 'Templates', path: '/templates', icon: '📄' }
       ]
     },
     {
       title: 'AUTOMATION',
       items: [
-        { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
-        { name: 'Automations', path: '/automations', icon: '🔁' },
-        { name: 'Instagram', path: '/instagram-automation', icon: '📸' }
+        { name: 'Flow Builder', path: '/flow-builder', icon: '🤖', comingSoon: true },
+        { name: 'Automations', path: '/automations', icon: '🔁', comingSoon: true },
+        { name: 'Instagram', path: '/instagram-automation', icon: '📸', comingSoon: true }
       ]
     },
     {
       title: 'INTELLIGENCE',
       items: [
         { name: 'AI Agent', path: '/ai-agent', icon: '🧠' },
-        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: '📈' },
-        { name: 'Order Dispatch', path: '/dispatch', icon: '📦' },
-        { name: 'Calls', path: '/calls', icon: '📞' },
-        { name: 'Analytics', path: '/monthly-report', icon: '📈' }
+        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: '📈', comingSoon: true },
+        { name: 'Order Dispatch', path: '/dispatch', icon: '📦', comingSoon: true },
+        { name: 'Calls', path: '/calls', icon: '📞', comingSoon: true },
+        { name: 'Analytics', path: '/monthly-report', icon: '📈', comingSoon: true }
       ]
     },
     {
@@ -95,16 +95,18 @@ export default function Sidebar() {
                 return (
                   <li key={item.name}>
                     <Link
-                      to={item.path}
-                      className={`flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${
-                        isActive 
-                          ? 'bg-gradient-to-r from-purple-500/10 to-transparent text-purple-400 font-bold border border-purple-500/20' 
-                          : 'text-gray-400 hover:bg-gray-900 hover:text-gray-100 font-medium'
-                      }`}
+                    to={item.comingSoon ? '#' : item.path}
+                    className={`flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${
+                      isActive && !item.comingSoon
+                        ? 'bg-gradient-to-r from-purple-500/10 to-transparent text-purple-400 font-bold border border-purple-500/20' 
+                        : 'text-gray-400 hover:bg-gray-900 hover:text-gray-100 font-medium'
+                    } ${item.comingSoon ? 'opacity-50 cursor-default' : ''}`}
+                    onClick={(e) => item.comingSoon && e.preventDefault()}
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-lg opacity-80">{item.icon}</span>
                         {item.name}
+                      {item.comingSoon && <span className="bg-gray-800 text-gray-400 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ml-1">Soon</span>}
                       </div>
                       {item.badge > 0 && (
                         <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30">

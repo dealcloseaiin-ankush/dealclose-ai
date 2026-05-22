@@ -1,5 +1,6 @@
 const Lead = require('../models/leadModel');
 const Contact = require('../models/contactModel');
+const Message = require('../models/messageModel');
 const CrmActivity = require('../models/CrmActivitymodel');
 const { automationQueue } = require('../workers/automationWorker');
 
@@ -17,6 +18,28 @@ exports.getPipeline = async (req, res) => {
     const contacts = await Contact.find({ userId })
       .sort({ updatedAt: -1 })
       .lean();
+      
+    // 🚀 NEW: AUTO-SYNC OLD CHATS TO CRM
+    try {
+      const distinctPhones = await Message.distinct('customerPhone', { userId });
+      for (const phone of distinctPhones) {
+        if (!phone) continue;
+        const leadExists = await Lead.findOne({ phoneNumber: phone, userId });
+        const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
+        
+        if (!leadExists && !contactExists) {
+          await Lead.create({
+            userId,
+            phoneNumber: phone,
+            name: `User ${phone.slice(-4)}`,
+            source: 'WhatsApp (Old Chat)',
+            status: 'new'
+          });
+        }
+      }
+    } catch (syncErr) {
+      console.error("Old chat sync error:", syncErr);
+    }
 
     // Default pipeline structure
     const pipeline = {

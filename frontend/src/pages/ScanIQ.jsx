@@ -49,7 +49,16 @@ export default function ScanIQ() {
   };
 
   return (
-    <div className="p-6 md:p-10 bg-[#050505] min-h-[calc(100vh-4rem)] text-gray-100 font-sans">
+    <div className="p-6 md:p-10 bg-[#050505] min-h-[calc(100vh-4rem)] text-gray-100 font-sans relative">
+      {/* Coming Soon Overlay */}
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#050505]/80 backdrop-blur-sm">
+        <div className="text-center p-8 bg-[#111] border border-orange-500/50 rounded-2xl shadow-2xl">
+          <h2 className="text-4xl font-black text-orange-500 mb-2">PRO ADD-ON</h2>
+          <p className="text-gray-300 font-bold text-lg mb-4">ScanIQ Competitor Analysis is Coming Soon!</p>
+          <p className="text-gray-500 text-sm">We are currently focused on the core WhatsApp Automation.</p>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="mb-10 text-center max-w-3xl mx-auto">
         <div className="inline-block p-3 bg-red-500/10 text-red-500 rounded-full mb-4">

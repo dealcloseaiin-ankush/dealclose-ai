@@ -16,8 +16,9 @@ export default function DigitalCard() {
   useEffect(() => {
     const getLinks = async () => {
       try {
-        const { data } = await api.get('/settings');
-        const savedData = data.data || data;
+        // Use the correct profile endpoint to avoid 404 error
+        const { data } = await api.get('/users/profile');
+        const savedData = data.user || data.data || data;
         
         const queryParams = new URLSearchParams(location.search);
         const wsIndex = queryParams.get('ws');

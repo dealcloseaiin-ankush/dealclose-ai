@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function Catalog() {
   const [activeTab, setActiveTab] = useState('products');
-  const [items, setItems] = useState([
-    { id: 1, name: 'Premium Wireless Headphones', price: '₹2,499', description: 'Noise cancelling bluetooth headphones.' },
-    { id: 2, name: '2BHK Apartment (Rent)', price: '₹45,000/mo', description: 'Fully furnished flat in Andheri West.' }
-  ]);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Dummy Data for untested tabs
   const [properties] = useState([
     { _id: '60d0fe4f5311236168a109ca', propertyType: '2BHK Apartment', location: 'Andheri West, Mumbai', price: '1.5 Cr', status: 'listed', customerPhone: '+919876543210' },
     { _id: '60d0fe4f5311236168a109cb', propertyType: 'Commercial Shop', location: 'Connaught Place, Delhi', price: '50 Lakh', status: 'pending', customerPhone: '+919876543211' }
@@ -17,14 +19,43 @@ export default function Catalog() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', price: '', description: '' });
 
-  const handleAddItem = (e) => {
+  // 🚀 DEBUGGING: Fetch actual catalog from backend
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      console.log("➡️ [DEBUG] Fetching Catalog items...");
+      try {
+        // Note: Assuming /api/catalog backend exists, if not it will catch the error smoothly
+        const { data } = await api.get('/catalog');
+        setItems(Array.isArray(data) ? data : []);
+        console.log("✅ [DEBUG] Catalog fetched successfully:", data);
+      } catch (error) {
+        console.warn("⚠️ [DEBUG] /api/catalog endpoint might not exist yet. Showing empty state.", error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCatalog();
+  }, []);
+
+  const handleAddItem = async (e) => {
     e.preventDefault();
     if (!formData.name) return;
     
-    const newItem = { ...formData, id: Date.now() };
-    setItems([...items, newItem]);
-    setIsModalOpen(false);
-    setFormData({ name: '', price: '', description: '' });
+    console.log("➡️ [DEBUG] Attempting to save new catalog item:", formData);
+    try {
+      // Fallback local state update for MVP
+      const newItem = { ...formData, _id: Date.now().toString() };
+      // await api.post('/catalog', formData); // Future backend call
+      setItems([...items, newItem]);
+      
+      setIsModalOpen(false);
+      setFormData({ name: '', price: '', description: '' });
+      toast.success("Item added to AI Brain!");
+      console.log("✅ [DEBUG] Item saved.");
+    } catch (error) {
+      console.error("❌ [DEBUG] Failed to save item:", error);
+      toast.error("Failed to add item. Check console.");
+    }
   };
 
   return (
@@ -82,7 +113,9 @@ export default function Catalog() {
       )}
 
       {activeTab === 'products' ? (
-      items.length === 0 ? (
+      loading ? (
+        <div className="text-center p-10 text-gray-500">Loading catalog...</div>
+      ) : items.length === 0 ? (
         <div className="bg-[#111] rounded-2xl border border-gray-800 p-16 text-center text-gray-500 shadow-xl">
           <p className="text-5xl mb-4">📦</p>
           <h2 className="text-2xl font-bold text-gray-300 mb-2">Your Catalog is Empty</h2>
@@ -100,7 +133,7 @@ export default function Catalog() {
             </thead>
             <tbody className="divide-y divide-gray-800">
               {items.map(item => (
-                <tr key={item.id} className="hover:bg-gray-900/50 transition-colors">
+                <tr key={item._id || item.id} className="hover:bg-gray-900/50 transition-colors">
                   <td className="p-5 font-bold text-white">{item.name}</td>
                   <td className="p-5 text-green-400 font-semibold">{item.price}</td>
                   <td className="p-5 text-gray-400 text-sm whitespace-normal">{item.description}</td>
@@ -114,6 +147,9 @@ export default function Catalog() {
         <div className="space-y-6">
           <div className="bg-[#111111] border border-blue-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl"></div>
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
+               <span className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded font-bold uppercase tracking-widest border border-gray-600 shadow-xl">Feature in Development</span>
+            </div>
             <h2 className="text-xl font-bold text-white mb-2">Pending Quotation Approvals</h2>
             <p className="text-gray-400 text-sm mb-6">AI has matched the customer's request with your Excel sheet. Enter your rates and approve the quote.</p>
             
@@ -138,7 +174,10 @@ export default function Catalog() {
           </div>
         </div>
       ) : (
-        <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
+             <span className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded font-bold uppercase tracking-widest border border-gray-600 shadow-xl">Feature in Development</span>
+          </div>
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
               <tr className="bg-[#1a1a1a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">

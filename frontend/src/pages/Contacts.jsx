@@ -16,11 +16,18 @@ export default function Contacts() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [contactsRes, segmentsRes] = await Promise.all([
-          api.get('/contacts').catch(() => ({ data: [] })),
+        const [pipelineRes, segmentsRes] = await Promise.all([
+          api.get('/crm/pipeline').catch(() => ({ data: { data: {} } })),
           api.get('/contacts/segments').catch(() => ({ data: [] }))
         ]);
-        setContacts(Array.isArray(contactsRes.data) ? contactsRes.data : []);
+        
+        const allContacts = [];
+        if (pipelineRes.data && pipelineRes.data.data) {
+          Object.values(pipelineRes.data.data).forEach(arr => {
+            if (Array.isArray(arr)) allContacts.push(...arr);
+          });
+        }
+        setContacts(allContacts);
         setSmartSegments(Array.isArray(segmentsRes.data) ? segmentsRes.data : []);
       } catch (error) {
         console.error("Failed to load contacts", error);
@@ -33,7 +40,7 @@ export default function Contacts() {
 
   const columns = [
     { header: 'Name', accessor: 'name' },
-    { header: 'WhatsApp Number', accessor: 'phone' },
+    { header: 'WhatsApp Number', render: (row) => row.phoneNumber || row.phone },
     { header: 'Source', accessor: 'source' },
     { 
       header: 'Status', 

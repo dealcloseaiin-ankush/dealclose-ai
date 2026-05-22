@@ -98,7 +98,7 @@ export default function Pricing() {
               <p className="text-xs text-gray-400 mb-4 flex-1">Extract high-quality business leads (shops, clinics, B2B) directly from Google Maps.</p>
               <div className="text-xl font-bold text-white mb-4">₹10<span className="text-xs text-gray-500">/Page</span></div>
               <ul className="text-xs text-gray-300 space-y-2 mb-4 pb-4 border-b border-gray-800">
-                <li className="flex items-start gap-1"><CheckCircle size={14} className="text-emerald-500 mt-0.5 shrink-0"/> <strong className="text-white">Free Trial:</strong> 40 Leads (2 Pages)</li>
+                <li className="flex items-start gap-1"><span className="bg-gray-800 text-xs px-2 py-0.5 rounded font-bold text-emerald-400">Coming Soon</span></li>
                 <li className="flex items-start gap-1"><CheckCircle size={14} className="text-gray-500 mt-0.5 shrink-0"/> ₹10 per search (up to 20 leads)</li>
                 <li className="flex items-start gap-1"><CheckCircle size={14} className="text-gray-500 mt-0.5 shrink-0"/> Direct CRM Import</li>
                 <li className="flex items-start gap-1"><CheckCircle size={14} className="text-rose-500 mt-0.5 shrink-0"/> Min. Wallet Recharge: ₹500</li>
@@ -112,8 +112,7 @@ export default function Pricing() {
               <p className="text-xs text-gray-400 mb-4 flex-1">Omnichannel NLP Agent that handles spelling mistakes, answers complex queries, and negotiates contextually.</p>
               <div className="text-xl font-bold text-white mb-4">₹499<span className="text-xs text-gray-500">/mo</span></div>
               <ul className="text-xs text-gray-300 space-y-2 mb-4 pb-4 border-b border-gray-800">
-                <li>• 14-Day Trial (30 Comments Free)</li>
-                <li>• Token limits apply for fair usage</li>
+                <li><span className="bg-gray-800 text-xs px-2 py-0.5 rounded font-bold text-purple-400">Coming Soon</span></li>
               </ul>
               <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors"><Plus size={14} className="inline mr-1"/> Add to Plan</button>
             </div>
@@ -124,9 +123,7 @@ export default function Pricing() {
               <p className="text-xs text-gray-400 mb-4 flex-1">Outbound AI calls (Exotel/Twilio) to negotiate and qualify high-ticket leads automatically.</p>
               <div className="text-xl font-bold text-white mb-4">From ₹99<span className="text-xs text-gray-500">/mo</span></div>
               <ul className="text-xs text-gray-300 space-y-2 mb-4 pb-4 border-b border-gray-800">
-                <li>• Starter: ₹99 for 10 mins</li>
-                <li>• Pro: ₹499 for 60 mins</li>
-                <li>• Elite: ₹1999 for 400 mins</li>
+                <li><span className="bg-gray-800 text-xs px-2 py-0.5 rounded font-bold text-orange-400">Coming Soon</span></li>
               </ul>
               <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors"><Plus size={14} className="inline mr-1"/> Add to Plan</button>
             </div>
@@ -137,9 +134,7 @@ export default function Pricing() {
               <p className="text-xs text-gray-400 mb-4 flex-1">Auto-track post views, analyze comments, extract leads for the brand, and pitch repeat ads.</p>
               <div className="text-xl font-bold text-white mb-4">₹100<span className="text-xs text-gray-500">/Brand</span></div>
               <ul className="text-xs text-gray-300 space-y-2 mb-4 pb-4 border-b border-gray-800">
-                <li>• Data & CRM sharing with Brand</li>
-                <li>• AI automatically pitches repeat ads</li>
-                <li>• Includes ScanIQ ad tracking</li>
+                <li><span className="bg-gray-800 text-xs px-2 py-0.5 rounded font-bold text-blue-400">Coming Soon</span></li>
               </ul>
               <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors"><Plus size={14} className="inline mr-1"/> Add to Plan</button>
             </div>
@@ -150,9 +145,7 @@ export default function Pricing() {
               <p className="text-xs text-gray-400 mb-4 flex-1">Turn text/images into cinematic ads or create talking AI avatars for marketing.</p>
               <div className="text-xl font-bold text-white mb-4">From ₹499<span className="text-xs text-gray-500">/mo</span></div>
               <ul className="text-xs text-gray-300 space-y-2 mb-4 pb-4 border-b border-gray-800">
-                <li>• Coming Soon 🚀</li>
-                <li>• Pay per Video (Replicate API)</li>
-                <li>• Auto-post to Instagram</li>
+                <li><span className="bg-gray-800 text-xs px-2 py-0.5 rounded font-bold text-pink-400">Coming Soon</span></li>
               </ul>
               <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors"><Plus size={14} className="inline mr-1"/> Notify Me</button>
             </div>
