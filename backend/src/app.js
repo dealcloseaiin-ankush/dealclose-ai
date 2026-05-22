@@ -21,6 +21,9 @@ const dispatchRoutes = require('./routes/dispatchRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const crmRoutes = require('./routes/crmRoutes');
 const videoRoutes = require('./routes/videoRoutes');
+const catalogRoutes = require('./routes/catalogRoutes');
+const trackingRoutes = require('./routes/trackingRoutes');
+const trackingController = require('./controllers/trackingController');
 
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
@@ -71,6 +74,11 @@ app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/crm', crmRoutes);
 app.use('/api/video', videoRoutes);
+app.use('/api/catalog', catalogRoutes);
+app.use('/api/tracking', trackingRoutes);
+
+// Direct route for the Universal Tracking Pixel script
+app.get('/api/pixel.js', trackingController.servePixel);
 
 // Mount Modular Features
 app.use('/api/scaniq', scaniqRoutes);

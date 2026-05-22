@@ -67,10 +67,11 @@ export default function Catalog() {
         finalImageUrl = uploadRes.data.url || uploadRes.data.imageUrl;
       }
 
-      // Fallback local state update for MVP
-      const newItem = { ...formData, imageUrl: finalImageUrl, _id: Date.now().toString() };
-      // await api.post('/catalog', formData); // Future backend call
-      setItems([...items, newItem]);
+      // 🚀 Save to Real Database via Backend
+      const payload = { ...formData, imageUrl: finalImageUrl };
+      const res = await api.post('/catalog', payload);
+      
+      setItems([res.data, ...items]);
       
       setImageFile(null);
       setImagePreview('');

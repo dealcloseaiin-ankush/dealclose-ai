@@ -40,8 +40,26 @@ export function ChatHeaderToggle({ customerPhone, initialAiStatus = false }) {
 
 // 💡 UI SNIPPET FOR MESSAGE BUBBLE (AI BADGE)
 export function MessageBubble({ message }) {
+  // Format time (e.g. "10:30 AM")
+  const timeStr = message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Ticks for outgoing messages
+  let StatusIcon = null;
+  if (message.direction === 'outgoing') {
+    if (message.status === 'read') {
+      StatusIcon = <span className="text-blue-500 font-bold ml-1 text-[10px]">✓✓</span>;
+    } else if (message.status === 'delivered') {
+      StatusIcon = <span className="text-gray-400 font-bold ml-1 text-[10px]">✓✓</span>;
+    } else if (message.status === 'failed') {
+      StatusIcon = <span className="text-red-500 font-bold ml-1 text-[10px]">⚠️</span>;
+    } else {
+      // sent
+      StatusIcon = <span className="text-gray-400 font-bold ml-1 text-[10px]">✓</span>;
+    }
+  }
+
   return (
-    <div className={`p-3 max-w-sm rounded-xl mb-2 ${message.direction === 'outgoing' ? 'bg-blue-100 ml-auto' : 'bg-gray-100 mr-auto'}`}>
+    <div className={`p-3 max-w-sm rounded-xl mb-2 flex flex-col shadow-sm ${message.direction === 'outgoing' ? 'bg-[#dcf8c6] ml-auto rounded-tr-none' : 'bg-white mr-auto rounded-tl-none border border-gray-100'}`}>
       {/* SHOW AI BADGE IF MESSAGE WAS SENT BY AI */}
       {message.sentBy === 'ai' && (
         <div className="text-[10px] font-bold text-purple-600 mb-1 flex items-center gap-1">
@@ -49,6 +67,9 @@ export function MessageBubble({ message }) {
         </div>
       )}
       <p className="text-sm text-gray-800 whitespace-pre-wrap">{message.messageText}</p>
+      <div className="text-[10px] text-gray-500 mt-1 self-end flex items-center gap-1">
+        {timeStr} {StatusIcon}
+      </div>
     </div>
   );
 }

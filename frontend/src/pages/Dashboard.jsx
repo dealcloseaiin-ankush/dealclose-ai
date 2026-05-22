@@ -60,7 +60,7 @@ export default function Dashboard() {
             setMessageStats(userData.messageStats);
           }
           // Set the dropdown options
-          const mainBusiness = { _id: 'main_business', name: userData.businessName || 'Main Business' };
+          const mainBusiness = { _id: 'main_business', name: (userData.businessName && userData.businessName !== 'Main Business') ? userData.businessName : 'DealClose AI (Main)' };
           const otherWorkspaces = userData.workspaces || [];
           setWorkspaces([mainBusiness, ...otherWorkspaces]);
         }
@@ -69,6 +69,7 @@ export default function Dashboard() {
         const hasCredits = userData?.aiCredits > 0 || isSuperAdmin;
         const hasNoTraining = !userData?.businessDescription || userData.businessDescription.trim().length < 10;
         console.log(`🔍 [Dashboard Popup Logic] hasCredits: ${hasCredits}, hasNoTraining: ${hasNoTraining}, AI_Prompt_Length: ${userData?.businessDescription?.length || 0}`);
+        console.log(`📊 [Dashboard Graph Data from API] => `, response.data.graphData);
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
       } finally {

@@ -11,7 +11,7 @@ export default function Sidebar() {
   
   // Real Workspaces Data from Auth Context
   const workspaces = useMemo(() => {
-    const mainBusiness = { _id: 'main_business', name: user?.businessName || 'Main Business' };
+    const mainBusiness = { _id: 'main_business', name: (user?.businessName && user.businessName !== 'Main Business') ? user.businessName : 'DealClose AI (Main)' };
     const otherWorkspaces = user?.workspaces || [];
     return [mainBusiness, ...otherWorkspaces];
   }, [user]);
