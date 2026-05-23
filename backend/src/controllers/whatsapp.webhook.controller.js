@@ -215,12 +215,30 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               } 
               
-              // 🚀 SAAS LOGIC: Send menu ONLY IF user has multiple businesses. Else let AI / Flow handle it!
-              if (menuRows.length > 0) {
+              // 🚀 RESTORED: Single Business Fallback (Menu hamesha aayega taaki Flow Builder trigger ho sake)
+              if (menuRows.length === 0) {
+                menuRows = [
+                  { id: `workspace_default`, title: (user.businessName || "Main Business").substring(0, 24), description: "Explore our products and services" }
+                ];
+              }
+
+              // 🚀 SMART LINKS INJECTION
+              // Menu ke upar Instagram, Google Review aur Website ke links add karna
+              let bodyText = "Please select the business division you want to interact with today:";
+              const links = user.digitalCardConfig || {};
+              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
+              
+              if (links.googleReview || links.instagram || websiteUrl) {
+                bodyText += "\n\n*Connect with us:*";
+                if (websiteUrl) bodyText += `\n🌐 Website: ${websiteUrl}`;
+                if (links.instagram) bodyText += `\n📸 Instagram: ${links.instagram}`;
+                if (links.googleReview) bodyText += `\n⭐ Rate Us: ${links.googleReview}`;
+              }
+
                 const interactiveObj = {
                   type: "list",
                   header: { type: "text", text: `Welcome to ${user.fullName || 'Our Business'}` },
-                  body: { text: "Please select the business division you want to interact with today:" },
+                  body: { text: bodyText },
                   footer: { text: "Powered by DealClose AI" },
                   action: {
                     button: "Select Business",
@@ -235,7 +253,6 @@ exports.handleWhatsApp = async (req, res) => {
                 await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
                 await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                 continue; 
-              }
             }
 
             const autoReplyRule = (user.autoReplies || []).find(r => incomingText.toLowerCase() === r.triggerWord.toLowerCase());

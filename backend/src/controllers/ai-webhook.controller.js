@@ -67,16 +67,14 @@ exports.handleWhatsApp = async (req, res) => {
           if (statusStr === 'delivered') user.messageStats.delivered = (user.messageStats.delivered || 0) + 1;
           if (statusStr === 'read') user.messageStats.read = (user.messageStats.read || 0) + 1;
           
-          // Agar 24-hour rule ya kisi aur wajah se fail ho jaye
           if (statusStr === 'failed') {
              const failReason = value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown';
              console.error(`❌ [Webhook] Message Failed to send. Reason: ${failReason}`);
              if (failReason.includes('24 hours')) console.error(`🔍 [DEBUG RULE]: Remember, the customer must message your number first to start the 24-hour clock.`);
-             // Aap message ka status database me update kar sakte hain
              await Message.findOneAndUpdate(
                { customerPhone: value.statuses[0].recipient_id, status: 'sent' },
                { $set: { status: 'failed', messageText: `[⚠️ Failed: 24-Hour Window Closed]` } },
-               { sort: { timestamp: -1 } } // Update the latest message
+               { sort: { timestamp: -1 } }
              );
           }
           await user.save();
@@ -94,7 +92,6 @@ exports.handleWhatsApp = async (req, res) => {
             const orderDetails = msg.order;
             const Order = require('../models/orderModel');
             
-            // Create unique order ID based on timestamp
             const newOrderId = 'WA-' + Date.now().toString().slice(-6);
             
             await Order.create({ userId: user._id, orderId: newOrderId, customerPhone: fromNumber, status: 'Pending', lastUpdated: new Date() });
@@ -113,7 +110,6 @@ exports.handleWhatsApp = async (req, res) => {
             
             console.log(`📍 [Webhook] Location received from ${fromNumber}: ${locationString}`);
             
-            // Check if there's a pending order for this customer to attach this address to
             const Order = require('../models/orderModel');
             const pendingOrder = await Order.findOneAndUpdate(
               { customerPhone: fromNumber, userId: user._id, status: 'Pending' },
@@ -152,14 +148,8 @@ exports.handleWhatsApp = async (req, res) => {
             
             let responseMessage = "Got it! How can I help you today?";
             
-            // 🚀 DYNAMIC WORKSPACE ROUTING
-            // Yahan hum hardcoded names ('menu_real_estate') ki jagah unique IDs match kar rahe hain
             if (selectedContext.startsWith('workspace_')) {
-              const workspaceId = selectedContext.replace('workspace_', ''); // e.g., '12345'
-              
-              // TODO: Future me hum DB se us workspaceId ki detail nikalenge
-              // aur us particular business ka welcome message bhejenge.
-              // Sath hi is chat/lead me tag laga denge ki ye is workspace ki hai.
+              const workspaceId = selectedContext.replace('workspace_', ''); 
               
               responseMessage = "You have selected this business profile. How can I assist you further today?";
             }
@@ -184,16 +174,13 @@ exports.handleWhatsApp = async (req, res) => {
 
             await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer' });
             
-            // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
             const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
             const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
             
             if (isCurrentlyPaused) {
               console.log(`⏸️ [Webhook] Human has taken over the chat for ${fromNumber}. AI is currently paused. Skipping AI reply.`);
-              continue; // Yahan se nikal jayega aur koi auto-reply nahi karega
+              continue; 
             } else if (currentLeadCheck && currentLeadCheck.isAiPaused) {
-              // 🔥 NEW: The pause has expired. Let's reset the flag so the AI can resume normally.
-              // This makes the system state clean and prevents any future confusion.
               console.log(`▶️ [Webhook] AI pause has expired for ${fromNumber}. Resuming AI and resetting the flag.`);
               await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: false, aiPausedUntil: null } });
             }
@@ -201,25 +188,24 @@ exports.handleWhatsApp = async (req, res) => {
             const incomingTextLower = incomingText.toLowerCase();
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               
-              // 🚀 DYNAMIC MENU GENERATOR
-              // Agar user ne multiple businesses (workspaces) add kiye hain, toh unki list banayenge
               let menuRows = [];
               
               if (user.workspaces && user.workspaces.length > 0) {
                 menuRows = user.workspaces.map(w => ({
-                  id: `workspace_${w._id}`, // Hidden ID bheji jayegi
-                  title: w.name.substring(0, 24), // Meta restricts title to 24 chars max
+                  id: `workspace_${w._id}`,
+                  title: w.name.substring(0, 24),
                   description: (w.description || "View our services").substring(0, 72)
                 }));
-              } else {
-                // Fallback: Agar usne koi secondary business nahi banaya hai, toh uska main naam dikhayenge
+              } 
+              
+              // 🚀 RESTORED: Single Business Fallback
+              if (menuRows.length === 0) {
                 menuRows = [
                   { id: `workspace_default`, title: (user.businessName || "Main Business").substring(0, 24), description: "Explore our products and services" }
                 ];
               }
 
               // 🚀 SMART LINKS INJECTION
-              // Menu ke upar Instagram, Google Review aur Website ke links add karna
               let bodyText = "Please select the business division you want to interact with today:";
               const links = user.digitalCardConfig || {};
               const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
@@ -260,10 +246,9 @@ exports.handleWhatsApp = async (req, res) => {
               const freeTestNumbers = ['919876543210', '918888888888'];
               const isFreeTestUser = freeTestNumbers.includes(fromNumber);
               
-              const isAiEnabled = user.aiAgentEnabled !== false; // defaults to true
+              const isAiEnabled = user.aiAgentEnabled !== false; 
               const hasTrainingData = user.businessDescription && user.businessDescription.trim().length > 10;
               
-              // Auto-Review Links (Bina AI ke fallback message me links jodna)
               const links = user.digitalCardConfig || {};
               let autoLinks = "";
               if (links.googleReview || links.instagram) {
@@ -273,18 +258,15 @@ exports.handleWhatsApp = async (req, res) => {
               }
 
               if (!isAiEnabled || (user.aiCredits <= 0 && !isFreeTestUser)) {
-                // AI completely disabled / No credits (Hardcoded standard message)
                 responseMessage = "Thank you for your message! Our human team will get back to you shortly. 🙏" + autoLinks;
                 repliedBy = 'system';
                 
-                // Send an Alert to the Business Owner if the limit just expired (and prevent spamming by setting to -1)
                 if (user.aiCredits === 0 && user.ownerPhone) {
                   await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, "🚨 *AI Limit Exhausted*\n\nAapka DealClose AI ka free trial (50 messages) khatam ho gaya hai. AI ne aapke customers ko automatically reply karna band kar diya hai.\n\nPlease apne dashboard se recharge karein taaki AI aage kaam kar sake.");
                   user.aiCredits = -1; 
                   await user.save();
                 }
               } else if (!hasTrainingData) {
-                // AI is enabled but user hasn't trained it yet (No AI hallucination allowed)
                 responseMessage = "Thank you for reaching out! Our support team is currently reviewing your request and will assist you shortly. ⏳" + autoLinks;
                 repliedBy = 'system';
               } else {
@@ -292,7 +274,7 @@ exports.handleWhatsApp = async (req, res) => {
                   user.aiCredits -= 1;
                   if (user.aiCredits === 0 && user.ownerPhone) {
                     await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, "🚨 *AI Limit Exhausted*\n\nAapka DealClose AI ka free trial (50 messages) khatam ho gaya hai. AI ne aapke customers ko automatically reply karna band kar diya hai.\n\nPlease apne dashboard se recharge karein taaki AI aage kaam kar sake.");
-                    user.aiCredits = -1; // Change to -1 so the alert doesn't fire on the next message
+                    user.aiCredits = -1;
                   }
                   await user.save();
                   try {
@@ -303,16 +285,13 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               
               try {
-                // Har SaaS User ka apna personal AI context! 
                 let businessInfo = user.businessDescription || "a modern business";
                 let ownerRules = user.aiRules || "Be polite, helpful, and professional.";
                 
-                // Check if customer ne koi specific business select kiya tha
                 const lead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
                 if (lead && lead.lastSelectedWorkspaceId) {
                   const selectedWs = user.workspaces.find(ws => ws._id.toString() === lead.lastSelectedWorkspaceId);
                   if (selectedWs) {
-                    console.log(`🧠 [AI Context] Using Workspace Brain: ${selectedWs.name}`);
                     businessInfo = selectedWs.businessDescription || businessInfo;
                     ownerRules = selectedWs.aiRules || ownerRules;
                   }
@@ -369,8 +348,8 @@ exports.handleWhatsApp = async (req, res) => {
                       const searchData = JSON.parse(toolCall.function.arguments);
                       const Catalog = require('../models/catalogModel');
                       
-                      const items = await Catalog.find({ 
-                        userId: user._id, 
+                      const items = await Catalog.find({
+                        userId: user._id,
                         $or: [
                           { name: { $regex: new RegExp(searchData.searchQuery, 'i') } },
                           { description: { $regex: new RegExp(searchData.searchQuery, 'i') } }
@@ -393,10 +372,8 @@ exports.handleWhatsApp = async (req, res) => {
                     } else if (toolCall.function.name === "escalate_to_staff") {
                       const callData = JSON.parse(toolCall.function.arguments);
                       
-                      // Add to knowledge gap training data
-                      await User.findByIdAndUpdate(user._id, { $push: { trainingData: { question: callData.customerQuestion, status: 'unanswered', customerPhone: fromNumber } } });                      
+                      await User.findByIdAndUpdate(user._id, { $push: { trainingData: { question: callData.customerQuestion, status: 'unanswered', customerPhone: fromNumber } } });
                       
-                      // Check what the owner wanted us to do (Fallback Rule)
                       if (user.fallbackAction === 'notify_owner' && user.ownerPhone) {
                         await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, `🚨 *AI Alert: Help Needed*\nCustomer (${fromNumber}) asked: "${callData.customerQuestion}".\nI didn't know the answer so I paused the chat. Please reply to them from the Dashboard!`);
                         responseMessage = "That's a great question! I'm not entirely sure about that yet, but I've notified the business owner directly. They will get back to you shortly.";
@@ -411,9 +388,7 @@ exports.handleWhatsApp = async (req, res) => {
                       const statusData = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { returnDocument: 'after', upsert: true });
                       
-                      // 🎯 META CONVERSIONS API SYNC
                       if ((statusData.status.toLowerCase() === 'converted' || statusData.status.toLowerCase() === 'won') && user.metaAdsConfig?.pixelId && user.metaAdsConfig?.accessToken) {
-                         // Sync this converted lead back to Meta!
                          await metaAdsService.sendConversionEvent(user.metaAdsConfig.pixelId, user.metaAdsConfig.accessToken, fromNumber, 'Purchase');
                       }
                     } else if (toolCall.function.name === "request_star_review") {
@@ -430,7 +405,11 @@ exports.handleWhatsApp = async (req, res) => {
                     } else if (toolCall.function.name === "mark_lead_as_lost_and_share") {
                       const data = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: 'lost', notes: `Lost reason: ${data.reason}` });
-                      const query = { _id: { $ne: user._id }, optInForSharedLeads: true, productCategories: { $regex: new RegExp(data.productCategory, 'i') } };
+                      const query = {
+                        _id: { $ne: user._id },
+                        optInForSharedLeads: true,
+                        productCategories: { $regex: data.productCategory, $options: 'i' }
+                      };
                       if (data.customerPinCode) query.servedPinCodes = data.customerPinCode;
                       const otherSellers = await User.find(query).limit(2);
                       if (otherSellers.length > 0) {
@@ -442,7 +421,7 @@ exports.handleWhatsApp = async (req, res) => {
                       }
                     } else if (toolCall.function.name === "create_saas_account") {
                       const accData = JSON.parse(toolCall.function.arguments);
-                      const tempPassword = Math.random().toString(36).slice(-8); // Generate 8-char random password
+                      const tempPassword = Math.random().toString(36).slice(-8); 
                       
                       let existingUser = await User.findOne({ email: accData.email });
                       if (existingUser) {
@@ -453,7 +432,7 @@ exports.handleWhatsApp = async (req, res) => {
                           email: accData.email,
                           password: tempPassword,
                           businessDescription: accData.businessDescription,
-                          aiCredits: 50 // 50 Free trial credits for customer chats
+                          aiCredits: 50 
                         });
                         responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
                       }
@@ -471,7 +450,7 @@ exports.handleWhatsApp = async (req, res) => {
                         action: { buttons }
                       });
                       
-                      responseMessage = null; // Prevent sending duplicate text
+                      responseMessage = null; 
                       repliedBy = 'ai';
                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
                     }
@@ -480,7 +459,7 @@ exports.handleWhatsApp = async (req, res) => {
                   responseMessage = aiMessage.content;
                 }
               
-              // 🚀 NEW: Catching AI's Address Parsing Magic
+              // 🚀 Catching AI's Address Parsing Magic
               if (responseMessage && responseMessage.includes('[ADDRESS_SAVED]')) {
                 const addressMatch = responseMessage.match(/\[ADDRESS_SAVED\]\s*([^\n]+)/i);
                 if (addressMatch && addressMatch[1]) {
@@ -489,9 +468,8 @@ exports.handleWhatsApp = async (req, res) => {
                    await Order.findOneAndUpdate(
                      { customerPhone: fromNumber, userId: user._id, status: 'Pending' },
                      { $set: { shippingAddress: extractedAddress, status: 'Confirmed' } },
-                     { sort: { createdAt: -1 } }
+                     { sort: { createdAt: -1 }, new: true }
                    );
-                   // Remove the secret AI tag before sending the final message to the customer
                    responseMessage = responseMessage.replace(/\[ADDRESS_SAVED\]\s*([^\n]+)/i, '').trim();
                    if (!responseMessage) responseMessage = "✅ Perfect! Your delivery address has been saved successfully. We will dispatch your order soon and share the tracking details!";
                 }
@@ -516,9 +494,9 @@ exports.handleWhatsApp = async (req, res) => {
         }
       }
         }
-    return; // Request already acknowledged at the top
+    return;
   } catch (error) {
     console.error('WhatsApp Webhook Error:', error);
-    return; // Request already acknowledged at the top
+    return;
   }
 };
