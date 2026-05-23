@@ -18,11 +18,12 @@ import api from '../services/api';
 
 // --- Custom Nodes Definitions ---
 const TriggerNode = ({ data }) => {
-  const [triggerType, setTriggerType] = useState('keyword');
+  const [triggerType, setTriggerType] = useState(data?.triggerType || 'business_selected');
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-emerald-500 min-w-[250px] text-white">
       <div className="font-bold mb-3 flex items-center gap-2 text-emerald-400">🚀 Start Trigger</div>
       <select value={triggerType} onChange={(e) => setTriggerType(e.target.value)} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 mb-3">
+        <option value="business_selected">When Business is Selected</option>
         <option value="keyword">When Keyword Matches</option>
         <option value="new_lead">When New Lead is Created</option>
         <option value="abandoned_cart">When Cart is Abandoned</option>
@@ -32,7 +33,7 @@ const TriggerNode = ({ data }) => {
       {triggerType === 'keyword' && (
         <div>
           <p className="text-xs text-gray-400 mb-1">Keywords (comma separated)</p>
-          <input type="text" placeholder="e.g. hi, hello, menu, hey" defaultValue={data?.keyword || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 placeholder-gray-600" />
+          <input type="text" placeholder="e.g. offer, price, support" defaultValue={data?.keyword || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 placeholder-gray-600" />
         </div>
       )}
       <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-emerald-500 border-none" />
@@ -144,7 +145,7 @@ const initialNodes = [
   {
     id: '1',
     type: 'trigger',
-    data: { label: 'Trigger', keyword: 'hi, hello' },
+    data: { label: 'Trigger', triggerType: 'keyword', keyword: 'hi, hello' },
     position: { x: 250, y: 50 },
   },
 ];
@@ -163,6 +164,7 @@ export default function FlowBuilder() {
   // 🚀 NEW: Workspace/Business Selector States
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('main');
+  const [mainBusinessName, setMainBusinessName] = useState('DealClose AI (Main)');
   
   // 🚀 NEW: AI Flow Builder Assistant States
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
@@ -181,6 +183,16 @@ export default function FlowBuilder() {
       const userData = res.data.user || res.data;
       if (userData && userData.workspaces) {
         setWorkspaces(userData.workspaces);
+      }
+      
+      // 🚀 SAAS LOGIC: If multiple businesses exist, auto-switch trigger to "Business Selected"
+      if (userData && userData.workspaces && userData.workspaces.length > 0) {
+        setNodes((nds) => nds.map(n => n.id === '1' ? { ...n, data: { ...n.data, triggerType: 'business_selected', keyword: '' } } : n));
+      }
+
+      if (userData) {
+        const bName = (userData.businessName && userData.businessName !== 'Main Business') ? userData.businessName : 'DealClose AI (Main)';
+        setMainBusinessName(bName);
       }
     }).catch(console.error);
   }, []);
@@ -276,7 +288,7 @@ export default function FlowBuilder() {
           setAiMessages(prev => [...prev, { role: 'ai', content: "I've created an Abandoned Cart flow for you on the canvas! 🛒 It waits 15 mins and sends a reminder." }]);
         } else if (lowerMsg.includes('question') || lowerMsg.includes('ask') || lowerMsg.includes('yes')) {
           const n1 = getId(), n2 = getId(), n3 = getId(), n4 = getId();
-          newNodes = [ { id: n1, type: 'trigger', data: { label: 'Trigger', keyword: 'hi, hello' }, position: { x: 300, y: 50 } }, { id: n2, type: 'askQuestion', data: { label: 'Ask Question' }, position: { x: 300, y: 200 } }, { id: n3, type: 'message', data: { label: 'Send Yes Reply' }, position: { x: 100, y: 400 } }, { id: n4, type: 'message', data: { label: 'Send No Reply' }, position: { x: 500, y: 400 } } ];
+          newNodes = [ { id: n1, type: 'trigger', data: { label: 'Trigger', triggerType: 'business_selected' }, position: { x: 300, y: 50 } }, { id: n2, type: 'askQuestion', data: { label: 'Ask Question' }, position: { x: 300, y: 200 } }, { id: n3, type: 'message', data: { label: 'Send Yes Reply' }, position: { x: 100, y: 400 } }, { id: n4, type: 'message', data: { label: 'Send No Reply' }, position: { x: 500, y: 400 } } ];
           newEdges = [ { id: `e${n1}-${n2}`, source: n1, target: n2 }, { id: `e${n2}-${n3}`, source: n2, target: n3, sourceHandle: 'yes' }, { id: `e${n2}-${n4}`, source: n2, target: n4, sourceHandle: 'no' } ];
           setNodes(newNodes); setEdges(newEdges);
           setAiMessages(prev => [...prev, { role: 'ai', content: "I've built a question flow for you! ⚡ It splits based on YES or NO replies." }]);
@@ -365,7 +377,7 @@ export default function FlowBuilder() {
           
           {/* 🚀 NEW: Business / Workspace Selector */}
           <select value={selectedWorkspace} onChange={(e) => setSelectedWorkspace(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 cursor-pointer shadow-lg font-bold">
-            <option value="main">🏢 Main Business</option>
+            <option value="main">🏢 {mainBusinessName}</option>
             {workspaces.map(ws => (
               <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
             ))}

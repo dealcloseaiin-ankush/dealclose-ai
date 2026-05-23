@@ -445,8 +445,8 @@ exports.handleWhatsApp = async (req, res) => {
               
               // 🚀 NEW: Catching AI's Address Parsing Magic
               if (responseMessage && responseMessage.includes('[ADDRESS_SAVED]')) {
-                const addressMatch = responseMessage.match(/\ADDRESS_SAVED\(?=\n|$)/i);
-                if (addressMatch) {
+                const addressMatch = responseMessage.match(/\[ADDRESS_SAVED\]\s*([^\n]+)/i);
+                if (addressMatch && addressMatch[1]) {
                    const extractedAddress = addressMatch[1].trim();
                    const Order = require('../models/orderModel');
                    await Order.findOneAndUpdate(
@@ -455,7 +455,7 @@ exports.handleWhatsApp = async (req, res) => {
                      { sort: { createdAt: -1 } }
                    );
                    // Remove the secret AI tag before sending the final message to the customer
-                   responseMessage = responseMessage.replace(/\[ADDRESS_SAVED\].*?(\n|$)/i, '').trim();
+                   responseMessage = responseMessage.replace(/\[ADDRESS_SAVED\]\s*([^\n]+)/i, '').trim();
                    if (!responseMessage) responseMessage = "✅ Perfect! Your delivery address has been saved successfully. We will dispatch your order soon and share the tracking details!";
                 }
               }
