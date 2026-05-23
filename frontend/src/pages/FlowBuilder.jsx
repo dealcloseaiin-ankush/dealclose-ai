@@ -12,22 +12,33 @@ import ReactFlow, {
   MiniMap
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
 // --- Custom Nodes Definitions ---
-const TriggerNode = () => (
-  <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-emerald-500 min-w-[250px] text-white">
-    <div className="font-bold mb-3 flex items-center gap-2 text-emerald-400">🚀 Start Trigger</div>
-    <select className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500">
-      <option>When Keyword is "HI"</option>
-      <option>When New Lead is Created</option>
-      <option>When Cart is Abandoned</option>
-    </select>
-    <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-emerald-500 border-none" />
-  </div>
-);
+const TriggerNode = ({ data }) => {
+  const [triggerType, setTriggerType] = useState('keyword');
+  return (
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-emerald-500 min-w-[250px] text-white">
+      <div className="font-bold mb-3 flex items-center gap-2 text-emerald-400">🚀 Start Trigger</div>
+      <select value={triggerType} onChange={(e) => setTriggerType(e.target.value)} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 mb-3">
+        <option value="keyword">When Keyword Matches</option>
+        <option value="new_lead">When New Lead is Created</option>
+        <option value="abandoned_cart">When Cart is Abandoned</option>
+      </select>
+      
+      {/* 🚀 NEW: User can type multiple keywords separated by commas */}
+      {triggerType === 'keyword' && (
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Keywords (comma separated)</p>
+          <input type="text" placeholder="e.g. hi, hello, menu, hey" defaultValue={data?.keyword || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 placeholder-gray-600" />
+        </div>
+      )}
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-emerald-500 border-none" />
+    </div>
+  );
+};
 
 const MessageNode = () => {
   const [templates, setTemplates] = useState([]);
@@ -133,7 +144,7 @@ const initialNodes = [
   {
     id: '1',
     type: 'trigger',
-    data: { label: 'Trigger' },
+    data: { label: 'Trigger', keyword: 'hi, hello' },
     position: { x: 250, y: 50 },
   },
 ];
@@ -148,6 +159,31 @@ export default function FlowBuilder() {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 🚀 NEW: Workspace/Business Selector States
+  const [workspaces, setWorkspaces] = useState([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState('main');
+  
+  // 🚀 NEW: AI Flow Builder Assistant States
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const [aiMessages, setAiMessages] = useState([{ role: 'ai', content: 'Hi! I am your AI Flow Builder. Tell me what kind of automation you want to build (e.g., "Build an abandoned cart flow" or "Create a yes/no question flow").' }]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const aiChatEndRef = useRef(null);
+
+  useEffect(() => {
+    aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [aiMessages]);
+
+  useEffect(() => {
+    // Fetch workspaces so users can assign flows to different businesses
+    api.get('/users/profile').then(res => {
+      const userData = res.data.user || res.data;
+      if (userData && userData.workspaces) {
+        setWorkspaces(userData.workspaces);
+      }
+    }).catch(console.error);
+  }, []);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#9ca3af' }, style: { stroke: '#9ca3af', strokeWidth: 2 } }, eds)), [setEdges]);
 
@@ -186,13 +222,79 @@ export default function FlowBuilder() {
     [reactFlowInstance, setNodes]
   );
 
+  // 🚀 NEW: Handle Click-to-add for Sidebar Buttons (Taki bina drag kiye bhi add ho sakein)
+  const onNodeClickAdd = useCallback((label) => {
+    let type = 'default';
+    if (label.includes('Message')) type = 'message';
+    else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
+    else if (label.includes('Condition')) type = 'condition';
+    else if (label.includes('Question')) type = 'askQuestion';
+
+    const newNode = {
+      id: getId(),
+      type,
+      position: { x: 300 + Math.random() * 50, y: 150 + Math.random() * 50 },
+      data: { label },
+    };
+    setNodes((nds) => nds.concat(newNode));
+  }, [setNodes]);
+
+  // 🚀 NEW: Handle AI Prompt to Auto-Generate Flow
+  const handleAiSubmit = async (e) => {
+    e.preventDefault();
+    if (!aiInput.trim()) return;
+
+    const userMsg = aiInput.trim();
+    setAiMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setAiInput('');
+    setIsAiTyping(true);
+
+    try {
+      // Try calling the real backend if it exists
+      const res = await api.post('/ai/generate-flow', { prompt: userMsg });
+      if (res.data.nodes && res.data.edges) {
+        setNodes(res.data.nodes);
+        setEdges(res.data.edges);
+        setAiMessages(prev => [...prev, { role: 'ai', content: "Here is your generated flow! You can drag and connect the blocks to customize it further." }]);
+      } else {
+        setAiMessages(prev => [...prev, { role: 'ai', content: res.data.reply || "I couldn't generate the flow." }]);
+      }
+      setIsAiTyping(false);
+    } catch (err) {
+      console.error("AI Flow Generation API failed or not ready:", err);
+      // 🚀 MVP FALLBACK: Simulate AI building logic instantly in frontend if backend API isn't ready
+      setTimeout(() => {
+        const lowerMsg = userMsg.toLowerCase();
+        let newNodes = [];
+        let newEdges = [];
+
+        if (lowerMsg.includes('abandon') || lowerMsg.includes('cart')) {
+          const n1 = getId(), n2 = getId(), n3 = getId();
+          newNodes = [ { id: n1, type: 'trigger', data: { label: 'Trigger', keyword: 'abandoned_cart' }, position: { x: 250, y: 50 } }, { id: n2, type: 'delay', data: { label: 'Wait 15 Mins' }, position: { x: 250, y: 200 } }, { id: n3, type: 'message', data: { label: 'Send Reminder' }, position: { x: 250, y: 350 } } ];
+          newEdges = [ { id: `e${n1}-${n2}`, source: n1, target: n2 }, { id: `e${n2}-${n3}`, source: n2, target: n3 } ];
+          setNodes(newNodes); setEdges(newEdges);
+          setAiMessages(prev => [...prev, { role: 'ai', content: "I've created an Abandoned Cart flow for you on the canvas! 🛒 It waits 15 mins and sends a reminder." }]);
+        } else if (lowerMsg.includes('question') || lowerMsg.includes('ask') || lowerMsg.includes('yes')) {
+          const n1 = getId(), n2 = getId(), n3 = getId(), n4 = getId();
+          newNodes = [ { id: n1, type: 'trigger', data: { label: 'Trigger', keyword: 'hi, hello' }, position: { x: 300, y: 50 } }, { id: n2, type: 'askQuestion', data: { label: 'Ask Question' }, position: { x: 300, y: 200 } }, { id: n3, type: 'message', data: { label: 'Send Yes Reply' }, position: { x: 100, y: 400 } }, { id: n4, type: 'message', data: { label: 'Send No Reply' }, position: { x: 500, y: 400 } } ];
+          newEdges = [ { id: `e${n1}-${n2}`, source: n1, target: n2 }, { id: `e${n2}-${n3}`, source: n2, target: n3, sourceHandle: 'yes' }, { id: `e${n2}-${n4}`, source: n2, target: n4, sourceHandle: 'no' } ];
+          setNodes(newNodes); setEdges(newEdges);
+          setAiMessages(prev => [...prev, { role: 'ai', content: "I've built a question flow for you! ⚡ It splits based on YES or NO replies." }]);
+        } else {
+          setAiMessages(prev => [...prev, { role: 'ai', content: "I'm ready to build! Try saying 'Build an abandoned cart flow' or 'Create a flow that asks a yes/no question'." }]);
+        }
+        setIsAiTyping(false);
+      }, 1500);
+    }
+  };
+
   const handleSave = async () => {
     if (reactFlowInstance) {
       setIsSaving(true);
       try {
       const flowData = reactFlowInstance.toObject();
       console.log("Saving Flow:", flowData);
-        await api.post('/whatsapp/flows', { name: 'Main Automation', flowData });
+        await api.post('/whatsapp/flows', { name: 'Main Automation', flowData, workspaceId: selectedWorkspace });
       toast.success("Automation Flow Saved & Published! 🚀");
       } catch (error) {
         console.error("Failed to save flow:", error);
@@ -240,26 +342,35 @@ export default function FlowBuilder() {
       <div className="w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col gap-4 z-10">
         <div>
           <h2 className="text-xl font-bold text-white mb-1">Flow Builder</h2>
-          <p className="text-xs text-gray-400 mb-6">Drag and drop blocks to build automation logic.</p>
+          <p className="text-xs text-gray-400 mb-6">Drag and drop blocks or click to build automation logic.</p>
         </div>
         
-        <div className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-grab hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>
+        <div onClick={() => onNodeClickAdd('💬 Send Message')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>
           <MessageSquare size={18} className="text-blue-400" /> <span className="font-semibold text-sm">Send Message</span>
         </div>
-        <div className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-grab hover:border-purple-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⚡ Ask Question')} draggable>
+        <div onClick={() => onNodeClickAdd('⚡ Ask Question')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-purple-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⚡ Ask Question')} draggable>
           <Zap size={18} className="text-purple-400" /> <span className="font-semibold text-sm">Ask Question</span>
         </div>
-        <div className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-grab hover:border-orange-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🔄 Condition (If/Else)')} draggable>
+        <div onClick={() => onNodeClickAdd('🔄 Condition (If/Else)')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-orange-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🔄 Condition (If/Else)')} draggable>
           <GitBranch size={18} className="text-orange-400" /> <span className="font-semibold text-sm">Condition</span>
         </div>
-        <div className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-grab hover:border-gray-400 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⏳ Wait 15 Mins')} draggable>
+        <div onClick={() => onNodeClickAdd('⏳ Wait 15 Mins')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-gray-400 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⏳ Wait 15 Mins')} draggable>
           <Clock size={18} className="text-gray-400" /> <span className="font-semibold text-sm">Add Delay</span>
         </div>
       </div>
 
       {/* Flow Canvas */}
       <div className="flex-1 relative" ref={reactFlowWrapper}>
-        <div className="absolute top-6 right-6 z-10 flex gap-3">
+        <div className="absolute top-6 right-6 z-50 flex gap-3">
+          
+          {/* 🚀 NEW: Business / Workspace Selector */}
+          <select value={selectedWorkspace} onChange={(e) => setSelectedWorkspace(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 cursor-pointer shadow-lg font-bold">
+            <option value="main">🏢 Main Business</option>
+            {workspaces.map(ws => (
+              <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+            ))}
+          </select>
+
           <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold shadow-lg transition-colors">
             <HelpCircle size={18} /> How to Use?
           </button>
@@ -268,6 +379,46 @@ export default function FlowBuilder() {
           </button>
         </div>
         <ReactFlowProvider>
+          
+          {/* 🚀 NEW: AI Flow Assistant Widget Floating */}
+          <div className="absolute bottom-6 left-6 z-50 flex flex-col items-start">
+            {isAiChatOpen && (
+              <div className="bg-[#111] border border-blue-500/30 rounded-2xl shadow-2xl w-80 mb-4 overflow-hidden flex flex-col animate-fade-in origin-bottom-left">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-white">
+                    <Bot size={20} />
+                    <h3 className="font-bold leading-tight text-sm">AI Flow Builder</h3>
+                  </div>
+                  <button onClick={() => setIsAiChatOpen(false)} className="text-white/80 hover:text-white"><X size={18} /></button>
+                </div>
+                
+                <div className="h-64 p-4 overflow-y-auto flex flex-col gap-3 bg-[#0a0a0a]">
+                  {aiMessages.map((msg, idx) => (
+                    <div key={idx} className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'ai' ? 'bg-[#1a1a1a] text-gray-200 self-start rounded-tl-sm border border-gray-800' : 'bg-blue-600 text-white self-end rounded-tr-sm'}`}>
+                      {msg.content}
+                    </div>
+                  ))}
+                  {isAiTyping && (
+                    <div className="bg-[#1a1a1a] text-gray-400 self-start p-3 rounded-2xl rounded-tl-sm border border-gray-800 text-sm flex gap-1">
+                      <span className="animate-bounce">.</span><span className="animate-bounce" style={{animationDelay: '0.1s'}}>.</span><span className="animate-bounce" style={{animationDelay: '0.2s'}}>.</span>
+                    </div>
+                  )}
+                  <div ref={aiChatEndRef} />
+                </div>
+                
+                <form onSubmit={handleAiSubmit} className="p-3 bg-[#111] border-t border-gray-800 flex gap-2">
+                  <input type="text" value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Type 'build abandoned cart flow'" className="flex-1 bg-[#1a1a1a] border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:border-blue-500 outline-none" disabled={isAiTyping} />
+                  <button type="submit" disabled={isAiTyping || !aiInput.trim()} className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-500 transition-colors disabled:opacity-50">
+                    <Send size={16} />
+                  </button>
+                </form>
+              </div>
+            )}
+            <button onClick={() => setIsAiChatOpen(!isAiChatOpen)} className="w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:scale-110 transition-transform text-2xl relative">
+              {isAiChatOpen ? <X size={24} /> : <Bot size={28} />}
+            </button>
+          </div>
+
           <ReactFlow 
             nodes={nodes} 
             edges={edges} 

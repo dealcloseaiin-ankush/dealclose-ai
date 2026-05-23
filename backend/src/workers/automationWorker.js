@@ -33,8 +33,12 @@ const automationWorker = new Worker('automationQueue', async job => {
       return;
     }
 
-    // Optional TODO: Yahan database check aayega ki "kya is number ne pichle 15 min me payment ki hai?"
-    // Agar payment ho gayi ho, toh return kar denge (message cancel).
+    // 🚀 NEW: VERIFY IF CUSTOMER ALREADY COMPLETED PURCHASE BEFORE SENDING
+    const lead = await Lead.findOne({ phoneNumber: phone, userId });
+    if (lead && (lead.status === 'converted' || lead.status === 'won' || lead.status === 'completed')) {
+      console.log(`✅ [Worker Info] Customer ${phone} already completed purchase. Abandoned cart message cancelled.`);
+      return; // Stop execution
+    }
 
     try {
       // Send META APPROVED TEMPLATE with Dynamic Variables

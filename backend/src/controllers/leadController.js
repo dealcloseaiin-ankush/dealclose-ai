@@ -1,6 +1,7 @@
 const Lead = require('../models/leadModel');
 const Contact = require('../models/contactModel');
 const Message = require('../models/messageModel');
+const User = require('../models/userModel');
 const aiService = require('../services/aiService');
 const mongoose = require('mongoose');
 
@@ -8,8 +9,9 @@ const mongoose = require('mongoose');
 // @route   GET /api/leads
 exports.getLeads = async (req, res) => {
   try {
-    // Future: Filter by req.user.id
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const leads = await Lead.find({ userId }).sort({ createdAt: -1 });
     res.status(200).json(leads);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -20,19 +22,22 @@ exports.getLeads = async (req, res) => {
 // @route   POST /api/leads
 exports.createLead = async (req, res) => {
   try {
-    const { name, phoneNumber, email, status, source, createdBy } = req.body;
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const { name, phoneNumber, email, status, source } = req.body;
 
     if (!name || !phoneNumber) {
       return res.status(400).json({ message: 'Name and Phone Number are required' });
     }
 
     const lead = await Lead.create({
+      userId,
       name,
       phoneNumber,
       email,
       status,
       source,
-      createdBy // Frontend se bhejna padega abhi ke liye
+      createdBy: userId 
     });
 
     res.status(201).json(lead);
@@ -45,7 +50,9 @@ exports.createLead = async (req, res) => {
 // @route   GET /api/leads/export
 exports.exportLeads = async (req, res) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const leads = await Lead.find({ userId }).sort({ createdAt: -1 });
     
     // Simple CSV Generation
     const headers = ['Name', 'Phone', 'Email', 'Status', 'Source', 'Created At'];
@@ -144,11 +151,23 @@ exports.getLeadAnalytics = async (req, res) => {
         { $project: { date: '$_id', leads: '$count', _id: 0 } }
     ]);
 
+    // 🚀 NEW: Fetch User Message Stats for WhatsApp Delivery Report
+    const user = await User.findById(userIdObj).lean();
+    const messageStats = user?.messageStats || { sent: 0, delivered: 0, read: 0 };
+
+    // 🚀 NEW: Fetch Recent Activity for Live AI Activity Section
+    const recentActivity = await Lead.find({ userId: userIdObj })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('name status source createdAt notes');
+
     res.status(200).json({
       stats: { totalLeads, converted, conversionRate, totalInvestment, costPerLead },
       graphData,
       leadsBySource,
-      dailyLeads: dailyLeadsData
+      dailyLeads: dailyLeadsData,
+      messageStats,
+      recentActivity
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -5,7 +5,9 @@ const callService = require('../services/callService');
 // @route   GET /api/calls
 exports.getCalls = async (req, res) => {
   try {
-    const calls = await Call.find().sort({ createdAt: -1 });
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const calls = await Call.find({ userId }).sort({ createdAt: -1 });
     res.status(200).json(calls);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -16,6 +18,8 @@ exports.getCalls = async (req, res) => {
 // @route   POST /api/calls/dial
 exports.initiateCall = async (req, res) => {
   const { phoneNumber, leadId } = req.body;
+  const userId = req.user?._id || req.user?.id;
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
   if (!phoneNumber) {
     return res.status(400).json({ message: 'Phone number is required' });
@@ -29,6 +33,7 @@ exports.initiateCall = async (req, res) => {
 
     // Save to DB
     const newCall = await Call.create({
+      userId,
       sid: call.Sid, // Exotel uses capital 'S'
       to: phoneNumber,
       status: call.Status, // Exotel uses capital 'S'

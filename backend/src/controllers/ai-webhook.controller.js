@@ -287,6 +287,25 @@ exports.handleWhatsApp = async (req, res) => {
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { userId: user._id, name: "New AI Lead", source: leadData.category, status: "interested", notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` }, { returnDocument: 'after', upsert: true });
                       responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`;
                       repliedBy = 'ai';
+                    } else if (toolCall.function.name === "search_catalog") {
+                      const searchData = JSON.parse(toolCall.function.arguments);
+                      const Catalog = require('../models/catalogModel');
+                      
+                      const items = await Catalog.find({ 
+                        userId: user._id, 
+                        $or: [
+                          { name: { $regex: new RegExp(searchData.searchQuery, 'i') } },
+                          { description: { $regex: new RegExp(searchData.searchQuery, 'i') } }
+                        ]
+                      }).limit(5);
+
+                      if (items.length > 0) {
+                        const catalogList = items.map(item => `*${item.name}* - ₹${item.price}\n${item.description || ''}`).join('\n\n');
+                        responseMessage = `Here are the options I found for you:\n\n${catalogList}\n\nWould you like to know more about any of these or place an order?`;
+                      } else {
+                        responseMessage = `I checked our catalog, but I couldn't find an exact match for "${searchData.searchQuery}". Please let me know if you are looking for something else.`;
+                      }
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "trigger_outbound_call") {
                       const exotelNumber = process.env.EXOTEL_EXOPHONE; 
                       const webhookUrl = `${process.env.BASE_URL}/api/webhooks/voice`;

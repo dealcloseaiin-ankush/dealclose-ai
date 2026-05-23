@@ -6,6 +6,9 @@ import api from '../services/api'; // Use main api service
 export default function Forms() {
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [newForm, setNewForm] = useState({ title: '', description: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     // Fetch forms or mock the default Digital Card Form
@@ -25,6 +28,27 @@ export default function Forms() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await api.post('/forms', {
+        title: newForm.title,
+        description: newForm.description,
+        fields: [{ name: 'Name', type: 'text' }, { name: 'Phone', type: 'text' }]
+      });
+      // Remove dummy default forms if they exist, then append new one
+      const currentForms = forms[0]?._id === 'digital-card-form' ? [] : forms;
+      setForms([res.data, ...currentForms]);
+      setShowModal(false);
+      setNewForm({ title: '', description: '' });
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to create form');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const copyLink = (id) => {
     const link = `${window.location.origin}/card/${id}`;
     navigator.clipboard.writeText(link);
@@ -38,7 +62,7 @@ export default function Forms() {
           <h1 className="text-3xl font-extrabold text-white mb-2">Lead Capture Forms</h1>
           <p className="text-gray-400">Manage your Digital Card and Website embedding forms.</p>
         </div>
-        <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg transition-all">
+        <button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg transition-all">
           + Create New Form
         </button>
       </div>
@@ -76,6 +100,28 @@ export default function Forms() {
         ))}
         {!loading && forms.length === 0 && <div className="text-gray-500 col-span-full">No forms created yet.</div>}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">✕</button>
+            <h2 className="text-xl font-bold text-white mb-4">Create New Form</h2>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Form Title</label>
+                <input type="text" required value={newForm.title} onChange={e => setNewForm({...newForm, title: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" placeholder="e.g. Website Contact Form" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Description (Optional)</label>
+                <textarea value={newForm.description} onChange={e => setNewForm({...newForm, description: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" placeholder="What is this form for?"></textarea>
+              </div>
+              <button type="submit" disabled={submitting} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors disabled:opacity-50">
+                {submitting ? 'Creating...' : 'Create Form'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

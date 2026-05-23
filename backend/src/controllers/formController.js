@@ -3,8 +3,9 @@ const Form = require('../models/formModel');
 // @desc    Get all forms for a user
 exports.getForms = async (req, res) => {
   try {
-    // Later, we will filter by req.user.id
-    const forms = await Form.find({}).sort({ createdAt: -1 });
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const forms = await Form.find({ createdBy: userId }).sort({ createdAt: -1 });
     res.json(forms);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -15,12 +16,15 @@ exports.getForms = async (req, res) => {
 exports.createForm = async (req, res) => {
   try {
     const { title, description, fields } = req.body;
+    const userId = req.user?._id || req.user?.id;
+    
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
     
     const newForm = new Form({
       title,
       description,
       fields,
-      createdBy: "60d0fe4f5311236168a109ca" // Placeholder: Replace with req.user.id from auth
+      createdBy: userId
     });
 
     const savedForm = await newForm.save();

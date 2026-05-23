@@ -28,7 +28,7 @@ export default function Sidebar() {
         { name: 'Contacts', path: '/contacts', icon: '👥' },
         { name: 'Catalog', path: '/catalog', icon: '🛍️' },
         { name: 'CRM', path: '/crm', icon: '🗂️' },
-        { name: 'Campaigns', path: '/campaigns', icon: '📢', comingSoon: true },
+        { name: 'Campaigns', path: '/campaigns', icon: '📢' },
         { name: 'Templates', path: '/templates', icon: '📄' }
       ]
     },
@@ -36,18 +36,18 @@ export default function Sidebar() {
       title: 'AUTOMATION',
       items: [
         { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
-        { name: 'Automations', path: '/automations', icon: '🔁', comingSoon: true },
-        { name: 'Instagram', path: '/instagram-automation', icon: '📸', comingSoon: true }
+        { name: 'Automations', path: '/automations', icon: '🔁' },
+        { name: 'Instagram', path: '/instagram-automation', icon: '📸' }
       ]
     },
     {
       title: 'INTELLIGENCE',
       items: [
         { name: 'AI Agent', path: '/ai-agent', icon: '🧠' },
-        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: '📈', comingSoon: true },
-        { name: 'Order Dispatch', path: '/dispatch', icon: '📦', comingSoon: true },
-        { name: 'Calls', path: '/calls', icon: '📞', comingSoon: true },
-        { name: 'Analytics', path: '/monthly-report', icon: '📈', comingSoon: true }
+        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: '📈' },
+        { name: 'Order Dispatch', path: '/dispatch', icon: '📦' },
+        { name: 'Calls', path: '/calls', icon: '📞' },
+        { name: 'Analytics', path: '/monthly-report', icon: '📈' }
       ]
     },
     {
