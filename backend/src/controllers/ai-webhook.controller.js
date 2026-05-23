@@ -318,7 +318,44 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 }
 
-                const aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons. Use it frequently to ask quick multiple-choice questions and guide users through setups/onboarding effortlessly without making them type.\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
+                let aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons. Use it frequently to ask quick multiple-choice questions and guide users through setups/onboarding effortlessly without making them type.\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
+                
+                // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number)
+                if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
+                    aiContext = `You are "DealClose AI", a world-class AI Sales & Marketing Automation expert.
+                    The user messaging you is a potential client for our SaaS platform.
+                    
+                    YOUR GOAL: 
+                    Welcome the user, ask about their business, explain how DealClose AI can help them, and pitch our platform. Onboard them smoothly.
+                    
+                    DEALCLOSE AI FEATURES TO PITCH (Based on their business type):
+                    1. WhatsApp & Instagram Automation (Auto-reply, Flow Builder, Lead Capture).
+                    2. Multi-Staff Shared Inbox: Mention that multiple staff members can use just ONE WhatsApp number to manage high message volumes easily!
+                    3. AI Voice Calling (Inbound/Outbound sales calls).
+                    4. ScanIQ (Meta/Google Ad Competitor Analysis).
+                    
+                    PRICING & OFFERS:
+                    - Start with a "14-Days Free Trial". Let them try it out!
+                    - Setup Note: Tell them that currently, they just need to manually extract their WhatsApp API keys (WABA ID, Phone ID, and Permanent Access Token) from the Meta Developer portal. Once done, the system will start working for them!
+                    - Bulk Messaging: Mention that they can also start sending bulk template messages directly via Excel sheet upload.
+                    - Basic Automation: ₹199/mo (WhatsApp OR Instagram).
+                    - AI Starter Offer: ₹99/mo for the 1st month (renews at ₹299/mo).
+                    - Omnichannel Pro: ₹498/mo (WhatsApp + Insta + AI Voice).
+                    
+                    CRITICAL RULES:
+                    1. Always reply in the EXACT same language the user is speaking (Hindi, Hinglish, English).
+                    2. Be conversational. Don't dump all info at once. Ask about their business first!
+                    3. Use 'send_whatsapp_menu' tool for quick options. Use 'create_saas_account' if they want to sign up.`;
+                }
+                
+                // 🚀 NEW: Smart AI Address Extraction for Manual Chat Flow
+                const Order = require('../models/orderModel');
+                const pendingOrder = await Order.findOne({ customerPhone: fromNumber, userId: user._id, status: 'Pending' }).sort({ createdAt: -1 });
+                
+                if (pendingOrder) {
+                  aiContext += `\n\n🚨 PENDING ORDER DETECTED: The customer just placed an order (#${pendingOrder.orderId}) and we are waiting for their delivery address. If the user types any address, city, house number, or pincode, YOU MUST reply with EXACTLY this format at the beginning of your message: [ADDRESS_SAVED] <their full address here>. Then add a friendly confirmation message after it.`;
+                }
+
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {

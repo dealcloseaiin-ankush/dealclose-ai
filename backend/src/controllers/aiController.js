@@ -1,5 +1,6 @@
 const User = require('../models/userModel');
 const aiService = require('../services/aiService');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // @desc    Get unanswered queries for AI training
 // @route   GET /api/ai/training-data
@@ -248,5 +249,64 @@ exports.handleDashboardAssistant = async (req, res) => {
   } catch (error) {
     console.error('Dashboard Assistant Error:', error);
     res.status(500).json({ success: false, reply: 'Oops, something went wrong while processing your request.' });
+  }
+};
+
+// @desc    Generate ReactFlow data using Gemini 2.5 Flash
+// @route   POST /api/ai/generate-flow
+exports.generateFlow = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is missing. Please add it to your .env file.");
+      return res.status(500).json({ success: false, reply: 'Mera AI engine abhi disconnect ho gaya hai (API Key missing).' });
+    }
+
+    // 🚀 NEW: Using Gemini 2.5 Flash as requested!
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const systemPrompt = `You are the DealClose AI Flow Builder Assistant, a highly intelligent automation expert.
+    The user will describe what automation flow they want to build in any language (like Hindi, Hinglish, or English).
+    
+    DEALCLOSE AI FEATURES YOU KNOW ABOUT (from our Landing Page):
+    - WhatsApp & Instagram DM Automation (Auto-reply, Lead Capture, Abandoned Cart, Custom Menus)
+    - AI Voice Calling (Inbound/Outbound sales calls via Exotel)
+    - CRM & Lead Management (Auto-save leads, Track deal stages)
+    - ScanIQ (Meta/Google Ad Competitor Analysis)
+    
+    CONSULTATIVE APPROACH:
+    If the user asks what you can do or how you can help (e.g., "kya karenge", "help me"), DO NOT just build a random flow. Instead, reply in their language asking what their business is (e.g., "Main DealClose AI ka expert hu. Aapka kis cheez ka business hai?"). When they tell you their business, suggest 1 or 2 specific automation flows tailored to them using DealClose AI features.
+    
+    You must return a JSON object with this exact structure:
+    {
+      "reply": "A friendly response to the user IN THE EXACT SAME LANGUAGE THEY USED (e.g. Hindi/Hinglish). Explain what you just added, or ask them about their business if you are just chatting.",
+      "nodes": [ /* Array of node objects, or empty [] if just chatting */ ],
+      "edges": []
+    }
+
+    Node Types available: 
+    - 'trigger' (Always include this as id: '1' at the top)
+    - 'message' (data: { label: 'Send Message' })
+    - 'askQuestion' (data: { label: 'Ask Question' })
+    - 'delay' (data: { label: 'Wait 15 Mins' })
+    - 'condition' (data: { label: 'Condition' })
+    
+    Build a logical flow based on the user's prompt. Assign unique string IDs like 'node_2', 'node_3' to new nodes. Connect them properly in the "edges" array (e.g., { "id": "e1-node_2", "source": "1", "target": "node_2" }).
+    If you are just having a conversation and NOT building a flow, set "nodes" and "edges" to empty arrays []. ONLY include the 'trigger' node if you are actually drawing a flow.
+    Return ONLY valid JSON. Do not include markdown formatting or backticks.`;
+
+    const result = await model.generateContent([systemPrompt, prompt]);
+    const responseText = result.response.text();
+    const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const flowData = JSON.parse(cleaned);
+
+    res.status(200).json(flowData);
+  } catch (error) {
+    console.error('Flow Gen Error:', error);
+    res.status(500).json({ success: false, reply: "Maafi chahunga, mujhe flow banane me kuch technical error aa raha hai." });
   }
 };

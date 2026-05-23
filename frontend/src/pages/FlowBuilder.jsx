@@ -195,7 +195,7 @@ export default function FlowBuilder() {
         setMainBusinessName(bName);
       }
     }).catch(console.error);
-  }, []);
+  }, [setNodes]);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#9ca3af' }, style: { stroke: '#9ca3af', strokeWidth: 2 } }, eds)), [setEdges]);
 
