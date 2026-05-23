@@ -89,6 +89,47 @@ exports.handleWhatsApp = async (req, res) => {
           console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
           console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
           
+          // 🚀 NEW: AUTO-SYNC WHATSAPP CATALOG ORDERS
+          if (msg.type === 'order') {
+            const orderDetails = msg.order;
+            const Order = require('../models/orderModel');
+            
+            // Create unique order ID based on timestamp
+            const newOrderId = 'WA-' + Date.now().toString().slice(-6);
+            
+            await Order.create({ userId: user._id, orderId: newOrderId, customerPhone: fromNumber, status: 'Pending', lastUpdated: new Date() });
+            
+            const responseMessage = `🛍️ *Order Received!*\nThank you for placing an order from our catalog! Your Order ID is *#${newOrderId}*.\n\nCould you please reply with your complete *Delivery Address* and Pincode so we can dispatch it?`;
+            
+            await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
+            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+            continue;
+          }
+
+          // 🚀 NEW: CATCH LOCATION PINS FOR ADDRESSES
+          if (msg.type === 'location') {
+            const { latitude, longitude, address, name } = msg.location;
+            const locationString = `${name ? name + ', ' : ''}${address ? address : `Lat: ${latitude}, Long: ${longitude}`}`;
+            
+            console.log(`📍 [Webhook] Location received from ${fromNumber}: ${locationString}`);
+            
+            // Check if there's a pending order for this customer to attach this address to
+            const Order = require('../models/orderModel');
+            const pendingOrder = await Order.findOneAndUpdate(
+              { customerPhone: fromNumber, userId: user._id, status: 'Pending' },
+              { $set: { shippingAddress: locationString, status: 'Confirmed' } },
+              { sort: { createdAt: -1 }, new: true }
+            );
+
+            const replyMessage = pendingOrder 
+              ? `✅ Thank you! We have updated your delivery address for Order *#${pendingOrder.orderId}*. We will process your dispatch shortly!`
+              : `📍 Thank you for sharing your location. I have updated it in your profile!`;
+
+            await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMessage);
+            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Shared Location]: ${locationString}`, direction: 'incoming', status: 'received', sentBy: 'customer' });
+            continue;
+          }
+
           if (msg.type === 'image') {
             const mediaId = msg.image.id;
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "I received your image! Let me read the list using AI for you... ⏳");
@@ -401,6 +442,23 @@ exports.handleWhatsApp = async (req, res) => {
                 } else {
                   responseMessage = aiMessage.content;
                 }
+              
+              // 🚀 NEW: Catching AI's Address Parsing Magic
+              if (responseMessage && responseMessage.includes('[ADDRESS_SAVED]')) {
+                const addressMatch = responseMessage.match(/\ADDRESS_SAVED\(?=\n|$)/i);
+                if (addressMatch) {
+                   const extractedAddress = addressMatch[1].trim();
+                   const Order = require('../models/orderModel');
+                   await Order.findOneAndUpdate(
+                     { customerPhone: fromNumber, userId: user._id, status: 'Pending' },
+                     { $set: { shippingAddress: extractedAddress, status: 'Confirmed' } },
+                     { sort: { createdAt: -1 } }
+                   );
+                   // Remove the secret AI tag before sending the final message to the customer
+                   responseMessage = responseMessage.replace(/\[ADDRESS_SAVED\].*?(\n|$)/i, '').trim();
+                   if (!responseMessage) responseMessage = "✅ Perfect! Your delivery address has been saved successfully. We will dispatch your order soon and share the tracking details!";
+                }
+              }
               } catch (aiError) {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
                 responseMessage = "Thank you for reaching out! We are currently experiencing high message volumes. Our team will get back to you shortly! 🙏";

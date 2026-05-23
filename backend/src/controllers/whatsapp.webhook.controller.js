@@ -102,6 +102,23 @@ exports.handleWhatsApp = async (req, res) => {
             console.error("❌ [Webhook] Error auto-saving Lead to CRM:", leadErr.message);
           }
 
+          // 🚀 NEW: AUTO-SYNC WHATSAPP CATALOG ORDERS
+          if (msg.type === 'order') {
+            const orderDetails = msg.order;
+            const Order = require('../models/orderModel');
+            
+            // Create unique order ID based on timestamp
+            const newOrderId = 'WA-' + Date.now().toString().slice(-6);
+            
+            await Order.create({ userId: user._id, orderId: newOrderId, customerPhone: fromNumber, status: 'Pending', lastUpdated: new Date() });
+            
+            const responseMessage = `🛍️ *Order Received!*\nThank you for placing an order from our catalog! Your Order ID is *#${newOrderId}*.\n\nCould you please reply with your complete *Delivery Address* and Pincode so we can dispatch it?`;
+            
+            await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
+            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+            continue;
+          }
+
           if (msg.type === 'image') {
             const mediaId = msg.image.id;
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "I received your image! Let me read the list using AI for you... ⏳");
