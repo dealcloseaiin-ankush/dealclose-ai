@@ -18,4 +18,7 @@ router.put('/training-data/:id/answer', protect, aiController.answerTrainingQues
 // Handle Dashboard Setup Assistant Chat
 router.post('/dashboard-assistant', protect, aiController.handleDashboardAssistant);
 
+// Generate ReactFlow logic using AI Assistant
+router.post('/generate-flow', aiController.generateFlow);
+
 module.exports = router;

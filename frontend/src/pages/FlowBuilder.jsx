@@ -274,29 +274,10 @@ export default function FlowBuilder() {
       setIsAiTyping(false);
     } catch (err) {
       console.error("AI Flow Generation API failed or not ready:", err);
-      // 🚀 MVP FALLBACK: Simulate AI building logic instantly in frontend if backend API isn't ready
-      setTimeout(() => {
-        const lowerMsg = userMsg.toLowerCase();
-        let newNodes = [];
-        let newEdges = [];
-
-        if (lowerMsg.includes('abandon') || lowerMsg.includes('cart')) {
-          const n1 = getId(), n2 = getId(), n3 = getId();
-          newNodes = [ { id: n1, type: 'trigger', data: { label: 'Trigger', keyword: 'abandoned_cart' }, position: { x: 250, y: 50 } }, { id: n2, type: 'delay', data: { label: 'Wait 15 Mins' }, position: { x: 250, y: 200 } }, { id: n3, type: 'message', data: { label: 'Send Reminder' }, position: { x: 250, y: 350 } } ];
-          newEdges = [ { id: `e${n1}-${n2}`, source: n1, target: n2 }, { id: `e${n2}-${n3}`, source: n2, target: n3 } ];
-          setNodes(newNodes); setEdges(newEdges);
-          setAiMessages(prev => [...prev, { role: 'ai', content: "I've created an Abandoned Cart flow for you on the canvas! 🛒 It waits 15 mins and sends a reminder." }]);
-        } else if (lowerMsg.includes('question') || lowerMsg.includes('ask') || lowerMsg.includes('yes')) {
-          const n1 = getId(), n2 = getId(), n3 = getId(), n4 = getId();
-          newNodes = [ { id: n1, type: 'trigger', data: { label: 'Trigger', triggerType: 'business_selected' }, position: { x: 300, y: 50 } }, { id: n2, type: 'askQuestion', data: { label: 'Ask Question' }, position: { x: 300, y: 200 } }, { id: n3, type: 'message', data: { label: 'Send Yes Reply' }, position: { x: 100, y: 400 } }, { id: n4, type: 'message', data: { label: 'Send No Reply' }, position: { x: 500, y: 400 } } ];
-          newEdges = [ { id: `e${n1}-${n2}`, source: n1, target: n2 }, { id: `e${n2}-${n3}`, source: n2, target: n3, sourceHandle: 'yes' }, { id: `e${n2}-${n4}`, source: n2, target: n4, sourceHandle: 'no' } ];
-          setNodes(newNodes); setEdges(newEdges);
-          setAiMessages(prev => [...prev, { role: 'ai', content: "I've built a question flow for you! ⚡ It splits based on YES or NO replies." }]);
-        } else {
-          setAiMessages(prev => [...prev, { role: 'ai', content: "I'm ready to build! Try saying 'Build an abandoned cart flow' or 'Create a flow that asks a yes/no question'." }]);
-        }
-        setIsAiTyping(false);
-      }, 1500);
+      // Now showing the real error from the backend instead of the fake dummy replies
+      const errorMsg = err.response?.data?.reply || err.response?.data?.message || "Oops! Mera AI engine abhi connect nahi ho paya. Please check backend API Routes & Gemini API Keys.";
+      setAiMessages(prev => [...prev, { role: 'ai', content: errorMsg }]);
+      setIsAiTyping(false);
     }
   };
 
