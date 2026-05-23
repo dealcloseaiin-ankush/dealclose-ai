@@ -265,9 +265,11 @@ export default function FlowBuilder() {
       // Try calling the real backend if it exists
       const res = await api.post('/ai/generate-flow', { prompt: userMsg });
       if (res.data.nodes && res.data.edges) {
-        setNodes(res.data.nodes);
-        setEdges(res.data.edges);
-        setAiMessages(prev => [...prev, { role: 'ai', content: "Here is your generated flow! You can drag and connect the blocks to customize it further." }]);
+        if (res.data.nodes.length > 0) {
+          setNodes(res.data.nodes);
+          setEdges(res.data.edges);
+        }
+        setAiMessages(prev => [...prev, { role: 'ai', content: res.data.reply || "Here is your generated flow! You can drag and connect the blocks to customize it further." }]);
       } else {
         setAiMessages(prev => [...prev, { role: 'ai', content: res.data.reply || "I couldn't generate the flow." }]);
       }
