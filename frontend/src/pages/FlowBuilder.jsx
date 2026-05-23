@@ -9,7 +9,8 @@ import ReactFlow, {
   MarkerType,
   Handle,
   Position,
-  MiniMap
+  MiniMap,
+  useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send } from 'lucide-react';
@@ -17,10 +18,17 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 
 // --- Custom Nodes Definitions ---
-const TriggerNode = ({ data }) => {
+const TriggerNode = ({ id, data }) => {
+  const { setNodes, setEdges } = useReactFlow();
   const [triggerType, setTriggerType] = useState(data?.triggerType || 'business_selected');
   return (
-    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-emerald-500 min-w-[250px] text-white">
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-emerald-500 min-w-[250px] text-white relative group">
+      {id !== '1' && (
+        <button onClick={() => {
+          setNodes(nds => nds.filter(n => n.id !== id));
+          setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+        }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
+      )}
       <div className="font-bold mb-3 flex items-center gap-2 text-emerald-400">🚀 Start Trigger</div>
       <select value={triggerType} onChange={(e) => setTriggerType(e.target.value)} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 mb-3">
         <option value="business_selected">When Business is Selected</option>
@@ -41,7 +49,8 @@ const TriggerNode = ({ data }) => {
   );
 };
 
-const MessageNode = () => {
+const MessageNode = ({ id }) => {
+  const { setNodes, setEdges } = useReactFlow();
   const [templates, setTemplates] = useState([]);
   
   useEffect(() => {
@@ -52,7 +61,11 @@ const MessageNode = () => {
   }, []);
 
   return (
-    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-blue-500 min-w-[280px] text-white">
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-blue-500 min-w-[280px] text-white relative group">
+      <button onClick={() => {
+        setNodes(nds => nds.filter(n => n.id !== id));
+        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+      }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-blue-500 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-blue-400">💬 Send Message</div>
       <div className="space-y-3">
@@ -74,64 +87,85 @@ const MessageNode = () => {
   );
 };
 
-const AskQuestionNode = () => (
-  <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white">
-    <Handle type="target" position={Position.Top} className="w-3 h-3 bg-purple-500 border-none" />
-    <div className="font-bold mb-3 flex items-center gap-2 text-purple-400">⚡ Ask Question (Wait for Reply)</div>
-    <div className="space-y-3">
-      <div>
-        <p className="text-xs text-gray-400 mb-1">Question to ask</p>
-        <textarea className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
-      </div>
-      <div>
-        <p className="text-xs text-gray-400 mb-1">Expected Replies (Branches)</p>
-        <div className="flex justify-between text-[10px] font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
-          <span className="text-green-400 text-center w-1/3 border-r border-gray-700">If "YES"</span>
-          <span className="text-rose-400 text-center w-1/3 border-r border-gray-700">If "NO"</span>
-          <span className="text-gray-400 text-center w-1/3">Any Other</span>
+const AskQuestionNode = ({ id }) => {
+  const { setNodes, setEdges } = useReactFlow();
+  return (
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white relative group">
+      <button onClick={() => {
+        setNodes(nds => nds.filter(n => n.id !== id));
+        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+      }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-purple-500 border-none" />
+      <div className="font-bold mb-3 flex items-center gap-2 text-purple-400">⚡ Ask Question (Wait for Reply)</div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Question to ask</p>
+          <textarea className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Expected Replies (Branches)</p>
+          <div className="flex justify-between text-[10px] font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
+            <span className="text-green-400 text-center w-1/3 border-r border-gray-700">If "YES"</span>
+            <span className="text-rose-400 text-center w-1/3 border-r border-gray-700">If "NO"</span>
+            <span className="text-gray-400 text-center w-1/3">Any Other</span>
+          </div>
         </div>
       </div>
+      {/* Multiple Output Handles for different user replies */}
+      <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-3 h-3 bg-green-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-3 h-3 bg-rose-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-3 h-3 bg-gray-400 border-none" />
     </div>
-    {/* Multiple Output Handles for different user replies */}
-    <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-3 h-3 bg-green-500 border-none" />
-    <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-3 h-3 bg-rose-500 border-none" />
-    <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-3 h-3 bg-gray-400 border-none" />
-  </div>
-);
+  );
+};
 
-const DelayNode = () => (
-  <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-gray-500 min-w-[220px] text-white">
-    <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-none" />
-    <div className="font-bold mb-3 flex items-center gap-2 text-gray-300">⏳ Wait / Delay</div>
-    <div className="flex gap-2">
-      <input type="number" className="nodrag nopan w-20 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400" defaultValue="15" />
-      <select className="nodrag nopan flex-1 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400">
-        <option>Minutes</option>
-        <option>Hours</option>
-        <option>Days</option>
+const DelayNode = ({ id }) => {
+  const { setNodes, setEdges } = useReactFlow();
+  return (
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-gray-500 min-w-[220px] text-white relative group">
+      <button onClick={() => {
+        setNodes(nds => nds.filter(n => n.id !== id));
+        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+      }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-none" />
+      <div className="font-bold mb-3 flex items-center gap-2 text-gray-300">⏳ Wait / Delay</div>
+      <div className="flex gap-2">
+        <input type="number" className="nodrag nopan w-20 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400" defaultValue="15" />
+        <select className="nodrag nopan flex-1 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400">
+          <option>Minutes</option>
+          <option>Hours</option>
+          <option>Days</option>
+        </select>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-gray-400 border-none" />
+    </div>
+  );
+};
+
+const ConditionNode = ({ id }) => {
+  const { setNodes, setEdges } = useReactFlow();
+  return (
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-orange-500 min-w-[250px] text-white relative group">
+      <button onClick={() => {
+        setNodes(nds => nds.filter(n => n.id !== id));
+        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+      }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-orange-400 border-none" />
+      <div className="font-bold mb-3 flex items-center gap-2 text-orange-400">🔄 Condition (If/Else)</div>
+      <select className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-orange-500">
+        <option>If User Replied</option>
+        <option>If Payment Pending</option>
+        <option>If Tag = VIP</option>
       </select>
+      <div className="flex justify-between mt-5 text-xs font-bold px-2">
+        <span className="text-green-400">TRUE</span>
+        <span className="text-rose-400">FALSE</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} id="true" style={{ left: '20%' }} className="w-3 h-3 bg-green-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="false" style={{ left: '80%' }} className="w-3 h-3 bg-rose-500 border-none" />
     </div>
-    <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-gray-400 border-none" />
-  </div>
-);
-
-const ConditionNode = () => (
-  <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-orange-500 min-w-[250px] text-white">
-    <Handle type="target" position={Position.Top} className="w-3 h-3 bg-orange-400 border-none" />
-    <div className="font-bold mb-3 flex items-center gap-2 text-orange-400">🔄 Condition (If/Else)</div>
-    <select className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-orange-500">
-      <option>If User Replied</option>
-      <option>If Payment Pending</option>
-      <option>If Tag = VIP</option>
-    </select>
-    <div className="flex justify-between mt-5 text-xs font-bold px-2">
-      <span className="text-green-400">TRUE</span>
-      <span className="text-rose-400">FALSE</span>
-    </div>
-    <Handle type="source" position={Position.Bottom} id="true" style={{ left: '20%' }} className="w-3 h-3 bg-green-500 border-none" />
-    <Handle type="source" position={Position.Bottom} id="false" style={{ left: '80%' }} className="w-3 h-3 bg-rose-500 border-none" />
-  </div>
-);
+  );
+};
 
 const nodeTypes = {
   trigger: TriggerNode,
