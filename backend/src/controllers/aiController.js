@@ -305,7 +305,7 @@ exports.generateFlow = async (req, res) => {
     2. If the user says "hi", "help", or seems confused, IMMEDIATELY greet them using their business name (e.g., "Welcome to DealClose Flow Builder! Since you run [Business Name], I suggest these 2 flows...").
     3. Give them 2-3 clear options to choose from (e.g., "1. Zero-Cost Lead Capture", "2. Support Menu"). Ask them to just reply with the number. DO NOT ask open-ended questions.
     4. Once they choose an option or describe a flow, GENERATE THE FULL FLOW (nodes and edges) immediately. Do not stretch out the conversation.
-    5. ZERO-COST LEAD CAPTURE EXPLANATION: If they ask how to capture names without AI cost, tell them: "DealClose AI me ab In-built Zero-Cost Lead Capture system hai! Jab customer pehli baar business select karta hai, toh system automatically unse Name & City poochta hai aur bina AI cost ke CRM me save kar leta hai!"
+    5. ZERO-COST LEAD CAPTURE EXPLANATION: If they ask about lead capture, create a flow that naturally asks the customer for their Name and City (e.g., "Please reply with your Name and City"). Do NOT explain the backend cost-saving mechanics to the user unless explicitly asked.
     6. VERY IMPORTANT: Whenever you generate nodes and edges, add this exact instruction in your reply: "Mene aapke liye flow canvas par bana diya hai. Ise hamesha ke liye save karne ke liye please upar ek 'Naam' likhein aur 'Save Flow' button par click karein."
     
     You must return a JSON object with this exact structure:
@@ -329,17 +329,25 @@ exports.generateFlow = async (req, res) => {
        - For 'condition' node, sourceHandle MUST be "true" or "false".
        - For 'askQuestion' node, sourceHandle MUST be "yes", "no", or "other".
        Example Edge: { "id": "e1-2", "source": "node_1", "target": "node_2", "sourceHandle": "yes" }
-    4. If just chatting, return nodes: [] and edges: [].
-    5. Return ONLY valid JSON. Do not include markdown formatting or backticks.`;
+    4. EVEN IF YOU ARE JUST CHATTING, YOU MUST RETURN JSON! Do NOT output plain text outside the JSON. Format: {"reply": "...", "nodes": [], "edges": []}
+    5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting or backticks.`;
 
+    let rawResponse = "";
     const result = await model.generateContent([systemPrompt, prompt]);
-    const responseText = result.response.text();
-    const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    rawResponse = result.response.text();
+    
+    let cleaned = rawResponse.replace(/```json\n?/gi, '').replace(/```\n?/gi, '').trim();
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    
     const flowData = JSON.parse(cleaned);
 
     res.status(200).json(flowData);
   } catch (error) {
-    console.error('Flow Gen Error:', error);
+    console.error('Flow Gen Error:', error.message);
     res.status(500).json({ success: false, reply: "Maafi chahunga, mujhe flow banane me kuch technical error aa raha hai." });
   }
 };
