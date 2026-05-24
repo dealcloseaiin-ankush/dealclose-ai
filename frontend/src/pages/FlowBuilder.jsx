@@ -352,6 +352,7 @@ export default function FlowBuilder() {
       const res = await api.get('/whatsapp/flows');
       setSavedFlows(res.data.data || []);
     } catch (err) {
+      console.error("Fetch flows error:", err);
       toast.error("Failed to fetch flows.");
     }
   };
