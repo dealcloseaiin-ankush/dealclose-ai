@@ -261,7 +261,7 @@ export default function FlowBuilder() {
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('main');
   const [mainBusinessName, setMainBusinessName] = useState('DealClose AI (Main)');
-  const [flowName, setFlowName] = useState('Main Automation');
+  const [flowName, setFlowName] = useState('');
   
   // 🚀 NEW: Flow List Modal States
   const [isFlowListOpen, setIsFlowListOpen] = useState(false);
@@ -443,7 +443,7 @@ export default function FlowBuilder() {
         console.log(`➡️ [DEBUG] Sending POST request to /whatsapp/flows...`);
         const response = await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace });
         console.log("✅ [DEBUG] Save Response from Server:", response.data);
-      toast.success("Automation Flow Saved & Published! 🚀");
+      toast.success(`🎉 Success! Flow "${finalName}" has been created & saved. You can find it inside the 'My Flows' 📂 folder.`, { duration: 6000 });
       } catch (error) {
         console.error("❌ [DEBUG] Failed to save flow:", error);
         toast.error(error.response?.data?.message || "Failed to save automation flow.");
@@ -543,9 +543,14 @@ export default function FlowBuilder() {
       {/* Node Palette Sidebar */}
       {isPaletteOpen && (
         <div className="w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col gap-4 z-10 shrink-0 overflow-y-auto">
-          <div>
-            <h2 className="text-xl font-bold text-white mb-1">Flow Builder</h2>
-            <p className="text-xs text-gray-400 mb-6">Drag and drop blocks or click to build automation logic.</p>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white mb-1">Flow Builder</h2>
+              <p className="text-xs text-gray-400">Drag and drop blocks.</p>
+            </div>
+            <button onClick={() => setIsPaletteOpen(false)} className="text-gray-400 hover:text-white bg-gray-800/50 p-1.5 rounded-lg hover:bg-gray-700 transition-colors" title="Hide Tools">
+              <ChevronLeft size={18} />
+            </button>
           </div>
           
           <div onClick={() => onNodeClickAdd('💬 Send Message')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>
@@ -565,14 +570,15 @@ export default function FlowBuilder() {
 
       {/* Flow Canvas */}
       <div className="flex-1 relative" ref={reactFlowWrapper}>
+        {!isPaletteOpen && (
+          <div className="absolute top-6 left-6 z-50">
+            <button onClick={() => setIsPaletteOpen(true)} className="flex items-center justify-center p-2.5 bg-[#1a1a1a] border border-gray-700 hover:border-blue-500 text-gray-300 hover:text-white rounded-xl shadow-lg transition-colors" title="Show Tools">
+              <Menu size={20} />
+            </button>
+          </div>
+        )}
         <div className="absolute top-6 right-6 z-50 flex gap-3">
           
-          {/* 🚀 NEW: Sidebar Toggle Button (Moved to Right Side for better visibility) */}
-          <button onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl shadow-lg transition-colors font-bold text-sm" title={isPaletteOpen ? "Hide Tools" : "Show Tools"}>
-            {isPaletteOpen ? <ChevronLeft size={18} /> : <Menu size={18} />}
-            <span className="hidden sm:inline">{isPaletteOpen ? "Hide Tools" : "Show Tools"}</span>
-          </button>
-
           {/* 🚀 NEW: Flow Name Input */}
           <input 
             type="text" 
