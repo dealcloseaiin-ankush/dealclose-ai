@@ -366,7 +366,7 @@ exports.handleWhatsApp = async (req, res) => {
                 const isNameKnown = lead && lead.name && !lead.name.startsWith('User ');
                 const customerNameContext = isNameKnown ? lead.name : "Unknown";
 
-                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk.\n3. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.\n4. LEAD CAPTURE: If the user provides their name and/or city, ALWAYS use the 'update_customer_profile' tool. Ensure you combine both name and city in the fullName argument (e.g. "Rahul - Delhi").\n5. VERY IMPORTANT: NEVER cut off your sentences midway. Always provide a complete and polite sentence.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
+                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk.\n3. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.\n4. LEAD CAPTURE: If the user provides their name, city, or business details, ALWAYS use the 'update_customer_profile' tool and extract as much info as possible.\n5. VERY IMPORTANT: NEVER cut off your sentences midway. Always provide a complete and polite sentence.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
                 
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
                 if (user.aiCredits > 0 && user.aiCredits <= 200) {
@@ -437,12 +437,19 @@ exports.handleWhatsApp = async (req, res) => {
                       const profileData = JSON.parse(toolCall.function.arguments);
                       // Keeping the unique ID with the name as requested by you to prevent duplicate name issues
                       const uniqueSuffix = fromNumber.slice(-4);
-                      // Make sure City gets embedded properly if AI sends it combined
                       const newName = `${profileData.fullName || 'Customer'} (ID: ${uniqueSuffix})`;
                       
+                      const updateFields = { name: newName };
+                      if (profileData.email) updateFields.email = profileData.email;
+                      
+                      let newNotes = [];
+                      if (profileData.city) newNotes.push(`City: ${profileData.city}`);
+                      if (profileData.businessType) newNotes.push(`Business: ${profileData.businessType}`);
+                      if (newNotes.length > 0) updateFields.notes = newNotes.join(' | ');
+
                       await Lead.findOneAndUpdate(
                         { phoneNumber: fromNumber, userId: user._id }, 
-                        { $set: { name: newName } }
+                        { $set: updateFields }
                       );
                       
                       responseMessage = `Thanks, ${profileData.fullName}! I've updated your profile. How can I help you today?`;

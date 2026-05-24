@@ -353,7 +353,7 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 }
 
-                let aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nCRITICAL: Never cut off your responses mid-sentence. Always finish your thoughts.\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons.\n4. LEAD CAPTURE: If the user provides their name and/or city, ALWAYS use the 'update_customer_profile' tool. Ensure you combine both name and city in the fullName argument (e.g. "Rahul - Delhi").`;
+                let aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nCRITICAL: Never cut off your responses mid-sentence. Always finish your thoughts.\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons.\n4. LEAD CAPTURE: If the user provides their name, city, or business details, ALWAYS use the 'update_customer_profile' tool and extract as much info as possible.`;
                 
                 // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number)
                 if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
@@ -445,9 +445,18 @@ exports.handleWhatsApp = async (req, res) => {
                       const profileData = JSON.parse(toolCall.function.arguments);
                       const uniqueSuffix = fromNumber.slice(-4);
                       const newName = `${profileData.fullName || 'Customer'} (ID: ${uniqueSuffix})`;
+                      
+                      const updateFields = { name: newName };
+                      if (profileData.email) updateFields.email = profileData.email;
+                      
+                      let newNotes = [];
+                      if (profileData.city) newNotes.push(`City: ${profileData.city}`);
+                      if (profileData.businessType) newNotes.push(`Business: ${profileData.businessType}`);
+                      if (newNotes.length > 0) updateFields.notes = newNotes.join(' | ');
+
                       await Lead.findOneAndUpdate(
                         { phoneNumber: fromNumber, userId: user._id }, 
-                        { $set: { name: newName } }
+                        { $set: updateFields }
                       );
                       responseMessage = `Thanks! I've updated your profile as ${profileData.fullName}. How can I help you today?`;
                       repliedBy = 'ai';
