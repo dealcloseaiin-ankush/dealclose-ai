@@ -13,6 +13,7 @@ const userRoutes = require('./routes/userRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const whatsappTemplateRoutes = require('./routes/whatsappTemplateRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const contactRoutes = require('./routes/contactRoutes');
@@ -63,6 +64,7 @@ app.use('/api/users', userRoutes); // Handles Profile & AI Training Rules
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // 👇 YAHAN PAR HAI AAPKA IMAGE UPLOAD ROUTE 👇
 app.use('/api/upload', uploadRoutes);
