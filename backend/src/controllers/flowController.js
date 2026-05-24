@@ -16,19 +16,26 @@ exports.saveFlow = async (req, res) => {
       name = `Flow-${Math.floor(Math.random() * 10000)}`;
     }
 
+    // Safe check to prevent MongoDB CastError for "main" string
+    const isMainWorkspace = !workspaceId || workspaceId === 'main';
+    let query = { userId, name };
+    if (!isMainWorkspace) query.workspaceId = workspaceId;
+
     // Upsert (Update if exists, Create if not)
-    let flow = await Flow.findOne({ userId, name, workspaceId });
+    let flow = await Flow.findOne(query);
     if (flow) {
       flow.flowData = flowData;
       await flow.save();
     } else {
-      flow = await Flow.create({ userId, name, flowData, workspaceId });
+      const createPayload = { userId, name, flowData };
+      if (!isMainWorkspace) createPayload.workspaceId = workspaceId;
+      flow = await Flow.create(createPayload);
     }
 
     res.status(200).json({ success: true, message: 'Flow saved successfully', flow });
   } catch (error) {
-    console.error('Save Flow Error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Save Flow Error details:', error);
+    res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
 };
 

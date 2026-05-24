@@ -440,7 +440,7 @@ export default function FlowBuilder() {
       toast.success("Automation Flow Saved & Published! 🚀");
       } catch (error) {
         console.error("Failed to save flow:", error);
-        toast.error("Failed to save automation flow.");
+        toast.error(error.response?.data?.message || "Failed to save automation flow.");
       } finally {
         setIsSaving(false);
       }

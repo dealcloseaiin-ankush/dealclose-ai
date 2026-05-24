@@ -303,7 +303,12 @@ exports.handleWhatsApp = async (req, res) => {
             
             // Workspace routing for Flows
             const workspaceIdToUse = (currentLeadCheck && currentLeadCheck.lastSelectedWorkspaceId) ? currentLeadCheck.lastSelectedWorkspaceId : 'main';
-            const userFlows = await Flow.find({ userId: user._id, workspaceId: workspaceIdToUse });
+            
+            let flowQuery = { userId: user._id };
+            if (workspaceIdToUse !== 'main') {
+               flowQuery.workspaceId = workspaceIdToUse;
+            }
+            const userFlows = await Flow.find(flowQuery);
 
             // STEP 1: Check if customer is currently inside an active "Ask Question" Flow block
             if (currentLeadCheck && currentLeadCheck.activeFlowState && currentLeadCheck.activeFlowState.flowId) {
