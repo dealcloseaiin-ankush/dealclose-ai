@@ -392,7 +392,7 @@ export default function FlowBuilder() {
       const simplifyEdges = edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle }));
       const recentChat = aiMessages.slice(-6).map(m => `${m.role === 'ai' ? 'AI' : 'User'}: ${m.content}`).join('\n');
       
-      const enrichedPrompt = `Chat History:\n${recentChat}\n\nCurrent Canvas Nodes:\n${JSON.stringify(simplifyNodes)}\n\nCurrent Canvas Edges:\n${JSON.stringify(simplifyEdges)}\n\nUser Request: ${userMsg}\n\nIMPORTANT INSTRUCTIONS:\n1. If modifying the flow, return the FULL updated nodes and edges arrays (do not delete existing ones unless asked).\n2. Put actual conversational text inside data.message or data.question.\n3. If just chatting, return nodes: [] and edges: [].`;
+      const enrichedPrompt = `Chat History:\n${recentChat}\n\nCurrent Canvas Nodes:\n${JSON.stringify(simplifyNodes)}\n\nCurrent Canvas Edges:\n${JSON.stringify(simplifyEdges)}\n\nUser Request: ${userMsg}\n\nIMPORTANT INSTRUCTIONS:\n1. Deeply analyze Current Canvas Nodes. DO NOT duplicate existing logic. Reuse and connect existing nodes.\n2. Return the FULL updated nodes and edges arrays (do not delete existing ones unless asked).\n3. Put actual conversational text inside data.message or data.question.\n4. If just chatting, return nodes: [] and edges: [].`;
 
       // Pass the selected business name to the backend explicitly
       const activeBizName = selectedWorkspace === 'main' ? mainBusinessName : workspaces.find(w => w._id === selectedWorkspace)?.name || mainBusinessName;
