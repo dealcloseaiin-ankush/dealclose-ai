@@ -86,6 +86,7 @@ export default function AIAgent() {
       toast.success(`"${query.keyword}" converted to Auto-Flow! AI bypassed for this question. 🚀`);
       setTrendingQueries(tq => tq.filter(q => q.id !== query.id));
     } catch (error) {
+      console.error("Auto-Flow Error:", error);
       toast.error("Failed to add to Auto-Flow");
     }
   };

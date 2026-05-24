@@ -303,9 +303,10 @@ exports.generateFlow = async (req, res) => {
     CONSULTATIVE APPROACH & COST SAVING (CRITICAL):
     1. YOU ALREADY KNOW THE BUSINESS DETAILS. Do NOT ask "Aapka business kya hai?". 
     2. If the user says "hi", "help", or seems confused, IMMEDIATELY greet them using their business name (e.g., "Welcome to DealClose Flow Builder! Since you run [Business Name], I suggest these 2 flows...").
-    3. Give them 2-3 clear options to choose from (e.g., "1. Lead Capture Flow", "2. Support Menu"). Ask them to just reply with the number. DO NOT ask open-ended questions.
+    3. Give them 2-3 clear options to choose from (e.g., "1. Zero-Cost Lead Capture", "2. Support Menu"). Ask them to just reply with the number. DO NOT ask open-ended questions.
     4. Once they choose an option or describe a flow, GENERATE THE FULL FLOW (nodes and edges) immediately. Do not stretch out the conversation.
-    5. VERY IMPORTANT: Whenever you generate nodes and edges, add this exact instruction in your reply: "Mene aapke liye flow canvas par bana diya hai. Ise hamesha ke liye save karne ke liye please upar ek 'Naam' likhein aur 'Save Flow' button par click karein."
+    5. ZERO-COST LEAD CAPTURE EXPLANATION: If they ask how to capture names without AI cost, tell them: "DealClose AI me ab In-built Zero-Cost Lead Capture system hai! Jab customer pehli baar business select karta hai, toh system automatically unse Name & City poochta hai aur bina AI cost ke CRM me save kar leta hai!"
+    6. VERY IMPORTANT: Whenever you generate nodes and edges, add this exact instruction in your reply: "Mene aapke liye flow canvas par bana diya hai. Ise hamesha ke liye save karne ke liye please upar ek 'Naam' likhein aur 'Save Flow' button par click karein."
     
     You must return a JSON object with this exact structure:
     {
