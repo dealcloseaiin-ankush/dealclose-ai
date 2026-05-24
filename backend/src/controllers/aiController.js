@@ -87,14 +87,18 @@ exports.trainAI = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
-    const { question, answer, aiRules, businessDescription, fallbackAction, workspaceId } = req.body;
+    const { question, answer, aiRules, businessDescription, fallbackAction, workspaceId, type, triggerWord, replyMessage } = req.body;
     let updateQuery = {};
 
     // MongoDB strict update rules ke liye $set aur $push ko alag kiya gaya hai
     let setQuery = {};
 
+    // 🚀 NEW: Handle 1-Click Auto-Reply addition (Bypass AI Cost feature)
+    if (type === 'auto_reply' && triggerWord && replyMessage) {
+      updateQuery.$push = { autoReplies: { triggerWord, replyMessage } };
+    }
     // Agar specific Q&A aaya hai
-    if (question && answer) {
+    else if (question && answer) {
       updateQuery.$push = { trainingData: { question, answer, status: 'answered' } };
     }
     
@@ -259,15 +263,15 @@ exports.handleDashboardAssistant = async (req, res) => {
 // @route   POST /api/ai/generate-flow
 exports.generateFlow = async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, businessName } = req.body;
     const userId = req.user?._id || req.user?.id;
     if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
 
-    let businessContext = "Unknown Business";
+    let businessContext = businessName ? `Business Name: ${businessName}` : "Unknown Business";
     if (userId) {
       const user = await User.findById(userId);
       if (user) {
-        businessContext = `Business Name: ${user.businessName || 'Not Set'}. Description: ${user.businessDescription || 'Not Set'}.`;
+        businessContext = `Business Name: ${user.businessName || businessName || 'Not Set'}. Description: ${user.businessDescription || 'Not Set'}.`;
         if (user.workspaces && user.workspaces.length > 0) {
           businessContext += ` Other divisions: ${user.workspaces.map(w => w.name).join(', ')}.`;
         }

@@ -9,6 +9,12 @@ export default function AIAgent() {
   const [selectedBrain, setSelectedBrain] = useState('main');
   const [mainRules, setMainRules] = useState('');
 
+  // 🚀 NEW: Trending queries state for 1-Click Auto Flow
+  const [trendingQueries, setTrendingQueries] = useState([
+    { id: 1, keyword: "location", question: "What is your shop location?", aiReply: "We are located at 123 Main Street, New Delhi.", count: 12 },
+    { id: 2, keyword: "timing", question: "When does your shop open?", aiReply: "We are open from 9 AM to 9 PM, Monday to Saturday.", count: 10 }
+  ]);
+
   useEffect(() => {
     const fetchQueries = async () => {
       try {
@@ -66,6 +72,21 @@ export default function AIAgent() {
     } catch (error) {
       console.error("Failed to save knowledge:", error);
       toast.error("Failed to train AI. Please try again.");
+    }
+  };
+
+  // 🚀 NEW: Handle saving query to Auto-Flow with 1-Click
+  const handleAddAutoFlow = async (query) => {
+    try {
+      await api.post('/ai/train', { 
+        type: 'auto_reply', 
+        triggerWord: query.keyword, 
+        replyMessage: query.aiReply 
+      });
+      toast.success(`"${query.keyword}" converted to Auto-Flow! AI bypassed for this question. 🚀`);
+      setTrendingQueries(tq => tq.filter(q => q.id !== query.id));
+    } catch (error) {
+      toast.error("Failed to add to Auto-Flow");
     }
   };
 
@@ -143,6 +164,40 @@ export default function AIAgent() {
                 </form>
               </div>
             ))
+          )}
+        </div>
+      </div>
+
+      {/* 🚀 NEW: Trending FAQs (1-Click Auto Flow) */}
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">⚡ 1-Click Auto-Flow (Save AI Cost)</h2>
+        <p className="text-gray-400 text-sm mb-6">AI detected that these questions were asked 10+ times with the exact same reply. Add them to static Auto-Flow to save API tokens!</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {trendingQueries.map((tq) => (
+            <div key={tq.id} className="bg-[#111] p-6 rounded-2xl border border-orange-500/30 shadow-lg relative overflow-hidden group hover:border-orange-500 transition-colors">
+              <div className="absolute top-0 right-0 bg-orange-500/20 text-orange-400 text-[10px] font-bold px-3 py-1 rounded-bl-xl border-b border-l border-orange-500/30">
+                Asked {tq.count} times
+              </div>
+              <p className="text-gray-400 text-sm font-semibold mb-1 mt-2">Customer Question Pattern:</p>
+              <p className="text-white font-bold mb-3">"{tq.question}"</p>
+              
+              <p className="text-gray-400 text-sm font-semibold mb-1">Standard AI Reply:</p>
+              <p className="text-orange-200 text-sm italic mb-5">"{tq.aiReply}"</p>
+              
+              <button 
+                onClick={() => handleAddAutoFlow(tq)}
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors flex justify-center items-center gap-2 shadow-lg shadow-orange-500/20"
+              >
+                🚀 Convert to Auto-Flow
+              </button>
+            </div>
+          ))}
+          {trendingQueries.length === 0 && (
+            <div className="col-span-2 bg-[#111] p-8 rounded-2xl border border-gray-800 text-center text-green-500 font-medium shadow-lg">
+              <p className="text-3xl mb-2">✅</p>
+              No highly repeated queries right now. Your Auto-Flows are perfectly optimized!
+            </div>
           )}
         </div>
       </div>
