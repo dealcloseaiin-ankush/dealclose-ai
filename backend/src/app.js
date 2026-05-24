@@ -48,8 +48,8 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
-app.use(express.json()); // Parses JSON incoming requests
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' })); // Increased limit for heavy flow data
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Make uploads folder publicly accessible to see images
 app.use('/uploads', express.static('public/uploads'));

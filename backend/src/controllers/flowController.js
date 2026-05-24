@@ -4,10 +4,21 @@ const Flow = require('../models/flowModel');
 // @route   POST /api/whatsapp/flows
 exports.saveFlow = async (req, res) => {
   try {
+    console.log("\n➡️ [DEBUG] POST /api/whatsapp/flows called!");
+    console.log("➡️ [DEBUG] Request Body:", JSON.stringify(req.body).substring(0, 150) + "...");
+    
     let { name, flowData, workspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
 
+    console.log(`➡️ [DEBUG] User ID from Auth: ${userId}`);
+
+    if (!userId) {
+      console.log("❌ [DEBUG] Unauthorized: User ID is missing.");
+      return res.status(401).json({ success: false, message: 'Unauthorized. Please login again.' });
+    }
+
     if (!flowData) {
+      console.log("❌ [DEBUG] Error: Flow data is missing.");
       return res.status(400).json({ success: false, message: 'Flow data is required' });
     }
 
@@ -25,15 +36,19 @@ exports.saveFlow = async (req, res) => {
     const updatePayload = { flowData };
     if (!isMainWorkspace) updatePayload.workspaceId = workspaceId;
 
+    console.log("➡️ [DEBUG] MongoDB Query:", query);
+
     let flow = await Flow.findOneAndUpdate(
       query,
       { $set: updatePayload },
       { upsert: true, new: true, setDefaultsOnInsert: true, strict: false }
     );
 
+    console.log("✅ [DEBUG] Flow saved successfully in MongoDB. Flow ID:", flow._id);
+
     res.status(200).json({ success: true, message: 'Flow saved successfully', flow });
   } catch (error) {
-    console.error('Save Flow Error details:', error);
+    console.error('❌ [DEBUG] Save Flow Error details:', error);
     res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
 };

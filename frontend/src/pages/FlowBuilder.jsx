@@ -430,21 +430,27 @@ export default function FlowBuilder() {
   };
 
   const handleSave = async () => {
-    if (reactFlowInstance) {
+    console.log("➡️ [DEBUG] Save button clicked!");
+    if (!reactFlowInstance) {
+      toast.error("Flow builder is still loading. Please wait.");
+      return;
+    }
       setIsSaving(true);
       try {
       const flowData = reactFlowInstance.toObject();
-      console.log("Saving Flow:", flowData);
+        console.log("➡️ [DEBUG] Extracted Flow Data:", flowData);
         const finalName = flowName.trim() === '' ? `Flow-${Math.floor(Math.random() * 1000)}` : flowName;
-        await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace });
+        console.log(`➡️ [DEBUG] Sending POST request to /whatsapp/flows...`);
+        const response = await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace });
+        console.log("✅ [DEBUG] Save Response from Server:", response.data);
       toast.success("Automation Flow Saved & Published! 🚀");
       } catch (error) {
-        console.error("Failed to save flow:", error);
+        console.error("❌ [DEBUG] Failed to save flow:", error);
         toast.error(error.response?.data?.message || "Failed to save automation flow.");
       } finally {
         setIsSaving(false);
+        console.log("➡️ [DEBUG] Save process finished.");
       }
-    }
   };
 
   // 🚀 NEW: Fetch and Load Flows Logic
