@@ -323,6 +323,7 @@ exports.generateFlow = async (req, res) => {
     - 'condition': { "id": "node_5", "type": "condition", "position": {"x":250,"y":450}, "data": { "condition": "If User Replied" } }
     
     CRITICAL RULES:
+    0. If asked to "hand over to AI", just end the flow with a 'message' node. Do NOT invent new node types.
     1. ALWAYS PUT REAL TEXT IN 'data.message' AND 'data.question'. Never leave them blank! Write the Hindi/English text inside them!
     2. SMART MODIFICATION: Deeply analyze 'Current Canvas Nodes'. If a node with a similar purpose already exists (e.g., asking for Name/City, or a Start Trigger), DO NOT create a duplicate! REUSE existing nodes, update their text if needed, and just fix the edges. Take the 'Current Canvas Nodes' and 'Current Canvas Edges', modify them, and return the FULL updated arrays.
     3. Edges must logically connect 'source' to 'target'. If a node has multiple outputs, you MUST specify "sourceHandle" in the edge. 
@@ -331,7 +332,7 @@ exports.generateFlow = async (req, res) => {
        - For 'askQuestion' node with "open", sourceHandle MUST be "replied".
        Example Edge: { "id": "e1-2", "source": "node_1", "target": "node_2", "sourceHandle": "yes" }
     4. EVEN IF YOU ARE JUST CHATTING, YOU MUST RETURN JSON! Do NOT output plain text outside the JSON. Format: {"reply": "...", "nodes": [], "edges": []}
-    5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting or backticks.`;
+    5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting, trailing commas, or unescaped newlines in strings. If you need a newline in a message, use \\n.`;
 
     let rawResponse = "";
     const result = await model.generateContent([systemPrompt, prompt]);
@@ -344,11 +345,17 @@ exports.generateFlow = async (req, res) => {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
     
-    const flowData = JSON.parse(cleaned);
+    let flowData;
+    try {
+      flowData = JSON.parse(cleaned);
+    } catch (parseError) {
+      console.error('❌ [Flow Gen JSON Parse Error]:', cleaned);
+      return res.status(500).json({ success: false, reply: "Maafi chahunga, lambe flow ke karan AI ne formatting me galti kar di. Kripya ek-ek karke block banwayein (e.g. 'Pehle sirf Name/City poochne ka block lagao')." });
+    }
 
     res.status(200).json(flowData);
   } catch (error) {
     console.error('Flow Gen Error:', error.message);
-    res.status(500).json({ success: false, reply: "Maafi chahunga, mujhe flow banane me kuch technical error aa raha hai." });
+    res.status(500).json({ success: false, reply: "Maafi chahunga, mujhe flow banane me kuch technical error aa raha hai. Kripya dobara try karein." });
   }
 };

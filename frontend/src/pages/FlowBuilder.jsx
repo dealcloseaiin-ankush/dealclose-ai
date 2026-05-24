@@ -13,7 +13,7 @@ import ReactFlow, {
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -561,8 +561,9 @@ export default function FlowBuilder() {
       <div className="flex-1 relative" ref={reactFlowWrapper}>
         {/* 🚀 NEW: Sidebar Toggle Button */}
         <div className="absolute top-6 left-6 z-50">
-          <button onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="flex items-center justify-center p-2.5 bg-[#1a1a1a] border border-gray-700 hover:border-blue-500 text-gray-400 hover:text-white rounded-xl shadow-lg transition-colors" title={isPaletteOpen ? "Hide Sidebar" : "Show Sidebar"}>
-            {isPaletteOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+          <button onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-gray-700 hover:border-blue-500 text-gray-300 hover:text-white rounded-xl shadow-lg transition-colors font-bold text-sm" title={isPaletteOpen ? "Hide Tools" : "Show Tools"}>
+            {isPaletteOpen ? <ChevronLeft size={18} /> : <Menu size={18} />}
+            <span className="hidden sm:inline">{isPaletteOpen ? "Hide Tools" : "Show Tools"}</span>
           </button>
         </div>
         <div className="absolute top-6 right-6 z-50 flex gap-3">
