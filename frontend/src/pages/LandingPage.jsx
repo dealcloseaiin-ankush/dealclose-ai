@@ -36,29 +36,29 @@ export default function LandingPage() {
   // Dynamic Pricing Structure for Scalability
   const pricingPlans = [
     {
-      name: "Core CRM Foundation",
-      badge: "Free Forever",
-      price: "₹0",
+      name: "WhatsApp Solo",
+      badge: "14-Day Free Trial",
+      price: "₹199",
       period: "/mo",
-      features: ["Manual Kanban CRM & Lists", "Digital Business Card & QR", "Lead Capture Forms", "Manual WhatsApp/IG Chats", "Basic Staff Management"],
-      cta: "Start for Free"
+      features: ["1 Business Profile", "Single User Access", "Drag & Drop Flow Builder", "Auto-Followups"],
+      cta: "Start Free Trial"
     },
     {
-      name: "B2B WhatsApp Pro",
-      badge: "14-Day Free Trial",
+      name: "WhatsApp Team",
+      badge: "Most Popular",
       price: "₹299",
       period: "/mo",
-      features: ["Cart Abandonment Recovery", "Drag & Drop Flow Builder", "Bulk Order Dispatch (Excel)", "Auto-Followups (Rule-based)"],
-      cta: "Start WhatsApp Trial",
+      features: ["Multi-Staff Shared Inbox", "Advanced Lead Routing", "Bulk Order Dispatch", "Role-based Access"],
+      cta: "Start Team Trial",
       highlight: true
     },
     {
-      name: "Influencer Manager AI",
-      badge: "14-Day Free Trial",
+      name: "WhatsApp Multi-Brand",
+      badge: "Agency Level",
       price: "₹999",
       period: "/mo",
-      features: ["Full AI Deal Negotiation", "Extract Budgets & Deliverables", "Market Insights (ROI)", "IG Keyword Chatbot (₹99/mo Base)"],
-      cta: "Start Instagram Trial"
+      features: ["Unlimited Sub-Businesses", "Interactive Branch Menus", "Per-Branch AI Rules", "Custom Digital Cards"],
+      cta: "Start Agency Trial"
     }
   ];
 

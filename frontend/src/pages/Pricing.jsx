@@ -42,46 +42,46 @@ export default function Pricing() {
           <h2 className="text-2xl font-bold text-white mb-8 text-center"><span className="text-purple-500">Step 2:</span> Choose Your Primary Channel (14-Day Free Trial)</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            {/* B2B WhatsApp */}
+            {/* WhatsApp Team (Multi-Staff) */}
             <div className="bg-gradient-to-b from-[#0a1a10] to-[#111] border border-green-500/30 rounded-3xl p-8 shadow-xl relative group hover:border-green-500/60 transition-all">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-green-500/20 text-green-400 rounded-xl"><MessageCircle size={24} /></div>
-                  <h3 className="text-2xl font-bold text-white">B2B WhatsApp Pro</h3>
+                  <h3 className="text-2xl font-bold text-white">WhatsApp Team</h3>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-green-400">₹299<span className="text-sm text-gray-500 font-normal">/mo</span></div>
+                  <div className="text-2xl font-bold text-green-400">₹499<span className="text-sm text-gray-500 font-normal">/mo</span></div>
                 </div>
               </div>
-              <p className="text-gray-400 text-sm mb-6 h-10">Best for e-commerce, real estate, and retail businesses looking to automate sales.</p>
+              <p className="text-gray-400 text-sm mb-6 h-10">Best for businesses with multiple sales or support team members.</p>
               <ul className="space-y-4 text-sm text-gray-300 mb-8">
-                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-green-500 shrink-0"/> Auto-Followups (Rule-based 15min cart rescue)</li>
+                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-green-500 shrink-0"/> Multi-Staff Shared Inbox</li>
                 <li className="flex items-start gap-3"><CheckCircle size={18} className="text-green-500 shrink-0"/> Drag & Drop Flow Builder (Automated Menus)</li>
                 <li className="flex items-start gap-3"><CheckCircle size={18} className="text-green-500 shrink-0"/> Bulk Order Dispatch (Excel Upload)</li>
                 <li className="flex items-start gap-3"><CheckCircle size={18} className="text-green-500 shrink-0"/> Website Tracking Pixel</li>
               </ul>
-              <Link to="/register" className="block w-full py-3 text-center bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white font-bold rounded-xl border border-green-500/50 transition-colors">Start WhatsApp Trial</Link>
+              <Link to="/register" className="block w-full py-3 text-center bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white font-bold rounded-xl border border-green-500/50 transition-colors">Start Team Trial</Link>
             </div>
 
-            {/* Instagram Influencers */}
+            {/* WhatsApp Multi-Brand */}
             <div className="bg-gradient-to-b from-[#1a0a10] to-[#111] border border-pink-500/30 rounded-3xl p-8 shadow-xl relative group hover:border-pink-500/60 transition-all">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-pink-500/20 text-pink-400 rounded-xl"><Instagram size={24} /></div>
-                  <h3 className="text-2xl font-bold text-white">Influencer Manager</h3>
+                  <div className="p-3 bg-pink-500/20 text-pink-400 rounded-xl"><Database size={24} /></div>
+                  <h3 className="text-2xl font-bold text-white">Multi-Brand Agency</h3>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-pink-400">From ₹999<span className="text-sm text-gray-500 font-normal">/mo</span></div>
+                  <div className="text-2xl font-bold text-pink-400">₹999<span className="text-sm text-gray-500 font-normal">/mo</span></div>
                 </div>
               </div>
-              <p className="text-gray-400 text-sm mb-6 h-10">Your personal AI Talent Manager. Negotiates brand deals based on usage limits.</p>
+              <p className="text-gray-400 text-sm mb-6 h-10">Run multiple businesses or divisions inside a single WhatsApp Number.</p>
               <ul className="space-y-4 text-sm text-gray-300 mb-8">
-                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Auto-Spam/Fan Filter:</strong> (Saves AI limits)</li>
-                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Free:</strong> 20 Brand Chats or 2 Deals</li>
-                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Pro (₹999):</strong> 150 Brand Conversations</li>
-                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Elite (₹1999):</strong> 400 Brand Conversations</li>
+                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Unlimited Sub-Businesses</strong></li>
+                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Interactive Branch Menus</strong></li>
+                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Per-Branch AI Rules</strong></li>
+                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Custom Digital Cards</strong></li>
               </ul>
-              <Link to="/register" className="block w-full py-3 text-center bg-pink-600/20 hover:bg-pink-600 text-pink-400 hover:text-white font-bold rounded-xl border border-pink-500/50 transition-colors">Start Free Tier</Link>
+              <Link to="/register" className="block w-full py-3 text-center bg-pink-600/20 hover:bg-pink-600 text-pink-400 hover:text-white font-bold rounded-xl border border-pink-500/50 transition-colors">Start Agency Trial</Link>
             </div>
 
           </div>

@@ -381,9 +381,11 @@ exports.handleWhatsApp = async (req, res) => {
                     3. AI Voice Calling (Inbound/Outbound sales calls).
                     4. ScanIQ (Meta/Google Ad Competitor Analysis).
                     
-                    - Basic Automation: ₹199/mo (WhatsApp OR Instagram).
-                    - AI Starter Offer: ₹99/mo for the 1st month (renews at ₹299/mo).
-                    - Omnichannel Pro: ₹498/mo (WhatsApp + Insta + AI Voice).
+                    PRICING TO PITCH:
+                    - WhatsApp Solo (1 Business, 1 User): ₹199/mo
+                    - WhatsApp Team (1 Business, Multi-Staff): ₹499/mo
+                    - WhatsApp Multi-Brand (Multiple Businesses on 1 Number): ₹999/mo
+                    - 🎁 SPECIAL OFFER: Tell them if they use the referral code 'DEALCLOSE3M' during onboarding, they will get 3 MONTHS of subscription for just ₹499!
                     
                     CRITICAL RULES:
                     1. Always reply in the EXACT same language the user is speaking (Hindi, Hinglish, English).
@@ -539,7 +541,7 @@ exports.handleWhatsApp = async (req, res) => {
                         } else {
                           flowData = {
                             nodes: [
-r ek refr                              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog' }, position: { x: 400, y: 50 } },
+                              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog' }, position: { x: 400, y: 50 } },
                               { id: '2', type: 'askQuestion', data: { question: `Welcome to ${accData.businessName}! 🏢 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
                               { id: '3', type: 'askQuestion', data: { question: 'Thanks {{name}}! What type of business do you run? (e.g., Retail Shop, Distributor, Online Store)', replyType: 'open' }, position: { x: 100, y: 310 } },
                               { id: '4', type: 'menu', data: { message: 'Noted! What products are you looking for today? (⚠️ Note: We only deal in Wholesale/Bulk. Minimum Order Quantity applies.)', opt1: 'View Catalog 📦', opt2: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
