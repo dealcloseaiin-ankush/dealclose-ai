@@ -44,7 +44,7 @@ const TriggerNode = ({ id, data }) => {
           <input type="text" placeholder="e.g. offer, price, support" defaultValue={data?.keyword || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 placeholder-gray-600" />
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-emerald-500 border-none" />
+      <Handle type="source" position={Position.Bottom} className="w-4 h-4 bg-emerald-500 border-2 border-[#111] z-50 cursor-crosshair" />
     </div>
   );
 };
@@ -66,7 +66,7 @@ const MessageNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-blue-500 border-none" />
+      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-blue-500 border-2 border-[#111] z-50 cursor-crosshair" />
       <div className="font-bold mb-3 flex items-center gap-2 text-blue-400">💬 Send Message</div>
       <div className="space-y-3">
         <div>
@@ -82,7 +82,7 @@ const MessageNode = ({ id, data }) => {
           <textarea defaultValue={data?.message || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500 placeholder-gray-600" rows="2" placeholder="Hi there! How can we help?"></textarea>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-blue-500 border-none" />
+      <Handle type="source" position={Position.Bottom} className="w-4 h-4 bg-blue-500 border-2 border-[#111] z-50 cursor-crosshair" />
     </div>
   );
 };
@@ -95,7 +95,7 @@ const AskQuestionNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-purple-500 border-none" />
+      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-purple-500 border-2 border-[#111] z-50 cursor-crosshair" />
       <div className="font-bold mb-3 flex items-center gap-2 text-purple-400">⚡ Ask Question (Wait for Reply)</div>
       <div className="space-y-3">
         <div>
@@ -112,9 +112,9 @@ const AskQuestionNode = ({ id, data }) => {
         </div>
       </div>
       {/* Multiple Output Handles for different user replies */}
-      <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-3 h-3 bg-green-500 border-none" />
-      <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-3 h-3 bg-rose-500 border-none" />
-      <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-3 h-3 bg-gray-400 border-none" />
+      <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-4 h-4 bg-green-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-4 h-4 bg-rose-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
     </div>
   );
 };
@@ -127,7 +127,7 @@ const DelayNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-none" />
+      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
       <div className="font-bold mb-3 flex items-center gap-2 text-gray-300">⏳ Wait / Delay</div>
       <div className="flex gap-2">
         <input type="number" className="nodrag nopan w-20 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400" defaultValue={data?.delay || "15"} />
@@ -137,7 +137,7 @@ const DelayNode = ({ id, data }) => {
           <option>Days</option>
         </select>
       </div>
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-gray-400 border-none" />
+      <Handle type="source" position={Position.Bottom} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
     </div>
   );
 };
@@ -150,7 +150,7 @@ const ConditionNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-orange-400 border-none" />
+      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-orange-400 border-2 border-[#111] z-50 cursor-crosshair" />
       <div className="font-bold mb-3 flex items-center gap-2 text-orange-400">🔄 Condition (If/Else)</div>
       <select defaultValue={data?.condition || "If User Replied"} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-orange-500">
         <option>If User Replied</option>
@@ -161,8 +161,8 @@ const ConditionNode = ({ id, data }) => {
         <span className="text-green-400">TRUE</span>
         <span className="text-rose-400">FALSE</span>
       </div>
-      <Handle type="source" position={Position.Bottom} id="true" style={{ left: '20%' }} className="w-3 h-3 bg-green-500 border-none" />
-      <Handle type="source" position={Position.Bottom} id="false" style={{ left: '80%' }} className="w-3 h-3 bg-rose-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="true" style={{ left: '20%' }} className="w-4 h-4 bg-green-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} id="false" style={{ left: '80%' }} className="w-4 h-4 bg-rose-500 border-2 border-[#111] z-50 cursor-crosshair" />
     </div>
   );
 };
@@ -314,6 +314,7 @@ export default function FlowBuilder() {
       else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
       else if (label.includes('Condition')) type = 'condition';
       else if (label.includes('Question')) type = 'askQuestion';
+      else if (label.includes('Trigger')) type = 'trigger';
 
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowWrapper.current.getBoundingClientRect().left,
@@ -339,6 +340,7 @@ export default function FlowBuilder() {
     else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
     else if (label.includes('Condition')) type = 'condition';
     else if (label.includes('Question')) type = 'askQuestion';
+    else if (label.includes('Trigger')) type = 'trigger';
 
     const newNode = {
       id: getId(),
@@ -499,6 +501,9 @@ export default function FlowBuilder() {
         <div>
           <h2 className="text-xl font-bold text-white mb-1">Flow Builder</h2>
           <p className="text-xs text-gray-400 mb-6">Drag and drop blocks or click to build automation logic.</p>
+        </div>
+        <div onClick={() => onNodeClickAdd('🚀 Start Trigger')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-emerald-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🚀 Start Trigger')} draggable>
+          <span className="text-lg">🚀</span> <span className="font-semibold text-sm">Start Trigger</span>
         </div>
         
         <div onClick={() => onNodeClickAdd('💬 Send Message')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>

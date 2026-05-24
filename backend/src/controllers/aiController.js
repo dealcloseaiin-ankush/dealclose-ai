@@ -325,7 +325,10 @@ exports.generateFlow = async (req, res) => {
     CRITICAL RULES:
     1. ALWAYS PUT REAL TEXT IN 'data.message' AND 'data.question'. Never leave them blank! Write the Hindi/English text inside them!
     2. If the user asks to modify an existing flow, DO NOT DELETE existing nodes. Take the 'Current Canvas Nodes' and 'Current Canvas Edges' from the prompt, modify them as requested, and return the FULL updated arrays.
-    3. Edges must logically connect 'source' to 'target'. Ensure 'sourceHandle' matches node outputs if applicable.
+    3. Edges must logically connect 'source' to 'target'. If a node has multiple outputs, you MUST specify "sourceHandle" in the edge. 
+       - For 'condition' node, sourceHandle MUST be "true" or "false".
+       - For 'askQuestion' node, sourceHandle MUST be "yes", "no", or "other".
+       Example Edge: { "id": "e1-2", "source": "node_1", "target": "node_2", "sourceHandle": "yes" }
     4. If just chatting, return nodes: [] and edges: [].
     5. Return ONLY valid JSON. Do not include markdown formatting or backticks.`;
 
