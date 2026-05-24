@@ -301,6 +301,13 @@ exports.handleWhatsApp = async (req, res) => {
             // ==========================================================
             let flowReplyHandled = false;
             
+            // 🚀 NEW: Dynamic Variable Replacer (e.g. {{name}})
+            const formatFlowMsg = (text) => {
+              if (!text) return "";
+              let cName = (currentLeadCheck && currentLeadCheck.name && !currentLeadCheck.name.startsWith('User ')) ? currentLeadCheck.name.split(' ')[0] : '';
+              return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
+            };
+            
             // Workspace routing for Flows
             const workspaceIdToUse = (currentLeadCheck && currentLeadCheck.lastSelectedWorkspaceId) ? currentLeadCheck.lastSelectedWorkspaceId : 'main';
             
@@ -346,14 +353,14 @@ exports.handleWhatsApp = async (req, res) => {
                      if (!nextNode) break;
 
                      if (nextNode.type === 'message') {
-                       const msgText = nextNode.data.message || nextNode.data.label;
+                       const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
                        await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
-                       const msgText = nextNode.data.question || nextNode.data.label;
+                       const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
                        await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
@@ -361,7 +368,7 @@ exports.handleWhatsApp = async (req, res) => {
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
                      } else if (nextNode.type === 'menu') {
-                       const msgText = nextNode.data.message || "Please choose an option:";
+                       const msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
                        const options = [nextNode.data.opt1, nextNode.data.opt2, nextNode.data.opt3].filter(opt => opt && opt.trim() !== '');
                        
                        if (options.length > 0) {
@@ -412,14 +419,14 @@ exports.handleWhatsApp = async (req, res) => {
                      if (!nextNode) break;
 
                      if (nextNode.type === 'message') {
-                       const msgText = nextNode.data.message || nextNode.data.label;
+                       const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
                        await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
-                       const msgText = nextNode.data.question || nextNode.data.label;
+                       const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
                        await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
@@ -427,7 +434,7 @@ exports.handleWhatsApp = async (req, res) => {
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
                      } else if (nextNode.type === 'menu') {
-                       const msgText = nextNode.data.message || "Please choose an option:";
+                       const msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
                        const options = [nextNode.data.opt1, nextNode.data.opt2, nextNode.data.opt3].filter(opt => opt && opt.trim() !== '');
                        
                        if (options.length > 0) {

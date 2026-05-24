@@ -539,12 +539,14 @@ exports.handleWhatsApp = async (req, res) => {
                         } else {
                           flowData = {
                             nodes: [
-                              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'price, details, buy' }, position: { x: 250, y: 50 } },
-                              { id: '2', type: 'message', data: { message: `Welcome to ${accData.businessName}! We are excited to help you today. 🏢` }, position: { x: 250, y: 160 } },
-                              { id: '3', type: 'askQuestion', data: { question: 'Before we proceed, could you please reply with your Full Name and City?', replyType: 'open' }, position: { x: 250, y: 280 } },
-                              { id: '4', type: 'message', data: { message: 'Thank you! ✅ Your details are saved. Our team will contact you shortly with the best offers.' }, position: { x: 250, y: 460 } }
+r ek refr                              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog' }, position: { x: 400, y: 50 } },
+                              { id: '2', type: 'askQuestion', data: { question: `Welcome to ${accData.businessName}! 🏢 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
+                              { id: '3', type: 'askQuestion', data: { question: 'Thanks {{name}}! What type of business do you run? (e.g., Retail Shop, Distributor, Online Store)', replyType: 'open' }, position: { x: 100, y: 310 } },
+                              { id: '4', type: 'menu', data: { message: 'Noted! What products are you looking for today? (⚠️ Note: We only deal in Wholesale/Bulk. Minimum Order Quantity applies.)', opt1: 'View Catalog 📦', opt2: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
+                              { id: '5', type: 'message', data: { message: 'Great! Here is our latest wholesale catalog: [Your Catalog Link Here]. Let us know your bulk requirements!' }, position: { x: 100, y: 500 } },
+                              { id: '6', type: 'message', data: { message: 'Our B2B sales expert has been notified and will contact you shortly to discuss bulk pricing!' }, position: { x: 700, y: 500 } }
                             ],
-                            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+                            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' }, { id: 'e4-5', source: '4', target: '5', sourceHandle: 'opt_0' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'opt_1' } ]
                           };
                         }
 
