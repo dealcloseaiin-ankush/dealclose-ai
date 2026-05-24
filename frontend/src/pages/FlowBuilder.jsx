@@ -13,7 +13,7 @@ import ReactFlow, {
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -199,7 +199,12 @@ export default function FlowBuilder() {
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('main');
   const [mainBusinessName, setMainBusinessName] = useState('DealClose AI (Main)');
+  const [flowName, setFlowName] = useState('Main Automation');
   
+  // 🚀 NEW: Flow List Modal States
+  const [isFlowListOpen, setIsFlowListOpen] = useState(false);
+  const [savedFlows, setSavedFlows] = useState([]);
+
   // 🚀 NEW: AI Flow Builder Assistant States
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
@@ -329,7 +334,8 @@ export default function FlowBuilder() {
       try {
       const flowData = reactFlowInstance.toObject();
       console.log("Saving Flow:", flowData);
-        await api.post('/whatsapp/flows', { name: 'Main Automation', flowData, workspaceId: selectedWorkspace });
+        const finalName = flowName.trim() === '' ? `Flow-${Math.floor(Math.random() * 1000)}` : flowName;
+        await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace });
       toast.success("Automation Flow Saved & Published! 🚀");
       } catch (error) {
         console.error("Failed to save flow:", error);
@@ -337,6 +343,27 @@ export default function FlowBuilder() {
       } finally {
         setIsSaving(false);
       }
+    }
+  };
+
+  // 🚀 NEW: Fetch and Load Flows Logic
+  const fetchSavedFlows = async () => {
+    try {
+      const res = await api.get('/whatsapp/flows');
+      setSavedFlows(res.data.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch flows.");
+    }
+  };
+
+  const loadFlow = (flow) => {
+    if (flow.flowData) {
+      setNodes(flow.flowData.nodes || []);
+      setEdges(flow.flowData.edges || []);
+      setFlowName(flow.name);
+      setSelectedWorkspace(flow.workspaceId || 'main');
+      setIsFlowListOpen(false);
+      toast.success(`Loaded Flow: ${flow.name}`);
     }
   };
 
@@ -372,6 +399,38 @@ export default function FlowBuilder() {
         </div>
       </div>
     )}
+
+    {/* 🚀 NEW: Saved Flows List Modal */}
+    {isFlowListOpen && (
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl p-8 w-full max-w-2xl shadow-2xl relative max-h-[80vh] flex flex-col">
+          <button onClick={() => setIsFlowListOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+            <X size={24} />
+          </button>
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <FolderOpen className="text-indigo-500" /> My Saved Automations
+          </h2>
+          <div className="overflow-y-auto flex-1 space-y-3">
+            {savedFlows.length === 0 ? (
+              <p className="text-gray-500 text-center py-10">No saved flows found. Build and save one first!</p>
+            ) : (
+              savedFlows.map(flow => (
+                <div key={flow._id} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl flex justify-between items-center hover:border-indigo-500 transition-colors">
+                  <div>
+                    <h3 className="font-bold text-white text-lg">{flow.name}</h3>
+                    <p className="text-xs text-gray-400">Workspace: {flow.workspaceId === 'main' ? 'Main Business' : workspaces.find(w => w._id === flow.workspaceId)?.name || flow.workspaceId}</p>
+                  </div>
+                  <button onClick={() => loadFlow(flow)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors">
+                    Load Flow
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="flex h-[calc(100vh-4rem)] bg-[#050505] text-gray-100 font-sans">
       {/* Node Palette Sidebar */}
       <div className="w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col gap-4 z-10">
@@ -398,6 +457,15 @@ export default function FlowBuilder() {
       <div className="flex-1 relative" ref={reactFlowWrapper}>
         <div className="absolute top-6 right-6 z-50 flex gap-3">
           
+          {/* 🚀 NEW: Flow Name Input */}
+          <input 
+            type="text" 
+            value={flowName} 
+            onChange={(e) => setFlowName(e.target.value)} 
+            placeholder="Enter Flow Name..." 
+            className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 shadow-lg font-bold w-48"
+          />
+
           {/* 🚀 NEW: Business / Workspace Selector */}
           <select value={selectedWorkspace} onChange={(e) => setSelectedWorkspace(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 cursor-pointer shadow-lg font-bold">
             <option value="main">🏢 {mainBusinessName}</option>
@@ -405,6 +473,11 @@ export default function FlowBuilder() {
               <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
             ))}
           </select>
+          
+          {/* 🚀 NEW: My Flows Button */}
+          <button onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
+            <FolderOpen size={18} /> My Flows
+          </button>
 
           <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold shadow-lg transition-colors">
             <HelpCircle size={18} /> How to Use?

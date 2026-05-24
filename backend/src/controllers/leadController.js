@@ -116,9 +116,12 @@ exports.getLeadAnalytics = async (req, res) => {
     // Calculations
     const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : 0;
     
-    // For now, setting a fixed investment mock value (e.g. ₹500 AI cost). 
-    // Future me isko User ki exact wallet usage se fetch karenge.
-    const totalInvestment = 500; 
+    // 🚀 NEW: Fetch User Message Stats first to calculate LIVE costs
+    const user = await User.findById(userIdObj).lean();
+    const messageStats = user?.messageStats || { sent: 0, delivered: 0, read: 0 };
+
+    // 🚀 LIVE: Total Investment calculated based on WhatsApp messages sent (₹0.80 per msg approx)
+    const totalInvestment = messageStats.sent * 0.80; 
     const costPerLead = totalLeads > 0 ? (totalInvestment / totalLeads).toFixed(2) : 0;
 
     const graphData = [
@@ -150,10 +153,6 @@ exports.getLeadAnalytics = async (req, res) => {
         { $sort: { _id: 1 } },
         { $project: { date: '$_id', leads: '$count', _id: 0 } }
     ]);
-
-    // 🚀 NEW: Fetch User Message Stats for WhatsApp Delivery Report
-    const user = await User.findById(userIdObj).lean();
-    const messageStats = user?.messageStats || { sent: 0, delivered: 0, read: 0 };
 
     // 🚀 NEW: Fetch Recent Activity for Live AI Activity Section
     const recentActivity = await Lead.find({ userId: userIdObj })

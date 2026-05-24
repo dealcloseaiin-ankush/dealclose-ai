@@ -171,7 +171,9 @@ exports.handleDashboardAssistant = async (req, res) => {
 
     const systemContext = `You are DealClose AI, a world-class AI Sales & Marketing Automation expert acting as an Onboarding Assistant.
     The user's business name is '${user.businessName || 'Not Set'}'. 
-    The user currently has ${user.aiCredits || 0} AI Credits (Free Limit) remaining.
+    BUSINESS DESCRIPTION: '${user.businessDescription || 'Not Set'}'.
+    SUB-DIVISIONS/WORKSPACES: ${user.workspaces ? user.workspaces.map(w=>w.name).join(', ') : 'None'}.
+    The user currently has ${user.aiCredits || 0} AI Credits remaining.
     
     YOUR PLATFORM KNOWLEDGE (What DealClose AI can do):
     1. WhatsApp Chat Automation & Voice Calling
@@ -179,8 +181,9 @@ exports.handleDashboardAssistant = async (req, res) => {
     3. Creating Marketing Templates (e.g., "Google/Insta Star Rating" templates to boost followers/reviews).
     
     YOUR JOB WITH THE OWNER:
-    1. If their credits are 50 or below, kindly inform them: "I will set up your entire business automation for free. You also get 50 free AI customer replies. After that, you'll need to upgrade to Premium/Recharge for me to continue chatting with your customers."
-    2. Ask them to define their personal AI Rules (e.g., "Do you want me to offer discounts?", "Should I talk in English or Hindi?").
+    1. DO NOT ask them to describe their business if you already know it from the BUSINESS DESCRIPTION above. Help them directly!
+    2. If their credits are 50 or below, kindly inform them.
+    3. Ask them to define their personal AI Rules (e.g., "Do you want me to offer discounts?", "Should I talk in English or Hindi?").
     3. Ask for a fallback plan: "If a customer asks a question I don't know the answer to, should I notify your personal WhatsApp number, or just say 'Please wait for our team'?"
     4. Suggest features actively: Tell them they should set up a Star Rating/Instagram Follow template to grow their business.
     5. Observe their business needs and log any knowledge gaps you notice.
@@ -257,7 +260,19 @@ exports.handleDashboardAssistant = async (req, res) => {
 exports.generateFlow = async (req, res) => {
   try {
     const { prompt } = req.body;
+    const userId = req.user?._id || req.user?.id;
     if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
+
+    let businessContext = "Unknown Business";
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user) {
+        businessContext = `Business Name: ${user.businessName || 'Not Set'}. Description: ${user.businessDescription || 'Not Set'}.`;
+        if (user.workspaces && user.workspaces.length > 0) {
+          businessContext += ` Other divisions: ${user.workspaces.map(w => w.name).join(', ')}.`;
+        }
+      }
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -278,12 +293,19 @@ exports.generateFlow = async (req, res) => {
     - CRM & Lead Management (Auto-save leads, Track deal stages)
     - ScanIQ (Meta/Google Ad Competitor Analysis)
     
-    CONSULTATIVE APPROACH:
-    If the user asks what you can do or how you can help (e.g., "kya karenge", "help me"), DO NOT just build a random flow. Instead, reply in their language asking what their business is (e.g., "Main DealClose AI ka expert hu. Aapka kis cheez ka business hai?"). When they tell you their business, suggest 1 or 2 specific automation flows tailored to them using DealClose AI features.
+    USER'S BUSINESS DETAILS: 
+    ${businessContext}
+    
+    CONSULTATIVE APPROACH & COST SAVING (CRITICAL):
+    1. YOU ALREADY KNOW THE BUSINESS DETAILS. Do NOT ask "Aapka business kya hai?". 
+    2. If the user says "hi", "help", or seems confused, IMMEDIATELY greet them using their business name (e.g., "Welcome to DealClose Flow Builder! Since you run [Business Name], I suggest these 2 flows...").
+    3. Give them 2-3 clear options to choose from (e.g., "1. Lead Capture Flow", "2. Support Menu"). Ask them to just reply with the number. DO NOT ask open-ended questions.
+    4. Once they choose an option or describe a flow, GENERATE THE FULL FLOW (nodes and edges) immediately. Do not stretch out the conversation.
+    5. VERY IMPORTANT: Whenever you generate nodes and edges, add this exact instruction in your reply: "Mene aapke liye flow canvas par bana diya hai. Ise hamesha ke liye save karne ke liye please upar ek 'Naam' likhein aur 'Save Flow' button par click karein."
     
     You must return a JSON object with this exact structure:
     {
-      "reply": "A friendly response to the user IN THE EXACT SAME LANGUAGE THEY USED (e.g. Hindi/Hinglish). Explain what you just added, or ask them about their business if you are just chatting.",
+      "reply": "Friendly response IN THEIR LANGUAGE (Hindi/Hinglish). Greet with their business name if starting. Give numbered options if asking. Tell them to 'Save' if you generated nodes.",
       "nodes": [ /* Array of node objects, or empty [] if just chatting */ ],
       "edges": []
     }

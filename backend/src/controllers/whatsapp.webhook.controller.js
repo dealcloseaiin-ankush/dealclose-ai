@@ -352,11 +352,11 @@ exports.handleWhatsApp = async (req, res) => {
                 const isNameKnown = lead && lead.name && !lead.name.startsWith('User ');
                 const customerNameContext = isNameKnown ? lead.name : "Unknown";
 
-                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk. If asked about unrelated topics, steer back to business immediately or ignore.\n3. When asking multiple-choice questions, ALWAYS use the 'send_whatsapp_menu' tool (max 3 options) instead of typing options in text. This saves user time and API tokens. Ask one question at a time.\n4. LEAD CAPTURE: If the user provides their name and city, ALWAYS use the 'update_customer_profile' tool to save it in the database immediately.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
+                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk.\n3. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.\n4. LEAD CAPTURE: If the user provides their name and/or city, ALWAYS use the 'update_customer_profile' tool. Ensure you combine both name and city in the fullName argument (e.g. "Rahul - Delhi").\n5. VERY IMPORTANT: NEVER cut off your sentences midway. Always provide a complete and polite sentence.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
                 
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
                 if (user.aiCredits > 0 && user.aiCredits <= 200) {
-                  aiContext += "\n\n⚠️ LOW BUDGET MODE ACTIVE: You must provide short and concise answers (1-2 sentences max) to save processing time and API cost.";
+                  aiContext += "\n\n⚠️ BUDGET LIMIT ACTIVE: Provide short answers (1-2 sentences max), but ALWAYS ensure the sentence finishes completely.";
                 }
                 
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
@@ -423,7 +423,8 @@ exports.handleWhatsApp = async (req, res) => {
                       const profileData = JSON.parse(toolCall.function.arguments);
                       // Keeping the unique ID with the name as requested by you to prevent duplicate name issues
                       const uniqueSuffix = fromNumber.slice(-4);
-                      const newName = `${profileData.fullName} (ID: ${uniqueSuffix})`;
+                      // Make sure City gets embedded properly if AI sends it combined
+                      const newName = `${profileData.fullName || 'Customer'} (ID: ${uniqueSuffix})`;
                       
                       await Lead.findOneAndUpdate(
                         { phoneNumber: fromNumber, userId: user._id }, 

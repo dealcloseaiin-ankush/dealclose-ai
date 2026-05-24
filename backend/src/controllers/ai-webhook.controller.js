@@ -334,7 +334,7 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 }
 
-                let aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons. Use it frequently to ask quick multiple-choice questions and guide users through setups/onboarding effortlessly without making them type.\nIf you don't know the answer to a question, politely inform the user and use the 'escalate_to_staff' tool.`;
+                let aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nCRITICAL: Never cut off your responses mid-sentence. Always finish your thoughts.\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons.\n4. LEAD CAPTURE: If the user provides their name and/or city, ALWAYS use the 'update_customer_profile' tool. Ensure you combine both name and city in the fullName argument (e.g. "Rahul - Delhi").`;
                 
                 // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number)
                 if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
@@ -361,7 +361,8 @@ exports.handleWhatsApp = async (req, res) => {
                     CRITICAL RULES:
                     1. Always reply in the EXACT same language the user is speaking (Hindi, Hinglish, English).
                     2. Be conversational. Don't dump all info at once. Ask about their business first!
-                    3. Use 'send_whatsapp_menu' tool for quick options. Use 'create_saas_account' if they want to sign up.`;
+                    3. Use 'send_whatsapp_menu' tool for quick options. Use 'create_saas_account' if they want to sign up.
+                    4. NEVER cut off your message in the middle. Always provide a full, complete sentence.`;
                 }
                 
                 // 🚀 NEW: Smart AI Address Extraction for Manual Chat Flow
@@ -420,6 +421,16 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "check_order_status") {
                       responseMessage = "Let me check the dispatch system for your number. Your order is currently being processed and will be shipped soon!";
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "update_customer_profile") {
+                      const profileData = JSON.parse(toolCall.function.arguments);
+                      const uniqueSuffix = fromNumber.slice(-4);
+                      const newName = `${profileData.fullName || 'Customer'} (ID: ${uniqueSuffix})`;
+                      await Lead.findOneAndUpdate(
+                        { phoneNumber: fromNumber, userId: user._id }, 
+                        { $set: { name: newName } }
+                      );
+                      responseMessage = `Thanks! I've updated your profile as ${profileData.fullName}. How can I help you today?`;
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);
