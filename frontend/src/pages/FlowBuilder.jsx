@@ -13,7 +13,7 @@ import ReactFlow, {
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -44,7 +44,7 @@ const TriggerNode = ({ id, data }) => {
           <input type="text" placeholder="e.g. offer, price, support" defaultValue={data?.keyword || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-emerald-500 placeholder-gray-600" />
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="w-4 h-4 bg-emerald-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-emerald-500 border-none" />
     </div>
   );
 };
@@ -66,7 +66,7 @@ const MessageNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-blue-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-blue-500 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-blue-400">💬 Send Message</div>
       <div className="space-y-3">
         <div>
@@ -82,36 +82,26 @@ const MessageNode = ({ id, data }) => {
           <textarea defaultValue={data?.message || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500 placeholder-gray-600" rows="2" placeholder="Hi there! How can we help?"></textarea>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="w-4 h-4 bg-blue-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-blue-500 border-none" />
     </div>
   );
 };
 
 const AskQuestionNode = ({ id, data }) => {
   const { setNodes, setEdges } = useReactFlow();
-  const [replyType, setReplyType] = useState(data?.replyType || 'yes_no');
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white relative group">
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-purple-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-purple-500 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-purple-400">⚡ Ask Question (Wait for Reply)</div>
       <div className="space-y-3">
         <div>
-          <p className="text-xs text-gray-400 mb-1">Expected Reply Type</p>
-          <select value={replyType} onChange={(e) => setReplyType(e.target.value)} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 mb-2">
-            <option value="yes_no">Yes / No Choice</option>
-            <option value="open">Open Text (Name, City, etc.)</option>
-          </select>
-        </div>
-        <div>
           <p className="text-xs text-gray-400 mb-1">Question to ask</p>
-          <textarea defaultValue={data?.question || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., What is your name?"></textarea>
+          <textarea defaultValue={data?.question || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
         </div>
-        
-        {replyType === 'yes_no' && (
         <div>
           <p className="text-xs text-gray-400 mb-1">Expected Replies (Branches)</p>
           <div className="flex justify-between text-[10px] font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
@@ -120,26 +110,11 @@ const AskQuestionNode = ({ id, data }) => {
             <span className="text-gray-400 text-center w-1/3">Any Other</span>
           </div>
         </div>
-        )}
-        
-        {replyType === 'open' && (
-        <div>
-          <div className="flex justify-center text-xs font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
-            <span className="text-emerald-400 text-center">User Replies Any Text</span>
-          </div>
-        </div>
-        )}
       </div>
-      
-      {replyType === 'yes_no' ? (
-        <>
-          <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-4 h-4 bg-green-500 border-2 border-[#111] z-50 cursor-crosshair" />
-          <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-4 h-4 bg-rose-500 border-2 border-[#111] z-50 cursor-crosshair" />
-          <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
-        </>
-      ) : (
-        <Handle type="source" position={Position.Bottom} id="replied" style={{ left: '50%' }} className="w-4 h-4 bg-emerald-500 border-2 border-[#111] z-50 cursor-crosshair" />
-      )}
+      {/* Multiple Output Handles for different user replies */}
+      <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-3 h-3 bg-green-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-3 h-3 bg-rose-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-3 h-3 bg-gray-400 border-none" />
     </div>
   );
 };
@@ -152,7 +127,7 @@ const DelayNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-gray-300">⏳ Wait / Delay</div>
       <div className="flex gap-2">
         <input type="number" className="nodrag nopan w-20 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400" defaultValue={data?.delay || "15"} />
@@ -162,7 +137,7 @@ const DelayNode = ({ id, data }) => {
           <option>Days</option>
         </select>
       </div>
-      <Handle type="source" position={Position.Bottom} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-gray-400 border-none" />
     </div>
   );
 };
@@ -175,7 +150,7 @@ const ConditionNode = ({ id, data }) => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-4 h-4 bg-orange-400 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-orange-400 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-orange-400">🔄 Condition (If/Else)</div>
       <select defaultValue={data?.condition || "If User Replied"} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-orange-500">
         <option>If User Replied</option>
@@ -186,8 +161,8 @@ const ConditionNode = ({ id, data }) => {
         <span className="text-green-400">TRUE</span>
         <span className="text-rose-400">FALSE</span>
       </div>
-      <Handle type="source" position={Position.Bottom} id="true" style={{ left: '20%' }} className="w-4 h-4 bg-green-500 border-2 border-[#111] z-50 cursor-crosshair" />
-      <Handle type="source" position={Position.Bottom} id="false" style={{ left: '80%' }} className="w-4 h-4 bg-rose-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      <Handle type="source" position={Position.Bottom} id="true" style={{ left: '20%' }} className="w-3 h-3 bg-green-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="false" style={{ left: '80%' }} className="w-3 h-3 bg-rose-500 border-none" />
     </div>
   );
 };
@@ -241,6 +216,7 @@ export default function FlowBuilder() {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(true);
   
   // 🚀 NEW: Workspace/Business Selector States
   const [workspaces, setWorkspaces] = useState([]);
@@ -339,7 +315,6 @@ export default function FlowBuilder() {
       else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
       else if (label.includes('Condition')) type = 'condition';
       else if (label.includes('Question')) type = 'askQuestion';
-      else if (label.includes('Trigger')) type = 'trigger';
 
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowWrapper.current.getBoundingClientRect().left,
@@ -365,7 +340,6 @@ export default function FlowBuilder() {
     else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
     else if (label.includes('Condition')) type = 'condition';
     else if (label.includes('Question')) type = 'askQuestion';
-    else if (label.includes('Trigger')) type = 'trigger';
 
     const newNode = {
       id: getId(),
@@ -392,7 +366,7 @@ export default function FlowBuilder() {
       const simplifyEdges = edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle }));
       const recentChat = aiMessages.slice(-6).map(m => `${m.role === 'ai' ? 'AI' : 'User'}: ${m.content}`).join('\n');
       
-      const enrichedPrompt = `Chat History:\n${recentChat}\n\nCurrent Canvas Nodes:\n${JSON.stringify(simplifyNodes)}\n\nCurrent Canvas Edges:\n${JSON.stringify(simplifyEdges)}\n\nUser Request: ${userMsg}\n\nIMPORTANT INSTRUCTIONS:\n1. Deeply analyze Current Canvas Nodes. DO NOT duplicate existing logic. Reuse and connect existing nodes.\n2. Return the FULL updated nodes and edges arrays (do not delete existing ones unless asked).\n3. Put actual conversational text inside data.message or data.question.\n4. If just chatting, return nodes: [] and edges: [].`;
+      const enrichedPrompt = `Chat History:\n${recentChat}\n\nCurrent Canvas Nodes:\n${JSON.stringify(simplifyNodes)}\n\nCurrent Canvas Edges:\n${JSON.stringify(simplifyEdges)}\n\nUser Request: ${userMsg}\n\nIMPORTANT INSTRUCTIONS:\n1. If modifying the flow, return the FULL updated nodes and edges arrays (do not delete existing ones unless asked).\n2. Put actual conversational text inside data.message or data.question.\n3. If just chatting, return nodes: [] and edges: [].`;
 
       // Pass the selected business name to the backend explicitly
       const activeBizName = selectedWorkspace === 'main' ? mainBusinessName : workspaces.find(w => w._id === selectedWorkspace)?.name || mainBusinessName;
@@ -522,31 +496,36 @@ export default function FlowBuilder() {
 
     <div className="flex h-[calc(100vh-4rem)] bg-[#050505] text-gray-100 font-sans">
       {/* Node Palette Sidebar */}
-      <div className="w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col gap-4 z-10">
-        <div>
-          <h2 className="text-xl font-bold text-white mb-1">Flow Builder</h2>
-          <p className="text-xs text-gray-400 mb-6">Drag and drop blocks or click to build automation logic.</p>
+      {isPaletteOpen && (
+        <div className="w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col gap-4 z-10 shrink-0 overflow-y-auto">
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">Flow Builder</h2>
+            <p className="text-xs text-gray-400 mb-6">Drag and drop blocks or click to build automation logic.</p>
+          </div>
+          
+          <div onClick={() => onNodeClickAdd('💬 Send Message')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>
+            <MessageSquare size={18} className="text-blue-400" /> <span className="font-semibold text-sm">Send Message</span>
+          </div>
+          <div onClick={() => onNodeClickAdd('⚡ Ask Question')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-purple-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⚡ Ask Question')} draggable>
+            <Zap size={18} className="text-purple-400" /> <span className="font-semibold text-sm">Ask Question</span>
+          </div>
+          <div onClick={() => onNodeClickAdd('🔄 Condition (If/Else)')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-orange-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🔄 Condition (If/Else)')} draggable>
+            <GitBranch size={18} className="text-orange-400" /> <span className="font-semibold text-sm">Condition</span>
+          </div>
+          <div onClick={() => onNodeClickAdd('⏳ Wait 15 Mins')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-gray-400 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⏳ Wait 15 Mins')} draggable>
+            <Clock size={18} className="text-gray-400" /> <span className="font-semibold text-sm">Add Delay</span>
+          </div>
         </div>
-        <div onClick={() => onNodeClickAdd('🚀 Start Trigger')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-emerald-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🚀 Start Trigger')} draggable>
-          <span className="text-lg">🚀</span> <span className="font-semibold text-sm">Start Trigger</span>
-        </div>
-        
-        <div onClick={() => onNodeClickAdd('💬 Send Message')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>
-          <MessageSquare size={18} className="text-blue-400" /> <span className="font-semibold text-sm">Send Message</span>
-        </div>
-        <div onClick={() => onNodeClickAdd('⚡ Ask Question')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-purple-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⚡ Ask Question')} draggable>
-          <Zap size={18} className="text-purple-400" /> <span className="font-semibold text-sm">Ask Question</span>
-        </div>
-        <div onClick={() => onNodeClickAdd('🔄 Condition (If/Else)')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-orange-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🔄 Condition (If/Else)')} draggable>
-          <GitBranch size={18} className="text-orange-400" /> <span className="font-semibold text-sm">Condition</span>
-        </div>
-        <div onClick={() => onNodeClickAdd('⏳ Wait 15 Mins')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-gray-400 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⏳ Wait 15 Mins')} draggable>
-          <Clock size={18} className="text-gray-400" /> <span className="font-semibold text-sm">Add Delay</span>
-        </div>
-      </div>
+      )}
 
       {/* Flow Canvas */}
       <div className="flex-1 relative" ref={reactFlowWrapper}>
+        {/* 🚀 NEW: Sidebar Toggle Button */}
+        <div className="absolute top-6 left-6 z-50">
+          <button onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="flex items-center justify-center p-2.5 bg-[#1a1a1a] border border-gray-700 hover:border-blue-500 text-gray-400 hover:text-white rounded-xl shadow-lg transition-colors" title={isPaletteOpen ? "Hide Sidebar" : "Show Sidebar"}>
+            {isPaletteOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+          </button>
+        </div>
         <div className="absolute top-6 right-6 z-50 flex gap-3">
           
           {/* 🚀 NEW: Flow Name Input */}
