@@ -74,9 +74,9 @@ export default function Pricing() {
                   <div className="text-2xl font-bold text-pink-400">₹999<span className="text-sm text-gray-500 font-normal">/mo</span></div>
                 </div>
               </div>
-              <p className="text-gray-400 text-sm mb-6 h-10">Run multiple businesses or divisions inside a single WhatsApp Number.</p>
+              <p className="text-gray-400 text-sm mb-6 h-10">Run multiple businesses with your entire team inside a single WhatsApp Number.</p>
               <ul className="space-y-4 text-sm text-gray-300 mb-8">
-                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Unlimited Sub-Businesses</strong></li>
+                <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Multi-Staff & Sub-Businesses</strong></li>
                 <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Interactive Branch Menus</strong></li>
                 <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Per-Branch AI Rules</strong></li>
                 <li className="flex items-start gap-3"><CheckCircle size={18} className="text-pink-500 shrink-0"/> <strong className="text-white">Custom Digital Cards</strong></li>

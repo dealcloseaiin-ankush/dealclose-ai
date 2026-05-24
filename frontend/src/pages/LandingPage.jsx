@@ -57,7 +57,7 @@ export default function LandingPage() {
       badge: "Agency Level",
       price: "₹999",
       period: "/mo",
-      features: ["Unlimited Sub-Businesses", "Interactive Branch Menus", "Per-Branch AI Rules", "Custom Digital Cards"],
+      features: ["Unlimited Sub-Businesses", "Multi-Staff Access", "Interactive Branch Menus", "Custom Digital Cards"],
       cta: "Start Agency Trial"
     }
   ];

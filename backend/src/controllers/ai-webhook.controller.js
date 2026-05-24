@@ -384,8 +384,8 @@ exports.handleWhatsApp = async (req, res) => {
                     PRICING TO PITCH:
                     - WhatsApp Solo (1 Business, 1 User): ₹199/mo
                     - WhatsApp Team (1 Business, Multi-Staff): ₹499/mo
-                    - WhatsApp Multi-Brand (Multiple Businesses on 1 Number): ₹999/mo
-                    - 🎁 SPECIAL OFFER: Tell them if they use the referral code 'DEALCLOSE3M' during onboarding, they will get 3 MONTHS of subscription for just ₹499!
+                    - WhatsApp Multi-Brand (Multi-Business, Multi-Staff): ₹999/mo
+                    - 🎁 SPECIAL OFFER: Tell them if they use the referral code 'AI499' during checkout/onboarding, they will get 3 MONTHS of subscription for just ₹499!
                     
                     CRITICAL RULES:
                     1. Always reply in the EXACT same language the user is speaking (Hindi, Hinglish, English).
