@@ -187,6 +187,28 @@ const initialNodes = [
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
+// 🚀 NEW: LocalStorage Logic for Chat History (12 hours limit & Max 5 recent chats)
+const CHAT_STORAGE_KEY = 'dealclose_ai_chat_history';
+const CHAT_EXPIRY_HOURS = 12;
+
+const loadChatHistory = () => {
+  const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      const now = new Date().getTime();
+      if (now - parsed.timestamp < CHAT_EXPIRY_HOURS * 60 * 60 * 1000) {
+        return parsed.messages;
+      } else {
+        localStorage.removeItem(CHAT_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.error('Failed to parse chat history:', error);
+    }
+  }
+  return [{ role: 'ai', content: 'Welcome to DealClose Flow Builder! ✨ I have analyzed your business profile. You don\'t need to build from scratch. Just tell me your goal (e.g. "I want to capture leads", "Create a Support Menu"), and I will auto-generate the complete flow for you!' }];
+};
+
 export default function FlowBuilder() {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -208,13 +230,50 @@ export default function FlowBuilder() {
   // 🚀 NEW: AI Flow Builder Assistant States
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
-  const [aiMessages, setAiMessages] = useState([{ role: 'ai', content: 'Hi! I am your AI Flow Builder. Tell me what kind of automation you want to build (e.g., "Build an abandoned cart flow" or "Create a yes/no question flow").' }]);
+  const [aiMessages, setAiMessages] = useState(loadChatHistory);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const aiChatEndRef = useRef(null);
+
+  // 🚀 NEW: Draggable Chat Widget States
+  const [chatOffset, setChatOffset] = useState({ x: 0, y: 0 });
+  const dragStart = useRef({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+
+  useEffect(() => {
+    // Auto-save chat history & strictly keep only max 5-6 recent chats
+    if (aiMessages.length > 6) {
+      setAiMessages([aiMessages[0], ...aiMessages.slice(-5)]);
+      return;
+    }
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
+      timestamp: new Date().getTime(),
+      messages: aiMessages
+    }));
+  }, [aiMessages]);
 
   useEffect(() => {
     aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [aiMessages]);
+
+  // 🚀 NEW: Drag Handlers for Chat Box
+  const handleChatDragStart = (e) => {
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX - chatOffset.x, y: e.clientY - chatOffset.y };
+    document.addEventListener('mousemove', handleChatDragMove);
+    document.addEventListener('mouseup', handleChatDragEnd);
+  };
+
+  const handleChatDragMove = (e) => {
+    if (isDragging.current) {
+      setChatOffset({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+    }
+  };
+
+  const handleChatDragEnd = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', handleChatDragMove);
+    document.removeEventListener('mouseup', handleChatDragEnd);
+  };
 
   useEffect(() => {
     // Fetch workspaces so users can assign flows to different businesses
@@ -492,15 +551,21 @@ export default function FlowBuilder() {
         <ReactFlowProvider>
           
           {/* 🚀 NEW: AI Flow Assistant Widget Floating */}
-          <div className="absolute bottom-6 left-6 z-50 flex flex-col items-start">
+          <div 
+            className="absolute bottom-6 left-6 z-50 flex flex-col items-start"
+            style={{ transform: `translate(${chatOffset.x}px, ${chatOffset.y}px)`, transition: isDragging.current ? 'none' : 'transform 0.1s' }}
+          >
             {isAiChatOpen && (
               <div className="bg-[#111] border border-blue-500/30 rounded-2xl shadow-2xl w-80 mb-4 overflow-hidden flex flex-col animate-fade-in origin-bottom-left">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-white">
+                <div 
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center cursor-move"
+                  onMouseDown={handleChatDragStart}
+                >
+                  <div className="flex items-center gap-2 text-white pointer-events-none">
                     <Bot size={20} />
                     <h3 className="font-bold leading-tight text-sm">AI Flow Builder</h3>
                   </div>
-                  <button onClick={() => setIsAiChatOpen(false)} className="text-white/80 hover:text-white"><X size={18} /></button>
+                  <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setIsAiChatOpen(false)} className="text-white/80 hover:text-white cursor-pointer"><X size={18} /></button>
                 </div>
                 
                 <div className="h-64 p-4 overflow-y-auto flex flex-col gap-3 bg-[#0a0a0a]">
