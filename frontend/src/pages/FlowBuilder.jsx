@@ -89,6 +89,7 @@ const MessageNode = ({ id, data }) => {
 
 const AskQuestionNode = ({ id, data }) => {
   const { setNodes, setEdges } = useReactFlow();
+  const [replyType, setReplyType] = useState(data?.replyType || 'yes_no');
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white relative group">
       <button onClick={() => {
@@ -99,9 +100,18 @@ const AskQuestionNode = ({ id, data }) => {
       <div className="font-bold mb-3 flex items-center gap-2 text-purple-400">⚡ Ask Question (Wait for Reply)</div>
       <div className="space-y-3">
         <div>
-          <p className="text-xs text-gray-400 mb-1">Question to ask</p>
-          <textarea defaultValue={data?.question || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
+          <p className="text-xs text-gray-400 mb-1">Expected Reply Type</p>
+          <select value={replyType} onChange={(e) => setReplyType(e.target.value)} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 mb-2">
+            <option value="yes_no">Yes / No Choice</option>
+            <option value="open">Open Text (Name, City, etc.)</option>
+          </select>
         </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Question to ask</p>
+          <textarea defaultValue={data?.question || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., What is your name?"></textarea>
+        </div>
+        
+        {replyType === 'yes_no' && (
         <div>
           <p className="text-xs text-gray-400 mb-1">Expected Replies (Branches)</p>
           <div className="flex justify-between text-[10px] font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
@@ -110,11 +120,26 @@ const AskQuestionNode = ({ id, data }) => {
             <span className="text-gray-400 text-center w-1/3">Any Other</span>
           </div>
         </div>
+        )}
+        
+        {replyType === 'open' && (
+        <div>
+          <div className="flex justify-center text-xs font-bold px-2 mt-3 bg-[#1a1a1a] p-2 rounded border border-gray-800">
+            <span className="text-emerald-400 text-center">User Replies Any Text</span>
+          </div>
+        </div>
+        )}
       </div>
-      {/* Multiple Output Handles for different user replies */}
-      <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-4 h-4 bg-green-500 border-2 border-[#111] z-50 cursor-crosshair" />
-      <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-4 h-4 bg-rose-500 border-2 border-[#111] z-50 cursor-crosshair" />
-      <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
+      
+      {replyType === 'yes_no' ? (
+        <>
+          <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '16%' }} className="w-4 h-4 bg-green-500 border-2 border-[#111] z-50 cursor-crosshair" />
+          <Handle type="source" position={Position.Bottom} id="no" style={{ left: '50%' }} className="w-4 h-4 bg-rose-500 border-2 border-[#111] z-50 cursor-crosshair" />
+          <Handle type="source" position={Position.Bottom} id="other" style={{ left: '83%' }} className="w-4 h-4 bg-gray-400 border-2 border-[#111] z-50 cursor-crosshair" />
+        </>
+      ) : (
+        <Handle type="source" position={Position.Bottom} id="replied" style={{ left: '50%' }} className="w-4 h-4 bg-emerald-500 border-2 border-[#111] z-50 cursor-crosshair" />
+      )}
     </div>
   );
 };
