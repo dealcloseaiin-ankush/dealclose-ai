@@ -49,7 +49,7 @@ const TriggerNode = ({ id, data }) => {
   );
 };
 
-const MessageNode = ({ id }) => {
+const MessageNode = ({ id, data }) => {
   const { setNodes, setEdges } = useReactFlow();
   const [templates, setTemplates] = useState([]);
   
@@ -79,7 +79,7 @@ const MessageNode = ({ id }) => {
         </div>
         <div>
           <p className="text-xs text-gray-400 mb-1">Or Type Custom Text</p>
-          <textarea className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500 placeholder-gray-600" rows="2" placeholder="Hi there! How can we help?"></textarea>
+          <textarea defaultValue={data?.message || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500 placeholder-gray-600" rows="2" placeholder="Hi there! How can we help?"></textarea>
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-blue-500 border-none" />
@@ -87,7 +87,7 @@ const MessageNode = ({ id }) => {
   );
 };
 
-const AskQuestionNode = ({ id }) => {
+const AskQuestionNode = ({ id, data }) => {
   const { setNodes, setEdges } = useReactFlow();
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white relative group">
@@ -100,7 +100,7 @@ const AskQuestionNode = ({ id }) => {
       <div className="space-y-3">
         <div>
           <p className="text-xs text-gray-400 mb-1">Question to ask</p>
-          <textarea className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
+          <textarea defaultValue={data?.question || data?.label || ""} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-purple-500 placeholder-gray-600" rows="2" placeholder="e.g., Are you interested? (Reply YES or NO)"></textarea>
         </div>
         <div>
           <p className="text-xs text-gray-400 mb-1">Expected Replies (Branches)</p>
@@ -119,7 +119,7 @@ const AskQuestionNode = ({ id }) => {
   );
 };
 
-const DelayNode = ({ id }) => {
+const DelayNode = ({ id, data }) => {
   const { setNodes, setEdges } = useReactFlow();
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-gray-500 min-w-[220px] text-white relative group">
@@ -130,8 +130,8 @@ const DelayNode = ({ id }) => {
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-gray-300">⏳ Wait / Delay</div>
       <div className="flex gap-2">
-        <input type="number" className="nodrag nopan w-20 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400" defaultValue="15" />
-        <select className="nodrag nopan flex-1 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400">
+        <input type="number" className="nodrag nopan w-20 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400" defaultValue={data?.delay || "15"} />
+        <select defaultValue={data?.unit || "Minutes"} className="nodrag nopan flex-1 bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-gray-400">
           <option>Minutes</option>
           <option>Hours</option>
           <option>Days</option>
@@ -142,7 +142,7 @@ const DelayNode = ({ id }) => {
   );
 };
 
-const ConditionNode = ({ id }) => {
+const ConditionNode = ({ id, data }) => {
   const { setNodes, setEdges } = useReactFlow();
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-orange-500 min-w-[250px] text-white relative group">
@@ -152,7 +152,7 @@ const ConditionNode = ({ id }) => {
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-orange-400 border-none" />
       <div className="font-bold mb-3 flex items-center gap-2 text-orange-400">🔄 Condition (If/Else)</div>
-      <select className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-orange-500">
+      <select defaultValue={data?.condition || "If User Replied"} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-orange-500">
         <option>If User Replied</option>
         <option>If Payment Pending</option>
         <option>If Tag = VIP</option>
@@ -296,8 +296,14 @@ export default function FlowBuilder() {
     setIsAiTyping(true);
 
     try {
-      // Try calling the real backend if it exists
-      const res = await api.post('/ai/generate-flow', { prompt: userMsg });
+      // 🚀 NEW: Add canvas state and chat history to the prompt so AI remembers context
+      const simplifyNodes = nodes.map(n => ({ id: n.id, type: n.type, data: n.data, position: n.position }));
+      const simplifyEdges = edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle }));
+      const recentChat = aiMessages.slice(-6).map(m => `${m.role === 'ai' ? 'AI' : 'User'}: ${m.content}`).join('\n');
+      
+      const enrichedPrompt = `Chat History:\n${recentChat}\n\nCurrent Canvas Nodes:\n${JSON.stringify(simplifyNodes)}\n\nCurrent Canvas Edges:\n${JSON.stringify(simplifyEdges)}\n\nUser Request: ${userMsg}\n\nIMPORTANT INSTRUCTIONS:\n1. If modifying the flow, return the FULL updated nodes and edges arrays (do not delete existing ones unless asked).\n2. Put actual conversational text inside data.message or data.question.\n3. If just chatting, return nodes: [] and edges: [].`;
+
+      const res = await api.post('/ai/generate-flow', { prompt: enrichedPrompt });
       if (res.data.nodes && res.data.edges) {
         if (res.data.nodes.length > 0) {
           setNodes(res.data.nodes);

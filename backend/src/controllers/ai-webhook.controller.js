@@ -151,7 +151,34 @@ exports.handleWhatsApp = async (req, res) => {
             if (selectedContext.startsWith('workspace_')) {
               const workspaceId = selectedContext.replace('workspace_', ''); 
               
-              responseMessage = "You have selected this business profile. How can I assist you further today?";
+              // Save the selected business division in DB
+              await Lead.findOneAndUpdate(
+                { phoneNumber: fromNumber, userId: user._id },
+                { $set: { lastSelectedWorkspaceId: workspaceId } }
+              );
+              
+              let selectedWsName = user.businessName || "Main Business";
+              if (workspaceId !== 'default' && user.workspaces) {
+                const selectedWs = user.workspaces.find(w => w._id.toString() === workspaceId);
+                if (selectedWs) selectedWsName = selectedWs.name;
+              }
+              
+              responseMessage = `Welcome to *${selectedWsName}*! 🏢\nHow can I assist you further today?`;
+              
+              // 🚀 SMART LINKS INJECTION
+              const links = user.digitalCardConfig || {};
+              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
+              
+              let socialLinks = [];
+              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
+              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
+              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
+              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
+              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
+              
+              if (socialLinks.length > 0) {
+                responseMessage += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
+              }
             }
 
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
@@ -188,33 +215,43 @@ exports.handleWhatsApp = async (req, res) => {
             const incomingTextLower = incomingText.toLowerCase();
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               
-              let menuRows = [];
+              let menuRows = [
+                { 
+                  id: `workspace_default`, 
+                  title: (user.businessName || "Main Business").substring(0, 24), 
+                  description: (user.businessDescription || "Explore our products and services").substring(0, 72) 
+                }
+              ];
               
               if (user.workspaces && user.workspaces.length > 0) {
-                menuRows = user.workspaces.map(w => ({
-                  id: `workspace_${w._id}`,
-                  title: w.name.substring(0, 24),
-                  description: (w.description || "View our services").substring(0, 72)
-                }));
+                const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
+                if (validWs.length > 0) {
+                  const wsRows = validWs.map(w => ({
+                    id: `workspace_${w._id}`, 
+                    title: w.name.substring(0, 24), 
+                    description: (w.description || "View our services").substring(0, 72)
+                  }));
+                  menuRows = [...menuRows, ...wsRows];
+                }
               } 
               
-              // 🚀 RESTORED: Single Business Fallback
-              if (menuRows.length === 0) {
-                menuRows = [
-                  { id: `workspace_default`, title: (user.businessName || "Main Business").substring(0, 24), description: "Explore our products and services" }
-                ];
-              }
+              // WhatsApp API limits a section to maximum 10 rows
+              menuRows = menuRows.slice(0, 10);
 
               // 🚀 SMART LINKS INJECTION
-              let bodyText = "Please select the business division you want to interact with today:";
+              let bodyText = `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:`;
               const links = user.digitalCardConfig || {};
               const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
               
-              if (links.googleReview || links.instagram || websiteUrl) {
-                bodyText += "\n\n*Connect with us:*";
-                if (websiteUrl) bodyText += `\n🌐 Website: ${websiteUrl}`;
-                if (links.instagram) bodyText += `\n📸 Instagram: ${links.instagram}`;
-                if (links.googleReview) bodyText += `\n⭐ Rate Us: ${links.googleReview}`;
+              let socialLinks = [];
+              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
+              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
+              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
+              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
+              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
+              
+              if (socialLinks.length > 0) {
+                bodyText += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
               }
 
               const interactiveObj = {

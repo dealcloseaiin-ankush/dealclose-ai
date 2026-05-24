@@ -288,16 +288,19 @@ exports.generateFlow = async (req, res) => {
       "edges": []
     }
 
-    Node Types available: 
-    - 'trigger' (Always include this as id: '1' at the top)
-    - 'message' (data: { label: 'Send Message' })
-    - 'askQuestion' (data: { label: 'Ask Question' })
-    - 'delay' (data: { label: 'Wait 15 Mins' })
-    - 'condition' (data: { label: 'Condition' })
+    Node Types & EXACT Data Schema YOU MUST USE:
+    - 'trigger': { "id": "1", "type": "trigger", "position": {"x":250,"y":50}, "data": { "triggerType": "keyword", "keyword": "hi" } }
+    - 'message': { "id": "node_2", "type": "message", "position": {"x":250,"y":150}, "data": { "message": "Write the actual reply text here!" } }
+    - 'askQuestion': { "id": "node_3", "type": "askQuestion", "position": {"x":250,"y":250}, "data": { "question": "Write the actual question here!" } }
+    - 'delay': { "id": "node_4", "type": "delay", "position": {"x":250,"y":350}, "data": { "delay": "15", "unit": "Minutes" } }
+    - 'condition': { "id": "node_5", "type": "condition", "position": {"x":250,"y":450}, "data": { "condition": "If User Replied" } }
     
-    Build a logical flow based on the user's prompt. Assign unique string IDs like 'node_2', 'node_3' to new nodes. Connect them properly in the "edges" array (e.g., { "id": "e1-node_2", "source": "1", "target": "node_2" }).
-    If you are just having a conversation and NOT building a flow, set "nodes" and "edges" to empty arrays []. ONLY include the 'trigger' node if you are actually drawing a flow.
-    Return ONLY valid JSON. Do not include markdown formatting or backticks.`;
+    CRITICAL RULES:
+    1. ALWAYS PUT REAL TEXT IN 'data.message' AND 'data.question'. Never leave them blank! Write the Hindi/English text inside them!
+    2. If the user asks to modify an existing flow, DO NOT DELETE existing nodes. Take the 'Current Canvas Nodes' and 'Current Canvas Edges' from the prompt, modify them as requested, and return the FULL updated arrays.
+    3. Edges must logically connect 'source' to 'target'. Ensure 'sourceHandle' matches node outputs if applicable.
+    4. If just chatting, return nodes: [] and edges: [].
+    5. Return ONLY valid JSON. Do not include markdown formatting or backticks.`;
 
     const result = await model.generateContent([systemPrompt, prompt]);
     const responseText = result.response.text();

@@ -144,7 +144,7 @@ exports.handleWhatsApp = async (req, res) => {
             // 🚀 DYNAMIC WORKSPACE ROUTING
             // Yahan hum hardcoded names ('menu_real_estate') ki jagah unique IDs match kar rahe hain
             if (selectedContext.startsWith('workspace_')) {
-              const workspaceId = selectedContext.replace('workspace_', ''); // e.g., '12345'
+              const workspaceId = selectedContext.replace('workspace_', ''); 
               
               // Save the selected business division in DB
               await Lead.findOneAndUpdate(
@@ -154,11 +154,32 @@ exports.handleWhatsApp = async (req, res) => {
               
               const currentLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
               
+              let selectedWsName = user.businessName || "Main Business";
+              if (workspaceId !== 'default' && user.workspaces) {
+                const selectedWs = user.workspaces.find(w => w._id.toString() === workspaceId);
+                if (selectedWs) selectedWsName = selectedWs.name;
+              }
+              
               // 🔥 SMART AUTOMATION: Ask for name automatically WITHOUT using AI (0 Cost)
               if (currentLead && currentLead.name && currentLead.name.startsWith('User ')) {
-                responseMessage = "Thank you for choosing this division! 🏢\n\nBefore we proceed, could you please reply with your *Full Name* and *City*? (e.g., Rahul Sharma, Delhi)";
+                responseMessage = `Welcome to *${selectedWsName}*! 🏢\n\nBefore we proceed, could you please reply with your *Full Name* and *City*? (e.g., Rahul Sharma, Delhi)`;
               } else {
-                responseMessage = `Welcome back, ${currentLead.name.split(' ')[0]}! How can I assist you further today?`;
+                responseMessage = `Welcome back to *${selectedWsName}*, ${currentLead.name.split(' ')[0]}! How can I assist you further today?`;
+              }
+              
+              // 🚀 SMART LINKS INJECTION
+              const links = user.digitalCardConfig || {};
+              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
+              
+              let socialLinks = [];
+              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
+              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
+              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
+              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
+              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
+              
+              if (socialLinks.length > 0) {
+                responseMessage += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
               }
             }
 
@@ -200,39 +221,44 @@ exports.handleWhatsApp = async (req, res) => {
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               
               // 🚀 DYNAMIC MENU GENERATOR
-              // Agar user ne multiple businesses (workspaces) add kiye hain, toh unki list banayenge
-              let menuRows = [];
-              
+              let menuRows = [
+                { 
+                  id: `workspace_default`, 
+                  title: (user.businessName || "Main Business").substring(0, 24), 
+                  description: (user.businessDescription || "Explore our products and services").substring(0, 72) 
+                }
+              ];
+
               if (user.workspaces && user.workspaces.length > 0) {
                 // Safe Filter: Only map valid workspaces that have a name
                 const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
                 if (validWs.length > 0) {
-                  menuRows = validWs.map(w => ({
+                  const wsRows = validWs.map(w => ({
                     id: `workspace_${w._id}`, 
                     title: w.name.substring(0, 24), 
                     description: (w.description || "View our services").substring(0, 72)
                   }));
+                  menuRows = [...menuRows, ...wsRows];
                 }
               } 
               
-              // 🚀 RESTORED: Single Business Fallback (Menu hamesha aayega taaki Flow Builder trigger ho sake)
-              if (menuRows.length === 0) {
-                menuRows = [
-                  { id: `workspace_default`, title: (user.businessName || "Main Business").substring(0, 24), description: "Explore our products and services" }
-                ];
-              }
+              // WhatsApp API limits a section to maximum 10 rows
+              menuRows = menuRows.slice(0, 10);
 
               // 🚀 SMART LINKS INJECTION
-              // Menu ke upar Instagram, Google Review aur Website ke links add karna
-              let bodyText = "Please select the business division you want to interact with today:";
+              let bodyText = `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:`;
               const links = user.digitalCardConfig || {};
               const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
               
-              if (links.googleReview || links.instagram || websiteUrl) {
-                bodyText += "\n\n*Connect with us:*";
-                if (websiteUrl) bodyText += `\n🌐 Website: ${websiteUrl}`;
-                if (links.instagram) bodyText += `\n📸 Instagram: ${links.instagram}`;
-                if (links.googleReview) bodyText += `\n⭐ Rate Us: ${links.googleReview}`;
+              let socialLinks = [];
+              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
+              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
+              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
+              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
+              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
+              
+              if (socialLinks.length > 0) {
+                bodyText += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
               }
 
                 const interactiveObj = {
