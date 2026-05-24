@@ -319,6 +319,7 @@ exports.generateFlow = async (req, res) => {
     - 'trigger': { "id": "1", "type": "trigger", "position": {"x":250,"y":50}, "data": { "triggerType": "keyword", "keyword": "hi" } }
     - 'message': { "id": "node_2", "type": "message", "position": {"x":250,"y":150}, "data": { "message": "Write the actual reply text here!" } }
     - 'askQuestion': { "id": "node_3", "type": "askQuestion", "position": {"x":250,"y":250}, "data": { "question": "Write the actual question here!", "replyType": "open" } } // Set replyType to "open" for free-text like Name/City, or "yes_no" for confirmation.
+    - 'menu': { "id": "node_m", "type": "menu", "position": {"x":250,"y":250}, "data": { "message": "Choose option:", "opt1": "Collab", "opt2": "Ads", "opt3": "Fan" } }
     - 'delay': { "id": "node_4", "type": "delay", "position": {"x":250,"y":350}, "data": { "delay": "15", "unit": "Minutes" } }
     - 'condition': { "id": "node_5", "type": "condition", "position": {"x":250,"y":450}, "data": { "condition": "If User Replied" } }
     
@@ -330,6 +331,7 @@ exports.generateFlow = async (req, res) => {
        - For 'condition' node, sourceHandle MUST be "true" or "false".
        - For 'askQuestion' node with "yes_no", sourceHandle MUST be "yes", "no", or "other".
        - For 'askQuestion' node with "open", sourceHandle MUST be "replied".
+       - For 'menu' node, sourceHandle MUST be "opt_0" (for opt1), "opt_1" (for opt2), or "opt_2" (for opt3).
        Example Edge: { "id": "e1-2", "source": "node_1", "target": "node_2", "sourceHandle": "yes" }
     4. EVEN IF YOU ARE JUST CHATTING, YOU MUST RETURN JSON! Do NOT output plain text outside the JSON. Format: {"reply": "...", "nodes": [], "edges": []}
     5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting, trailing commas, or unescaped newlines in strings. If you need a newline in a message, use \\n.`;

@@ -13,7 +13,7 @@ import ReactFlow, {
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -206,12 +206,49 @@ const ConditionNode = ({ id, data }) => {
   );
 };
 
+// 🚀 NEW: Interactive WhatsApp Menu Node (Buttons)
+const MenuNode = ({ id, data }) => {
+  const { setNodes, setEdges } = useReactFlow();
+  return (
+    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-teal-500 min-w-[280px] text-white relative group">
+      <button onClick={() => {
+        setNodes(nds => nds.filter(n => n.id !== id));
+        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+      }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-teal-500 border-none" />
+      <div className="font-bold mb-3 flex items-center gap-2 text-teal-400"><ListPlus size={18} /> Interactive Menu</div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Message Text</p>
+          <textarea defaultValue={data?.message || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, message: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-teal-500 placeholder-gray-600" rows="2" placeholder="Please select an option:"></textarea>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Button 1</p>
+          <input type="text" defaultValue={data?.opt1 || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, opt1: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-teal-500" placeholder="e.g. Collab / PR" />
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Button 2</p>
+          <input type="text" defaultValue={data?.opt2 || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, opt2: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-teal-500" placeholder="e.g. Paid Ads" />
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Button 3</p>
+          <input type="text" defaultValue={data?.opt3 || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, opt3: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-teal-500" placeholder="e.g. Just a Fan ❤️" />
+        </div>
+      </div>
+      <Handle type="source" position={Position.Bottom} id="opt_0" style={{ left: '20%' }} className="w-3 h-3 bg-teal-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="opt_1" style={{ left: '50%' }} className="w-3 h-3 bg-teal-500 border-none" />
+      <Handle type="source" position={Position.Bottom} id="opt_2" style={{ left: '80%' }} className="w-3 h-3 bg-teal-500 border-none" />
+    </div>
+  );
+};
+
 const nodeTypes = {
   trigger: TriggerNode,
   message: MessageNode,
   delay: DelayNode,
   condition: ConditionNode,
-  askQuestion: AskQuestionNode
+  askQuestion: AskQuestionNode,
+  menu: MenuNode
 };
 
 const initialNodes = [
@@ -354,6 +391,7 @@ export default function FlowBuilder() {
       else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
       else if (label.includes('Condition')) type = 'condition';
       else if (label.includes('Question')) type = 'askQuestion';
+    else if (label.includes('Menu')) type = 'menu';
 
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowWrapper.current.getBoundingClientRect().left,
@@ -379,6 +417,7 @@ export default function FlowBuilder() {
     else if (label.includes('Wait') || label.includes('Delay')) type = 'delay';
     else if (label.includes('Condition')) type = 'condition';
     else if (label.includes('Question')) type = 'askQuestion';
+    else if (label.includes('Menu')) type = 'menu';
 
     const newNode = {
       id: getId(),
@@ -482,17 +521,22 @@ export default function FlowBuilder() {
     
     if (type === 'influencer_collab') {
       newNodes = [
-        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr' }, position: { x: 250, y: 50 } },
-        { id: '2', type: 'message', data: { message: 'Hi there! ✨ Thanks for reaching out for a collaboration. I would love to know more about your campaign.' }, position: { x: 250, y: 160 } },
-        { id: '3', type: 'askQuestion', data: { question: 'To help my team understand better, could you tell us your approximate budget or is it a barter collaboration?', replyType: 'open' }, position: { x: 250, y: 300 } },
-        { id: '4', type: 'message', data: { message: 'Got it! 🚀 Please drop your product details and my AI manager will share my Media Kit with you shortly!' }, position: { x: 250, y: 480 } }
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, hi' }, position: { x: 400, y: 50 } },
+        { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 400, y: 160 } },
+        { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 100, y: 350 } },
+        { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 400, y: 350 } },
+        { id: '5', type: 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 350 } },
+        { id: '6', type: 'message', data: { message: 'Thank you! ✅ I have saved your details. My team will review and share the Media Kit shortly!' }, position: { x: 250, y: 550 } }
       ];
       newEdges = [
         { id: 'e1-2', source: '1', target: '2' },
-        { id: 'e2-3', source: '2', target: '3' },
-        { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' }
+        { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' },
+        { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' },
+        { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' },
+        { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' },
+        { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' }
       ];
-      setFlowName("Instagram Collab Flow");
+      setFlowName("Creator Menu Flow");
     } else if (type === 'lead_gen') {
       newNodes = [
         { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'price, details, buy' }, position: { x: 250, y: 50 } },
@@ -596,6 +640,9 @@ export default function FlowBuilder() {
           </div>
           <div onClick={() => onNodeClickAdd('⚡ Ask Question')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-purple-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⚡ Ask Question')} draggable>
             <Zap size={18} className="text-purple-400" /> <span className="font-semibold text-sm">Ask Question</span>
+          </div>
+          <div onClick={() => onNodeClickAdd('📋 Interactive Menu')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-teal-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '📋 Interactive Menu')} draggable>
+            <ListPlus size={18} className="text-teal-400" /> <span className="font-semibold text-sm">Interactive Menu</span>
           </div>
           <div onClick={() => onNodeClickAdd('🔄 Condition (If/Else)')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-orange-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '🔄 Condition (If/Else)')} draggable>
             <GitBranch size={18} className="text-orange-400" /> <span className="font-semibold text-sm">Condition</span>

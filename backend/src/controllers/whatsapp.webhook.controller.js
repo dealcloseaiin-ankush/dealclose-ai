@@ -360,6 +360,21 @@ exports.handleWhatsApp = async (req, res) => {
                        // Put user back into waiting state for this new question
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
+                     } else if (nextNode.type === 'menu') {
+                       const msgText = nextNode.data.message || "Please choose an option:";
+                       const options = [nextNode.data.opt1, nextNode.data.opt2, nextNode.data.opt3].filter(opt => opt && opt.trim() !== '');
+                       
+                       if (options.length > 0) {
+                         const buttons = options.map((opt, idx) => ({
+                           type: "reply",
+                           reply: { id: `flow_opt_${idx}`, title: opt.substring(0, 20) }
+                         }));
+                         
+                         await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
+                         await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       }
+                       currNodeId = null; 
                      } else {
                        break;
                      }
@@ -410,6 +425,21 @@ exports.handleWhatsApp = async (req, res) => {
                        
                        // Pause execution and wait for user's reply
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       currNodeId = null; 
+                     } else if (nextNode.type === 'menu') {
+                       const msgText = nextNode.data.message || "Please choose an option:";
+                       const options = [nextNode.data.opt1, nextNode.data.opt2, nextNode.data.opt3].filter(opt => opt && opt.trim() !== '');
+                       
+                       if (options.length > 0) {
+                         const buttons = options.map((opt, idx) => ({
+                           type: "reply",
+                           reply: { id: `flow_opt_${idx}`, title: opt.substring(0, 20) }
+                         }));
+                         
+                         await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
+                         await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       }
                        currNodeId = null; 
                      } else {
                        break;
