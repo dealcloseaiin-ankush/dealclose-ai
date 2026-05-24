@@ -565,15 +565,14 @@ export default function FlowBuilder() {
 
       {/* Flow Canvas */}
       <div className="flex-1 relative" ref={reactFlowWrapper}>
-        {/* 🚀 NEW: Sidebar Toggle Button */}
-        <div className="absolute top-6 left-6 z-50">
-          <button onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-gray-700 hover:border-blue-500 text-gray-300 hover:text-white rounded-xl shadow-lg transition-colors font-bold text-sm" title={isPaletteOpen ? "Hide Tools" : "Show Tools"}>
+        <div className="absolute top-6 right-6 z-50 flex gap-3">
+          
+          {/* 🚀 NEW: Sidebar Toggle Button (Moved to Right Side for better visibility) */}
+          <button onClick={() => setIsPaletteOpen(!isPaletteOpen)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl shadow-lg transition-colors font-bold text-sm" title={isPaletteOpen ? "Hide Tools" : "Show Tools"}>
             {isPaletteOpen ? <ChevronLeft size={18} /> : <Menu size={18} />}
             <span className="hidden sm:inline">{isPaletteOpen ? "Hide Tools" : "Show Tools"}</span>
           </button>
-        </div>
-        <div className="absolute top-6 right-6 z-50 flex gap-3">
-          
+
           {/* 🚀 NEW: Flow Name Input */}
           <input 
             type="text" 
