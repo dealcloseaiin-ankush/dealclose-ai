@@ -21,16 +21,15 @@ exports.saveFlow = async (req, res) => {
     let query = { userId, name };
     if (!isMainWorkspace) query.workspaceId = workspaceId;
 
-    // Upsert (Update if exists, Create if not)
-    let flow = await Flow.findOne(query);
-    if (flow) {
-      flow.flowData = flowData;
-      await flow.save();
-    } else {
-      const createPayload = { userId, name, flowData };
-      if (!isMainWorkspace) createPayload.workspaceId = workspaceId;
-      flow = await Flow.create(createPayload);
-    }
+    // 🚀 STRICT BYPASS: Use findOneAndUpdate to force save workspaceId and flowData even if Model is outdated
+    const updatePayload = { flowData };
+    if (!isMainWorkspace) updatePayload.workspaceId = workspaceId;
+
+    let flow = await Flow.findOneAndUpdate(
+      query,
+      { $set: updatePayload },
+      { upsert: true, new: true, setDefaultsOnInsert: true, strict: false }
+    );
 
     res.status(200).json({ success: true, message: 'Flow saved successfully', flow });
   } catch (error) {

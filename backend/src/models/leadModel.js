@@ -46,6 +46,22 @@ const leadSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  isAiPaused: {
+    type: Boolean,
+    default: false
+  },
+  aiPausedUntil: {
+    type: Date,
+    default: null
+  },
+  activeFlowState: {
+    type: Object,
+    default: null
+  },
+  lastSelectedWorkspaceId: {
+    type: String,
+    default: 'main'
+  },
   // Custom fields can be stored in a flexible way
   customFields: {
     type: Map,

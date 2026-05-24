@@ -348,14 +348,14 @@ exports.handleWhatsApp = async (req, res) => {
                      if (nextNode.type === 'message') {
                        const msgText = nextNode.data.message || nextNode.data.label;
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = nextNode.data.question || nextNode.data.label;
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
                        // Put user back into waiting state for this new question
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
@@ -399,14 +399,14 @@ exports.handleWhatsApp = async (req, res) => {
                      if (nextNode.type === 'message') {
                        const msgText = nextNode.data.message || nextNode.data.label;
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = nextNode.data.question || nextNode.data.label;
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
                        // Pause execution and wait for user's reply
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
@@ -502,6 +502,33 @@ exports.handleWhatsApp = async (req, res) => {
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
                 if (user.aiCredits > 0 && user.aiCredits <= 200) {
                   aiContext += "\n\n⚠️ BUDGET LIMIT ACTIVE: Provide short answers (1-2 sentences max), but ALWAYS ensure the sentence finishes completely.";
+                }
+                
+                // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number)
+                if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
+                    const customerNameContext = lead && !lead.name.startsWith('User ') ? lead.name : 'Unknown User';
+                    const customerDetailsContext = lead && lead.notes ? lead.notes : 'Unknown';
+
+                    aiContext = `You are "DealClose AI", a world-class AI Sales & Marketing Automation expert.
+                    The user messaging you is a potential client for our SaaS platform.
+                    
+                    CUSTOMER DETAILS EXTRACTED SO FAR:
+                    Name: ${customerNameContext}
+                    City/Business Info: ${customerDetailsContext}
+                    
+                    YOUR GOAL: 
+                    1. Greet the user WARMLY using their name (if known). If their business or city is known, mention specifically how DealClose AI can automate THEIR type of business (e.g., "Since you are in Real Estate in Delhi, we can set up Lead Capture flows...").
+                    2. If you don't know their business, politely ask what business they run so you can suggest the right automation.
+                    3. Explain the simple onboarding: Once they create an account, they just need to connect their Meta WhatsApp API keys (Access Token, Phone ID, and WABA ID).
+                    4. Highlight the 14-Day Free Trial! Tell them they get full app access for 14 days. They can log in to explore the dashboard, or just provide their Meta keys to start WhatsApp automation instantly.
+                    
+                    DEALCLOSE AI FEATURES TO PITCH:
+                    1. WhatsApp & Instagram Automation (Auto-reply, Flow Builder, Lead Capture).
+                    2. Multi-Staff Shared Inbox: Mention that multiple staff members can use just ONE WhatsApp number to manage high message volumes easily!
+                    
+                    CRITICAL RULES:
+                    1. Always reply in the EXACT same language the user is speaking (Hindi, Hinglish, English).
+                    2. NEVER cut off your message in the middle. Always provide a full, complete sentence.`;
                 }
                 
                 const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
