@@ -14,6 +14,7 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const whatsappTemplateRoutes = require('./routes/whatsappTemplateRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
+const templateRoutes = require('./routes/templateRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const contactRoutes = require('./routes/contactRoutes');
@@ -25,6 +26,9 @@ const videoRoutes = require('./routes/videoRoutes');
 const catalogRoutes = require('./routes/catalogRoutes');
 const trackingRoutes = require('./routes/trackingRoutes');
 const trackingController = require('./controllers/trackingController');
+const authRoutes = require('./routes/authRoutes');
+const scraperRoutes = require('./routes/scraperRoutes');
+const trackerRoutes = require('./routes/trackerRoutes');
 
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
@@ -65,6 +69,10 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/scraper', scraperRoutes);
+app.use('/api/tracker', trackerRoutes);
 
 // 👇 YAHAN PAR HAI AAPKA IMAGE UPLOAD ROUTE 👇
 app.use('/api/upload', uploadRoutes);
