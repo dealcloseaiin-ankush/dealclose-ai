@@ -7,6 +7,7 @@ const Message = require('../models/messageModel');
 const callService = require('../services/callService');
 const billing = require('../utils/billing');
 const metaAdsService = require('../services/metaAdsService');
+const Flow = require('../models/flowModel');
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
@@ -372,6 +373,7 @@ exports.handleWhatsApp = async (req, res) => {
                     2. If you don't know their business, politely ask what business they run so you can suggest the right automation.
                     3. Explain the simple onboarding: Once they create an account, they just need to connect their Meta WhatsApp API keys (Access Token, Phone ID, and WABA ID).
                     4. Highlight the 14-Day Free Trial! Tell them they get full app access for 14 days. They can log in to explore the dashboard, or just provide their Meta keys to start WhatsApp automation instantly.
+                    5. MAGIC ONBOARDING: Tell them that when they create an account, DealClose AI automatically builds and deploys a fully working Automation Flow (Influencer Collab or Lead Gen) based on their business type so they don't have to do any manual work. They can customize it in the Dashboard's Template Library!
                     
                     DEALCLOSE AI FEATURES TO PITCH (Based on their business type):
                     1. WhatsApp & Instagram Automation (Auto-reply, Flow Builder, Lead Capture).
@@ -516,7 +518,42 @@ exports.handleWhatsApp = async (req, res) => {
                           businessDescription: accData.businessDescription,
                           aiCredits: 50 
                         });
-                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
+                        
+                        // 🚀 MAGIC ONBOARDING: Auto-Deploy Pre-built Flow based on Business Type
+                        const isInfluencer = /influencer|creator|collab|youtube|instagram|vlog/i.test(accData.businessDescription || '');
+                        let flowName = isInfluencer ? "Instagram Collab Flow" : "Lead Generation Auto";
+                        let flowData = {};
+
+                        if (isInfluencer) {
+                          flowData = {
+                            nodes: [
+                              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr' }, position: { x: 250, y: 50 } },
+                              { id: '2', type: 'message', data: { message: 'Hi there! ✨ Thanks for reaching out for a collaboration. I would love to know more about your campaign.' }, position: { x: 250, y: 160 } },
+                              { id: '3', type: 'askQuestion', data: { question: 'To help my team understand better, could you tell us your approximate budget or is it a barter collaboration?', replyType: 'open' }, position: { x: 250, y: 300 } },
+                              { id: '4', type: 'message', data: { message: 'Got it! 🚀 Please drop your product details and my AI manager will share my Media Kit with you shortly!' }, position: { x: 250, y: 480 } }
+                            ],
+                            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+                          };
+                        } else {
+                          flowData = {
+                            nodes: [
+                              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'price, details, buy' }, position: { x: 250, y: 50 } },
+                              { id: '2', type: 'message', data: { message: `Welcome to ${accData.businessName}! We are excited to help you today. 🏢` }, position: { x: 250, y: 160 } },
+                              { id: '3', type: 'askQuestion', data: { question: 'Before we proceed, could you please reply with your Full Name and City?', replyType: 'open' }, position: { x: 250, y: 280 } },
+                              { id: '4', type: 'message', data: { message: 'Thank you! ✅ Your details are saved. Our team will contact you shortly with the best offers.' }, position: { x: 250, y: 460 } }
+                            ],
+                            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+                          };
+                        }
+
+                        await Flow.create({
+                          userId: newUser._id,
+                          workspaceId: 'main',
+                          name: flowName,
+                          flowData: flowData
+                        });
+
+                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n✨ *MAGIC ONBOARDING:* I didn't want you to do manual work, so I have ALREADY deployed a fully working *${flowName}* into your account! It will automatically reply to your customers.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ Log in to connect your Meta API keys, customize your automation using AI, or explore our Template Library!`;
                       }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "send_whatsapp_menu") {

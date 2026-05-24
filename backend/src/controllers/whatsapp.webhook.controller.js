@@ -521,6 +521,7 @@ exports.handleWhatsApp = async (req, res) => {
                     2. If you don't know their business, politely ask what business they run so you can suggest the right automation.
                     3. Explain the simple onboarding: Once they create an account, they just need to connect their Meta WhatsApp API keys (Access Token, Phone ID, and WABA ID).
                     4. Highlight the 14-Day Free Trial! Tell them they get full app access for 14 days. They can log in to explore the dashboard, or just provide their Meta keys to start WhatsApp automation instantly.
+                    5. MAGIC ONBOARDING: Tell them that when they create an account, DealClose AI automatically builds and deploys a fully working Automation Flow (Influencer Collab or Lead Gen) based on their business type so they don't have to do any manual work. They can customize it in the Dashboard's Template Library!
                     
                     DEALCLOSE AI FEATURES TO PITCH:
                     1. WhatsApp & Instagram Automation (Auto-reply, Flow Builder, Lead Capture).

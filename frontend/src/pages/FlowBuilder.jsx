@@ -475,6 +475,44 @@ export default function FlowBuilder() {
     }
   };
 
+  // 🚀 NEW: Pre-built SaaS Templates (1-Click Deploy)
+  const loadTemplate = (type) => {
+    let newNodes = [];
+    let newEdges = [];
+    
+    if (type === 'influencer_collab') {
+      newNodes = [
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr' }, position: { x: 250, y: 50 } },
+        { id: '2', type: 'message', data: { message: 'Hi there! ✨ Thanks for reaching out for a collaboration. I would love to know more about your campaign.' }, position: { x: 250, y: 160 } },
+        { id: '3', type: 'askQuestion', data: { question: 'To help my team understand better, could you tell us your approximate budget or is it a barter collaboration?', replyType: 'open' }, position: { x: 250, y: 300 } },
+        { id: '4', type: 'message', data: { message: 'Got it! 🚀 Please drop your product details and my AI manager will share my Media Kit with you shortly!' }, position: { x: 250, y: 480 } }
+      ];
+      newEdges = [
+        { id: 'e1-2', source: '1', target: '2' },
+        { id: 'e2-3', source: '2', target: '3' },
+        { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' }
+      ];
+      setFlowName("Instagram Collab Flow");
+    } else if (type === 'lead_gen') {
+      newNodes = [
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'price, details, buy' }, position: { x: 250, y: 50 } },
+        { id: '2', type: 'message', data: { message: `Welcome to ${mainBusinessName}! We are excited to help you today. 🏢` }, position: { x: 250, y: 160 } },
+        { id: '3', type: 'askQuestion', data: { question: 'Before we proceed, could you please reply with your Full Name and City?', replyType: 'open' }, position: { x: 250, y: 280 } },
+        { id: '4', type: 'message', data: { message: 'Thank you! ✅ Your details are saved. Our team will contact you shortly with the best offers.' }, position: { x: 250, y: 460 } }
+      ];
+      newEdges = [
+        { id: 'e1-2', source: '1', target: '2' },
+        { id: 'e2-3', source: '2', target: '3' },
+        { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' }
+      ];
+      setFlowName("Lead Generation Auto");
+    }
+
+    setNodes(newNodes);
+    setEdges(newEdges);
+    toast.success("Template Loaded! You can now customize or save it.");
+  };
+
   return (
     <>
     {/* Help Guide Modal */}
@@ -564,6 +602,21 @@ export default function FlowBuilder() {
           </div>
           <div onClick={() => onNodeClickAdd('⏳ Wait 15 Mins')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-gray-400 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '⏳ Wait 15 Mins')} draggable>
             <Clock size={18} className="text-gray-400" /> <span className="font-semibold text-sm">Add Delay</span>
+          </div>
+
+          {/* 🚀 NEW: Pre-built Templates Section */}
+          <div className="mt-6 border-t border-gray-800 pt-6">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">Pre-Built Templates</h2>
+            <div className="space-y-3">
+              <div onClick={() => loadTemplate('influencer_collab')} className="bg-pink-500/10 border border-pink-500/30 p-3 rounded-xl cursor-pointer hover:bg-pink-500/20 transition-colors">
+                <p className="text-pink-400 font-bold text-sm">📸 Influencer Collab Flow</p>
+                <p className="text-xs text-gray-400 mt-1">Auto-negotiate brand deals</p>
+              </div>
+              <div onClick={() => loadTemplate('lead_gen')} className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl cursor-pointer hover:bg-emerald-500/20 transition-colors">
+                <p className="text-emerald-400 font-bold text-sm">🧲 B2B Lead Capture</p>
+                <p className="text-xs text-gray-400 mt-1">Ask Name & City automatically</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
