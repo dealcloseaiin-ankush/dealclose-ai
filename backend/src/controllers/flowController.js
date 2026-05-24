@@ -4,8 +4,8 @@ const Flow = require('../models/flowModel');
 // @route   POST /api/whatsapp/flows
 exports.saveFlow = async (req, res) => {
   try {
-    let { name, flowData } = req.body;
-    const userId = req.user._id;
+    let { name, flowData, workspaceId } = req.body;
+    const userId = req.user?._id || req.user?.id;
 
     if (!flowData) {
       return res.status(400).json({ success: false, message: 'Flow data is required' });
@@ -17,12 +17,12 @@ exports.saveFlow = async (req, res) => {
     }
 
     // Upsert (Update if exists, Create if not)
-    let flow = await Flow.findOne({ userId, name });
+    let flow = await Flow.findOne({ userId, name, workspaceId });
     if (flow) {
       flow.flowData = flowData;
       await flow.save();
     } else {
-      flow = await Flow.create({ userId, name, flowData });
+      flow = await Flow.create({ userId, name, flowData, workspaceId });
     }
 
     res.status(200).json({ success: true, message: 'Flow saved successfully', flow });
@@ -36,7 +36,8 @@ exports.saveFlow = async (req, res) => {
 // @route   GET /api/whatsapp/flows
 exports.getFlows = async (req, res) => {
   try {
-    const flows = await Flow.find({ userId: req.user._id });
+    const userId = req.user?._id || req.user?.id;
+    const flows = await Flow.find({ userId }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: flows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
