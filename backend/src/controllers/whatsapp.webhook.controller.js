@@ -7,6 +7,7 @@ const Message = require('../models/messageModel');
 const callService = require('../services/callService');
 const billing = require('../utils/billing');
 const metaAdsService = require('../services/metaAdsService');
+const Flow = require('../models/flowModel');
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
@@ -294,6 +295,131 @@ exports.handleWhatsApp = async (req, res) => {
               await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system' });
               continue; // 🚀 Skip AI completely to save tokens!
             }
+
+            // ==========================================================
+            // 🚀 NEW: FLOW EXECUTION ENGINE (Stateful Automation System)
+            // ==========================================================
+            let flowReplyHandled = false;
+            
+            // Workspace routing for Flows
+            const workspaceIdToUse = (currentLeadCheck && currentLeadCheck.lastSelectedWorkspaceId) ? currentLeadCheck.lastSelectedWorkspaceId : 'main';
+            const userFlows = await Flow.find({ userId: user._id, workspaceId: workspaceIdToUse });
+
+            // STEP 1: Check if customer is currently inside an active "Ask Question" Flow block
+            if (currentLeadCheck && currentLeadCheck.activeFlowState && currentLeadCheck.activeFlowState.flowId) {
+              const activeFlow = userFlows.find(f => f._id.toString() === currentLeadCheck.activeFlowState.flowId);
+              if (activeFlow && activeFlow.flowData) {
+                const nodes = activeFlow.flowData.nodes || [];
+                const edges = activeFlow.flowData.edges || [];
+                const questionNode = nodes.find(n => n.id === currentLeadCheck.activeFlowState.nodeId);
+
+                if (questionNode && questionNode.type === 'askQuestion') {
+                   let chosenEdge = null;
+                   
+                   if (questionNode.data.replyType === 'open') {
+                     // Save Open Text Answer to Lead Notes
+                     await Lead.updateOne({ _id: currentLeadCheck._id }, { $push: { notes: `Flow Answer: ${incomingText}` } });
+                     chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'replied');
+                   } else {
+                     // Yes / No Choice Evaluator
+                     if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
+                       chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'yes');
+                     } else if (['no', 'n', 'na', 'nahi', 'nahin'].includes(incomingTextLower)) {
+                       chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'no');
+                     } else {
+                       chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'other');
+                     }
+                   }
+
+                   // Clear the waiting state since user has replied
+                   await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
+
+                   // Move to the next connected node
+                   let currNodeId = chosenEdge ? chosenEdge.target : null;
+                   while (currNodeId) {
+                     const nextNode = nodes.find(n => n.id === currNodeId);
+                     if (!nextNode) break;
+
+                     if (nextNode.type === 'message') {
+                       const msgText = nextNode.data.message || nextNode.data.label;
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'askQuestion') {
+                       const msgText = nextNode.data.question || nextNode.data.label;
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       
+                       // Put user back into waiting state for this new question
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       currNodeId = null; 
+                     } else {
+                       break;
+                     }
+                   }
+                   flowReplyHandled = true;
+                }
+              }
+            }
+
+            // STEP 2: Check for Keyword Triggers (If not already inside an active flow)
+            if (!flowReplyHandled) {
+              for (const flow of userFlows) {
+                if (!flow.flowData) continue;
+                const nodes = flow.flowData.nodes || [];
+                const edges = flow.flowData.edges || [];
+                
+                const triggerNodes = nodes.filter(n => n.type === 'trigger' && n.data.triggerType === 'keyword');
+                
+                let matchedTrigger = null;
+                for (const trigger of triggerNodes) {
+                  const keywords = (trigger.data.keyword || "").split(',').map(k => k.trim().toLowerCase());
+                  if (keywords.includes(incomingTextLower)) {
+                    matchedTrigger = trigger;
+                    break;
+                  }
+                }
+
+                if (matchedTrigger) {
+                  console.log(`[Flow Engine] 🚀 Trigger matched in Flow: ${flow.name}`);
+                  let nextEdge = edges.find(e => e.source === matchedTrigger.id);
+                  let currNodeId = nextEdge ? nextEdge.target : null;
+                  
+                  while (currNodeId) {
+                     const nextNode = nodes.find(n => n.id === currNodeId);
+                     if (!nextNode) break;
+
+                     if (nextNode.type === 'message') {
+                       const msgText = nextNode.data.message || nextNode.data.label;
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'askQuestion') {
+                       const msgText = nextNode.data.question || nextNode.data.label;
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
+                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'flow-builder' });
+                       
+                       // Pause execution and wait for user's reply
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       currNodeId = null; 
+                     } else {
+                       break;
+                     }
+                  }
+                  flowReplyHandled = true;
+                  break; // Stop checking other flows
+                }
+              }
+            }
+
+            if (flowReplyHandled) {
+              continue; // 🚀 Flow Engine handled this, Skip the Heavy AI!
+            }
+            // ==========================================================
 
             const autoReplyRule = (user.autoReplies || []).find(r => incomingText.toLowerCase() === r.triggerWord.toLowerCase());
 
