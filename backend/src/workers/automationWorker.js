@@ -11,11 +11,26 @@ if (!process.env.REDIS_URL) {
 }
 
 const connection = process.env.REDIS_URL 
-  ? new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null })
+  ? new IORedis(process.env.REDIS_URL, { 
+      maxRetriesPerRequest: null,
+      retryStrategy(times) {
+        // Connection break hone par dheere-dheere retry karega, crash nahi hoga
+        return Math.min(times * 100, 3000); 
+      }
+    })
   : { host: '127.0.0.1', port: 6379 };
+
+// 🔴 PREVENT CRASH: Agar Redis limit cross ho jaye toh server crash na ho
+connection.on('error', (err) => {
+  console.error('⚠️ [Redis Error] Server bacha liya gaya hai:', err.message);
+});
 
 // Create the Queue
 const automationQueue = new Queue('automationQueue', { connection });
+
+automationQueue.on('error', (err) => {
+  console.error('⚠️ [Queue Error]:', err.message);
+});
 
 // Create the Worker that processes jobs
 const automationWorker = new Worker('automationQueue', async job => {
@@ -100,6 +115,18 @@ const automationWorker = new Worker('automationQueue', async job => {
       console.error(`❌ [Worker Failed] Post-campaign follow-up failed:`, error.message);
     }
   }
-}, { connection });
+}, { 
+  connection,
+  // 🔴 TRICK: Stop the "Tick-Tick" polling!
+  settings: {
+    drainDelay: 60000,      // Jab queue khali ho, toh agla check 60 seconds baad kare (Default 5s hota hai)
+    stalledInterval: 300000 // Stalled jobs ko har 5 minute me check kare, bar-bar nahi
+  }
+});
+
+// 🔴 PREVENT CRASH: Worker fail hone par process kill hone se bachayega
+automationWorker.on('error', err => {
+  console.error('⚠️ [BullMQ Worker Error]:', err.message);
+});
 
 module.exports = { automationQueue, automationWorker };
