@@ -281,15 +281,21 @@ exports.handleWhatsApp = async (req, res) => {
             // 🚀 ZERO-COST LEAD CAPTURE (Bypass AI to save Name/City & AI Cost)
             if (currentLeadCheck && currentLeadCheck.name && currentLeadCheck.name.startsWith('User ') && incomingText.length > 2 && incomingText.length < 60 && isNaN(incomingText)) {
               const extractedName = incomingText.trim();
-              const newName = `${extractedName} (ID: ${fromNumber.slice(-4)})`;
-              
-              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { name: newName } });
+              const parts = extractedName.split(',').map(p => p.trim());
+              const finalName = parts[0];
+              const finalCity = parts.length > 1 ? parts[1] : null;
 
-              let responseMessage = `Thank you, ${extractedName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
+              const newName = `${finalName} (ID: ${fromNumber.slice(-4)})`;
+              const updatePayload = { name: newName };
+              if (finalCity) updatePayload.city = finalCity;
+              
+              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updatePayload });
+
+              let responseMessage = `Thank you, ${finalName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
               
               // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI)
               if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
-                 responseMessage = `Thanks ${extractedName.split(' ')[0]}! ✅\n\nI am DealClose AI. I can automate your WhatsApp, Instagram, and Voice Calls to save your time & money.\n\nWould you like to:\n1️⃣ Start a 14-Day Free Trial\n2️⃣ Know more about features\n3️⃣ See Pricing (Reply with number)`;
+                 responseMessage = `Thanks ${finalName.split(' ')[0]}! ✅\n\nI am DealClose AI. I can automate your WhatsApp, Instagram, and Voice Calls to save your time & money.\n\nWould you like to:\n1️⃣ Start a 14-Day Free Trial\n2️⃣ Know more about features\n3️⃣ See Pricing (Reply with number)`;
               }
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);

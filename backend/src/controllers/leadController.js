@@ -160,13 +160,48 @@ exports.getLeadAnalytics = async (req, res) => {
       .limit(5)
       .select('name status source createdAt notes');
 
+    // 🚀 NEW: Advanced Reply Analytics
+    const replyAnalytics = await Message.aggregate([
+        { $match: { userId: userIdObj } },
+        {
+            $group: {
+                _id: '$direction',
+                uniqueCustomers: { $addToSet: '$customerPhone' },
+                // For outgoing messages, group by sentBy
+                botReplies: { $sum: { $cond: [ { $and: [ { $eq: ['$direction', 'outgoing'] }, { $in: ['$sentBy', ['auto-reply', 'system']] } ] }, 1, 0 ] } },
+                aiReplies: { $sum: { $cond: [ { $and: [ { $eq: ['$direction', 'outgoing'] }, { $eq: ['$sentBy', 'ai'] } ] }, 1, 0 ] } },
+                humanReplies: { $sum: { $cond: [ { $and: [ { $eq: ['$direction', 'outgoing'] }, { $eq: ['$sentBy', 'staff'] } ] }, 1, 0 ] } },
+            }
+        }
+    ]);
+
+    let customersReplied = 0;
+    let weRepliedTo = 0;
+    let botReplyCount = 0;
+    let aiReplyCount = 0;
+    let humanReplyCount = 0;
+
+    replyAnalytics.forEach(group => {
+        if (group._id === 'incoming') {
+            customersReplied = group.uniqueCustomers.length;
+        } else if (group._id === 'outgoing') {
+            weRepliedTo = group.uniqueCustomers.length;
+            botReplyCount = group.botReplies;
+            aiReplyCount = group.aiReplies;
+            humanReplyCount = group.humanReplies;
+        }
+    });
+
+    const advancedStats = { customersReplied, weRepliedTo, replySources: { bot: botReplyCount, ai: aiReplyCount, human: humanReplyCount } };
+
     res.status(200).json({
       stats: { totalLeads, converted, conversionRate, totalInvestment, costPerLead },
       graphData,
       leadsBySource,
       dailyLeads: dailyLeadsData,
       messageStats,
-      recentActivity
+      recentActivity,
+      advancedStats,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

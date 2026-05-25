@@ -6,12 +6,43 @@ const whatsappService = require('../services/whatsappService');
 // @desc    Get all chat history for a user (Grouped by customer)
 exports.getChats = async (req, res) => {
   try {
-    // Ab auth middleware se asli user ID aayegi
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized. Please login again.' });
     
-    const messages = await Message.find({ userId }).sort({ timestamp: 1 });
-    res.json(messages);
+    const { search } = req.query; // Search query from frontend
+
+    const messages = await Message.find({ userId }).lean().sort({ timestamp: 1 });
+
+    const leads = await Lead.find({ userId }).lean();
+    const leadDataMap = {};
+    leads.forEach(lead => {
+      leadDataMap[lead.phoneNumber] = {
+        name: lead.name,
+        city: lead.city || ''
+      };
+    });
+
+    let enrichedMessages = messages.map(msg => ({
+      ...msg,
+      customerName: leadDataMap[msg.customerPhone]?.name || 'Unknown',
+      customerCity: leadDataMap[msg.customerPhone]?.city || ''
+    }));
+
+    // If there's a search query, filter the results
+    if (search) {
+      const searchTerm = search.toLowerCase();
+      // We need to get all messages for a customer if any of their messages match
+      const matchingPhones = new Set();
+      enrichedMessages.forEach(msg => {
+        if ((msg.customerName && msg.customerName.toLowerCase().includes(searchTerm)) ||
+            (msg.customerCity && msg.customerCity.toLowerCase().includes(searchTerm))) {
+          matchingPhones.add(msg.customerPhone);
+        }
+      });
+      enrichedMessages = enrichedMessages.filter(msg => matchingPhones.has(msg.customerPhone));
+    }
+
+    res.json(enrichedMessages);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
