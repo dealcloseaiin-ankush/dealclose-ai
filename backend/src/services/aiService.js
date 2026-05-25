@@ -372,6 +372,56 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
               required: ["messageText", "options"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_real_estate_properties",
+            description: "Search for real estate properties on NewPropertyHub based on user criteria (city, budget, property type, or nearby location).",
+            parameters: {
+              type: "object",
+              properties: {
+                location: { type: "string", description: "City or location name" },
+                lat: { type: "number", description: "Latitude if live location is shared" },
+                lng: { type: "number", description: "Longitude if live location is shared" },
+                maxPrice: { type: "number", description: "Maximum budget" },
+                propertyType: { type: "string", description: "Type of property (e.g., Flat, Plot, Villa)" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "list_real_estate_property",
+            description: "List a new real estate property on NewPropertyHub for the user.",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Short title for the property" },
+                propertyType: { type: "string", description: "Type of property (e.g., Flat, Plot, Villa)" },
+                city: { type: "string", description: "City where property is located" },
+                price: { type: "number", description: "Price or rent amount" },
+                purpose: { type: "string", enum: ["Sale", "Rent"], description: "Purpose of listing" }
+              },
+              required: ["title", "propertyType", "city", "price", "purpose"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "schedule_property_visit",
+            description: "Schedule a site visit for a specific property. Use this when a user asks to visit a property you just showed them.",
+            parameters: {
+              type: "object",
+              properties: {
+                propertyId: { type: "string", description: "The ID of the property to visit (extract from the link provided earlier)" },
+                visitDate: { type: "string", description: "Date and time for the visit" }
+              },
+              required: ["propertyId", "visitDate"]
+            }
+          }
         }
       ],
       tool_choice: "auto"

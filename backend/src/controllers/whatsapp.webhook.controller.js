@@ -139,6 +139,15 @@ exports.handleWhatsApp = async (req, res) => {
           if (msg.type === 'interactive') {
             const interactiveType = msg.interactive.type;
             let selectedContext = interactiveType === 'list_reply' ? msg.interactive.list_reply.id : msg.interactive.button_reply.id;
+            let buttonTitle = interactiveType === 'list_reply' ? msg.interactive.list_reply.title : msg.interactive.button_reply.title;
+            
+            // 🚀 SMART ROUTING: Agar Flow ya AI ka button click kiya hai, toh usko text banakar Flow Engine me bhej do!
+            if (selectedContext.startsWith('flow_opt_') || selectedContext.startsWith('ai_btn_')) {
+              msg.type = 'text';
+              msg.text = { body: buttonTitle };
+              console.log(`🔘 [Interactive Button] Converted button click '${buttonTitle}' to text for Flow/AI Engine.`);
+              // Yahan 'continue' nahi lagayenge, taaki code niche 'msg.type === text' wale block me ja sake!
+            } else {
             
             let responseMessage = "Got it! How can I help you today?";
             
@@ -187,6 +196,7 @@ exports.handleWhatsApp = async (req, res) => {
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
             await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
             continue;
+            }
           }
 
           if (msg.type === 'text') {
@@ -463,6 +473,78 @@ exports.handleWhatsApp = async (req, res) => {
             }
             // ==========================================================
 
+            // ==========================================================
+            // 🚀 FALLBACK: DYNAMIC MAIN MENU & ZERO-COST LEAD CAPTURE
+            // (This runs ONLY if no custom Flow matched the user's input)
+            // ==========================================================
+            if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
+              let menuRows = [
+                { 
+                  id: `workspace_default`, 
+                  title: (user.businessName || "Main Business").substring(0, 24), 
+                  // ⚠️ FIX: Text cutoff problem handled gracefully with "..."
+                  description: (user.businessDescription || "Explore our products and services").length > 69 
+                                ? (user.businessDescription || "Explore our products and services").substring(0, 69) + '...'
+                                : (user.businessDescription || "Explore our products and services")
+                }
+              ];
+              
+              if (user.workspaces && user.workspaces.length > 0) {
+                const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
+                if (validWs.length > 0) {
+                  const wsRows = validWs.map(w => ({
+                    id: `workspace_${w._id}`, 
+                    title: w.name.substring(0, 24), 
+                    description: (w.description || "View our services").length > 69
+                                  ? (w.description || "View our services").substring(0, 69) + '...'
+                                  : (w.description || "View our services")
+                  }));
+                  menuRows = [...menuRows, ...wsRows];
+                }
+              } 
+              
+              menuRows = menuRows.slice(0, 10);
+
+              let bodyText = `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:`;
+              const links = user.digitalCardConfig || {};
+              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
+              
+              let socialLinks = [];
+              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
+              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
+              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
+              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
+              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
+              
+              if (socialLinks.length > 0) {
+                bodyText += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
+              }
+
+              const interactiveObj = {
+                type: "list",
+                header: { type: "text", text: `Welcome to ${user.fullName || 'Our Business'}` },
+                body: { text: bodyText },
+                footer: { text: "Powered by DealClose AI" },
+                action: { button: "Select Business", sections: [{ title: "Our Divisions", rows: menuRows }] }
+              };
+              await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
+              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+              continue; 
+            }
+
+            if (currentLeadCheck && currentLeadCheck.name && currentLeadCheck.name.startsWith('User ') && incomingText.length > 2 && incomingText.length < 60 && isNaN(incomingText)) {
+              const extractedName = incomingText.trim();
+              const newName = `${extractedName} (ID: ${fromNumber.slice(-4)})`;
+              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { name: newName } });
+              let responseMessage = `Thank you, ${extractedName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
+              if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
+                 responseMessage = `Thanks ${extractedName.split(' ')[0]}! ✅\n\nI am DealClose AI. I can automate your WhatsApp, Instagram, and Voice Calls to save your time & money.\n\nWould you like to:\n1️⃣ Start a 14-Day Free Trial\n2️⃣ Know more about features\n3️⃣ See Pricing (Reply with number)`;
+              }
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
+              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system' });
+              continue; 
+            }
+
             const autoReplyRule = (user.autoReplies || []).find(r => incomingText.toLowerCase() === r.triggerWord.toLowerCase());
 
             if (autoReplyRule) {
@@ -533,8 +615,9 @@ exports.handleWhatsApp = async (req, res) => {
                 // CHECK IF WE ALREADY KNOW THE CUSTOMER'S NAME
                 const isNameKnown = lead && lead.name && !lead.name.startsWith('User ');
                 const customerNameContext = isNameKnown ? lead.name : "Unknown";
+                const customerNotesContext = lead && lead.notes ? lead.notes : "No previous history.";
 
-                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n2. Do NOT engage in irrelevant, personal, or non-business small talk.\n3. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.\n4. LEAD CAPTURE: If the user provides their name, city, or business details, ALWAYS use the 'update_customer_profile' tool and extract as much info as possible.\n5. VERY IMPORTANT: NEVER cut off your sentences midway. Always provide a complete and polite sentence.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
+                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\nCustomer History/Notes: ${customerNotesContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Review the Customer History/Notes. If they answered bot questions (like City, Buyer or Seller), use that context to personalize your reply.\n2. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n3. Do NOT engage in irrelevant, personal, or non-business small talk.\n4. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.\n5. LEAD CAPTURE: If the user provides new details, use the 'update_customer_profile' tool.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
                 
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
                 if (user.aiCredits > 0 && user.aiCredits <= 200) {
@@ -674,6 +757,30 @@ exports.handleWhatsApp = async (req, res) => {
                       
                       responseMessage = msg;
                       repliedBy = 'ai';
+                    } else if (toolCall.function.name === "post_lead_to_connected_platform") {
+                      const platformData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        if (platformData.platformName.toLowerCase().includes('newpropertyhub')) {
+                          const leadPayload = JSON.parse(platformData.leadDetails);
+                          
+                          // Send lead directly to NewPropertyHub CRM API
+                          await axios.post('https://newpropertyhub.in/api/leads/external', {
+                            name: leadPayload.name || 'WhatsApp User',
+                            phone: fromNumber,
+                            city: leadPayload.city || 'Unknown',
+                            source: 'DealClose AI WhatsApp'
+                          }, { headers: { 
+                            'x-api-key': process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
+                            'Authorization': `Bearer ${process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
+                          } });
+                          
+                          responseMessage = `✅ Aapki details humari property team ke paas NewPropertyHub par secure tarike se save ho gayi hain.\n\nKaisi property dekhna pasand karenge aap?`;
+                        }
+                      } catch (err) {
+                        console.error('NPH Lead Sync Error:', err.message);
+                        responseMessage = `Aapki details note kar li gayi hain! Ab batayein, aapko kis type ki property ki talash hai?`;
+                      }
+                      repliedBy = 'ai';
                     } else if (toolCall.function.name === "mark_lead_as_lost_and_share") {
                       const data = JSON.parse(toolCall.function.arguments);
                       await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: 'lost', notes: `Lost reason: ${data.reason}` });
@@ -721,6 +828,64 @@ exports.handleWhatsApp = async (req, res) => {
                       responseMessage = null; // Prevent sending duplicate text
                       repliedBy = 'ai';
                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
+                    } else if (toolCall.function.name === "search_real_estate_properties") {
+                      const searchData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        const baseUrl = 'https://newpropertyhub.in/api/properties';
+                        let apiUrl = searchData.lat && searchData.lng 
+                          ? `${baseUrl}/nearby?lat=${searchData.lat}&lng=${searchData.lng}&radius=10`
+                          : `${baseUrl}?keyword=${searchData.location || ''}&maxPrice=${searchData.maxPrice || ''}&propertyType=${searchData.propertyType || ''}`;
+                        
+                        const response = await axios.get(apiUrl, { headers: { 
+                          'x-api-key': process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
+                          'Authorization': `Bearer ${process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
+                        } });
+                        const properties = response.data.properties || response.data.data || []; 
+                        
+                        if (properties.length > 0) {
+                          const propList = properties.slice(0, 3).map((p, i) => `*${i+1}. ${p.title}*\n💰 ₹${p.price}\n📍 ${p.city}\n🔗 https://newpropertyhub.in/property/${p._id}`).join('\n\n');
+                          responseMessage = `Mujhe aapke liye kuch behtareen properties mili hain:\n\n${propList}\n\nKya aap inme se kisi property ki Site Visit book karna chahenge? Mujhe bas property number batayein!`;
+                        } else {
+                          responseMessage = `Maafi chahunga, filhal is criteria mein koi properties available nahi hain. Kya aap thoda budget ya location change karke dekhna chahenge?`;
+                        }
+                      } catch (apiErr) {
+                        console.error('NPH API Error:', apiErr.message);
+                        responseMessage = `Property data fetch karne mein thodi दिक्कत aayi. Humari team aapse jaldi sampark karegi!`;
+                      }
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "list_real_estate_property") {
+                      const propData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        await axios.post('https://newpropertyhub.in/api/properties/quick-post', {
+                          ...propData,
+                          clientPhone: fromNumber, 
+                          source: 'DealClose AI WhatsApp'
+                        }, { headers: { 
+                          'x-api-key': process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
+                          'Authorization': `Bearer ${process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
+                        } });
+                        responseMessage = `✅ Badhai ho! Aapki property *"${propData.title}"* NewPropertyHub par safaltapurvak list ho gayi hai!\n\nHumaare buyers ab ise dekh sakte hain. Koi inquiry aane par hum aapko turant WhatsApp par notify karenge.`;
+                      } catch (apiErr) {
+                         console.error('NPH Post Error:', apiErr.message);
+                         responseMessage = `Property list karte waqt thodi error aayi. Maine details note kar li hain, humari team ise manually upload kar degi!`;
+                      }
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "schedule_property_visit") {
+                      const visitData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        await axios.post(`https://newpropertyhub.in/api/properties/${visitData.propertyId}/schedule-visit`, {
+                          clientPhone: fromNumber,
+                          visitDate: visitData.visitDate
+                        }, { headers: { 
+                          'x-api-key': process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
+                          'Authorization': `Bearer ${process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
+                        } });
+                        responseMessage = `📅 Perfect! Aapki site visit *${visitData.visitDate}* ke liye book ho gayi hai. Property owner ko notify kar diya gaya hai. Vo jald hi aapse coordinate karenge!`;
+                      } catch (apiErr) {
+                         console.error('NPH Visit Error:', apiErr.message);
+                         responseMessage = `Maine aapki visit request note kar li hai. Humare agent aapse visit confirm karne ke liye call karenge!`;
+                      }
+                      repliedBy = 'ai';
                     }
                   }
                 } else {

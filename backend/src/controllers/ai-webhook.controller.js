@@ -8,6 +8,7 @@ const callService = require('../services/callService');
 const billing = require('../utils/billing');
 const metaAdsService = require('../services/metaAdsService');
 const Flow = require('../models/flowModel');
+const axios = require('axios'); // Added to make requests to NewPropertyHub
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
@@ -112,19 +113,21 @@ exports.handleWhatsApp = async (req, res) => {
             console.log(`📍 [Webhook] Location received from ${fromNumber}: ${locationString}`);
             
             const Order = require('../models/orderModel');
-            const pendingOrder = await Order.findOneAndUpdate(
-              { customerPhone: fromNumber, userId: user._id, status: 'Pending' },
-              { $set: { shippingAddress: locationString, status: 'Confirmed' } },
-              { sort: { createdAt: -1 }, new: true }
-            );
+            const pendingOrder = await Order.findOne({ customerPhone: fromNumber, userId: user._id, status: 'Pending' }).sort({ createdAt: -1 });
 
-            const replyMessage = pendingOrder 
-              ? `✅ Thank you! We have updated your delivery address for Order *#${pendingOrder.orderId}*. We will process your dispatch shortly!`
-              : `📍 Thank you for sharing your location. I have updated it in your profile!`;
-
-            await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMessage);
-            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Shared Location]: ${locationString}`, direction: 'incoming', status: 'received', sentBy: 'customer' });
-            continue;
+            if (pendingOrder) {
+               pendingOrder.shippingAddress = locationString;
+               pendingOrder.status = 'Confirmed';
+               await pendingOrder.save();
+               const replyMessage = `✅ Thank you! We have updated your delivery address for Order *#${pendingOrder.orderId}*. We will process your dispatch shortly!`;
+               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMessage);
+               await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Shared Location]: ${locationString}`, direction: 'incoming', status: 'received', sentBy: 'customer' });
+               continue;
+            } else {
+               // REAL ESTATE MAGIC: Feed location to AI to trigger nearby property search
+               msg.type = 'text'; 
+               msg.text = { body: `[User Shared Live Location] Latitude: ${latitude}, Longitude: ${longitude}, Address: ${locationString}. Please find properties near me.` };
+            }
           }
 
           if (msg.type === 'image') {
@@ -578,6 +581,56 @@ exports.handleWhatsApp = async (req, res) => {
                       responseMessage = null; 
                       repliedBy = 'ai';
                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
+                    } else if (toolCall.function.name === "search_real_estate_properties") {
+                      const searchData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        const baseUrl = 'https://newpropertyhub.in/api/properties';
+                        let apiUrl = searchData.lat && searchData.lng 
+                          ? `${baseUrl}/nearby?lat=${searchData.lat}&lng=${searchData.lng}&radius=10`
+                          : `${baseUrl}?keyword=${searchData.location || ''}&maxPrice=${searchData.maxPrice || ''}&propertyType=${searchData.propertyType || ''}`;
+                        
+                        const response = await axios.get(apiUrl);
+                        const properties = response.data.properties || response.data.data || []; 
+                        
+                        if (properties.length > 0) {
+                          const propList = properties.slice(0, 3).map((p, i) => `*${i+1}. ${p.title}*\n💰 ₹${p.price}\n📍 ${p.city}\n🔗 https://newpropertyhub.in/property/${p._id}`).join('\n\n');
+                          responseMessage = `Mujhe aapke liye kuch behtareen properties mili hain:\n\n${propList}\n\nKya aap inme se kisi property ki Site Visit book karna chahenge? Mujhe bas property number batayein!`;
+                        } else {
+                          responseMessage = `Maafi chahunga, filhal is criteria mein koi properties available nahi hain. Kya aap thoda budget ya location change karke dekhna chahenge?`;
+                        }
+                      } catch (apiErr) {
+                        console.error('NPH API Error:', apiErr.message);
+                        responseMessage = `Property data fetch karne mein thodi dikkat aayi. Humari team aapse jaldi sampark karegi!`;
+                      }
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "list_real_estate_property") {
+                      const propData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        // 'NPH_MASTER_SECRET_KEY' ko aapne NewPropertyHub ke backend key se replace karein
+                        await axios.post('https://newpropertyhub.in/api/properties/quick-post', {
+                          ...propData,
+                          clientPhone: fromNumber, 
+                          source: 'DealClose AI WhatsApp'
+                        }, { headers: { 'Authorization': `Bearer NPH_MASTER_SECRET_KEY` } });
+                        responseMessage = `✅ Badhai ho! Aapki property *"${propData.title}"* NewPropertyHub par safaltapurvak list ho gayi hai!\n\nHumaare buyers ab ise dekh sakte hain. Koi inquiry aane par hum aapko turant WhatsApp par notify karenge.`;
+                      } catch (apiErr) {
+                         console.error('NPH Post Error:', apiErr.message);
+                         responseMessage = `Property list karte waqt thodi error aayi. Maine details note kar li hain, humari team ise manually upload kar degi!`;
+                      }
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "schedule_property_visit") {
+                      const visitData = JSON.parse(toolCall.function.arguments);
+                      try {
+                        await axios.post(`https://newpropertyhub.in/api/properties/${visitData.propertyId}/schedule-visit`, {
+                          clientPhone: fromNumber,
+                          visitDate: visitData.visitDate
+                        }, { headers: { 'Authorization': `Bearer NPH_MASTER_SECRET_KEY` } });
+                        responseMessage = `📅 Perfect! Aapki site visit *${visitData.visitDate}* ke liye book ho gayi hai. Property owner ko notify kar diya gaya hai. Vo jald hi aapse coordinate karenge!`;
+                      } catch (apiErr) {
+                         console.error('NPH Visit Error:', apiErr.message);
+                         responseMessage = `Maine aapki visit request note kar li hai. Humare agent aapse visit confirm karne ke liye call karenge!`;
+                      }
+                      repliedBy = 'ai';
                     }
                   }
                 } else {

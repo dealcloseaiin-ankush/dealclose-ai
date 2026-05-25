@@ -33,8 +33,12 @@ const trackerRoutes = require('./routes/trackerRoutes');
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
 
-// Initialize Background Workers
-require('./workers/automationWorker');
+// Initialize Background Workers Safely
+if (process.env.DISABLE_REDIS_WORKER !== 'true') {
+  require('./workers/automationWorker');
+} else {
+  console.log('⚠️ [Warning] Background Automation Worker is DISABLED via environment variables.');
+}
 
 const app = express();
 
