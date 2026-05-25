@@ -540,6 +540,22 @@ exports.handleWhatsApp = async (req, res) => {
               if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
                  responseMessage = `Thanks ${extractedName.split(' ')[0]}! ✅\n\nI am DealClose AI. I can automate your WhatsApp, Instagram, and Voice Calls to save your time & money.\n\nWould you like to:\n1️⃣ Start a 14-Day Free Trial\n2️⃣ Know more about features\n3️⃣ See Pricing (Reply with number)`;
               }
+              
+              // 🚀 SMART LINKS INJECTION (For Zero-Cost Welcome)
+              const links = user.digitalCardConfig || {};
+              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
+              
+              let socialLinks = [];
+              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
+              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
+              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
+              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
+              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
+              
+              if (socialLinks.length > 0) {
+                responseMessage += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
+              }
+
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
               await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system' });
               continue; 

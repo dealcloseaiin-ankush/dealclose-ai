@@ -21,4 +21,7 @@ router.post('/instagram', instagramController.handleInstagramWebhook);
 // Universal (Shopify, Vyapar, etc.)
 router.post('/universal', universalController.handleUniversalData);
 
+// Outbound CRM Webhook (NewPropertyHub Broadcast)
+router.post('/outbound', universalController.handleOutboundMessage);
+
 module.exports = router;

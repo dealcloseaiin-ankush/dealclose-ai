@@ -296,6 +296,7 @@ exports.generateFlow = async (req, res) => {
     - AI Voice Calling (Inbound/Outbound sales calls via Exotel)
     - CRM & Lead Management (Auto-save leads, Track deal stages)
     - ScanIQ (Meta/Google Ad Competitor Analysis)
+    - Real Estate Automation (Seamless integration with NewPropertyHub.in APIs to list, search, and book properties!)
     
     USER'S BUSINESS DETAILS: 
     ${businessContext}
