@@ -115,6 +115,7 @@ exports.saveSettings = async (req, res) => {
     if (updates.externalApiPostUrl !== undefined) updateData.externalApiPostUrl = updates.externalApiPostUrl;
     if (updates.externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = updates.externalApiBlogUrl;
     if (updates.externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = updates.externalApiVisitUrl;
+    if (updates.customWebhooks !== undefined) updateData.customWebhooks = updates.customWebhooks;
     
     // 🔥 MAGIC ONBOARDING: If business description is being set for the first time, create a default flow.
     if (updates.businessDescription && !user.businessDescription) {

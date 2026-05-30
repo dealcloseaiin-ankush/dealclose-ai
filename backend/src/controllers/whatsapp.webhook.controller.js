@@ -68,6 +68,15 @@ exports.handleWhatsApp = async (req, res) => {
           if (statusStr === 'delivered') user.messageStats.delivered = (user.messageStats.delivered || 0) + 1;
           if (statusStr === 'read') user.messageStats.read = (user.messageStats.read || 0) + 1;
           
+          // 🚀 NEW: Update Message Status for Ticks (Sent, Delivered, Read)
+          if (['sent', 'delivered', 'read'].includes(statusStr)) {
+            await Message.findOneAndUpdate(
+              { customerPhone: value.statuses[0].recipient_id, direction: 'outgoing' },
+              { $set: { status: statusStr } },
+              { sort: { _id: -1 } } // Sabse latest message ko update karega
+            );
+          }
+
           // Agar 24-hour rule ya kisi aur wajah se fail ho jaye
           if (statusStr === 'failed') {
              const failReason = value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown';
@@ -93,11 +102,15 @@ exports.handleWhatsApp = async (req, res) => {
           // 🚀 NEW: AUTO-ADD EVERY SENDER TO CRM (So it shows on your board immediately)
           try {
             console.log(`[Webhook Debug] Attempting to save Lead ${fromNumber} for user ${user._id}`);
-            const savedLead = await Lead.findOneAndUpdate(
-              { phoneNumber: fromNumber, userId: user._id },
-              { $setOnInsert: { name: `User ${fromNumber.slice(-4)}`, source: 'WhatsApp Inbound', status: 'new', createdBy: user._id } },
-              { upsert: true, new: true }
-            );
+            let savedLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+            if (!savedLead) {
+              const leadCount = await Lead.countDocuments({ userId: user._id });
+              const seqId = String(leadCount + 1).padStart(4, '0');
+              savedLead = await Lead.create({
+                userId: user._id, phoneNumber: fromNumber, name: `User #${seqId}`,
+                source: 'WhatsApp Inbound', status: 'new', createdBy: user._id
+              });
+            }
             console.log(`✅ [Webhook Debug] Lead saved/verified in CRM (ID: ${savedLead._id})`);
           } catch (leadErr) {
             console.error("❌ [Webhook] Error auto-saving Lead to CRM:", leadErr.message);
@@ -339,8 +352,34 @@ exports.handleWhatsApp = async (req, res) => {
                    let chosenEdge = null;
                    
                    if (questionNode.data.replyType === 'open') {
-                     // Save Open Text Answer to Lead Notes
-                     await Lead.updateOne({ _id: currentLeadCheck._id }, { $push: { notes: `Flow Answer: ${incomingText}` } });
+                     // 🚀 SYSTEM ZERO-COST PARSER: Extract Name/City without AI!
+                     let updatePayload = { $push: { notes: `Flow Answer (${questionNode.data.question}): ${incomingText}` } };
+                     let setPayload = {};
+                     const qText = (questionNode.data.question || '').toLowerCase();
+                     
+                     if (qText.includes('name') && qText.includes('city')) {
+                         const parts = incomingText.split(/[\s,]+/);
+                         const idMatch = currentLeadCheck.name ? currentLeadCheck.name.match(/(?:#|ID: )\d+/) : null;
+                         const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+                         if (parts.length >= 2) {
+                             setPayload.name = `${parts[0]} (${seqId})`;
+                             setPayload.city = parts.slice(1).join(' ');
+                         } else {
+                             setPayload.name = `${incomingText.trim()} (${seqId})`;
+                         }
+                     } else if (qText.includes('name') && incomingText.length < 50) {
+                         const idMatch = currentLeadCheck.name ? currentLeadCheck.name.match(/(?:#|ID: )\d+/) : null;
+                         const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+                         setPayload.name = `${incomingText.trim()} (${seqId})`;
+                     } else if ((qText.includes('city') || qText.includes('location')) && incomingText.length < 50) {
+                         setPayload.city = incomingText.trim();
+                     }
+                     if (qText.includes('email') && incomingText.includes('@')) {
+                         setPayload.email = incomingText.trim();
+                     }
+                     if (Object.keys(setPayload).length > 0) updatePayload.$set = setPayload;
+                     
+                     await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
                      chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'replied');
                    } else {
                      // Yes / No Choice Evaluator
@@ -679,7 +718,9 @@ exports.handleWhatsApp = async (req, res) => {
                     PRICING TO PITCH:
                     - WhatsApp Solo (1 Business, 1 User): ₹199/mo
                     - WhatsApp Team (1 Business, Multi-Staff): ₹499/mo
-                    - WhatsApp Multi-Brand (Multi
+                    - WhatsApp Multi-Brand (Multi-Business, Multi-Staff): ₹999/mo
+                    - 🎁 SPECIAL OFFER: Tell them if they use the referral code 'AI499' during checkout/onboarding, they will get 3 MONTHS of subscription for just ₹499!
+                    
                     CRITICAL RULES:
                     1. Always reply in the EXACT same language the user is speaking (Hindi, Hinglish, English).
                     2. NEVER cut off your message in the middle. Always provide a full, complete sentence.`;
@@ -774,21 +815,21 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_customer_profile") {
                       const profileData = JSON.parse(toolCall.function.arguments);
-                      // Keeping the unique ID with the name as requested by you to prevent duplicate name issues
-                      const uniqueSuffix = fromNumber.slice(-4);
-                      const newName = `${profileData.fullName || 'Customer'} (ID: ${uniqueSuffix})`;
+                      const currentLeadForId = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+                      const idMatch = currentLeadForId && currentLeadForId.name ? currentLeadForId.name.match(/(?:#|ID: )\d+/) : null;
+                      const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+                      const newName = `${profileData.fullName || 'Customer'} (${seqId})`;
                       
                       const updateFields = { name: newName };
                       if (profileData.email) updateFields.email = profileData.email;
+                      if (profileData.city) updateFields.city = profileData.city;
+                      if (profileData.businessType) updateFields.businessType = profileData.businessType;
                       
-                      let newNotes = [];
-                      if (profileData.city) newNotes.push(`City: ${profileData.city}`);
-                      if (profileData.businessType) newNotes.push(`Business: ${profileData.businessType}`);
-                      if (newNotes.length > 0) updateFields.notes = newNotes.join(' | ');
+                      const aiLog = `[AI Assistant] Updated Profile - Name: ${profileData.fullName || 'N/A'}${profileData.city ? ', City: ' + profileData.city : ''}${profileData.email ? ', Email: ' + profileData.email : ''}`;
 
                       await Lead.findOneAndUpdate(
                         { phoneNumber: fromNumber, userId: user._id }, 
-                        { $set: updateFields }
+                        { $set: updateFields, $push: { notes: aiLog } }
                       );
                       
                       responseMessage = `Thanks, ${profileData.fullName}! I've updated your profile. How can I help you today?`;
@@ -816,18 +857,19 @@ exports.handleWhatsApp = async (req, res) => {
                     } else if (toolCall.function.name === "post_lead_to_connected_platform") {
                       const platformData = JSON.parse(toolCall.function.arguments);
                       try {
-                        if (platformData.platformName.toLowerCase().includes('newpropertyhub')) {
+                        if (platformData.platformName.toLowerCase().includes('newpropertyhub') || activeApiUrl) {
                           const leadPayload = JSON.parse(platformData.leadDetails);
+                          const leadEndpoint = activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties/whatsapp-bot-lead` : 'https://newpropertyhub.in/api/properties/whatsapp-bot-lead';
                           
-                          // Send lead directly to NewPropertyHub CRM API
-                          await axios.post('https://newpropertyhub.in/api/leads/external', {
+                          // Send lead directly to External CRM API
+                          await axios.post(leadEndpoint, {
                             name: leadPayload.name || 'WhatsApp User',
                             phone: fromNumber,
                             city: leadPayload.city || 'Unknown',
                             source: 'DealClose AI WhatsApp'
                           }, { headers: { 
-                            'x-api-key': process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
-                            'Authorization': `Bearer ${process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
+                            'x-api-key': activeApiToken || process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
+                            'Authorization': `Bearer ${activeApiToken || process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
                           } });
                           
                           responseMessage = `✅ Aapki details humari property team ke paas NewPropertyHub par secure tarike se save ho gayi hain.\n\nKaisi property dekhna pasand karenge aap?`;
@@ -875,15 +917,17 @@ exports.handleWhatsApp = async (req, res) => {
                         reply: { id: `ai_btn_${idx}`, title: opt.substring(0, 20) }
                       }));
                       
+                      const menuText = menuData.messageText.includes('🤖') ? menuData.messageText : `🤖 ` + menuData.messageText;
+
                       await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, {
                         type: "button",
-                        body: { text: menuData.messageText },
+                        body: { text: menuText },
                         action: { buttons }
                       });
                       
                       responseMessage = null; // Prevent sending duplicate text
                       repliedBy = 'ai';
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
                     } else if (toolCall.function.name === "search_real_estate_properties") {
                       const searchData = JSON.parse(toolCall.function.arguments);
                       const propertiesEndpoint = activeSearchUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties` : 'https://newpropertyhub.in/api/properties');
@@ -980,6 +1024,11 @@ exports.handleWhatsApp = async (req, res) => {
 
             if (responseMessage) {
               try {
+                // 🤖 Automatically add Robot Emoji if the message is from AI and doesn't already have it
+                if (repliedBy === 'ai' && !responseMessage.includes('🤖')) {
+                  responseMessage = `🤖 ` + responseMessage;
+                }
+
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
                 await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy });
               } catch (sendError) {

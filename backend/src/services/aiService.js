@@ -192,7 +192,7 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
  * @param {string} systemContext The system message.
  * @param {string} [platform="whatsapp"] The platform.
  */
-exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "whatsapp") => {
+exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "whatsapp", customWebhooks = []) => {
   try {
     let finalContext = systemContext || "You are a business AI assistant.";
     
@@ -203,12 +203,7 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
       finalContext += "\n\n[CRITICAL RULE]: You are on WhatsApp. Be comprehensive, format nicely with bullet points, and act as a closer.";
     }
 
-    const requestPayload = {
-      messages: [
-        { role: "system", content: finalContext },
-        { role: "user", content: prompt }
-      ],
-      tools: [
+    let toolsArray = [
         {
           type: "function",
           function: {
@@ -278,6 +273,36 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
               properties: {
                 orderId: { type: "string", description: "The order ID or tracking number if provided by the user (optional)" }
               }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "update_customer_profile",
+            description: "Update the customer's profile details like name, email, city, and business type in the CRM.",
+            parameters: {
+              type: "object",
+              properties: {
+                fullName: { type: "string", description: "Customer's full name" },
+                email: { type: "string", description: "Customer's email address" },
+                city: { type: "string", description: "Customer's city or location" },
+                businessType: { type: "string", description: "Type of business the customer runs" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "update_lead_status",
+            description: "Update the CRM status of the lead based on the conversation (e.g., if they agree to buy, change to 'converted', if they refuse, change to 'lost').",
+            parameters: {
+              type: "object",
+              properties: {
+                status: { type: "string", enum: ["new", "interested", "negotiating", "converted", "lost"], description: "The new status of the lead" }
+              },
+              required: ["status"]
             }
           }
         },
@@ -468,7 +493,35 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
             }
           }
         }
+      ];
+
+    // 🚀 DYNAMIC SAAS WEBHOOKS: Inject user's custom API URLs as AI Tools
+    if (customWebhooks && customWebhooks.length > 0) {
+      customWebhooks.forEach(webhook => {
+        if (webhook.name && webhook.description) {
+          toolsArray.push({
+            type: "function",
+            function: {
+              name: webhook.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(), // Ensure valid tool name
+              description: webhook.description, // THIS TELLS AI WHEN TO USE THE URL
+              parameters: {
+                type: "object",
+                properties: {
+                  payloadData: { type: "string", description: "JSON string containing all the necessary parameters needed for this action based on user conversation." }
+                }
+              }
+            }
+          });
+        }
+      });
+    }
+
+    const requestPayload = {
+      messages: [
+        { role: "system", content: finalContext },
+        { role: "user", content: prompt }
       ],
+      tools: toolsArray,
       tool_choice: "auto"
     };
 

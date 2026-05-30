@@ -69,6 +69,15 @@ exports.handleWhatsApp = async (req, res) => {
           if (statusStr === 'delivered') user.messageStats.delivered = (user.messageStats.delivered || 0) + 1;
           if (statusStr === 'read') user.messageStats.read = (user.messageStats.read || 0) + 1;
           
+          // 🚀 NEW: Update Message Status for Ticks (Sent, Delivered, Read)
+          if (['sent', 'delivered', 'read'].includes(statusStr)) {
+            await Message.findOneAndUpdate(
+              { customerPhone: value.statuses[0].recipient_id, direction: 'outgoing' },
+              { $set: { status: statusStr } },
+              { sort: { _id: -1 } } // Sabse latest message ko update karega
+            );
+          }
+
           if (statusStr === 'failed') {
              const failReason = value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown';
              console.error(`❌ [Webhook] Message Failed to send. Reason: ${failReason}`);
@@ -285,11 +294,14 @@ exports.handleWhatsApp = async (req, res) => {
               const finalName = parts[0];
               const finalCity = parts.length > 1 ? parts[1] : null;
 
-              const newName = `${finalName} (ID: ${fromNumber.slice(-4)})`;
+              const idMatch = currentLeadCheck.name.match(/(?:#|ID: )\d+/);
+              const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+              const newName = `${finalName} (${seqId})`;
               const updatePayload = { name: newName };
               if (finalCity) updatePayload.city = finalCity;
+              const sysLog = `[System Automation] Auto-captured details. Name: ${finalName}${finalCity ? ', City: ' + finalCity : ''}`;
               
-              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updatePayload });
+              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updatePayload, $push: { notes: sysLog } }, { strict: false });
 
               let responseMessage = `Thank you, ${finalName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
               
@@ -502,20 +514,21 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_customer_profile") {
                       const profileData = JSON.parse(toolCall.function.arguments);
-                      const uniqueSuffix = fromNumber.slice(-4);
-                      const newName = `${profileData.fullName || 'Customer'} (ID: ${uniqueSuffix})`;
+                      const currentLeadForId = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+                      const idMatch = currentLeadForId && currentLeadForId.name ? currentLeadForId.name.match(/(?:#|ID: )\d+/) : null;
+                      const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+                      const newName = `${profileData.fullName || 'Customer'} (${seqId})`;
                       
                       const updateFields = { name: newName };
                       if (profileData.email) updateFields.email = profileData.email;
+                      if (profileData.city) updateFields.city = profileData.city;
+                      if (profileData.businessType) updateFields.businessType = profileData.businessType;
                       
-                      let newNotes = [];
-                      if (profileData.city) newNotes.push(`City: ${profileData.city}`);
-                      if (profileData.businessType) newNotes.push(`Business: ${profileData.businessType}`);
-                      if (newNotes.length > 0) updateFields.notes = newNotes.join(' | ');
+                      const aiLog = `[AI Assistant] Updated Profile - Name: ${profileData.fullName || 'N/A'}${profileData.city ? ', City: ' + profileData.city : ''}${profileData.email ? ', Email: ' + profileData.email : ''}`;
 
                       await Lead.findOneAndUpdate(
                         { phoneNumber: fromNumber, userId: user._id }, 
-                        { $set: updateFields }
+                        { $set: updateFields, $push: { notes: aiLog } }
                       );
                       responseMessage = `Thanks! I've updated your profile as ${profileData.fullName}. How can I help you today?`;
                       repliedBy = 'ai';
@@ -618,15 +631,17 @@ exports.handleWhatsApp = async (req, res) => {
                         reply: { id: `ai_btn_${idx}`, title: opt.substring(0, 20) }
                       }));
                       
+                      const menuText = menuData.messageText.includes('🤖') ? menuData.messageText : `🤖 ` + menuData.messageText;
+
                       await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, {
                         type: "button",
-                        body: { text: menuData.messageText },
+                        body: { text: menuText },
                         action: { buttons }
                       });
                       
                       responseMessage = null; 
                       repliedBy = 'ai';
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
                     } else if (toolCall.function.name === "search_real_estate_properties") {
                       const searchData = JSON.parse(toolCall.function.arguments);
                       const propertiesEndpoint = activeSearchUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties` : 'https://newpropertyhub.in/api/properties');
@@ -730,6 +745,11 @@ exports.handleWhatsApp = async (req, res) => {
 
             if (responseMessage) {
               try {
+                // 🤖 Automatically add Robot Emoji if the message is from AI and doesn't already have it
+                if (repliedBy === 'ai' && !responseMessage.includes('🤖')) {
+                  responseMessage = `🤖 ` + responseMessage;
+                }
+                
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
                 await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy });
               } catch (sendError) {

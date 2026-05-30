@@ -91,11 +91,13 @@ exports.getLeadAnalytics = async (req, res) => {
           const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
           
           if (!leadExists && !contactExists) {
+            const leadCount = await Lead.countDocuments({ userId });
+            const seqId = String(leadCount + 1).padStart(4, '0');
             await Lead.create({
               userId,
               createdBy: userId,
               phoneNumber: phone,
-              name: `User ${phone.slice(-4)}`,
+              name: `User #${seqId}`,
               source: 'WhatsApp (Old Chat)',
               status: 'new'
             });

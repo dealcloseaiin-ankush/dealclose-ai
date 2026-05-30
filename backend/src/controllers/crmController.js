@@ -36,11 +36,13 @@ exports.getPipeline = async (req, res) => {
           const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
           
           if (!leadExists && !contactExists) {
+            const leadCount = await Lead.countDocuments({ userId });
+            const seqId = String(leadCount + 1).padStart(4, '0');
             await Lead.create({
               userId,
               createdBy: userId,
               phoneNumber: phone,
-              name: `User ${phone.slice(-4)}`,
+              name: `User #${seqId}`,
               source: 'WhatsApp (Old Chat)',
               status: 'new'
             });
@@ -138,7 +140,13 @@ exports.updateStage = async (req, res) => {
 
     // 🚀 NEW: Save Deal Value and Notes
     if (dealValue !== undefined) record.dealValue = dealValue;
-    if (notes !== undefined) record.notes = notes;
+    if (notes !== undefined && notes.trim() !== '') {
+      const humanLog = `[Human: ${req.user?.fullName || 'Staff'}] Added Note: ${notes}`;
+      
+      // Ensure notes is an array and push the new log
+      if (Array.isArray(record.notes)) record.notes.push(humanLog);
+      else record.notes = record.notes ? [record.notes, humanLog] : [humanLog];
+    }
 
     await record.save();
 
