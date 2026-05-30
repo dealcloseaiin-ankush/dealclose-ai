@@ -158,9 +158,9 @@ exports.getLeadAnalytics = async (req, res) => {
 
     // 🚀 NEW: Fetch Recent Activity for Live AI Activity Section
     const recentActivity = await Lead.find({ userId: userIdObj })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select('name status source createdAt notes');
+      .sort({ updatedAt: -1 })
+      .limit(8)
+      .select('name status source createdAt updatedAt notes aiFeedbackScore');
 
     // 🚀 NEW: Advanced Reply Analytics
     const replyAnalytics = await Message.aggregate([

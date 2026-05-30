@@ -32,6 +32,8 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     } else if (platform === 'whatsapp') {
       finalContext += "\n\n[CRITICAL RULE]: You are chatting privately on WhatsApp. You can provide detailed answers, exact pricing, long catalog lists, and ask follow-up questions to close the sale.";
     }
+    
+    finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are strictly an exclusive AI agent for THIS specific business only. You MUST NOT answer general knowledge questions, write code, or discuss any other businesses. If a user asks something unrelated to your products/services, politely say 'I can only assist with [Business Name] related queries.' Keep all your responses extremely concise, short, and to the point.";
 
     const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
     let lastError;
@@ -202,6 +204,8 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
     } else if (platform === 'whatsapp') {
       finalContext += "\n\n[CRITICAL RULE]: You are on WhatsApp. Be comprehensive, format nicely with bullet points, and act as a closer.";
     }
+    
+    finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are an exclusive AI assistant for THIS specific business only. You MUST NOT answer general knowledge questions, write code, or discuss any other businesses. If a user asks something unrelated to your products/services, politely decline and steer the conversation back. Keep all your responses extremely concise, short, and to the point.";
 
     let toolsArray = [
         {

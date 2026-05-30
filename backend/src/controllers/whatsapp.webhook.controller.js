@@ -305,6 +305,36 @@ exports.handleWhatsApp = async (req, res) => {
                 continue; 
             }
 
+            // 🚀 ZERO-COST AI FEEDBACK CAPTURE (Catching 1-5 Ratings)
+            if (currentLeadCheck && currentLeadCheck.awaitingFeedback) {
+              const ratingMatch = incomingText.match(/^[1-5]$/);
+              if (ratingMatch || incomingTextLower.includes('star')) {
+                const ratingStr = ratingMatch ? ratingMatch[0] : (incomingText.match(/[1-5]/) ? incomingText.match(/[1-5]/)[0] : '5');
+                const rating = parseInt(ratingStr);
+                const logMsg = `[Customer Feedback] Rated AI Assistant: ${rating} Stars ⭐`;
+                
+                await Lead.updateOne({ _id: currentLeadCheck._id }, { 
+                  $set: { awaitingFeedback: false, aiFeedbackScore: rating },
+                  $push: { notes: logMsg }
+                }, { strict: false });
+                
+                let replyMsg = `Thank you for your feedback (${rating} ⭐)! We are constantly learning to serve you better. Have a great day!`;
+                
+                // 🚀 SMART UPSELL: If they gave 4 or 5 stars, ask for a Google Review!
+                const googleReviewLink = user.digitalCardConfig?.googleReview;
+                if (rating >= 4 && googleReviewLink) {
+                   replyMsg = `Thank you for the amazing ${rating}⭐ rating! 🎉\n\nSince you had a great experience, it would mean the world to us if you could take 10 seconds to rate our business on Google:\n${googleReviewLink}\n\nHave a wonderful day! 🙏`;
+                }
+
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMsg);
+                await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system' });
+                continue; // 🚀 Skip AI completely to save tokens!
+              } else {
+                // Not a rating, just turn off the flag and process normally via AI
+                await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { awaitingFeedback: false } }, { strict: false });
+              }
+            }
+
             // 🚀 ZERO-COST LEAD CAPTURE (Bypass AI to save Name/City & AI Cost)
             if (currentLeadCheck && currentLeadCheck.name && currentLeadCheck.name.startsWith('User ') && incomingText.length > 2 && incomingText.length < 60 && isNaN(incomingText)) {
               const extractedName = incomingText.trim();
@@ -1031,6 +1061,13 @@ exports.handleWhatsApp = async (req, res) => {
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
                 await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy });
+                
+                // 🚀 SMART DELAYED FEEDBACK: Only trigger if AI actually replied!
+                if (repliedBy === 'ai') {
+                  try {
+                    if (automationQueue) await automationQueue.add('ask_feedback', { phone: fromNumber, userId: user._id }, { delay: 22 * 60 * 60 * 1000, jobId: `feedback_${user._id}_${fromNumber}` });
+                  } catch(e) { console.error("Queue feedback error", e.message); }
+                }
               } catch (sendError) {
                 console.error("❌ [Send/Save Error]:", sendError.message);
               }

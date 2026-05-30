@@ -211,21 +211,33 @@ export default function Dashboard() {
 
         {/* Activity Feed */}
         <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-2xl">
-          <h3 className="text-lg font-bold text-white mb-6">Live AI Activity</h3>
-          <div className="space-y-5">
-            {[
-              { action: `${data.stats.converted} leads successfully converted so far!`, time: "System Status", status: "text-green-400" },
-              { action: `AI categorized ${data.stats.interested} leads as highly interested.`, time: "System Status", status: "text-purple-400" },
-              { action: `Total Platform investment running at ₹${data.stats.totalInvestment}`, time: "Billing", status: "text-blue-400" },
-            ].map((log, i) => (
-              <div key={i} className="flex items-start gap-4">
-                <div className={`mt-1.5 w-2 h-2 rounded-full ${log.status} shadow-[0_0_8px_currentColor]`}></div>
-                <div>
-                  <p className="text-sm text-gray-300 font-medium">{log.action}</p>
-                  <p className="text-xs text-gray-600 mt-1">{log.time}</p>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-white">AI Learnings & Feedback</h3>
+            <span className="text-xs bg-green-500/10 text-green-400 font-bold px-2 py-1 rounded border border-green-500/20">Live</span>
+          </div>
+          
+          <div className="space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
+            {data.recentActivity && data.recentActivity.length > 0 ? (
+              data.recentActivity.map((log, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-[#1a1a1a] rounded-xl border border-gray-800 hover:border-gray-700 transition-colors">
+                  <div className="text-2xl mt-1 opacity-90">{log.status === 'converted' ? '🏆' : log.status === 'interested' ? '🔥' : log.status === 'lost' ? '💔' : '👤'}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start gap-2">
+                       <p className="text-sm font-bold text-white truncate">{log.name}</p>
+                       {log.aiFeedbackScore && <span className="text-[10px] whitespace-nowrap bg-yellow-500/10 text-yellow-400 font-black px-2 py-0.5 rounded-full border border-yellow-500/20 shadow-sm">{log.aiFeedbackScore} ⭐</span>}
+                    </div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-1.5">{log.status} • {log.source}</p>
+                    {/* AI Learning Notes (Shows the last captured requirement or action) */}
+                    {log.notes && log.notes.length > 0 && (
+                       <div className="text-xs text-blue-300 bg-blue-500/10 p-2 rounded-lg border border-blue-500/20 leading-snug">
+                          <span className="font-bold mr-1">🤖 AI Log:</span>
+                          {Array.isArray(log.notes) ? log.notes[log.notes.length - 1] : log.notes}
+                       </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (<p className="text-sm text-gray-500 text-center py-6">Waiting for AI to interact with customers...</p>)}
           </div>
         </div>
 

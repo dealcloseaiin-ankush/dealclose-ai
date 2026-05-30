@@ -32,7 +32,8 @@ export default function Settings() {
     externalApiSearchUrl: '',
     externalApiPostUrl: '',
     externalApiBlogUrl: '',
-    externalApiVisitUrl: ''
+    externalApiVisitUrl: '',
+    customWebhooks: []
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -45,6 +46,24 @@ export default function Settings() {
   
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPass, setIsChangingPass] = useState(false);
+
+  // --- Custom Webhook Functions ---
+  const addCustomWebhook = () => {
+    if (config.customWebhooks && config.customWebhooks.length >= 10) return alert("Maximum 10 custom actions allowed.");
+    const currentWebhooks = config.customWebhooks || [];
+    setConfig({ ...config, customWebhooks: [...currentWebhooks, { name: '', url: '', description: '', method: 'POST' }] });
+  };
+  
+  const removeCustomWebhook = (index) => {
+    const updated = config.customWebhooks.filter((_, i) => i !== index);
+    setConfig({ ...config, customWebhooks: updated });
+  };
+  
+  const handleCustomWebhookChange = (index, field, value) => {
+    const updated = [...config.customWebhooks];
+    updated[index][field] = value;
+    setConfig({ ...config, customWebhooks: updated });
+  };
 
   // Fetch saved settings on page load
   useEffect(() => {
@@ -83,7 +102,8 @@ export default function Settings() {
             externalApiSearchUrl: savedData.externalApiSearchUrl || '',
             externalApiPostUrl: savedData.externalApiPostUrl || '',
             externalApiBlogUrl: savedData.externalApiBlogUrl || '',
-            externalApiVisitUrl: savedData.externalApiVisitUrl || ''
+            externalApiVisitUrl: savedData.externalApiVisitUrl || '',
+            customWebhooks: savedData.customWebhooks || []
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -227,7 +247,8 @@ export default function Settings() {
         externalApiPostUrl: config.externalApiPostUrl,
         externalApiBlogUrl: config.externalApiBlogUrl,
         externalApiVisitUrl: config.externalApiVisitUrl,
-        workspaces: config.workspaces // Send workspaces to backend
+        workspaces: config.workspaces,
+        customWebhooks: config.customWebhooks
       };
       await api.post('/users/settings', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
@@ -337,9 +358,16 @@ export default function Settings() {
                 <p className="text-xs text-gray-500 mt-1">AI needs at least 1-2 sentences of training data to work properly. Otherwise, it will fallback to human support.</p>
                 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Custom AI Rules (AI Brain)</label>
-                  <textarea name="aiRules" value={config.aiRules} onChange={handleChange} rows="2" placeholder="e.g. Always ask for budget first. Talk in Hinglish." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
-                  <p className="text-xs text-gray-500 mt-1">These are the strict instructions for your main business bot.</p>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Custom AI Rules (Limit Response & Behavior)</label>
+                  <textarea name="aiRules" value={config.aiRules} onChange={handleChange} rows="3" placeholder="e.g. Maximum response length is 2 sentences. Talk in Hinglish. Never offer discounts without asking." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
+                  <div className="bg-purple-500/10 p-3 rounded-lg border border-purple-500/20 mt-2">
+                    <p className="text-xs text-purple-300 font-bold mb-1">💡 What to put here?</p>
+                    <ul className="text-xs text-gray-400 list-disc pl-4 space-y-1">
+                      <li>Set max response length (e.g. "Do not reply in more than 2 lines").</li>
+                      <li>Define tone & language (e.g. "Be very polite, use emojis, speak Hinglish").</li>
+                      <li>Set boundaries (e.g. "Focus strictly on selling, don't give free advice").</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -557,6 +585,40 @@ export default function Settings() {
                      <input type="url" name="externalApiVisitUrl" value={config.externalApiVisitUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/visit" />
                    </div>
                  </div>
+              </div>
+              
+              {/* Dynamic SaaS Webhooks */}
+              <div className="mt-6 pt-6 border-t border-teal-500/20">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm text-teal-400 font-bold">Dynamic AI Actions (Custom Webhooks)</h3>
+                  <button type="button" onClick={addCustomWebhook} className="text-xs bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 px-3 py-1.5 rounded-lg font-bold transition-colors">
+                    + Add Custom Action
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Teach AI to hit your specific URLs when a customer asks for it. (Limit: {(config.customWebhooks || []).length}/10)</p>
+                <div className="space-y-4">
+                  {(config.customWebhooks || []).map((webhook, index) => (
+                    <div key={index} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl relative group">
+                      <button type="button" onClick={() => removeCustomWebhook(index)} className="absolute top-3 right-3 text-gray-500 hover:text-rose-500 transition-colors p-1" title="Delete Action">
+                        <Trash2 size={16} />
+                      </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Action Name</label>
+                          <input type="text" value={webhook.name} onChange={e => handleCustomWebhookChange(index, 'name', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="e.g. cancel_order" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">API URL</label>
+                          <input type="url" value={webhook.url} onChange={e => handleCustomWebhookChange(index, 'url', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://api.domain.com/endpoint" />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Description (When should AI use this?)</label>
+                          <input type="text" value={webhook.description} onChange={e => handleCustomWebhookChange(index, 'description', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="e.g. Use this when the user wants to cancel their pending order." />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

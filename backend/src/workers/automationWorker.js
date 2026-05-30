@@ -115,6 +115,31 @@ const automationWorker = new Worker('automationQueue', async job => {
       console.error(`❌ [Worker Failed] Post-campaign follow-up failed:`, error.message);
     }
   }
+
+  // ==========================================
+  // 3. ZERO-COST AI FEEDBACK (22 HOURS LATER)
+  // ==========================================
+  if (job.name === 'ask_feedback') {
+    const { phone, userId } = job.data;
+    console.log(`⏳ [Worker Started] Requesting 0-cost AI feedback from ${phone}...`);
+    
+    const user = await User.findById(userId);
+    if (!user || !user.whatsappConfig || !user.whatsappConfig.accessToken) return;
+
+    const lead = await Lead.findOne({ phoneNumber: phone, userId });
+    // If they already gave a score, don't ask again
+    if (!lead || lead.aiFeedbackScore) return;
+
+    try {
+      const msg = "Hi! 🙏 Just checking in before we close today's chat session.\n\nHow would you rate your conversation with our AI Assistant today? \n\nPlease reply with a number from *1 to 5* (5 = Excellent ⭐). Your feedback helps us improve!";
+      await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, phone, msg);
+      
+      await Lead.updateOne({ _id: lead._id }, { $set: { awaitingFeedback: true } }, { strict: false });
+      console.log(`✅ [Worker Success] Sent AI feedback request to ${phone}`);
+    } catch (error) {
+      console.error(`❌ [Worker Failed] Could not send feedback request:`, error.message);
+    }
+  }
 }, { 
   connection,
   // 🔴 TRICK: Stop the "Tick-Tick" polling!
