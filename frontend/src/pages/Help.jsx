@@ -27,9 +27,12 @@ export default function Help() {
               </div>
               
               <div className="bg-[#111] p-6 rounded-2xl border border-gray-800">
-                <h3 className="text-xl font-bold text-white mb-2">📞 Call Us</h3>
-                <p className="text-gray-400 mb-2">Available Mon-Fri, 9 AM - 6 PM (IST).</p>
-                <p className="text-purple-400 font-bold">+91-98765XXXXX</p>
+                <h3 className="text-xl font-bold text-white mb-2">📞 Call / WhatsApp Us</h3>
+                <p className="text-gray-400 mb-2">Available 24/7 for support.</p>
+                <div className="flex gap-4">
+                  <a href="tel:+917587481702" className="text-blue-400 font-bold hover:underline">📞 +91 7587481702</a>
+                  <a href="https://wa.me/917587481702" target="_blank" rel="noreferrer" className="text-green-400 font-bold hover:underline">💬 WhatsApp</a>
+                </div>
               </div>
             </div>
           </div>
