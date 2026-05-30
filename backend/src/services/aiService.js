@@ -145,6 +145,21 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
               required: ["observationText"]
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "create_automation_flow",
+            description: "Automatically create and save a pre-built Flow Builder automation for the user's business type.",
+            parameters: {
+              type: "object",
+              properties: {
+                flowName: { type: "string", description: "Name of the flow (e.g., 'Real Estate Auto-Reply', 'E-commerce Bot')" },
+                businessType: { type: "string", enum: ["real_estate", "ecommerce", "influencer", "general"], description: "The type of business to generate the correct nodes." }
+              },
+              required: ["flowName", "businessType"]
+            }
+          }
         }
       ],
       tool_choice: "auto"
@@ -203,6 +218,20 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
               type: "object",
               properties: {
                 searchQuery: { type: "string", description: "The product or property name to search for (e.g., 'red t-shirt', '2BHK flat')" }
+              },
+              required: ["searchQuery"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "search_external_catalog",
+            description: "Search an external business catalog or e-commerce website (like Shopify) using the user's connected API URL.",
+            parameters: {
+              type: "object",
+              properties: {
+                searchQuery: { type: "string", description: "The product or item name to search for on the external website." }
               },
               required: ["searchQuery"]
             }
@@ -420,6 +449,22 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
                 visitDate: { type: "string", description: "Date and time for the visit" }
               },
               required: ["propertyId", "visitDate"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "publish_blog",
+            description: "Write and publish a real estate blog post or article directly to the website.",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "The title or topic of the blog." },
+                content: { type: "string", description: "A detailed, high-quality article content of at least 400 words." },
+                city: { type: "string", description: "The city the blog focuses on (optional)." }
+              },
+              required: ["title", "content"]
             }
           }
         }

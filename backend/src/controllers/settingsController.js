@@ -1,4 +1,65 @@
 const User = require('../models/userModel');
+const Flow = require('../models/flowModel');
+
+// 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
+const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
+    try {
+        // Check if a default flow already exists to prevent duplicates
+        const existingFlow = await Flow.findOne({ userId: userId, name: { $regex: /Instagram Collab Flow|Lead Generation Auto|Real Estate Lead Capture/i } });
+        if (existingFlow) {
+            console.log(`[Magic Onboarding] Default flow already exists for user ${userId}. Skipping creation.`);
+            return;
+        }
+
+        const isInfluencer = /influencer|creator|collab|youtube|instagram|vlog|artist|model/i.test(businessDescription || '');
+        const isRealEstate = /property|real estate|flat|plot|realtor/i.test(businessDescription || '');
+
+        let flowName = "Lead Generation Auto";
+        let flowData = {
+            nodes: [
+              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog, order' }, position: { x: 400, y: 50 } },
+              { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our store'}! 🏢 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
+              { id: '3', type: 'menu', data: { message: 'Thanks {{name}}! What would you like to do today?', opt1: 'View Catalog 📦', opt2: 'Track My Order 🚚', opt3: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
+              { id: '4', type: 'message', data: { message: 'Great! Here is our latest catalog: [Your Catalog Link Here]. Let us know your requirements!' }, position: { x: 100, y: 500 } },
+              { id: '5', type: 'message', data: { message: 'Please reply with your Order ID to get the latest tracking status.' }, position: { x: 400, y: 500 } },
+              { id: '6', type: 'message', data: { message: 'Our sales expert has been notified and will contact you shortly!' }, position: { x: 700, y: 500 } }
+            ],
+            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'opt_0' }, { id: 'e3-5', source: '3', target: '5', sourceHandle: 'opt_1' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'opt_2' } ]
+        };
+
+        if (isInfluencer) {
+            flowName = "Instagram Collab Flow";
+            flowData = {
+                nodes: [
+                  { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, hi' }, position: { x: 400, y: 50 } },
+                  { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 400, y: 160 } },
+                  { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 100, y: 350 } },
+                  { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 400, y: 350 } },
+                  { id: '5', 'type': 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 350 } },
+                  { id: '6', type: 'message', data: { message: 'Thank you! ✅ I have saved your details. My team will review and share the Media Kit shortly!' }, position: { x: 250, y: 550 } }
+                ],
+                edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' } ]
+            };
+        } else if (isRealEstate) {
+            flowName = "Real Estate Lead Capture";
+            flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent, flat, plot' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our Real Estate agency'}! 🏢 Are you looking to Buy or Rent a property today?`, replyType: 'open' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'askQuestion', data: { question: 'Great! To help you better, could you please share your preferred City and Budget?', replyType: 'open' }, position: { x: 400, y: 310 } },
+                { id: '4', type: 'message', data: { message: 'Thanks, {{name}}! I have saved your details. Our property expert will contact you shortly with the best options! ⏳' }, position: { x: 400, y: 460 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+            };
+        }
+
+        await Flow.create({ userId, workspaceId: 'main', name: flowName, flowData });
+        console.log(`✅ [Magic Onboarding] Automatically created '${flowName}' for user ${userId}.`);
+
+    } catch (error) {
+        console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user ${userId}:`, error.message);
+    }
+};
 
 // @desc    Get User Settings
 // @route   GET /api/users/settings
@@ -48,7 +109,18 @@ exports.saveSettings = async (req, res) => {
     if (updates.fallbackAction !== undefined) updateData.fallbackAction = updates.fallbackAction;
     if (updates.aiAgentEnabled !== undefined) updateData.aiAgentEnabled = updates.aiAgentEnabled;
     if (updates.businessUrls !== undefined) updateData.businessUrls = updates.businessUrls;
+    if (updates.externalApiUrl !== undefined) updateData.externalApiUrl = updates.externalApiUrl;
+    if (updates.externalApiToken !== undefined) updateData.externalApiToken = updates.externalApiToken;
+    if (updates.externalApiSearchUrl !== undefined) updateData.externalApiSearchUrl = updates.externalApiSearchUrl;
+    if (updates.externalApiPostUrl !== undefined) updateData.externalApiPostUrl = updates.externalApiPostUrl;
+    if (updates.externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = updates.externalApiBlogUrl;
+    if (updates.externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = updates.externalApiVisitUrl;
     
+    // 🔥 MAGIC ONBOARDING: If business description is being set for the first time, create a default flow.
+    if (updates.businessDescription && !user.businessDescription) {
+        await autoCreateDefaultFlow(userId, updates.businessDescription, updates.businessName || user.businessName);
+    }
+
     // Save multiple Workspaces/Businesses
     if (updates.workspaces !== undefined) {
       // Filter out any empty rows just to be safe

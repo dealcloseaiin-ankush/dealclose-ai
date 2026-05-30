@@ -26,7 +26,13 @@ export default function Settings() {
     aiRules: '',
     ownerPhone: '',
     metaPixelId: '',
-    metaAccessToken: ''
+    metaAccessToken: '',
+    externalApiUrl: '',
+    externalApiToken: '',
+    externalApiSearchUrl: '',
+    externalApiPostUrl: '',
+    externalApiBlogUrl: '',
+    externalApiVisitUrl: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -71,7 +77,13 @@ export default function Settings() {
             aiRules: savedData.aiRules || '',
             ownerPhone: savedData.ownerPhone || '',
             metaPixelId: savedData.metaAdsConfig?.pixelId || '',
-            metaAccessToken: savedData.metaAdsConfig?.accessToken || ''
+            metaAccessToken: savedData.metaAdsConfig?.accessToken || '',
+            externalApiUrl: savedData.externalApiUrl || '',
+            externalApiToken: savedData.externalApiToken || '',
+            externalApiSearchUrl: savedData.externalApiSearchUrl || '',
+            externalApiPostUrl: savedData.externalApiPostUrl || '',
+            externalApiBlogUrl: savedData.externalApiBlogUrl || '',
+            externalApiVisitUrl: savedData.externalApiVisitUrl || ''
           });
           if (savedData._id) setUserId(savedData._id);
         }
@@ -209,6 +221,12 @@ export default function Settings() {
           pixelId: config.metaPixelId,
           accessToken: config.metaAccessToken
         },
+        externalApiUrl: config.externalApiUrl,
+        externalApiToken: config.externalApiToken,
+        externalApiSearchUrl: config.externalApiSearchUrl,
+        externalApiPostUrl: config.externalApiPostUrl,
+        externalApiBlogUrl: config.externalApiBlogUrl,
+        externalApiVisitUrl: config.externalApiVisitUrl,
         workspaces: config.workspaces // Send workspaces to backend
       };
       await api.post('/users/settings', payload);
@@ -497,6 +515,48 @@ export default function Settings() {
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-400 mb-2">Twilio Phone Number</label>
                 <input type="text" name="twilioPhone" value={config.twilioPhone} onChange={handleChange} placeholder="+1234567890" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* External Website Integration (NewPropertyHub etc.) */}
+          <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-teal-500/20 mt-8">
+            <h2 className="text-xl font-semibold text-teal-400 mb-6 flex items-center gap-2">
+               🔗 External Website API Integration
+            </h2>
+            <p className="text-sm text-gray-400 mb-6">Connect your external website (like newpropertyhub.in) to allow DealClose AI to fetch catalog items, properties, post quick items, and publish blogs automatically directly via WhatsApp.</p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Website Base URL (Fallback)</label>
+                  <input type="url" name="externalApiUrl" value={config.externalApiUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-teal-500 outline-none" placeholder="https://newpropertyhub.in" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">API Secret Token / Key</label>
+                  <input type="password" name="externalApiToken" value={config.externalApiToken} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-teal-500 outline-none" placeholder="Your secret key" />
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                 <p className="text-sm text-teal-400 font-bold mb-4">Specific Custom API Endpoints (Optional but Recommended)</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-xs font-medium text-gray-400 mb-1">Search/Catalog Endpoint URL</label>
+                     <input type="url" name="externalApiSearchUrl" value={config.externalApiSearchUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/search" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-medium text-gray-400 mb-1">Quick Post Endpoint URL</label>
+                     <input type="url" name="externalApiPostUrl" value={config.externalApiPostUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/post" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-medium text-gray-400 mb-1">Publish Blog Endpoint URL</label>
+                     <input type="url" name="externalApiBlogUrl" value={config.externalApiBlogUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/blog" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-medium text-gray-400 mb-1">Schedule Visit Endpoint URL</label>
+                     <input type="url" name="externalApiVisitUrl" value={config.externalApiVisitUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/visit" />
+                   </div>
+                 </div>
               </div>
             </div>
           </div>

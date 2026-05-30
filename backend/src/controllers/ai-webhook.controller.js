@@ -354,12 +354,25 @@ exports.handleWhatsApp = async (req, res) => {
                 let businessInfo = user.businessDescription || "a modern business";
                 let ownerRules = user.aiRules || "Be polite, helpful, and professional.";
                 
+                let activeApiUrl = user.externalApiUrl;
+                let activeApiToken = user.externalApiToken;
+                let activeSearchUrl = user.externalApiSearchUrl;
+                let activePostUrl = user.externalApiPostUrl;
+                let activeBlogUrl = user.externalApiBlogUrl;
+                let activeVisitUrl = user.externalApiVisitUrl;
+
                 const lead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
                 if (lead && lead.lastSelectedWorkspaceId) {
                   const selectedWs = user.workspaces.find(ws => ws._id.toString() === lead.lastSelectedWorkspaceId);
                   if (selectedWs) {
                     businessInfo = selectedWs.businessDescription || businessInfo;
                     ownerRules = selectedWs.aiRules || ownerRules;
+                    if (selectedWs.externalApiUrl) activeApiUrl = selectedWs.externalApiUrl;
+                    if (selectedWs.externalApiToken) activeApiToken = selectedWs.externalApiToken;
+                    if (selectedWs.externalApiSearchUrl) activeSearchUrl = selectedWs.externalApiSearchUrl;
+                    if (selectedWs.externalApiPostUrl) activePostUrl = selectedWs.externalApiPostUrl;
+                    if (selectedWs.externalApiBlogUrl) activeBlogUrl = selectedWs.externalApiBlogUrl;
+                    if (selectedWs.externalApiVisitUrl) activeVisitUrl = selectedWs.externalApiVisitUrl;
                   }
                 }
 
@@ -437,6 +450,33 @@ exports.handleWhatsApp = async (req, res) => {
                         responseMessage = `Here are the options I found for you:\n\n${catalogList}\n\nWould you like to know more about any of these or place an order?`;
                       } else {
                         responseMessage = `I checked our catalog, but I couldn't find an exact match for "${searchData.searchQuery}". Please let me know if you are looking for something else.`;
+                      }
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "search_external_catalog") {
+                      const searchData = JSON.parse(toolCall.function.arguments);
+                      const searchEndpoint = activeSearchUrl || activeApiUrl;
+                      if (searchEndpoint) {
+                        try {
+                          const headers = {};
+                          if (activeApiToken) {
+                            headers['Authorization'] = `Bearer ${activeApiToken}`;
+                            headers['x-api-key'] = activeApiToken;
+                          }
+                          const response = await axios.get(`${searchEndpoint}?query=${encodeURIComponent(searchData.searchQuery)}`, { headers });
+                          const products = response.data.products || response.data.items || response.data.data || [];
+                          
+                          if (products.length > 0) {
+                            const productList = products.slice(0, 3).map((p, i) => `*${i+1}. ${p.name || p.title}*\n💰 ₹${p.price}\n🔗 ${p.url || p.link || 'Link not available'}`).join('\n\n');
+                            responseMessage = `Here are the top options from our website:\n\n${productList}\n\nWould you like to know more or add them to your cart?`;
+                          } else {
+                            responseMessage = `I checked our store, but couldn't find an exact match for "${searchData.searchQuery}".`;
+                          }
+                        } catch (apiErr) {
+                          console.error('External API Error:', apiErr.message);
+                          responseMessage = `Oops! API connection me kuch dikkat aayi. Kripya check karein ki aapka URL (${searchEndpoint}) sahi hai ya nahi.\nError: ${apiErr.message}`;
+                        }
+                      } else {
+                        responseMessage = `Maaf kijiye, Website Search API URL configured nahi hai. Kripya Dashboard Settings mein isey set karein.`;
                       }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "trigger_outbound_call") {
@@ -589,13 +629,13 @@ exports.handleWhatsApp = async (req, res) => {
                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuData.messageText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
                     } else if (toolCall.function.name === "search_real_estate_properties") {
                       const searchData = JSON.parse(toolCall.function.arguments);
+                      const propertiesEndpoint = activeSearchUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties` : 'https://newpropertyhub.in/api/properties');
                       try {
-                        const baseUrl = 'https://newpropertyhub.in/api/properties';
                         let apiUrl = searchData.lat && searchData.lng 
-                          ? `${baseUrl}/nearby?lat=${searchData.lat}&lng=${searchData.lng}&radius=10`
-                          : `${baseUrl}?keyword=${searchData.location || ''}&maxPrice=${searchData.maxPrice || ''}&propertyType=${searchData.propertyType || ''}`;
+                          ? `${propertiesEndpoint}/nearby?lat=${searchData.lat}&lng=${searchData.lng}&radius=10`
+                          : `${propertiesEndpoint}?keyword=${searchData.location || ''}&maxPrice=${searchData.maxPrice || ''}&propertyType=${searchData.propertyType || ''}`;
                         
-                        const response = await axios.get(apiUrl);
+                        const response = await axios.get(apiUrl, { headers: { 'Authorization': `Bearer ${activeApiToken || 'NPH_MASTER_SECRET_KEY'}` } });
                         const properties = response.data.properties || response.data.data || []; 
                         
                         if (properties.length > 0) {
@@ -606,35 +646,57 @@ exports.handleWhatsApp = async (req, res) => {
                         }
                       } catch (apiErr) {
                         console.error('NPH API Error:', apiErr.message);
-                        responseMessage = `Property data fetch karne mein thodi dikkat aayi. Humari team aapse jaldi sampark karegi!`;
+                        responseMessage = `Data fetch karne me error aayi. Aapka URL (${propertiesEndpoint}) connect nahi ho paa raha hai. \nError: ${apiErr.message}`;
                       }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "list_real_estate_property") {
                       const propData = JSON.parse(toolCall.function.arguments);
+                      const postEndpoint = activePostUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties/quick-post` : 'https://newpropertyhub.in/api/properties/quick-post');
                       try {
-                        // 'NPH_MASTER_SECRET_KEY' ko aapne NewPropertyHub ke backend key se replace karein
-                        await axios.post('https://newpropertyhub.in/api/properties/quick-post', {
+                        await axios.post(postEndpoint, {
                           ...propData,
                           clientPhone: fromNumber, 
                           source: 'DealClose AI WhatsApp'
-                        }, { headers: { 'Authorization': `Bearer NPH_MASTER_SECRET_KEY` } });
+                        }, { headers: { 'Authorization': `Bearer ${activeApiToken || 'NPH_MASTER_SECRET_KEY'}` } });
                         responseMessage = `✅ Badhai ho! Aapki property *"${propData.title}"* NewPropertyHub par safaltapurvak list ho gayi hai!\n\nHumaare buyers ab ise dekh sakte hain. Koi inquiry aane par hum aapko turant WhatsApp par notify karenge.`;
                       } catch (apiErr) {
                          console.error('NPH Post Error:', apiErr.message);
-                         responseMessage = `Property list karte waqt thodi error aayi. Maine details note kar li hain, humari team ise manually upload kar degi!`;
+                         responseMessage = `Property list karte waqt error aayi. Kripya check karein ki aapka Quick Post URL (${postEndpoint}) sahi se kaam kar raha hai.\nError: ${apiErr.message}`;
                       }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "schedule_property_visit") {
                       const visitData = JSON.parse(toolCall.function.arguments);
+                      const visitEndpointBase = activeVisitUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties` : 'https://newpropertyhub.in/api/properties');
+                      const visitEndpoint = activeVisitUrl ? activeVisitUrl : `${visitEndpointBase}/${visitData.propertyId}/schedule-visit`;
                       try {
-                        await axios.post(`https://newpropertyhub.in/api/properties/${visitData.propertyId}/schedule-visit`, {
+                        await axios.post(visitEndpoint, {
                           clientPhone: fromNumber,
                           visitDate: visitData.visitDate
-                        }, { headers: { 'Authorization': `Bearer NPH_MASTER_SECRET_KEY` } });
+                        }, { headers: { 'Authorization': `Bearer ${activeApiToken || 'NPH_MASTER_SECRET_KEY'}` } });
                         responseMessage = `📅 Perfect! Aapki site visit *${visitData.visitDate}* ke liye book ho gayi hai. Property owner ko notify kar diya gaya hai. Vo jald hi aapse coordinate karenge!`;
                       } catch (apiErr) {
                          console.error('NPH Visit Error:', apiErr.message);
-                         responseMessage = `Maine aapki visit request note kar li hai. Humare agent aapse visit confirm karne ke liye call karenge!`;
+                         responseMessage = `Visit schedule karne me connection error aayi. URL: ${visitEndpoint}\nError: ${apiErr.message}`;
+                      }
+                      repliedBy = 'ai';
+                    } else if (toolCall.function.name === "publish_blog") {
+                      const blogData = JSON.parse(toolCall.function.arguments);
+                      const blogEndpoint = activeBlogUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/posts/external-blog` : 'https://newpropertyhub.in/api/posts/external-blog');
+                      try {
+                        await axios.post(blogEndpoint, {
+                          title: blogData.title,
+                          content: blogData.content,
+                          city: blogData.city || '',
+                          source: 'DealClose AI WhatsApp',
+                          authorPhone: fromNumber
+                        }, { headers: { 
+                          'x-api-key': activeApiToken || process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024',
+                          'Authorization': `Bearer ${activeApiToken || process.env.NPH_API_KEY || 'DealClose-Secret-Key-2024'}`
+                        } });
+                        responseMessage = `✅ Aapka blog post "${blogData.title}" website par live kar diya gaya hai! Maine AI-generated image aur us sheher ki properties bhi attach kar di hain.`;
+                      } catch (apiErr) {
+                         console.error('NPH Blog Post Error:', apiErr.message);
+                         responseMessage = `Blog publish karte waqt error aayi. Kripya check karein ki Publish Blog URL (${blogEndpoint}) sahi hai.\nError: ${apiErr.message}`;
                       }
                       repliedBy = 'ai';
                     }

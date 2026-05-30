@@ -1,6 +1,7 @@
 const User = require('../models/userModel');
 const aiService = require('../services/aiService');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Flow = require('../models/flowModel');
 
 // @desc    Get unanswered queries for AI training
 // @route   GET /api/ai/training-data
@@ -246,6 +247,51 @@ exports.handleDashboardAssistant = async (req, res) => {
         else if (toolCall.function.name === "log_business_observation") {
           await User.findByIdAndUpdate(userId, { $push: { aiObservations: args.observationText } }, { strict: false });
           responseMessage = `📝 I have noted this down: "${args.observationText}". I will keep this in mind for your business setup!`;
+        }
+        else if (toolCall.function.name === "create_automation_flow") {
+          let flowData = {};
+          
+          if (args.businessType === 'real_estate') {
+            flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'askQuestion', data: { question: 'Welcome! 🏢 Are you looking to Buy or Rent a property today?', replyType: 'open' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'askQuestion', data: { question: 'Great! Please share your City and Budget.', replyType: 'open' }, position: { x: 400, y: 310 } },
+                { id: '4', type: 'message', data: { message: 'Thanks! I have saved your details. Let me find the best properties for you... ⏳' }, position: { x: 400, y: 460 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+            };
+          } else if (args.businessType === 'ecommerce') {
+            flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, catalog, buy, order' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'menu', data: { message: 'Welcome to our store! 🛍️ What would you like to do?', opt1: 'View Catalog', opt2: 'Track Order', opt3: 'Talk to Sales' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'message', data: { message: 'Here is our latest catalog link! Let us know what you like.' }, position: { x: 100, y: 350 } },
+                { id: '4', type: 'message', data: { message: 'Please reply with your Order ID to track it.' }, position: { x: 400, y: 350 } },
+                { id: '5', type: 'message', data: { message: 'A sales executive will be with you shortly! 📞' }, position: { x: 700, y: 350 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' } ]
+            };
+          } else {
+             flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, help' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'askQuestion', data: { question: `Welcome! To assist you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'message', data: { message: 'Thank you! Your details are saved. How can we help you today?' }, position: { x: 400, y: 310 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' } ]
+            };
+          }
+
+          await Flow.create({
+            userId: userId,
+            workspaceId: 'main',
+            name: args.flowName,
+            flowData: flowData
+          });
+
+          responseMessage = `✨ Magic! I have automatically built and deployed a new Flow named *${args.flowName}* for your business. You can view or edit it in the Flow Builder!`;
+          actionTaken = "flow_created";
         }
       }
     } else {

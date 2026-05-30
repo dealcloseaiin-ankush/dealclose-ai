@@ -1,6 +1,67 @@
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const Flow = require('../models/flowModel');
+
+// 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
+const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
+    try {
+        // Check if a default flow already exists to prevent duplicates
+        const existingFlow = await Flow.findOne({ userId: userId, name: { $regex: /Instagram Collab Flow|Lead Generation Auto|Real Estate Lead Capture/i } });
+        if (existingFlow) {
+            console.log(`[Magic Onboarding] Default flow already exists for user ${userId}. Skipping creation.`);
+            return;
+        }
+
+        const isInfluencer = /influencer|creator|collab|youtube|instagram|vlog|artist|model/i.test(businessDescription || '');
+        const isRealEstate = /property|real estate|flat|plot|realtor/i.test(businessDescription || '');
+
+        let flowName = "Lead Generation Auto";
+        let flowData = {
+            nodes: [
+              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog, order' }, position: { x: 400, y: 50 } },
+              { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our store'}! 🏢 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
+              { id: '3', type: 'menu', data: { message: 'Thanks {{name}}! What would you like to do today?', opt1: 'View Catalog 📦', opt2: 'Track My Order 🚚', opt3: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
+              { id: '4', type: 'message', data: { message: 'Great! Here is our latest catalog: [Your Catalog Link Here]. Let us know your requirements!' }, position: { x: 100, y: 500 } },
+              { id: '5', type: 'message', data: { message: 'Please reply with your Order ID to get the latest tracking status.' }, position: { x: 400, y: 500 } },
+              { id: '6', type: 'message', data: { message: 'Our sales expert has been notified and will contact you shortly!' }, position: { x: 700, y: 500 } }
+            ],
+            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'opt_0' }, { id: 'e3-5', source: '3', target: '5', sourceHandle: 'opt_1' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'opt_2' } ]
+        };
+
+        if (isInfluencer) {
+            flowName = "Instagram Collab Flow";
+            flowData = {
+                nodes: [
+                  { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, hi' }, position: { x: 400, y: 50 } },
+                  { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 400, y: 160 } },
+                  { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 100, y: 350 } },
+                  { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 400, y: 350 } },
+                  { id: '5', type: 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 350 } },
+                  { id: '6', type: 'message', data: { message: 'Thank you! ✅ I have saved your details. My team will review and share the Media Kit shortly!' }, position: { x: 250, y: 550 } }
+                ],
+                edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' } ]
+            };
+        } else if (isRealEstate) {
+            flowName = "Real Estate Lead Capture";
+            flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent, flat, plot' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our Real Estate agency'}! 🏢 Are you looking to Buy or Rent a property today?`, replyType: 'open' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'askQuestion', data: { question: 'Great! To help you better, could you please share your preferred City and Budget?', replyType: 'open' }, position: { x: 400, y: 310 } },
+                { id: '4', type: 'message', data: { message: 'Thanks, {{name}}! I have saved your details. Our property expert will contact you shortly with the best options! ⏳' }, position: { x: 400, y: 460 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+            };
+        }
+
+        await Flow.create({ userId, workspaceId: 'main', name: flowName, flowData });
+        console.log(`✅ [Magic Onboarding] Automatically created '${flowName}' for user ${userId}.`);
+
+    } catch (error) {
+        console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user ${userId}:`, error.message);
+    }
+};
 
 // @desc    Sync Supabase User with MongoDB
 // @route   POST /api/users/supabase-auth
@@ -9,11 +70,13 @@ exports.supabaseAuth = async (req, res) => {
 
   try {
     // Check agar user pehle se MongoDB me hai
+    let isNewUser = false;
     let user = await User.findOne({ email });
 
     if (!user) {
       // Agar naya user hai, toh create kar do. 
       // Agar model me password required hai toh ye dummy password usko bypass kar dega.
+      isNewUser = true;
       user = await User.create({ 
         email, 
         supabaseId, 
@@ -28,6 +91,12 @@ exports.supabaseAuth = async (req, res) => {
     }
 
     // Humara apna Backend JWT token generate karke frontend ko wapas bhejenge
+    // 🔥 MAGIC ONBOARDING: Auto-create a default flow for new users
+    if (isNewUser) {
+        // We don't have business description here, so we create a general one.
+        // The user can get a more specific one when they update their profile.
+        await autoCreateDefaultFlow(user._id, "", user.fullName);
+    }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
     res.status(200).json({ success: true, token, user });
   } catch (error) {
@@ -40,7 +109,7 @@ exports.supabaseAuth = async (req, res) => {
 // @route   POST /api/users/register
 exports.register = async (req, res) => {
   try {
-    const { fullName, email, password } = req.body;
+    const { fullName, email, password, businessName, businessDescription } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
@@ -54,8 +123,15 @@ exports.register = async (req, res) => {
     const user = await User.create({
       fullName: fullName || 'New User',
       email,
-      password // Make sure your User model has a pre-save hook to hash this using bcrypt
+      password, // Make sure your User model has a pre-save hook to hash this using bcrypt
+      businessName,
+      businessDescription
     });
+
+    // 🔥 MAGIC ONBOARDING: Auto-create a default flow based on their business description
+    if (user) {
+        await autoCreateDefaultFlow(user._id, user.businessDescription, user.businessName);
+    }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
     res.status(201).json({ success: true, token, user });
@@ -92,6 +168,11 @@ exports.login = async (req, res) => {
     if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid Password. Please try again.' });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
+
+    // 🔥 RETROACTIVE MAGIC ONBOARDING: Create flow for old users if missing (runs silently in background)
+    autoCreateDefaultFlow(user._id, user.businessDescription, user.businessName)
+        .catch(err => console.log("Retroactive Flow Check:", err.message));
+
     res.status(200).json({ success: true, token, user });
   } catch (error) {
     console.error('Login Error:', error);
