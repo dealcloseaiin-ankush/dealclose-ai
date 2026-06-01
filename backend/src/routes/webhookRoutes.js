@@ -5,10 +5,14 @@ const whatsappController = require('../controllers/whatsapp.webhook.controller')
 const instagramController = require('../controllers/instagram.webhook.controller');
 const exotelController = require('../controllers/exotel.webhook.controller');
 const universalController = require('../controllers/universal.webhook.controller');
+const twilioWebhookController = require('../controllers/twilio.webhook.controller');
 
 // Exotel (Voice Calls)
 router.post('/voice', exotelController.handleIncomingVoice);
 router.post('/voice/respond', exotelController.handleVoiceRespond);
+
+// Twilio (Fast Voice Streams)
+router.post('/twilio/voice', twilioWebhookController.handleTwilioVoice);
 
 // WhatsApp (Meta)
 router.get('/whatsapp', whatsappController.verifyWhatsAppWebhook);

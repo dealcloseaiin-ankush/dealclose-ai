@@ -7,6 +7,7 @@ export default function Chats() {
   const [activeCustomer, setActiveCustomer] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
@@ -134,7 +135,7 @@ export default function Chats() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] p-6 bg-[#050505] text-gray-200">
+    <div className="flex h-[calc(100vh-4rem)] p-0 md:p-6 bg-[#050505] text-gray-200 relative overflow-hidden">
       
       {/* New Chat Modal */}
       {isModalOpen && (
@@ -174,8 +175,16 @@ export default function Chats() {
         </div>
       )}
 
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="absolute inset-0 bg-black/70 z-30 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar for Customers */}
-      <div className="w-1/3 bg-[#111] border-r border-gray-800 rounded-l-2xl p-4 overflow-y-auto">
+      <div className={`absolute md:relative z-40 w-4/5 md:w-1/3 h-full bg-[#111] border-r border-gray-800 md:rounded-l-2xl p-4 overflow-y-auto transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
         <div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-4 mt-2">
           <h2 className="text-xl font-bold">Active Chats</h2>
           <button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-500 text-white text-sm px-3 py-1.5 rounded-lg font-bold transition-colors">+ New Chat</button>
@@ -184,7 +193,7 @@ export default function Chats() {
           customerDetails.map(customer => (
             <div 
               key={customer.phone}
-              onClick={() => setActiveCustomer(customer.phone)}
+              onClick={() => { setActiveCustomer(customer.phone); setIsSidebarOpen(false); }}
               className={`p-4 cursor-pointer rounded-xl mb-3 transition-all border ${activeCustomer === customer.phone ? 'bg-green-600/10 border-green-500' : 'bg-[#0a0a0a] border-gray-800 hover:border-gray-600'}`}
             >
               <div className="flex justify-between items-start mb-2">
@@ -205,16 +214,25 @@ export default function Chats() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#0a0a0a] border border-gray-800 border-l-0 rounded-r-2xl shadow-xl relative">
+      <div className="flex-1 flex flex-col w-full h-full bg-[#0a0a0a] md:border border-gray-800 md:border-l-0 md:rounded-r-2xl shadow-xl relative">
         
         {!activeCustomer ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-500 relative p-4 text-center">
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden absolute top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded-lg font-bold">☰ Chats</button>
             <p className="text-6xl mb-4">💬</p>
             <h3 className="text-2xl font-bold text-white mb-2">No Chat Selected</h3>
             <p>Select a chat from the sidebar or click "+ New Chat" to start messaging.</p>
           </div>
         ) : (
           <>
+            {/* Active Customer Header */}
+            <div className="p-4 border-b border-gray-800 bg-[#111] flex items-center gap-3 md:rounded-tr-2xl shrink-0">
+              <button onClick={() => setIsSidebarOpen(true)} className="md:hidden bg-gray-800 text-white p-2 rounded-lg">
+                ☰
+              </button>
+              <h3 className="font-bold text-white truncate">{activeCustomer}</h3>
+            </div>
+
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {activeChatMessages.map(msg => (
                 <div key={msg._id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
@@ -263,7 +281,7 @@ export default function Chats() {
             className="flex-1 p-3 bg-[#0a0a0a] border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none" 
             disabled={!activeCustomer}
           />
-              <button onClick={sendReply} disabled={!activeCustomer || !replyText.trim()} className="px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Send 🚀</button>
+              <button onClick={sendReply} disabled={!activeCustomer || !replyText.trim()} className="px-4 md:px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0">Send 🚀</button>
             </div>
           </>
         )}

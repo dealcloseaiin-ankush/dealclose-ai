@@ -1,5 +1,7 @@
 const Call = require('../models/callModel');
 const callService = require('../services/callService');
+const User = require('../models/userModel');
+const twilio = require('twilio');
 
 // @desc    Get call history
 // @route   GET /api/calls
@@ -26,21 +28,47 @@ exports.initiateCall = async (req, res) => {
   }
 
   try {
-    // Use the new Exotel service
-    const exotelNumber = process.env.EXOTEL_EXOPHONE;
-    const webhookUrl = `${process.env.BASE_URL}/api/webhooks/voice`;
-    const call = await callService.initiateCall(phoneNumber, exotelNumber, webhookUrl);
+    const user = await User.findById(userId);
+    let newCall;
 
-    // Save to DB
-    const newCall = await Call.create({
-      userId,
-      sid: call.Sid, // Exotel uses capital 'S'
-      to: phoneNumber,
-      status: call.Status, // Exotel uses capital 'S'
-      leadId: leadId
-    });
+    // 🚀 OPTION 1: USER'S OWN TWILIO NUMBER (If Configured in Settings)
+    if (user && user.twilioConfig && user.twilioConfig.accountSid && user.twilioConfig.authToken && user.twilioConfig.phoneNumber) {
+      console.log(`📞 [Calling] Using User's Custom Twilio Number...`);
+      const client = twilio(user.twilioConfig.accountSid, user.twilioConfig.authToken);
+      
+      const call = await client.calls.create({
+        url: `${process.env.BASE_URL}/api/webhooks/twilio/voice`, // Yahan WebSocket ka route aayega
+        to: phoneNumber,
+        from: user.twilioConfig.phoneNumber
+      });
 
-    res.status(200).json({ message: 'Call initiated', call: newCall });
+      newCall = await Call.create({
+        userId,
+        sid: call.sid, 
+        to: phoneNumber,
+        status: call.status, 
+        leadId: leadId,
+        provider: 'twilio_custom'
+      });
+    } 
+    // 🚀 OPTION 2: PLATFORM'S MASTER EXOTEL NUMBER (Default System)
+    else {
+      console.log(`📞 [Calling] Using Master Exotel Number...`);
+      const exotelNumber = process.env.EXOTEL_EXOPHONE;
+      const webhookUrl = `${process.env.BASE_URL}/api/webhooks/voice`;
+      const call = await callService.initiateCall(phoneNumber, exotelNumber, webhookUrl);
+
+      newCall = await Call.create({
+        userId,
+        sid: call.Sid || call.sid || Date.now().toString(), 
+        to: phoneNumber,
+        status: call.Status || call.status || 'queued', 
+        leadId: leadId,
+        provider: 'exotel_master'
+      });
+    }
+
+    res.status(200).json({ success: true, message: 'Call initiated', call: newCall });
   } catch (error) {
     console.error('Exotel Error:', error);
     res.status(500).json({ message: 'Failed to initiate call', error: error.message });

@@ -46,21 +46,50 @@ exports.createLead = async (req, res) => {
   }
 };
 
+// @desc    Update lead status (for CRM Kanban)
+// @route   PATCH /api/leads/:id/status
+exports.updateLeadStatus = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const updatedLead = await Lead.findOneAndUpdate(
+      { _id: id, userId },
+      { $set: { status } },
+      { new: true }
+    );
+
+    res.status(200).json({ success: true, lead: updatedLead });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Export leads to CSV
 // @route   GET /api/leads/export
 exports.exportLeads = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    const leads = await Lead.find({ userId }).sort({ createdAt: -1 });
+    const leads = await Lead.find({ userId }).sort({ createdAt: -1 }).lean();
+    const contacts = await Contact.find({ userId }).sort({ createdAt: -1 }).lean();
     
     // Simple CSV Generation
     const headers = ['Name', 'Phone', 'Email', 'Status', 'Source', 'Created At'];
     const csvRows = [headers.join(',')];
     
     leads.forEach(lead => {
-      const dateStr = new Date(lead.createdAt).toLocaleDateString();
-      csvRows.push(`${lead.name},${lead.phoneNumber},${lead.email || 'N/A'},${lead.status},${lead.source},${dateStr}`);
+      const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : 'N/A';
+      csvRows.push(`"${lead.name || ''}","${lead.phoneNumber || ''}","${lead.email || 'N/A'}","${lead.status || 'new'}","${lead.source || ''}","${dateStr}"`);
+    });
+
+    contacts.forEach(contact => {
+      const dateStr = contact.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A';
+      const phone = contact.phone || contact.phoneNumber || '';
+      csvRows.push(`"${contact.name || ''}","${phone}","${contact.email || 'N/A'}","${contact.crmStage || 'new'}","Manual Contact","${dateStr}"`);
     });
     
     res.setHeader('Content-Type', 'text/csv');

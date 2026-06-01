@@ -9,6 +9,8 @@ if (!process.env.OPENAI_API_KEY) {
 // require('./config/firebase'); 
 const mongoose = require('mongoose');
 const app = require('./app');
+const http = require('http');
+const WebSocket = require('ws');
 
 // 🔍 GLOBAL DEBUGGER: Track every request that comes to the backend
 app.use((req, res, next) => {
@@ -25,8 +27,19 @@ app.set('trust proxy', 1);
 
 const port = process.env.PORT || 5000;
 
+const server = http.createServer(app);
+
+// 🚀 NEW: Setup WebSocket Server for Twilio Fast AI Calling
+const wss = new WebSocket.Server({ server, path: '/api/webhooks/twilio/stream' });
+
+wss.on('connection', (ws) => {
+  console.log('🔗 [WebSocket] New Twilio Stream Connection established');
+  const twilioStreamHandler = require('./websockets/twilioStreamHandler');
+  twilioStreamHandler(ws);
+});
+
 // Pehle server start kar dete hain taaki Render "No open ports" ka error na de
-app.listen(port, '0.0.0.0', () => {
+server.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on port ${port}`);
 });
 
