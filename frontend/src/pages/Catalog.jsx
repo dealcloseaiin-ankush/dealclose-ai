@@ -8,6 +8,18 @@ export default function Catalog() {
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
+  // 🚀 DYNAMIC BUSINESS TYPE DETECTION
+  const activeWsObj = workspaces.find(w => w._id === activeWorkspace) || workspaces[0];
+  const bizDesc = (activeWsObj?.businessDescription || '').toLowerCase();
+  const isRealEstate = bizDesc.includes('real estate') || bizDesc.includes('property') || bizDesc.includes('flat') || bizDesc.includes('plot') || bizDesc.includes('realtor');
+  const isB2B = bizDesc.includes('wholesale') || bizDesc.includes('b2b') || bizDesc.includes('bulk') || bizDesc.includes('distributor');
+
+  // Dynamic Labels
+  const primaryTabLabel = isRealEstate ? 'Property Catalog' : 'Products & Services';
+  const itemNameLabel = isRealEstate ? 'Property Name' : 'Item Name';
+  const priceLabel = isRealEstate ? 'Price / Rent' : 'Price';
+  const descLabel = isRealEstate ? 'Property Details' : 'Products Description';
+
   const [activeTab, setActiveTab] = useState('products');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +38,7 @@ export default function Catalog() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null); // Tracks if we are editing
 
   // 🚀 DEBUGGING: Fetch actual catalog from backend
   useEffect(() => {
@@ -145,15 +158,37 @@ export default function Catalog() {
     }
   };
 
+  // Open Modal for Editing an existing item
+  const openEditModal = (item) => {
+    setEditingItemId(item._id || item.id);
+    setFormData({ name: item.name, price: item.price, description: item.description });
+    setImagePreview(item.imageUrl || '');
+    setImageFile(null); // Reset file input
+    setIsModalOpen(true);
+  };
+
+  // Handle Delete Item
+  const handleDeleteItem = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
+    try {
+      await api.delete(`/catalog/${id}`);
+      setItems(items.filter(item => (item._id || item.id) !== id));
+      toast.success("Item deleted successfully!");
+    } catch (error) {
+      console.error("Delete Error:", error);
+      toast.error("Failed to delete item.");
+    }
+  };
+
   const handleAddItem = async (e) => {
     e.preventDefault();
     if (!formData.name) return;
     
-    console.log("➡️ [DEBUG] Attempting to save new catalog item:", formData);
+    console.log("➡️ [DEBUG] Attempting to save/update catalog item:", formData);
     setSubmitting(true);
     
     try {
-      let finalImageUrl = '';
+      let finalImageUrl = imagePreview; // Keep existing image by default if editing
       // Upload Image to Cloudinary first if selected
       if (imageFile) {
         const uploadData = new FormData();
@@ -165,22 +200,30 @@ export default function Catalog() {
       }
 
       // 🚀 Save to Real Database via Backend
-      const payload = { ...formData, imageUrl: finalImageUrl, workspaceId: activeWorkspace };
-      const res = await api.post('/catalog', payload);
-      
-      setItems([res.data, ...items]);
+      const payload = { ...formData, workspaceId: activeWorkspace };
+      if (finalImageUrl) payload.imageUrl = finalImageUrl;
+
+      if (editingItemId) {
+        const res = await api.put(`/catalog/${editingItemId}`, payload);
+        setItems(items.map(item => (item._id || item.id) === editingItemId ? res.data : item));
+        toast.success("Item updated successfully!");
+      } else {
+        const res = await api.post('/catalog', payload);
+        setItems([res.data, ...items]);
+        toast.success("Item added to AI Brain!");
+      }
       
       setImageFile(null);
       setImagePreview('');
       setIsModalOpen(false);
       setFormData({ name: '', price: '', description: '' });
-      toast.success("Item added to AI Brain!");
       console.log("✅ [DEBUG] Item saved.");
     } catch (error) {
       console.error("❌ [DEBUG] Failed to save item:", error);
       toast.error("Failed to add item. Check console.");
     } finally {
       setSubmitting(false);
+      setEditingItemId(null);
     }
   };
 
@@ -210,33 +253,43 @@ export default function Catalog() {
                 📥 Import CSV
                 <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
               </label>
-              <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-purple-600/30 text-sm">+ Add Single Item</button>
+              <button onClick={() => {
+                setEditingItemId(null);
+                setFormData({ name: '', price: '', description: '' });
+                setImagePreview('');
+                setImageFile(null);
+                setIsModalOpen(true);
+              }} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-purple-600/30 text-sm">+ Add Single {isRealEstate ? 'Property' : 'Item'}</button>
             </div>
           </div>
-          <p className="text-gray-400">Manage your products, services, or real estate properties here. AI will use this data to answer customers.</p>
+          <p className="text-gray-400">Manage your {isRealEstate ? 'real estate properties' : 'products and services'} here. AI will use this data to answer customers.</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex space-x-4 mb-6 border-b border-gray-800 pb-px">
         <button onClick={() => setActiveTab('products')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'products' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
-          General Products Catalog
+          {primaryTabLabel}
         </button>
+        {isB2B && (
         <button onClick={() => setActiveTab('quotes')} className={`pb-3 px-2 font-semibold transition-all duration-300 relative ${activeTab === 'quotes' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
           B2B Smart Quotes
           <span className="absolute top-0 right-0 -mt-1 -mr-3 bg-rose-500 text-white text-[10px] px-1.5 rounded-full">1</span>
         </button>
+        )}
+        {isRealEstate && (
         <button onClick={() => setActiveTab('properties')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'properties' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
           AI Auto-Listed Properties
         </button>
+        )}
       </div>
 
       {/* Add Item Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl relative">
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white text-xl">✕</button>
-            <h2 className="text-2xl font-bold text-white mb-6">Add New Catalog Item</h2>
+            <button onClick={() => { setIsModalOpen(false); setEditingItemId(null); }} className="absolute top-4 right-4 text-gray-500 hover:text-white text-xl">✕</button>
+            <h2 className="text-2xl font-bold text-white mb-6">{editingItemId ? 'Edit Catalog Item' : 'Add New Catalog Item'}</h2>
             <form onSubmit={handleAddItem} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Product Image</label>
@@ -248,20 +301,20 @@ export default function Catalog() {
                 )}
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Item / Property Name</label>
-                <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder="e.g., Running Shoes / 3BHK Flat" />
+                <label className="block text-sm text-gray-400 mb-1">{itemNameLabel}</label>
+                <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder={isRealEstate ? "e.g. 3BHK Sea View Flat" : "e.g., Running Shoes"} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Price / Rent</label>
-                <input type="text" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder="e.g., ₹1,499 or ₹25,000/mo" />
+                <label className="block text-sm text-gray-400 mb-1">{priceLabel}</label>
+                <input type="text" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder={isRealEstate ? "e.g., ₹25,000/mo or ₹1.5 Cr" : "e.g., ₹1,499"} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Description (For AI to read)</label>
-                <textarea required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder="Details about this item..."></textarea>
+                <label className="block text-sm text-gray-400 mb-1">{descLabel} (For AI to read)</label>
+                <textarea required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder={isRealEstate ? "Amenities, floor, location..." : "Details about this product..."}></textarea>
               </div>
               <div className="pt-4">
                 <button type="submit" disabled={submitting} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50">
-                  {submitting ? 'Uploading & Saving...' : 'Save to Catalog'}
+                  {submitting ? 'Saving...' : (editingItemId ? 'Update Item' : 'Save to Catalog')}
                 </button>
               </div>
             </form>
@@ -276,17 +329,18 @@ export default function Catalog() {
         <div className="bg-[#111] rounded-2xl border border-gray-800 p-16 text-center text-gray-500 shadow-xl">
           <p className="text-5xl mb-4">📦</p>
           <h2 className="text-2xl font-bold text-gray-300 mb-2">Your Catalog is Empty</h2>
-          <p className="mb-6">Add your products or properties so AI can recommend them to customers.</p>
+          <p className="mb-6">Add your {isRealEstate ? 'properties' : 'products'} so AI can recommend them to customers.</p>
         </div>
       ) : (
         <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-          <table className="w-full text-left border-collapse whitespace-nowrap">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#1a1a1a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
                 <th className="p-5 font-semibold w-24">Image</th>
-                <th className="p-5 font-semibold">Item Name</th>
-                <th className="p-5 font-semibold">Price</th>
+                <th className="p-5 font-semibold">{itemNameLabel}</th>
+                <th className="p-5 font-semibold">{priceLabel}</th>
                 <th className="p-5 font-semibold w-1/2">AI Context / Description</th>
+                <th className="p-5 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
@@ -302,6 +356,10 @@ export default function Catalog() {
                   <td className="p-5 font-bold text-white">{item.name}</td>
                   <td className="p-5 text-green-400 font-semibold">{item.price}</td>
                   <td className="p-5 text-gray-400 text-sm whitespace-normal">{item.description}</td>
+                  <td className="p-5 text-right">
+                    <button onClick={() => openEditModal(item)} className="text-blue-400 hover:text-blue-300 font-bold text-sm bg-blue-500/10 px-3 py-1 rounded mr-2 transition-colors">Edit</button>
+                    <button onClick={() => handleDeleteItem(item._id || item.id)} className="text-red-400 hover:text-red-300 font-bold text-sm bg-red-500/10 px-3 py-1 rounded transition-colors">Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
