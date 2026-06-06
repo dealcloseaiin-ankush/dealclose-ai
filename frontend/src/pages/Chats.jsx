@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Chats() {
   const [allMessages, setAllMessages] = useState([]);
@@ -8,6 +9,10 @@ export default function Chats() {
   const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
@@ -36,11 +41,16 @@ export default function Chats() {
     fetchChats();
   }, []);
 
+  // 🔥 Filter messages by selected Workspace
+  const filteredMessages = useMemo(() => {
+    return allMessages.filter(msg => (msg.workspaceId || 'main') === activeWorkspace);
+  }, [allMessages, activeWorkspace]);
+
   // Advanced logic to calculate 24-Hour Window and Needs Reply status
   const customerDetails = useMemo(() => {
     const map = new Map();
 
-    allMessages.forEach(msg => {
+    filteredMessages.forEach(msg => {
       const phone = msg.customerPhone;
       if (!map.has(phone)) {
         map.set(phone, { phone, lastIncoming: null, lastMessage: msg, needsReply: false });
@@ -71,11 +81,11 @@ export default function Chats() {
       }
       return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' };
     }).sort((a, b) => new Date(b.lastMessage.timestamp || b.lastMessage.createdAt) - new Date(a.lastMessage.timestamp || a.lastMessage.createdAt));
-  }, [allMessages]);
+  }, [filteredMessages]);
 
   const activeChatMessages = useMemo(() => {
-    return allMessages.filter(m => m.customerPhone === activeCustomer);
-  }, [allMessages, activeCustomer]);
+    return filteredMessages.filter(m => m.customerPhone === activeCustomer);
+  }, [filteredMessages, activeCustomer]);
 
   // Start a manual chat by entering a new number
   const handleStartChatSubmit = (e) => {
@@ -189,6 +199,17 @@ export default function Chats() {
           <h2 className="text-xl font-bold">Active Chats</h2>
           <button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-500 text-white text-sm px-3 py-1.5 rounded-lg font-bold transition-colors">+ New Chat</button>
         </div>
+        
+        <select 
+          value={activeWorkspace} 
+          onChange={(e) => { setActiveWorkspace(e.target.value); setActiveCustomer(null); }} 
+          className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-2.5 outline-none focus:border-green-500 cursor-pointer mb-4"
+        >
+          {workspaces.map(ws => (
+            <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+          ))}
+        </select>
+
         {loading ? <p>Loading chats...</p> : (
           customerDetails.map(customer => (
             <div 

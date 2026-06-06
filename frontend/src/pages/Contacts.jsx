@@ -4,6 +4,7 @@ import api from '../services/api';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Contacts() {
   const [activeTab, setActiveTab] = useState('all');
@@ -12,6 +13,10 @@ export default function Contacts() {
 
   const [contacts, setContacts] = useState([]);
   const [smartSegments, setSmartSegments] = useState([]);
+  
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,6 +43,8 @@ export default function Contacts() {
     fetchData();
   }, []);
 
+  const filteredContacts = contacts.filter(c => (c.lastSelectedWorkspaceId || 'main') === activeWorkspace);
+
   const columns = [
     { header: 'Name', accessor: 'name' },
     { header: 'WhatsApp Number', render: (row) => row.phoneNumber || row.phone },
@@ -61,7 +68,18 @@ export default function Contacts() {
     <div className="min-h-[calc(100vh-4rem)] p-6 md:p-10 bg-[#050505] text-gray-100 font-sans">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white mb-2">Contacts & CRM</h1>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-white">Contacts & CRM</h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
           <p className="text-gray-400">Manage your address book and AI smart segments.</p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} variant="primary">+ Add Contact</Button>
@@ -78,7 +96,7 @@ export default function Contacts() {
       </div>
 
       {activeTab === 'all' ? (
-        <DataTable columns={columns} data={contacts} onRowClick={(row) => console.log('Clicked', row)} />
+        <DataTable columns={columns} data={filteredContacts} onRowClick={(row) => console.log('Clicked', row)} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {smartSegments.map(segment => (

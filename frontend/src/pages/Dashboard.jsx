@@ -42,8 +42,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        const response = await api.get('/leads/analytics');
+        const response = await api.get('/leads/analytics', { params: { workspaceId: activeBusinessId } });
         setData(response.data);
         
         if (isSuperAdmin) {
@@ -77,7 +78,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, activeBusinessId]);
 
   if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
 

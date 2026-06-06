@@ -15,9 +15,13 @@ export default function CrmPage() {
   const [viewMode, setViewMode] = useState('pipeline'); // pipeline, list, analytics
   const [selectedContact, setSelectedContact] = useState(null);
   const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
+  const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
+  
+  // Get workspaces list from user object
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
 
   useEffect(() => {
     fetchPipeline();
@@ -60,6 +64,17 @@ export default function CrmPage() {
     window.print();
   };
 
+  // 🔥 Filter data based on selected Workspace
+  const getFilteredPipeline = () => {
+    if (!pipelineData) return null;
+    const filtered = {};
+    Object.keys(pipelineData).forEach(key => {
+      filtered[key] = pipelineData[key].filter(lead => (lead.lastSelectedWorkspaceId || 'main') === activeWorkspace);
+    });
+    return filtered;
+  };
+  const filteredFlatContacts = flatContacts.filter(lead => (lead.lastSelectedWorkspaceId || 'main') === activeWorkspace);
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-950">
@@ -73,9 +88,20 @@ export default function CrmPage() {
       {/* Top Bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <div className="flex items-center gap-4 mb-2">
+          <div className="flex flex-wrap items-center gap-4 mb-2">
             <h1 className="text-2xl font-bold text-white">CRM Pipeline</h1>
             
+            {/* Workspace / Business Dropdown */}
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+
             {/* Team vs My Leads Filter (Only for Owners/Managers) */}
             {isOwner && (
               <div className="flex bg-[#111] p-1 rounded-lg border border-gray-800 text-xs font-bold">
@@ -118,9 +144,9 @@ export default function CrmPage() {
       </div>
 
       {/* Main Content Area */}
-      {viewMode === 'pipeline' && <KanbanBoard initialData={pipelineData} onContactClick={(contact) => setSelectedContact(contact)} />}
-      {viewMode === 'list' && <CrmList contacts={flatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
-      {viewMode === 'analytics' && <CrmAnalytics contacts={flatContacts} />}
+      {viewMode === 'pipeline' && <KanbanBoard initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} />}
+      {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
+      {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
 
       {/* Right Side Drawer */}
       <ContactDrawer 

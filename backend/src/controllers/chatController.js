@@ -18,14 +18,16 @@ exports.getChats = async (req, res) => {
     leads.forEach(lead => {
       leadDataMap[lead.phoneNumber] = {
         name: lead.name,
-        city: lead.city || ''
+        city: lead.city || '',
+        workspaceId: lead.lastSelectedWorkspaceId || 'main'
       };
     });
 
     let enrichedMessages = messages.map(msg => ({
       ...msg,
       customerName: leadDataMap[msg.customerPhone]?.name || 'Unknown',
-      customerCity: leadDataMap[msg.customerPhone]?.city || ''
+      customerCity: leadDataMap[msg.customerPhone]?.city || '',
+      workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main'
     }));
 
     // If there's a search query, filter the results
