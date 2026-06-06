@@ -863,8 +863,8 @@ exports.handleWhatsApp = async (req, res) => {
                     } else if (toolCall.function.name === "update_customer_profile") {
                       const profileData = JSON.parse(toolCall.function.arguments);
                       const currentLeadForId = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
-                      const idMatch = currentLeadForId && currentLeadForId.name ? currentLeadForId.name.match(/(?:#|ID: )\d+/) : null;
-                      const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+                      const idMatch = currentLeadForId && currentLeadForId.name ? currentLeadForId.name.match(/(?:#|ID:\s*)(\d+)/i) : null;
+                      const seqId = idMatch ? `#${idMatch[1]}` : `#${fromNumber.slice(-4)}`;
                       const newName = `${profileData.fullName || 'Customer'} (${seqId})`;
                       
                       const updateFields = { name: newName };

@@ -60,14 +60,22 @@ exports.getPipeline = async (req, res) => {
     const normalizeData = (nameStr, cityStr) => {
       let n = nameStr || '';
       let c = cityStr || '';
-      let idMatch = n.match(/\(?((?:#|ID:\s*)\d+)\)?/i);
-      let seqId = idMatch ? idMatch[1].replace(/ID:\s*/i, '#') : '';
+      let idMatch = n.match(/(?:#|ID:\s*)(\d+)/i);
+      let seqId = idMatch ? `#${idMatch[1]}` : '';
       let cleanName = n.replace(/\s*\(?(?:#|ID:\s*)\d+\)?/i, '').trim();
       
-      if (!c && cleanName.split(/\s+/).length > 1 && !cleanName.toLowerCase().startsWith('user')) {
-        let parts = cleanName.split(/\s+/);
-        c = parts.pop();
-        cleanName = parts.join(' ');
+      if (!c && !cleanName.toLowerCase().startsWith('user')) {
+        if (cleanName.includes(',')) {
+           const parts = cleanName.split(',');
+           cleanName = parts[0].trim();
+           c = parts.slice(1).join(' ').trim();
+        } else {
+           let parts = cleanName.split(/\s+/);
+           if (parts.length >= 3) {
+             c = parts.pop();
+             cleanName = parts.join(' ');
+           }
+        }
       }
       let finalName = cleanName || 'Unknown';
       if (seqId && !finalName.includes(seqId)) finalName += ` (${seqId})`;
