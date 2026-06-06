@@ -295,7 +295,14 @@ exports.updateProfile = async (req, res) => {
       aiAgentEnabled,
       acceptCollabs,
       workspaces,
-      twilioConfig
+      twilioConfig,
+      externalApiUrl,
+      externalApiToken,
+      externalApiSearchUrl,
+      externalApiPostUrl,
+      externalApiBlogUrl,
+      externalApiVisitUrl,
+      customWebhooks
     } = req.body;
 
     // Assuming you have an auth middleware that sets req.user
@@ -320,6 +327,13 @@ exports.updateProfile = async (req, res) => {
     if (acceptCollabs !== undefined) updateData.acceptCollabs = acceptCollabs;
     if (workspaces !== undefined) updateData.workspaces = workspaces;
     if (twilioConfig !== undefined) updateData.twilioConfig = twilioConfig;
+    if (externalApiUrl !== undefined) updateData.externalApiUrl = externalApiUrl;
+    if (externalApiToken !== undefined) updateData.externalApiToken = externalApiToken;
+    if (externalApiSearchUrl !== undefined) updateData.externalApiSearchUrl = externalApiSearchUrl;
+    if (externalApiPostUrl !== undefined) updateData.externalApiPostUrl = externalApiPostUrl;
+    if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
+    if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
+    if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,

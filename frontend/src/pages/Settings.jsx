@@ -41,6 +41,7 @@ export default function Settings() {
   const [userId, setUserId] = useState('demo-business'); // Used for QR code link
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showTwilioToken, setShowTwilioToken] = useState(false);
+  const [showExternalToken, setShowExternalToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCardId, setSelectedCardId] = useState('main');
   
@@ -532,7 +533,12 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">API Secret Token / Key</label>
-                  <input type="password" name="externalApiToken" value={config.externalApiToken} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-teal-500 outline-none" placeholder="Your secret key" />
+                  <div className="relative">
+                    <input type={showExternalToken ? "text" : "password"} name="externalApiToken" value={config.externalApiToken} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-teal-500 outline-none pr-10" placeholder="Your secret key" />
+                    <button type="button" onClick={() => setShowExternalToken(!showExternalToken)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none">
+                      {showExternalToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               
