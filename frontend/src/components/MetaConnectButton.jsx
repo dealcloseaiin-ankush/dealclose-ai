@@ -30,7 +30,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
     if (window.FB && !isSdkLoaded) {
       window.fbAsyncInit();
     }
-  }, []);
+  }, [isSdkLoaded]);
 
   // 2. Handle the Embedded Signup Click
   const handleMetaLogin = () => {
