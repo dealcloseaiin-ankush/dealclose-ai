@@ -5,7 +5,8 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../hooks/useAuth';
-import { Search } from 'lucide-react';
+import { Search, Mail, MessageCircle, Share2, Printer } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function Contacts() {
   const [activeTab, setActiveTab] = useState('all');
@@ -58,6 +59,14 @@ export default function Contacts() {
     return matchesWs && matchesSearch;
   });
 
+  const handlePrint = (row) => {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<div style="font-family: sans-serif; padding: 20px;"><h2>Lead / Contact Details</h2><hr/>
+    <p><strong>Name:</strong> ${row.name}</p><p><strong>Phone:</strong> ${row.phoneNumber || row.phone}</p>
+    <p><strong>City:</strong> ${row.city || 'Not Specified'}</p><p><strong>Source:</strong> ${row.source || 'N/A'}</p></div>`);
+    printWindow.document.close(); printWindow.print();
+  };
+
   const columns = [
     { header: 'Name', accessor: 'name' },
     { header: 'WhatsApp Number', render: (row) => row.phoneNumber || row.phone },
@@ -71,7 +80,17 @@ export default function Contacts() {
         </Badge>
       ) 
     },
-    { header: 'Last Active', accessor: 'lastActive' }
+    { 
+      header: 'Actions', 
+      render: (row) => (
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => window.open(`https://wa.me/${(row.phoneNumber || row.phone || '').replace(/\D/g,'')}?text=Hi ${row.name.split(' ')[0]}`, '_blank')} className="text-green-500 hover:text-green-400 p-1.5 bg-green-500/10 rounded-lg transition-colors" title="WhatsApp Message"><MessageCircle size={16}/></button>
+          <button onClick={() => window.open(`mailto:${row.email || ''}?subject=Connecting with DealClose AI`)} className="text-blue-500 hover:text-blue-400 p-1.5 bg-blue-500/10 rounded-lg transition-colors" title="Send Email"><Mail size={16}/></button>
+          <button onClick={() => { navigator.clipboard.writeText(`Name: ${row.name}\nPhone: ${row.phoneNumber || row.phone}\nCity: ${row.city || 'N/A'}`); toast.success('Details Copied!'); }} className="text-purple-500 hover:text-purple-400 p-1.5 bg-purple-500/10 rounded-lg transition-colors" title="Copy Details"><Share2 size={16}/></button>
+          <button onClick={() => handlePrint(row)} className="text-gray-400 hover:text-white p-1.5 bg-gray-800 rounded-lg transition-colors" title="Print Details"><Printer size={16}/></button>
+        </div>
+      ) 
+    }
   ];
 
   if (loading) {

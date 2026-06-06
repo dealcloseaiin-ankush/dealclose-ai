@@ -15,10 +15,30 @@ exports.getChats = async (req, res) => {
 
     const leads = await Lead.find({ userId }).lean();
     const leadDataMap = {};
+    
+    // 🚀 SMART NORMALIZER: Retroactively fix Old Names and extract City dynamically
+    const normalizeData = (nameStr, cityStr) => {
+      let n = nameStr || '';
+      let c = cityStr || '';
+      let idMatch = n.match(/\(?((?:#|ID:\s*)\d+)\)?/i);
+      let seqId = idMatch ? idMatch[1].replace(/ID:\s*/i, '#') : '';
+      let cleanName = n.replace(/\s*\(?(?:#|ID:\s*)\d+\)?/i, '').trim();
+      
+      if (!c && cleanName.split(/\s+/).length > 1 && !cleanName.toLowerCase().startsWith('user')) {
+        let parts = cleanName.split(/\s+/);
+        c = parts.pop();
+        cleanName = parts.join(' ');
+      }
+      let finalName = cleanName || 'Unknown';
+      if (seqId && !finalName.includes(seqId)) finalName += ` (${seqId})`;
+      return { name: finalName, city: c };
+    };
+
     leads.forEach(lead => {
+      const norm = normalizeData(lead.name, lead.city);
       leadDataMap[lead.phoneNumber] = {
-        name: lead.name,
-        city: lead.city || '',
+        name: norm.name,
+        city: norm.city,
         workspaceId: lead.lastSelectedWorkspaceId || 'main'
       };
     });

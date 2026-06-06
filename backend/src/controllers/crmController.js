@@ -56,6 +56,24 @@ exports.getPipeline = async (req, res) => {
       console.error("Old chat sync error:", syncErr);
     }
 
+    // 🚀 SMART NORMALIZER: Retroactively fix Old Names and extract City dynamically
+    const normalizeData = (nameStr, cityStr) => {
+      let n = nameStr || '';
+      let c = cityStr || '';
+      let idMatch = n.match(/\(?((?:#|ID:\s*)\d+)\)?/i);
+      let seqId = idMatch ? idMatch[1].replace(/ID:\s*/i, '#') : '';
+      let cleanName = n.replace(/\s*\(?(?:#|ID:\s*)\d+\)?/i, '').trim();
+      
+      if (!c && cleanName.split(/\s+/).length > 1 && !cleanName.toLowerCase().startsWith('user')) {
+        let parts = cleanName.split(/\s+/);
+        c = parts.pop();
+        cleanName = parts.join(' ');
+      }
+      let finalName = cleanName || 'Unknown';
+      if (seqId && !finalName.includes(seqId)) finalName += ` (${seqId})`;
+      return { name: finalName, city: c };
+    };
+
     // Default pipeline structure
     const pipeline = {
       new: [],
@@ -68,6 +86,9 @@ exports.getPipeline = async (req, res) => {
 
     // Group contacts by their current stage
     leads.forEach(lead => {
+      const norm = normalizeData(lead.name, lead.city);
+      lead.name = norm.name;
+      lead.city = norm.city;
       const stage = lead.status || lead.crmStage || 'new'; // Map AI status to pipeline
       if (pipeline[stage]) {
         pipeline[stage].push(lead);
@@ -79,9 +100,12 @@ exports.getPipeline = async (req, res) => {
     // Group old contacts into the pipeline too
     contacts.forEach(contact => {
       const stage = contact.crmStage || 'new';
+      const norm = normalizeData(contact.name, contact.city);
       // Normalize contact structure to match frontend expectations for Lead
       const normalizedContact = {
         ...contact,
+        name: norm.name,
+        city: norm.city,
         phoneNumber: contact.phone || contact.phoneNumber,
         status: stage,
         source: 'Manual Contact (Old Data)',

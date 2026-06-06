@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import KanbanBoard from '../components/crm/KanbanBoard';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { Search, Filter, Plus, FileDown, Printer, KanbanSquare, List, BarChart3 } from 'lucide-react';
+import { Search, Filter, Plus, FileDown, Printer, KanbanSquare, List, BarChart3, MessageCircle, Mail, Share2 } from 'lucide-react';
 import ContactDrawer from '../components/crm/ContactDrawer';
 import CrmList from '../components/crm/CrmList';
 import CrmAnalytics from '../components/crm/CrmAnalytics';
@@ -175,6 +175,26 @@ export default function CrmPage() {
       {viewMode === 'pipeline' && <KanbanBoard initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} />}
       {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
       {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
+
+      {/* 🚀 QUICK ACTIONS FLOATING BAR (Appears when a Lead is Clicked) */}
+      {selectedContact && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] border border-gray-700 p-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex items-center gap-4 animate-fade-in-up">
+          <span className="text-sm font-bold text-white px-3 border-r border-gray-700 truncate max-w-[150px]">{selectedContact.name.split(' ')[0]}</span>
+          
+          <button onClick={() => window.open(`https://wa.me/${(selectedContact.phoneNumber || selectedContact.phone || '').replace(/\D/g,'')}?text=Hi ${selectedContact.name.split(' ')[0]}`, '_blank')} className="text-green-500 hover:text-green-400 p-1 hover:scale-110 transition-transform" title="WhatsApp Message"><MessageCircle size={20}/></button>
+          <button onClick={() => window.open(`mailto:${selectedContact.email || ''}?subject=Connecting`)} className="text-blue-500 hover:text-blue-400 p-1 hover:scale-110 transition-transform" title="Send Email"><Mail size={20}/></button>
+          <button onClick={() => { navigator.clipboard.writeText(`Name: ${selectedContact.name}\nPhone: ${selectedContact.phoneNumber || selectedContact.phone}\nCity: ${selectedContact.city || 'N/A'}`); toast.success('Lead details copied to clipboard!'); }} className="text-purple-500 hover:text-purple-400 p-1 hover:scale-110 transition-transform" title="Copy to Share"><Share2 size={20}/></button>
+          <button onClick={() => {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`<div style="font-family: sans-serif; padding: 20px;"><h2>Lead Details</h2><hr/>
+            <p><strong>Name:</strong> ${selectedContact.name}</p>
+            <p><strong>Phone:</strong> ${selectedContact.phoneNumber || selectedContact.phone}</p>
+            <p><strong>City:</strong> ${selectedContact.city || 'Not Specified'}</p>
+            <p><strong>Source:</strong> ${selectedContact.source || 'N/A'}</p></div>`);
+            printWindow.document.close(); printWindow.print();
+          }} className="text-gray-400 hover:text-white p-1 hover:scale-110 transition-transform border-l border-gray-700 pl-4" title="Print Lead Details"><Printer size={20}/></button>
+        </div>
+      )}
 
       {/* Right Side Drawer */}
       <ContactDrawer 
