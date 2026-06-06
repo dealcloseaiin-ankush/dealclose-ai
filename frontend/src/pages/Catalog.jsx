@@ -55,6 +55,88 @@ export default function Catalog() {
     fetchCatalog();
   }, [activeWorkspace]);
 
+  // 🚀 NEW: Bulk Import CSV Logic
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    toast.loading("Importing catalog... Please wait.", { id: 'import-toast' });
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const csvText = event.target.result;
+        const rows = csvText.split('\n').filter(row => row.trim().length > 0);
+
+        if (rows.length <= 1) {
+          toast.error("File is empty or invalid format. Include headers.", { id: 'import-toast' });
+          return;
+        }
+
+        let successCount = 0;
+        for (let i = 1; i < rows.length; i++) {
+          // Format expected: Name, Price, Description, ImageURL
+          const cols = rows[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+          if (cols.length >= 2 && cols[0] && cols[1]) {
+            const payload = { name: cols[0], price: cols[1], description: cols[2] || '', imageUrl: cols[3] || '', workspaceId: activeWorkspace };
+            await api.post('/catalog', payload).catch(() => {});
+            successCount++;
+          }
+        }
+        toast.success(`✅ ${successCount} items imported successfully!`, { id: 'import-toast' });
+        // Refresh list
+        const { data } = await api.get('/catalog', { params: { workspaceId: activeWorkspace } });
+        setItems(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("CSV import error:", error);
+        toast.error("Failed to process file.", { id: 'import-toast' });
+      }
+      e.target.value = null; // reset input
+    };
+    reader.readAsText(file);
+  };
+
+  // 🚀 NEW: Bulk Auto-Create via Multiple Images
+  const handleBulkImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    toast.loading(`Processing & Uploading ${files.length} images...`, { id: 'bulk-image' });
+    let successCount = 0;
+
+    for (const file of files) {
+      try {
+        // 1. Upload to Cloudinary (using your existing /upload route)
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        const uploadRes = await api.post('/upload', uploadData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        const imageUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+
+        // 2. Automatically create catalog item using the filename
+        const fileName = file.name.split('.').slice(0, -1).join(' ').replace(/[-_]/g, ' ') || 'New Item';
+        
+        await api.post('/catalog', {
+          name: fileName,
+          price: '0', // Default price
+          description: 'Auto-created from image upload',
+          imageUrl: imageUrl,
+          workspaceId: activeWorkspace
+        });
+        successCount++;
+      } catch (err) {
+        console.error("Bulk image upload error for file:", file.name, err);
+      }
+    }
+
+    toast.success(`✅ ${successCount} items auto-created with images!`, { id: 'bulk-image' });
+    
+    // Refresh list
+    const { data } = await api.get('/catalog', { params: { workspaceId: activeWorkspace } });
+    setItems(Array.isArray(data) ? data : []);
+    e.target.value = null; // reset input
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -119,9 +201,16 @@ export default function Catalog() {
                 ))}
               </select>
             </div>
-            <div className="flex gap-3">
-              <button className="bg-[#111] hover:bg-gray-800 border border-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors">📥 Import Excel/CSV</button>
-              <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-purple-600/30">+ Add New Item</button>
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0">
+              <label className="bg-[#111] hover:bg-gray-800 border border-blue-500/30 text-blue-400 px-4 py-2.5 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-2 text-sm shadow-lg">
+                🖼️ Bulk Auto-Create (Images)
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleBulkImageUpload} />
+              </label>
+              <label className="bg-[#111] hover:bg-gray-800 border border-gray-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-2 text-sm">
+                📥 Import CSV
+                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+              </label>
+              <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-purple-600/30 text-sm">+ Add Single Item</button>
             </div>
           </div>
           <p className="text-gray-400">Manage your products, services, or real estate properties here. AI will use this data to answer customers.</p>
