@@ -20,19 +20,23 @@ This file tracks all the advanced features that are currently disabled (Coming S
 
 ## 4. Advanced Instagram Automation
 - **Description:** Smart comment clustering, auto-DMs, and silent phone number extraction from IG DMs.
-- **Current Status:** Disabled in MVP sidebar. Requires full Facebook App Review (Instagram Graph API permissions) to go live.
+- **Current Status:** Backend flow logic ("Instagram Collab Flow") and post-campaign worker jobs are already built. Requires full Facebook App Review (Instagram Graph API permissions) to go fully live.
 
 ## 5. B2B Lead Extractor
 - **Description:** Scrape verified business numbers from Google Maps and import them directly to CRM.
 - **Current Status:** UI built (`LeadExtractor.jsx`). Backend scraper (Puppeteer/Google Places API) integration required.
 
 ## 6. AI Voice Calling (Outbound)
-- **Description:** Call high-ticket leads automatically using Twilio/Exotel.
-- **Current Status:** Basic logic exists in `callService.js`. Needs real SIP integration and voice-bot training.
+- **Description:** Call high-ticket leads automatically using Twilio WebSockets.
+- **Current Status:** Twilio WebSocket stream handler (`twilioStreamHandler.js`) is built to catch live audio. Needs integration with Deepgram/ElevenLabs for real-time AI voice processing.
 
 ## 7. Advanced AI Analytics & Monthly Reports
 - **Description:** Provide users with PDF reports on how much ROI the AI generated.
 - **Current Status:** Disabled in MVP sidebar.
 
 ---
-*Rule:* Core MVP (Inbox, Templates, CRM, Flow Builder) must be 100% bug-free before we start building these.
+## ✅ MVP Core - Completed & Active (Foundation Ready)
+- **AI Flow Builder:** Powered by Gemini 2.5 Flash for prompt-to-flow generation (`aiController.js`).
+- **Magic Onboarding:** Auto-creates dynamic logic flows (E-commerce / Real Estate / Influencer) upon user sign-up (`authController.js`).
+- **Smart CRM:** Human takeover logic (pauses AI for 24 hours on manual reply) and chat status tagging (`chatController.js`).
+- **Background Automation:** BullMQ workers active for Abandoned Cart Rescue, Influencer ROI Pitch, and Feedback logic (`automationWorker.js`).

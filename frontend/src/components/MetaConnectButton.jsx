@@ -8,10 +8,10 @@ const MetaConnectButton = () => {
   useEffect(() => {
     window.fbAsyncInit = function () {
       window.FB.init({
-        appId: 'YOUR_META_APP_ID', // Apna Meta App ID yahan dalein
+        appId: 'YOUR_META_APP_ID', // TODO: Apna Meta App ID yahan dalein
         cookie: true,
         xfbml: true,
-        version: 'v19.0'
+        version: 'v19.0' // Make sure you are using the latest version (e.g., v19.0 or v20.0)
       });
       setIsSdkLoaded(true);
     };
@@ -37,10 +37,9 @@ const MetaConnectButton = () => {
     // Trigger Meta Oauth Popup
     window.FB.login((response) => {
       if (response.authResponse) {
-        const accessToken = response.authResponse.accessToken;
-        
-        // Note: For full Tech Provider flow, Meta sends a 'code' that you exchange for a system user token.
-        // But for standard setup, we can use the short-lived accessToken to fetch WABA and Phone IDs.
+        // Tech Provider (Embedded Signup) me Meta 'code' bhejta hai, 'accessToken' nahi.
+        // Is code ko backend secure tarike se Meta Graph API ko bhej kar System User Access Token nikalta hai.
+        const authCode = response.authResponse.code || response.authResponse.accessToken; 
         
         console.log('Meta Auth Success:', response);
         
@@ -54,10 +53,10 @@ const MetaConnectButton = () => {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            accessToken: accessToken,
-            // In actual flow, you fetch these from Meta Graph API using the code/token
-            wabaId: 'FETCHED_WABA_ID', 
-            phoneNumberId: 'FETCHED_PHONE_ID'
+            authCode: authCode, // Backend ko code bhejein
+            // Client ki WABA ID aur Phone ID aapko backend me token exchange karne ke baad
+            // 'GET /debug_token' ya 'GET /client_waba' API se nikalni hogi.
+            // Frontend se directly bhejna safe/reliable nahi hota Tech Provider flow me.
           })
         })
         .then(res => res.json())
@@ -76,9 +75,11 @@ const MetaConnectButton = () => {
         setLoading(false);
       }
     }, {
-      // config_id: 'YOUR_CONFIG_ID', // Tech Provider ke liye Meta portal se config_id yahan dalna hoga
+      config_id: 'YOUR_CONFIG_ID', // 🔥 IMPORTANT: Embedded Signup ke liye App Dashboard me bani configuration ID yahan dalni hai
       scopes: 'whatsapp_business_management,whatsapp_business_messaging',
-      return_scopes: true
+      return_scopes: true,
+      response_type: 'code', // 🔥 IMPORTANT: Meta ko batana hai ki hume 'code' chahiye, token nahi (Tech Provider Requirement)
+      override_default_response_type: true
     });
   };
 

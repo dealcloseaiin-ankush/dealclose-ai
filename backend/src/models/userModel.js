@@ -93,6 +93,11 @@ const userSchema = new Schema({
     webhookVerifyToken: { type: String },
     wabaId: { type: String } // Required by Meta for Template Approvals
   },
+  instagramConfig: {
+    accessToken: { type: String }, // Page Access Token (igAccessToken)
+    instagramAccountId: { type: String }, // Instagram Business/Creator ID
+    facebookPageId: { type: String } // Linked FB Page ID
+  },
   // --- New AI-related fields ---
   businessName: { type: String, default: '' },
   businessDescription: { type: String, default: '' }, // AI Training Data

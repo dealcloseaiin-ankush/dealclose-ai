@@ -2,6 +2,7 @@ const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Flow = require('../models/flowModel');
+const axios = require('axios');
 
 // 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
@@ -102,6 +103,76 @@ exports.supabaseAuth = async (req, res) => {
   } catch (error) {
     console.error('Supabase Sync Error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Connect Meta via Embedded Signup (Tech Provider)
+// @route   POST /api/users/settings/meta-connect
+exports.metaConnect = async (req, res) => {
+  try {
+    const { authCode } = req.body;
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId || !authCode) {
+      return res.status(400).json({ success: false, message: 'Missing authCode or unauthorized session' });
+    }
+
+    // TODO: Apne Meta App ka ID aur Secret yahan dalein (Ya .env se lein)
+    const APP_ID = process.env.META_APP_ID || 'YOUR_APP_ID';
+    const APP_SECRET = process.env.META_APP_SECRET || 'YOUR_APP_SECRET';
+
+    // 1. Exchange the authCode for a System User Access Token
+    const tokenResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
+      params: {
+        client_id: APP_ID,
+        client_secret: APP_SECRET,
+        code: authCode
+      }
+    });
+
+    const clientAccessToken = tokenResponse.data.access_token;
+
+    // 2. Fetch the WABA (WhatsApp Business Account) ID and Phone Number ID using the new token
+    // Meta's debug_token endpoint gives us the business boundaries
+    const debugResponse = await axios.get(`https://graph.facebook.com/v19.0/debug_token`, {
+      params: {
+        input_token: clientAccessToken,
+        access_token: `${APP_ID}|${APP_SECRET}`
+      }
+    });
+
+    const wabaId = debugResponse.data.data.granular_scopes.find(s => s.scope === 'whatsapp_business_messaging')?.target_ids?.[0];
+    
+    if (!wabaId) {
+      return res.status(400).json({ success: false, message: 'Could not find a valid WhatsApp Business Account for this user.' });
+    }
+
+    // 3. Fetch Phone Number ID attached to this WABA
+    const phoneResponse = await axios.get(`https://graph.facebook.com/v19.0/${wabaId}/phone_numbers`, {
+      headers: { Authorization: `Bearer ${clientAccessToken}` }
+    });
+
+    const phoneNumberId = phoneResponse.data.data[0]?.id; // Picking the first phone number
+    const displayPhoneNumber = phoneResponse.data.data[0]?.display_phone_number;
+
+    // 4. Save these details securely in your database for this specific user
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          "whatsappConfig.accessToken": clientAccessToken,
+          "whatsappConfig.wabaId": wabaId,
+          "whatsappConfig.phoneNumberId": phoneNumberId,
+          "whatsappConfig.connectedPhone": displayPhoneNumber
+        }
+      },
+      { new: true }
+    );
+
+    res.status(200).json({ success: true, message: 'WhatsApp successfully connected via Meta!', data: updatedUser.whatsappConfig });
+  } catch (error) {
+    console.error('Meta Connect Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Failed to connect Meta account. Check server logs.' });
   }
 };
 
