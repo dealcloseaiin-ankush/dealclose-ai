@@ -21,11 +21,18 @@ export default function Calls() {
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   useEffect(() => {
-    setLoading(true);
-    api.get('/calls', { params: { workspaceId: activeWorkspace } })
-      .then(res => setCalls(res.data))
-      .catch(err => console.error("Failed to fetch calls", err))
-      .finally(() => setLoading(false));
+    const fetchCalls = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/calls', { params: { workspaceId: activeWorkspace } });
+        setCalls(res.data);
+      } catch (err) {
+        console.error("Failed to fetch calls", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCalls();
   }, [activeWorkspace]);
 
   return (

@@ -1,5 +1,5 @@
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api'; // Assuming api service is set up
 import { useAuth } from '../hooks/useAuth';
@@ -17,7 +17,7 @@ export default function WhatsAppTemplates() {
   const [headerMediaFile, setHeaderMediaFile] = useState(null);
   const [headerMediaPreview, setHeaderMediaPreview] = useState('');
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get('/whatsapp/templates', { params: { workspaceId: activeWorkspace } });
@@ -27,11 +27,11 @@ export default function WhatsAppTemplates() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeWorkspace]);
 
   useEffect(() => {
     fetchTemplates();
-  }, [activeWorkspace]);
+  }, [fetchTemplates]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
