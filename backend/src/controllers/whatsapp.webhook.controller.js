@@ -338,11 +338,28 @@ exports.handleWhatsApp = async (req, res) => {
             // 🚀 ZERO-COST LEAD CAPTURE (Bypass AI to save Name/City & AI Cost)
             if (currentLeadCheck && currentLeadCheck.name && currentLeadCheck.name.startsWith('User ') && incomingText.length > 2 && incomingText.length < 60 && isNaN(incomingText)) {
               const extractedName = incomingText.trim();
-              const newName = `${extractedName} (ID: ${fromNumber.slice(-4)})`;
+              let finalName = extractedName;
+              let finalCity = null;
+              if (extractedName.includes(',')) {
+                  const parts = extractedName.split(',').map(p => p.trim());
+                  finalName = parts[0];
+                  finalCity = parts[1];
+              } else {
+                  const words = extractedName.split(/\s+/);
+                  if (words.length >= 2) {
+                      finalCity = words[words.length - 1];
+                      finalName = words.slice(0, words.length - 1).join(' ');
+                  }
+              }
+              const idMatch = currentLeadCheck.name.match(/(?:#|ID: )\d+/);
+              const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+              const newName = `${finalName} (${seqId})`;
+              const updatePayload = { name: newName };
+              if (finalCity) updatePayload.city = finalCity;
               
-              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { name: newName } });
+              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updatePayload });
 
-              let responseMessage = `Thank you, ${extractedName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
+              let responseMessage = `Thank you, ${finalName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
               
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
               await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system' });

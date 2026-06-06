@@ -52,7 +52,9 @@ export default function Contacts() {
   const filteredContacts = contacts.filter(c => {
     const ws = c.lastSelectedWorkspaceId || 'main';
     const matchesWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
-    const matchesSearch = searchTerm === '' || (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.phoneNumber || c.phone || '').includes(searchTerm) || (c.city || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString().toLowerCase() : '';
+    const matchesSearch = searchTerm === '' || (c.name || '').toLowerCase().includes(term) || (c.phoneNumber || c.phone || '').includes(term) || (c.city || '').toLowerCase().includes(term) || dateStr.includes(term);
     return matchesWs && matchesSearch;
   });
 

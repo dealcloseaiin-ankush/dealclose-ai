@@ -78,7 +78,9 @@ export default function CrmPage() {
       filtered[key] = pipelineData[key].filter(lead => {
         const ws = lead.lastSelectedWorkspaceId || 'main';
         const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
-        const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (lead.phoneNumber || lead.phone || '').includes(searchTerm) || (lead.city || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const term = searchTerm.toLowerCase();
+        const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
+        const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
         return matchWs && matchSearch;
       });
     });
@@ -87,7 +89,9 @@ export default function CrmPage() {
   const filteredFlatContacts = flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
     const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
-    const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (lead.phoneNumber || lead.phone || '').includes(searchTerm) || (lead.city || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
+    const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
     return matchWs && matchSearch;
   });
 

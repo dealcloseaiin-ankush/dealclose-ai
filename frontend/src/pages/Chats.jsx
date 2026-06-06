@@ -102,7 +102,7 @@ export default function Chats() {
     // Search Filter Logic
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      finalDetails = finalDetails.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term) || c.city.toLowerCase().includes(term));
+      finalDetails = finalDetails.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term) || c.city.toLowerCase().includes(term) || (c.lastMessage && new Date(c.lastMessage.timestamp || c.lastMessage.createdAt).toLocaleDateString().toLowerCase().includes(term)));
     }
     return finalDetails;
   }, [filteredMessages, searchTerm]);
