@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const MetaConnectButton = () => {
+const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -46,7 +46,7 @@ const MetaConnectButton = () => {
         // 3. Send Credentials to our Backend API
         const token = localStorage.getItem('token'); // Get user session token
         
-        fetch('http://localhost:5000/api/users/settings/meta-connect', {
+        fetch('https://dealclose-ai.onrender.com/api/users/settings/meta-connect', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ const MetaConnectButton = () => {
         .then(res => res.json())
         .then(data => {
           if (data.success) {
-            alert('🎉 WhatsApp API Connected Successfully!');
+            alert('🎉 Meta Accounts (WhatsApp & Instagram) Connected Successfully!');
           } else {
             alert('Failed to save Meta settings: ' + data.message);
           }
@@ -76,7 +76,7 @@ const MetaConnectButton = () => {
       }
     }, {
       config_id: 'YOUR_CONFIG_ID', // 🔥 IMPORTANT: Embedded Signup ke liye App Dashboard me bani configuration ID yahan dalni hai
-      scopes: 'whatsapp_business_management,whatsapp_business_messaging',
+      scopes: 'whatsapp_business_management,whatsapp_business_messaging,instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
       response_type: 'code', // 🔥 IMPORTANT: Meta ko batana hai ki hume 'code' chahiye, token nahi (Tech Provider Requirement)
       override_default_response_type: true
@@ -90,7 +90,7 @@ const MetaConnectButton = () => {
       className="flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#166FE5] text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all disabled:opacity-50"
     >
       <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg" alt="Meta" className="w-5 h-5 bg-white rounded-full" />
-      {loading ? 'Connecting...' : 'Connect WhatsApp via Meta'}
+      {loading ? 'Connecting...' : buttonText}
     </button>
   );
 };

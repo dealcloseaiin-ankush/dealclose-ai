@@ -12,7 +12,7 @@ This file tracks all the advanced features that are currently disabled (Coming S
 
 ## 2. ScanIQ (Competitor Ad Analyzer)
 - **Description:** Spy on competitors' ads, analyze viral hooks, and compare stats.
-- **Current Status:** UI built (`ScanIQ.jsx`) and linked on the Landing page. Needs backend scraper logic to be fully activated.
+- **Current Status:** Core UI and Backend AI Vision Scraper (Apify/SerpAPI/Meta Ad Library) implemented. Needs final frontend integration to display visual results.
 
 ## 3. AI Video Studio
 - **Description:** Generate marketing videos, lip-sync avatars, and product motion ads.
@@ -20,7 +20,7 @@ This file tracks all the advanced features that are currently disabled (Coming S
 
 ## 4. Advanced Instagram Automation
 - **Description:** Smart comment clustering, auto-DMs, and silent phone number extraction from IG DMs.
-- **Current Status:** Backend flow logic ("Instagram Collab Flow") and post-campaign worker jobs are already built. Requires full Facebook App Review (Instagram Graph API permissions) to go fully live.
+- **Current Status:** ✅ Webhooks verified. Scopes added to Embedded Signup. Needs final Graph API send DM code activation after Meta App Review is approved.
 
 ## 5. B2B Lead Extractor
 - **Description:** Scrape verified business numbers from Google Maps and import them directly to CRM.
@@ -36,6 +36,7 @@ This file tracks all the advanced features that are currently disabled (Coming S
 
 ---
 ## ✅ MVP Core - Completed & Active (Foundation Ready)
+- **Meta Embedded Signup (1-Click Connect):** Unified popup for users to connect their WhatsApp and Instagram accounts securely without copy-pasting raw tokens (`MetaConnectButton.jsx`).
 - **AI Flow Builder:** Powered by Gemini 2.5 Flash for prompt-to-flow generation (`aiController.js`).
 - **Magic Onboarding:** Auto-creates dynamic logic flows (E-commerce / Real Estate / Influencer) upon user sign-up (`authController.js`).
 - **Smart CRM:** Human takeover logic (pauses AI for 24 hours on manual reply) and chat status tagging (`chatController.js`).

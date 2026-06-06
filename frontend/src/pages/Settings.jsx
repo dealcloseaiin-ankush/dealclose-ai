@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
 import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase } from 'lucide-react'; // Icons for viewing tokens
+import MetaConnectButton from '../components/MetaConnectButton';
 
 export default function Settings() {
   const [config, setConfig] = useState({
@@ -41,7 +42,6 @@ export default function Settings() {
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFbSdkLoaded, setIsFbSdkLoaded] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState('main');
   
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -115,44 +115,6 @@ export default function Settings() {
     };
     fetchSettings();
   }, []);
-
-  // Load Facebook SDK for 1-Click Instagram Login
-  useEffect(() => {
-    window.fbAsyncInit = function() {
-      window.FB.init({
-        appId      : import.meta.env.VITE_META_APP_ID || 'YOUR_META_APP_ID',
-        cookie     : true,
-        xfbml      : true,
-        version    : 'v19.0'
-      });
-      setIsFbSdkLoaded(true);
-    };
-    (function(d, s, id){
-       var js, fjs = d.getElementsByTagName(s)[0];
-       if (d.getElementById(id)) {return;}
-       js = d.createElement(s); js.id = id;
-       js.src = "https://connect.facebook.net/en_US/sdk.js";
-       fjs.parentNode.insertBefore(js, fjs);
-     }(document, 'script', 'facebook-jssdk'));
-  }, []);
-
-  const handleInstagramConnect = () => {
-    if (!isFbSdkLoaded || !window.FB) {
-      alert("Facebook System is still loading. Please wait a second and try again.");
-      return;
-    }
-    window.FB.login((response) => {
-      if (response.authResponse) {
-        const accessToken = response.authResponse.accessToken;
-        console.log('IG System Access Token: ', accessToken);
-        // In future: await api.post('/users/connect-ig', { accessToken });
-        setIgConnected(true);
-        alert('✅ Instagram Successfully Connected!');
-      } else {
-        alert('Login cancelled or not authorized.');
-      }
-    }, { scope: 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement' });
-  };
 
   const handleChange = (e) => {
     setConfig({ ...config, [e.target.name]: e.target.value });
@@ -372,9 +334,12 @@ export default function Settings() {
               </div>
             </div>
 
-            <h2 className="text-xl font-semibold text-green-400 mb-6 flex items-center">
-               WhatsApp (Meta API)
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-green-400 flex items-center">
+                 WhatsApp (Meta API)
+              </h2>
+              <MetaConnectButton buttonText="1-Click Connect Meta" />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2 relative">
                 <label className="block text-sm font-medium text-gray-400 mb-2">Permanent Access Token</label>
@@ -501,14 +466,7 @@ export default function Settings() {
             <p className="text-sm text-gray-400 mb-6">Connect your Instagram to enable Auto-DMs, Comment tracking, and AI Profile Growth Audits.</p>
             
             {!igConnected ? (
-              <button 
-                onClick={handleInstagramConnect} 
-                type="button" 
-                disabled={!isFbSdkLoaded}
-                className={`px-6 py-3 font-bold rounded-xl shadow-lg transition-all ${isFbSdkLoaded ? 'bg-gradient-to-r from-pink-600 to-orange-500 hover:from-pink-500 hover:to-orange-400 text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
-              >
-                {isFbSdkLoaded ? 'Connect via Meta (Facebook)' : 'Loading Meta SDK...'}
-              </button>
+              <MetaConnectButton buttonText="Connect Instagram via Meta" />
             ) : (
               <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                  <p className="text-sm text-green-400 font-semibold">Your Instagram account is actively monitored by AI.</p>

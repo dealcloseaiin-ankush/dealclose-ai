@@ -766,3 +766,33 @@ exports.handleWhatsApp = async (req, res) => {
     return;
   }
 };
+
+// @desc    Handle Meta App Deauthorization
+// @route   POST /api/webhooks/meta-deauthorize
+exports.handleMetaDeauthorize = async (req, res) => {
+  try {
+    console.log("➡️ [Meta Webhook] User deauthorized the app.");
+    // Meta sends a signed_request in req.body. For MVP, we just acknowledge it.
+    res.status(200).send("Deauthorization recorded");
+  } catch (error) {
+    console.error("Deauth Error:", error);
+    res.status(500).send("Server Error");
+  }
+};
+
+// @desc    Handle Meta Data Deletion Request
+// @route   POST /api/webhooks/meta-data-deletion
+exports.handleMetaDataDeletion = async (req, res) => {
+  try {
+    console.log("➡️ [Meta Webhook] Data deletion request received.");
+    
+    // Meta requires us to return a JSON response with a status URL and a confirmation code
+    res.status(200).json({
+      url: "https://dealclose-ai.onrender.com/privacy", // Ye aapka Privacy Policy page ka URL hoga
+      confirmation_code: "DEL-" + Date.now()
+    });
+  } catch (error) {
+    console.error("Data Deletion Error:", error);
+    res.status(500).send("Server Error");
+  }
+};

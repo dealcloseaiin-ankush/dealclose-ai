@@ -28,4 +28,8 @@ router.post('/universal', universalController.handleUniversalData);
 // Outbound CRM Webhook (NewPropertyHub Broadcast)
 router.post('/outbound', universalController.handleOutboundMessage);
 
+// Meta Privacy & Compliance Webhooks
+router.post('/meta-deauthorize', whatsappController.handleMetaDeauthorize);
+router.post('/meta-data-deletion', whatsappController.handleMetaDataDeletion);
+
 module.exports = router;
