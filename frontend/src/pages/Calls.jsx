@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getCalls } from '../services/callService';
 import { formatDate } from '../utils/format';
+import api from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const CallRow = ({ call }) => (
   <tr className="bg-white border-b hover:bg-gray-50">
@@ -15,17 +16,32 @@ const CallRow = ({ call }) => (
 export default function Calls() {
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   useEffect(() => {
-    getCalls()
-      .then(setCalls)
+    setLoading(true);
+    api.get('/calls', { params: { workspaceId: activeWorkspace } })
+      .then(res => setCalls(res.data))
       .catch(err => console.error("Failed to fetch calls", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeWorkspace]);
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Call History</h1>
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <h1 className="text-2xl font-bold">Call History</h1>
+        <select 
+          value={activeWorkspace} 
+          onChange={(e) => setActiveWorkspace(e.target.value)} 
+          className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+        >
+          {workspaces.map(ws => (
+            <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+          ))}
+        </select>
+      </div>
       <div className="relative overflow-x-auto shadow-md sm:rounded-lg">
         <table className="w-full text-sm text-left text-gray-500">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50">

@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Campaigns() {
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAd, setGeneratedAd] = useState(null);
@@ -33,7 +38,8 @@ export default function Campaigns() {
         body: JSON.stringify({
           prompt: aiPrompt,
           mode: campaignMode,
-          targeting: { country, state: stateLoc, city, ageMin, ageMax, gender, interests, retargetType }
+          targeting: { country, state: stateLoc, city, ageMin, ageMax, gender, interests, retargetType },
+          workspaceId: activeWorkspace
         })
       });
 
@@ -59,11 +65,24 @@ export default function Campaigns() {
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-[calc(100vh-4rem)] text-gray-100 font-sans">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 mb-2">
-          AI Campaigns & Ads Manager
-        </h1>
-        <p className="text-gray-400">Launch highly targeted Meta Ads using AI and retarget your WhatsApp leads automatically.</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">
+              AI Campaigns & Ads Manager
+            </h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-gray-400">Launch highly targeted Meta Ads using AI and retarget your WhatsApp leads automatically.</p>
+        </div>
       </div>
 
       {/* True ROI Analytics Dashboard */}

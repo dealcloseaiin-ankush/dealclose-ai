@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 
 export default function InstagramAutomation() {
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
   const [activeTab, setActiveTab] = useState('general'); // 'general' or 'posts'
 
   const [stats, setStats] = useState({
@@ -29,7 +34,7 @@ export default function InstagramAutomation() {
   useEffect(() => {
     const fetchIgData = async () => {
       try {
-        const { data } = await api.get('/instagram/dashboard').catch(() => ({ data: {} }));
+        const { data } = await api.get('/instagram/dashboard', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: {} }));
         if (data.stats) setStats(data.stats);
         if (data.config) setConfig(data.config);
         if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
@@ -40,7 +45,7 @@ export default function InstagramAutomation() {
       }
     };
     fetchIgData();
-  }, []);
+  }, [activeWorkspace]);
 
   const handleReplyChange = (id, text) => {
     setCommentGroups(groups => groups.map(g => g.id === id ? { ...g, replyText: text } : g));
@@ -97,11 +102,24 @@ export default function InstagramAutomation() {
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#020202] text-gray-100 font-sans">
       
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
-          Instagram AI Funnel
-        </h1>
-        <p className="text-gray-400">Manage your Instagram automations and see how AI is converting comments into WhatsApp leads.</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
+              Instagram AI Funnel
+            </h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-gray-400">Manage your Instagram automations and see how AI is converting comments into WhatsApp leads.</p>
+        </div>
       </div>
 
       {/* 1. Analytics Section (The "Value" Prover) */}

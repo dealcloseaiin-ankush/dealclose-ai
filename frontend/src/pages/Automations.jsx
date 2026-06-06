@@ -5,6 +5,11 @@ import { useAuth } from '../hooks/useAuth';
 export default function Automations() {
   const { user } = useAuth() || { user: { _id: 'YOUR_WORKSPACE_ID' } };
   const [copied, setCopied] = useState(false);
+  
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+  
+  const trackingId = activeWorkspace === 'main' ? (user?._id || 'YOUR_WORKSPACE_ID') : activeWorkspace;
 
   const trackingCode = `<!-- DealClose AI Universal Tracker -->
 <script>
@@ -13,7 +18,7 @@ export default function Automations() {
   s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://dealclose-ai.onrender.com/api/pixel.js",
   s.parentNode.insertBefore(r,s)}(window,document,"script");
   
-  DealCloseTracker.init("${user?._id || 'YOUR_WORKSPACE_ID'}");
+  DealCloseTracker.init("${trackingId}");
   DealCloseTracker.track("page_view");
 </script>`;
 
@@ -25,9 +30,22 @@ export default function Automations() {
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-[calc(100vh-4rem)] text-gray-100 font-sans">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">Automations & Integrations</h1>
-        <p className="text-gray-400">Install the tracking pixel on your website to start recovering abandoned carts and tracking visitors.</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Automations & Integrations</h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-gray-400">Install the tracking pixel on your website to start recovering abandoned carts and tracking visitors.</p>
+        </div>
       </div>
 
       <div className="bg-[#111] border border-gray-800 p-8 rounded-3xl shadow-xl max-w-4xl">

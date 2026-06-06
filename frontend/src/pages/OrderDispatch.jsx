@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import api from '../services/api'; // Import your API service
 import toast from 'react-hot-toast'; // Assuming you use react-hot-toast for notifications
+import { useAuth } from '../hooks/useAuth';
 
 export default function OrderDispatch() {
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState(null);
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   // State for Single/Manual Dispatch
   const [manualForm, setManualForm] = useState({
@@ -46,7 +50,8 @@ export default function OrderDispatch() {
               customerPhone: cols[1]?.trim(),
               orderId: cols[2]?.trim(),
               status: cols[3]?.trim() || 'Dispatched',
-              trackingLink: cols[4]?.trim() || ''
+              trackingLink: cols[4]?.trim() || '',
+              workspaceId: activeWorkspace
             };
             // API hit for each row to update DB and send WhatsApp
             await api.post('/dispatch/update', payload).catch(err => console.error("Dispatch Failed for", payload.orderId, err));
@@ -72,7 +77,8 @@ export default function OrderDispatch() {
     try {
       await api.post('/dispatch/update', {
         ...manualForm,
-        status: 'Dispatched'
+        status: 'Dispatched',
+        workspaceId: activeWorkspace
       });
       toast.success('✅ Order updated and customer notified!');
       setManualForm({ orderId: '', customerPhone: '', deliveryMethod: 'Courier', trackingLink: '', builtyNo: '', shippingNotes: '' });
@@ -86,9 +92,22 @@ export default function OrderDispatch() {
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500 mb-2">Bulk Order Dispatch</h1>
-        <p className="text-gray-400">Upload your daily MS Excel/CSV tracking sheet. AI will notify all customers instantly.</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">Bulk Order Dispatch</h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-emerald-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-gray-400">Upload your daily MS Excel/CSV tracking sheet. AI will notify all customers instantly.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl">

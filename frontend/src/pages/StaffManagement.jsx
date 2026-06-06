@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Trash2, Edit } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function StaffManagement() {
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
   // Start with empty real staff list
   const [staffList, setStaffList] = useState([]);
 
@@ -14,7 +19,7 @@ export default function StaffManagement() {
       setStaffList(staffList.map(s => s.id === editMode ? { ...formData, id: editMode } : s));
       alert("Staff details updated!");
     } else {
-      const newStaff = { ...formData, id: Date.now() };
+      const newStaff = { ...formData, id: Date.now(), workspaceId: activeWorkspace };
       setStaffList([...staffList, newStaff]);
       alert("Staff member added! AI will now route relevant chats to them.");
     }
@@ -35,9 +40,22 @@ export default function StaffManagement() {
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500 mb-2">Staff & Routing Management</h1>
-        <p className="text-gray-400">Add your team members here. If AI cannot answer a question, it will escalate the chat to the right department.</p>
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Staff & Routing Management</h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-gray-400">Add your team members here. If AI cannot answer a question, it will escalate the chat to the right department.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -68,11 +86,11 @@ export default function StaffManagement() {
 
         <div className="lg:col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {staffList.length === 0 ? (
+            {staffList.filter(s => (s.workspaceId || 'main') === activeWorkspace).length === 0 ? (
                <div className="col-span-2 bg-[#111] border border-gray-800 rounded-2xl p-10 text-center text-gray-500">
                  No staff members added yet. Add your team to start routing leads!
                </div>
-            ) : staffList.map(staff => (
+            ) : staffList.filter(s => (s.workspaceId || 'main') === activeWorkspace).map(staff => (
               <div key={staff.id} className="bg-[#111] border border-gray-800 rounded-2xl p-5 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-lg text-white">{staff.name}</h3>

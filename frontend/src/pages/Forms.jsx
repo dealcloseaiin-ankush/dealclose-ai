@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Users, Share2, Copy } from 'lucide-react';
 import api from '../services/api'; // Use main api service
+import { useAuth } from '../hooks/useAuth';
 
 export default function Forms() {
   const [forms, setForms] = useState([]);
@@ -9,10 +10,14 @@ export default function Forms() {
   const [showModal, setShowModal] = useState(false);
   const [newForm, setNewForm] = useState({ title: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   useEffect(() => {
+    setLoading(true);
     // Fetch forms or mock the default Digital Card Form
-    api.get('/forms')
+    api.get('/forms', { params: { workspaceId: activeWorkspace } })
       .then(res => {
         if (res.data && res.data.length > 0) {
           setForms(res.data);
@@ -26,7 +31,7 @@ export default function Forms() {
       })
       .catch(err => console.error("Failed to fetch forms", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeWorkspace]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -35,7 +40,8 @@ export default function Forms() {
       const res = await api.post('/forms', {
         title: newForm.title,
         description: newForm.description,
-        fields: [{ name: 'Name', type: 'text' }, { name: 'Phone', type: 'text' }]
+        fields: [{ name: 'Name', type: 'text' }, { name: 'Phone', type: 'text' }],
+        workspaceId: activeWorkspace
       });
       // Remove dummy default forms if they exist, then append new one
       const currentForms = forms[0]?._id === 'digital-card-form' ? [] : forms;
@@ -59,7 +65,18 @@ export default function Forms() {
     <div className="min-h-[calc(100vh-4rem)] p-6 md:p-10 bg-[#050505] text-gray-100 font-sans">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white mb-2">Lead Capture Forms</h1>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-white">Lead Capture Forms</h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
           <p className="text-gray-400">Manage your Digital Card and Website embedding forms.</p>
         </div>
         <button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg transition-all">

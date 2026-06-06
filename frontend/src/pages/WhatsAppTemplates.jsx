@@ -2,8 +2,13 @@ import DashboardAIAssistant from '../components/DashboardAIAssistant';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api'; // Assuming api service is set up
+import { useAuth } from '../hooks/useAuth';
 
 export default function WhatsAppTemplates() {
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -15,7 +20,7 @@ export default function WhatsAppTemplates() {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/whatsapp/templates');
+      const { data } = await api.get('/whatsapp/templates', { params: { workspaceId: activeWorkspace } });
       setTemplates(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch templates", error);
@@ -26,7 +31,7 @@ export default function WhatsAppTemplates() {
 
   useEffect(() => {
     fetchTemplates();
-  }, []);
+  }, [activeWorkspace]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -73,10 +78,11 @@ export default function WhatsAppTemplates() {
       if(form.footerText) components.push({ type: "FOOTER", text: form.footerText });
 
       const payload = {
-        templateData: { name: form.name, category: form.category, language: form.language, components }
+        templateData: { name: form.name, category: form.category, language: form.language, components },
+        workspaceId: activeWorkspace
       };
 
-      await api.post('/whatsapp/templates', payload);
+      await api.post('/whatsapp/templates', payload, { params: { workspaceId: activeWorkspace } });
       
       setIsBuilding(false);
       fetchTemplates();
@@ -92,7 +98,7 @@ export default function WhatsAppTemplates() {
   const handleDelete = async (templateName) => {
     if (!window.confirm(`Are you sure you want to delete '${templateName}'?`)) return;
     try {
-      await api.delete(`/whatsapp/templates/${templateName}`);
+      await api.delete(`/whatsapp/templates/${templateName}`, { params: { workspaceId: activeWorkspace } });
       fetchTemplates();
       alert("Template deleted successfully!");
     } catch (error) {
@@ -256,11 +262,22 @@ export default function WhatsAppTemplates() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight mb-2">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
-              WhatsApp Meta Templates
-            </span>
-          </h1>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-4xl font-extrabold tracking-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
+                WhatsApp Meta Templates
+              </span>
+            </h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-green-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
           <p className="text-gray-400 text-lg">Manage and submit message templates for Meta's approval.</p>
         </div>
         <div className="flex items-center gap-4">

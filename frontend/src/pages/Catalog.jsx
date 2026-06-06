@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Catalog() {
+  const { user } = useAuth() || {};
+  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
   const [activeTab, setActiveTab] = useState('products');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,10 +30,11 @@ export default function Catalog() {
   // 🚀 DEBUGGING: Fetch actual catalog from backend
   useEffect(() => {
     const fetchCatalog = async () => {
+      setLoading(true);
       console.log("➡️ [DEBUG] Fetching Catalog items...");
       try {
         // Note: Assuming /api/catalog backend exists, if not it will catch the error smoothly
-        const { data } = await api.get('/catalog');
+        const { data } = await api.get('/catalog', { params: { workspaceId: activeWorkspace } });
         setItems(Array.isArray(data) ? data : []);
         console.log("✅ [DEBUG] Catalog fetched successfully:", data);
       } catch (error) {
@@ -38,7 +44,7 @@ export default function Catalog() {
       }
     };
     fetchCatalog();
-  }, []);
+  }, [activeWorkspace]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -68,7 +74,7 @@ export default function Catalog() {
       }
 
       // 🚀 Save to Real Database via Backend
-      const payload = { ...formData, imageUrl: finalImageUrl };
+      const payload = { ...formData, imageUrl: finalImageUrl, workspaceId: activeWorkspace };
       const res = await api.post('/catalog', payload);
       
       setItems([res.data, ...items]);
@@ -90,13 +96,26 @@ export default function Catalog() {
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
       <div className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 mb-2">Catalog & Listings</h1>
+        <div className="w-full">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
+            <div className="flex flex-wrap items-center gap-4">
+              <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">Catalog & Listings</h1>
+              <select 
+                value={activeWorkspace} 
+                onChange={(e) => setActiveWorkspace(e.target.value)} 
+                className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-purple-500 cursor-pointer shadow-sm"
+              >
+                {workspaces.map(ws => (
+                  <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3">
+              <button className="bg-[#111] hover:bg-gray-800 border border-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors">📥 Import Excel/CSV</button>
+              <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-purple-600/30">+ Add New Item</button>
+            </div>
+          </div>
           <p className="text-gray-400">Manage your products, services, or real estate properties here. AI will use this data to answer customers.</p>
-        </div>
-        <div className="flex gap-3">
-          <button className="bg-[#111] hover:bg-gray-800 border border-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors">📥 Import Excel/CSV</button>
-          <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-purple-600/30">+ Add New Item</button>
         </div>
       </div>
 
