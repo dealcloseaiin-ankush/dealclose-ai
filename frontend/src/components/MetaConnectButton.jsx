@@ -4,6 +4,10 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
   const [loading, setLoading] = useState(false);
 
+  // 🔥 SAFE FALLBACK: Agar Render environment variables kaam na karein, toh yahan direct paste kar dein!
+  const APP_ID = import.meta.env.VITE_META_APP_ID || '1611867760088959'; 
+  const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID || '1559471809111797';
+
   // 1. Load Facebook SDK for Meta Embedded Signup
   useEffect(() => {
     console.log("➡️ [Meta SDK] Checking SDK status...");
@@ -22,7 +26,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
       window.fbAsyncInit = function () {
         console.log("➡️ [Meta SDK] fbAsyncInit called, initializing...");
         window.FB.init({
-          appId: import.meta.env.VITE_META_APP_ID || 'YOUR_ACTUAL_META_APP_ID',
+          appId: APP_ID,
           cookie: true,
           xfbml: true,
           version: 'v19.0' 
@@ -41,7 +45,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
     }
 
     return () => clearInterval(checkInterval);
-  }, []);
+  }, [APP_ID]);
 
   // 2. Handle the Embedded Signup Click
   const handleMetaLogin = () => {
@@ -52,11 +56,16 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
       return;
     }
 
+    if (!APP_ID) {
+      alert("⚠️ Meta App ID is missing! Please paste your actual App ID in MetaConnectButton.jsx");
+      return;
+    }
+
     // Failsafe Initialization just in case it missed it
     if (!window.isFbInitialized) {
       console.log("➡️ [MetaConnect] Failsafe: Initializing FB SDK now...");
       window.FB.init({
-        appId: import.meta.env.VITE_META_APP_ID || 'YOUR_ACTUAL_META_APP_ID',
+        appId: APP_ID,
         cookie: true,
         xfbml: true,
         version: 'v19.0' 
@@ -111,7 +120,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         setLoading(false);
       }
     }, {
-      config_id: import.meta.env.VITE_META_CONFIG_ID || 'YOUR_CONFIG_ID',
+      config_id: CONFIG_ID,
       scopes: 'whatsapp_business_management,whatsapp_business_messaging,instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
       response_type: 'code', // 🔥 IMPORTANT: Meta ko batana hai ki hume 'code' chahiye, token nahi (Tech Provider Requirement)
