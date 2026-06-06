@@ -6,22 +6,32 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
 
   // 1. Load Facebook SDK for Meta Embedded Signup
   useEffect(() => {
-    if (isSdkLoaded) return;
+    console.log("➡️ [Meta SDK] Checking SDK status...");
+    // Interval to check if FB is loaded by the other button on the same page
+    const checkInterval = setInterval(() => {
+      if (window.FB && window.isFbInitialized) {
+        console.log("✅ [Meta SDK] Found globally initialized FB SDK.");
+        setIsSdkLoaded(true);
+        clearInterval(checkInterval);
+      }
+    }, 500);
 
-    window.fbAsyncInit = function () {
-      if (window.FB) {
+    // Script ko safely inject karo
+    if (!document.getElementById('facebook-jssdk')) {
+      console.log("➡️ [Meta SDK] Injecting Facebook SDK script...");
+      window.fbAsyncInit = function () {
+        console.log("➡️ [Meta SDK] fbAsyncInit called, initializing...");
         window.FB.init({
           appId: import.meta.env.VITE_META_APP_ID || 'YOUR_ACTUAL_META_APP_ID',
           cookie: true,
           xfbml: true,
           version: 'v19.0' 
         });
+        window.isFbInitialized = true;
         setIsSdkLoaded(true);
-      }
-    };
+        console.log("✅ [Meta SDK] Initialization complete.");
+      };
 
-    // Script ko safely inject karo
-    if (!document.getElementById('facebook-jssdk')) {
       const script = document.createElement('script');
       script.id = 'facebook-jssdk';
       script.src = "https://connect.facebook.net/en_US/sdk.js";
@@ -29,29 +39,48 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
       script.defer = true;
       document.body.appendChild(script);
     }
-  }, [isSdkLoaded]);
+
+    return () => clearInterval(checkInterval);
+  }, []);
 
   // 2. Handle the Embedded Signup Click
   const handleMetaLogin = () => {
-    if (!isSdkLoaded || !window.FB) {
+    console.log("➡️ [MetaConnect] Button clicked. isSdkLoaded status:", isSdkLoaded);
+    if (!window.FB) {
+      console.warn("⚠️ [MetaConnect] window.FB is not available yet.");
       alert('Meta SDK is loading, please wait a second...');
       return;
     }
 
+    // Failsafe Initialization just in case it missed it
+    if (!window.isFbInitialized) {
+      console.log("➡️ [MetaConnect] Failsafe: Initializing FB SDK now...");
+      window.FB.init({
+        appId: import.meta.env.VITE_META_APP_ID || 'YOUR_ACTUAL_META_APP_ID',
+        cookie: true,
+        xfbml: true,
+        version: 'v19.0' 
+      });
+      window.isFbInitialized = true;
+    }
+
     setLoading(true);
+    console.log("➡️ [MetaConnect] Triggering FB.login popup...");
 
     // Trigger Meta Oauth Popup
     window.FB.login((response) => {
+      console.log("➡️ [MetaConnect] FB.login response received:", response);
       if (response.authResponse) {
         // Tech Provider (Embedded Signup) me Meta 'code' bhejta hai, 'accessToken' nahi.
         // Is code ko backend secure tarike se Meta Graph API ko bhej kar System User Access Token nikalta hai.
         const authCode = response.authResponse.code || response.authResponse.accessToken; 
         
-        console.log('Meta Auth Success:', response);
+        console.log('✅ [MetaConnect] Meta Auth Success. Auth Code extracted:', authCode);
         
         // 3. Send Credentials to our Backend API
         const token = localStorage.getItem('token'); // Get user session token
         
+        console.log('➡️ [MetaConnect] Sending authCode to backend API...');
         fetch('https://dealclose-ai.onrender.com/api/users/settings/meta-connect', {
           method: 'POST',
           headers: {
@@ -67,17 +96,18 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         })
         .then(res => res.json())
         .then(data => {
+          console.log('➡️ [MetaConnect] Backend API response:', data);
           if (data.success) {
             alert('🎉 Meta Accounts (WhatsApp & Instagram) Connected Successfully!');
           } else {
             alert('Failed to save Meta settings: ' + data.message);
           }
         })
-        .catch(err => console.error('Backend Error:', err))
+        .catch(err => console.error('❌ [MetaConnect] Backend Fetch Error:', err))
         .finally(() => setLoading(false));
         
       } else {
-        console.log('User cancelled login or did not fully authorize.');
+        console.warn('⚠️ [MetaConnect] User cancelled login or did not fully authorize.', response);
         setLoading(false);
       }
     }, {
