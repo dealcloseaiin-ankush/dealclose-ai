@@ -7,13 +7,15 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
   // 1. Load Facebook SDK for Meta Embedded Signup
   useEffect(() => {
     window.fbAsyncInit = function () {
-      window.FB.init({
-        appId: 'YOUR_META_APP_ID', // TODO: Apna Meta App ID yahan dalein
-        cookie: true,
-        xfbml: true,
-        version: 'v19.0' // Make sure you are using the latest version (e.g., v19.0 or v20.0)
-      });
-      setIsSdkLoaded(true);
+      if (window.FB) {
+        window.FB.init({
+          appId: import.meta.env.VITE_META_APP_ID || '123456789', // 🔥 Yahan apna Asli Meta App ID dalein
+          cookie: true,
+          xfbml: true,
+          version: 'v19.0' 
+        });
+        setIsSdkLoaded(true);
+      }
     };
 
     (function (d, s, id) {
@@ -23,11 +25,16 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
       js.src = "https://connect.facebook.net/en_US/sdk.js";
       fjs.parentNode.insertBefore(js, fjs);
     }(document, 'script', 'facebook-jssdk'));
+
+    // Fallback if FB SDK was already loaded by another component
+    if (window.FB && !isSdkLoaded) {
+      window.fbAsyncInit();
+    }
   }, []);
 
   // 2. Handle the Embedded Signup Click
   const handleMetaLogin = () => {
-    if (!isSdkLoaded) {
+    if (!isSdkLoaded || !window.FB) {
       alert('Meta SDK is loading, please wait a second...');
       return;
     }
@@ -75,7 +82,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         setLoading(false);
       }
     }, {
-      config_id: 'YOUR_CONFIG_ID', // 🔥 IMPORTANT: Embedded Signup ke liye App Dashboard me bani configuration ID yahan dalni hai
+      config_id: import.meta.env.VITE_META_CONFIG_ID || 'YOUR_CONFIG_ID', // 🔥 Apni config ID yahan dalein
       scopes: 'whatsapp_business_management,whatsapp_business_messaging,instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
       response_type: 'code', // 🔥 IMPORTANT: Meta ko batana hai ki hume 'code' chahiye, token nahi (Tech Provider Requirement)
