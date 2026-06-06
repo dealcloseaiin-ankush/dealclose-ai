@@ -260,7 +260,7 @@ export default function Settings() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl"></div>
               <div className="flex justify-between items-center mb-4 relative z-10">
                 <h2 className="text-lg font-semibold text-purple-400 flex items-center gap-2">
-                   <span className="text-xl">🏢</span> Main Business Profile & AI
+                   <span className="text-xl">🏢</span> {config.businessName || 'Main Business'} Profile & AI
                 </h2>
                 <button type="button" onClick={() => setConfig({...config, aiAgentEnabled: !config.aiAgentEnabled})} className={`w-12 h-6 rounded-full transition-colors relative ${config.aiAgentEnabled ? 'bg-purple-600' : 'bg-gray-700'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${config.aiAgentEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
@@ -279,7 +279,7 @@ export default function Settings() {
               <div className="relative z-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Main Business Name</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Primary Business Name</label>
                     <input type="text" name="businessName" value={config.businessName} onChange={handleChange} placeholder="e.g. DealClose AI" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
                   </div>
                   <div>
@@ -434,6 +434,18 @@ export default function Settings() {
                       </div>
                       <input type="text" value={workspace.website || ''} onChange={(e) => handleWorkspaceChange(index, 'website', e.target.value)} placeholder="Website / Catalog Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                       <input type="text" value={workspace.googleReview || ''} onChange={(e) => handleWorkspaceChange(index, 'googleReview', e.target.value)} placeholder="Google Review Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                    </div>
+
+                    {/* Specific Meta API Keys for this Workspace (For independent automation) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-800">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">IG Access Token (For Specific Bot)</label>
+                        <input type="password" value={workspace.igAccessToken || ''} onChange={(e) => handleWorkspaceChange(index, 'igAccessToken', e.target.value)} placeholder="IG...Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:border-blue-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">FB Page / IG Account ID</label>
+                        <input type="text" value={workspace.fbPageId || ''} onChange={(e) => handleWorkspaceChange(index, 'fbPageId', e.target.value)} placeholder="123456789" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:border-blue-500 outline-none" />
+                      </div>
                     </div>
 
                     {/* Separate AI Brain for this Workspace */}

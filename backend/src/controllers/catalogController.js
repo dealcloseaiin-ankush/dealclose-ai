@@ -5,9 +5,17 @@ const Catalog = require('../models/catalogModel');
 exports.getCatalog = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
+    const { workspaceId } = req.query;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const items = await Catalog.find({ userId }).sort({ createdAt: -1 });
+    const query = { userId };
+    if (workspaceId && workspaceId !== 'main' && workspaceId !== 'all') {
+      query.workspaceId = workspaceId;
+    } else if (workspaceId === 'main') {
+      query.$or = [{ workspaceId: 'main' }, { workspaceId: { $exists: false } }, { workspaceId: null }];
+    }
+
+    const items = await Catalog.find(query).sort({ createdAt: -1 });
     res.status(200).json(items);
   } catch (error) {
     console.error('Get Catalog Error:', error);
@@ -22,13 +30,13 @@ exports.addCatalogItem = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { name, price, description, imageUrl } = req.body;
+    const { name, price, description, imageUrl, workspaceId } = req.body;
 
     if (!name || !price) {
       return res.status(400).json({ message: 'Name and price are required' });
     }
 
-    const newItem = await Catalog.create({ userId, name, price, description, imageUrl });
+    const newItem = await Catalog.create({ userId, name, price, description, imageUrl, workspaceId: workspaceId || 'main' });
 
     res.status(201).json(newItem);
   } catch (error) {

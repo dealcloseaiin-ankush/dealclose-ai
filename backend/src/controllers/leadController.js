@@ -107,7 +107,8 @@ exports.getLeadAnalytics = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: "Not authorized" });
 
-    console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}`);
+    const { workspaceId } = req.query;
+    console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}, workspace: ${workspaceId}`);
     const userIdObj = new mongoose.Types.ObjectId(userId);
 
     // 🚀 NEW: AUTO-SYNC OLD CHATS BEFORE FETCHING ANALYTICS (Ensures Dashboard is always accurate)
@@ -135,12 +136,33 @@ exports.getLeadAnalytics = async (req, res) => {
       }
     } catch (syncErr) { }
 
-    const totalLeads = await Lead.countDocuments({ userId });
-    const converted = await Lead.countDocuments({ userId, status: 'converted' });
-    const interested = await Lead.countDocuments({ userId, status: 'interested' });
-    const ignored = await Lead.countDocuments({ userId, status: 'ignored' });
-    const newLeads = await Lead.countDocuments({ userId, status: 'new' });
-    const lost = await Lead.countDocuments({ userId, status: 'lost' });
+    // 🔥 DYNAMIC WORKSPACE FILTER LOGIC
+    const leadQuery = { userId };
+    const aggLeadQuery = { userId: userIdObj }; // For Aggregations
+    
+    if (workspaceId && workspaceId !== 'main_business' && workspaceId !== 'main' && workspaceId !== 'all') {
+      leadQuery.lastSelectedWorkspaceId = workspaceId;
+      aggLeadQuery.lastSelectedWorkspaceId = workspaceId;
+    } else if (workspaceId === 'main_business' || workspaceId === 'main') {
+      const mainFilter = {
+        $or: [
+          { lastSelectedWorkspaceId: 'main' },
+          { lastSelectedWorkspaceId: 'main_business' },
+          { lastSelectedWorkspaceId: { $exists: false } },
+          { lastSelectedWorkspaceId: null },
+          { lastSelectedWorkspaceId: '' }
+        ]
+      };
+      Object.assign(leadQuery, mainFilter);
+      Object.assign(aggLeadQuery, mainFilter);
+    }
+
+    const totalLeads = await Lead.countDocuments(leadQuery);
+    const converted = await Lead.countDocuments({ ...leadQuery, status: 'converted' });
+    const interested = await Lead.countDocuments({ ...leadQuery, status: 'interested' });
+    const ignored = await Lead.countDocuments({ ...leadQuery, status: 'ignored' });
+    const newLeads = await Lead.countDocuments({ ...leadQuery, status: 'new' });
+    const lost = await Lead.countDocuments({ ...leadQuery, status: 'lost' });
     
     console.log(`📊 [Lead Analytics Debug] Found -> New: ${newLeads}, Interested: ${interested}, Converted: ${converted}, Lost/Ignored: ${lost + ignored}`);
     
@@ -164,7 +186,7 @@ exports.getLeadAnalytics = async (req, res) => {
 
     // 🚀 NEW: Lead Source Breakdown (Bar Chart)
     const leadsBySource = await Lead.aggregate([
-      { $match: { userId: userIdObj } },
+      { $match: aggLeadQuery },
       { $group: { _id: '$source', count: { $sum: 1 } } },
       { $project: { name: '$_id', leads: '$count', _id: 0 } },
       { $sort: { leads: -1 } }
@@ -174,7 +196,7 @@ exports.getLeadAnalytics = async (req, res) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const dailyLeadsData = await Lead.aggregate([
-        { $match: { userId: userIdObj, createdAt: { $gte: sevenDaysAgo } } },
+        { $match: { ...aggLeadQuery, createdAt: { $gte: sevenDaysAgo } } },
         {
             $group: {
                 _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -186,7 +208,7 @@ exports.getLeadAnalytics = async (req, res) => {
     ]);
 
     // 🚀 NEW: Fetch Recent Activity for Live AI Activity Section
-    const recentActivity = await Lead.find({ userId: userIdObj })
+    const recentActivity = await Lead.find(leadQuery)
       .sort({ updatedAt: -1 })
       .limit(8)
       .select('name status source createdAt updatedAt notes aiFeedbackScore');

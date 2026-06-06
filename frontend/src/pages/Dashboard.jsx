@@ -61,7 +61,7 @@ export default function Dashboard() {
             setMessageStats(userData.messageStats);
           }
           // Set the dropdown options
-          const mainBusiness = { _id: 'main_business', name: (userData.businessName && userData.businessName !== 'Main Business') ? userData.businessName : 'DealClose AI (Main)' };
+          const mainBusiness = { _id: 'main_business', name: userData.businessName || 'Main Business' };
           const otherWorkspaces = userData.workspaces || [];
           setWorkspaces([mainBusiness, ...otherWorkspaces]);
         }

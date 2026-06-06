@@ -8,8 +8,17 @@ const twilio = require('twilio');
 exports.getCalls = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
+    const { workspaceId } = req.query;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    const calls = await Call.find({ userId }).sort({ createdAt: -1 });
+    
+    const query = { userId };
+    if (workspaceId && workspaceId !== 'main' && workspaceId !== 'all') {
+      query.workspaceId = workspaceId;
+    } else if (workspaceId === 'main') {
+      query.$or = [{ workspaceId: 'main' }, { workspaceId: { $exists: false } }, { workspaceId: null }];
+    }
+
+    const calls = await Call.find(query).sort({ createdAt: -1 });
     res.status(200).json(calls);
   } catch (error) {
     res.status(500).json({ message: error.message });

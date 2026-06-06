@@ -4,8 +4,17 @@ const Form = require('../models/formModel');
 exports.getForms = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
+    const { workspaceId } = req.query;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    const forms = await Form.find({ createdBy: userId }).sort({ createdAt: -1 });
+    
+    const query = { createdBy: userId };
+    if (workspaceId && workspaceId !== 'main' && workspaceId !== 'all') {
+      query.workspaceId = workspaceId;
+    } else if (workspaceId === 'main') {
+      query.$or = [{ workspaceId: 'main' }, { workspaceId: { $exists: false } }, { workspaceId: null }];
+    }
+
+    const forms = await Form.find(query).sort({ createdAt: -1 });
     res.json(forms);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -15,7 +24,7 @@ exports.getForms = async (req, res) => {
 // @desc    Create a new form
 exports.createForm = async (req, res) => {
   try {
-    const { title, description, fields } = req.body;
+    const { title, description, fields, workspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
     
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
@@ -24,6 +33,7 @@ exports.createForm = async (req, res) => {
       title,
       description,
       fields,
+      workspaceId: workspaceId || 'main',
       createdBy: userId
     });
 
