@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
+import { Search } from 'lucide-react';
 
 export default function Chats() {
   const [allMessages, setAllMessages] = useState([]);
@@ -19,6 +20,7 @@ export default function Chats() {
   const [newChatName, setNewChatName] = useState('');
   const [newChatSource, setNewChatSource] = useState('Manual Entry');
   const [sendAutoOffer, setSendAutoOffer] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -54,14 +56,21 @@ export default function Chats() {
     });
   }, [allMessages, activeWorkspace]);
 
-  // Advanced logic to calculate 24-Hour Window and Needs Reply status
+  // Advanced logic to calculate 24-Hour Window, Needs Reply status, and Name/City
   const customerDetails = useMemo(() => {
     const map = new Map();
 
     filteredMessages.forEach(msg => {
       const phone = msg.customerPhone;
       if (!map.has(phone)) {
-        map.set(phone, { phone, lastIncoming: null, lastMessage: msg, needsReply: false });
+        map.set(phone, { 
+          phone, 
+          name: msg.customerName || 'Unknown', 
+          city: msg.customerCity || '', 
+          lastIncoming: null, 
+          lastMessage: msg, 
+          needsReply: false 
+        });
       }
 
       const data = map.get(phone);
@@ -77,7 +86,7 @@ export default function Chats() {
       }
     });
 
-    return Array.from(map.values()).map(data => {
+    let finalDetails = Array.from(map.values()).map(data => {
       let windowOpen = false;
       let timeLeft = "";
       if (data.lastIncoming) {
@@ -89,7 +98,14 @@ export default function Chats() {
       }
       return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' };
     }).sort((a, b) => new Date(b.lastMessage.timestamp || b.lastMessage.createdAt) - new Date(a.lastMessage.timestamp || a.lastMessage.createdAt));
-  }, [filteredMessages]);
+    
+    // Search Filter Logic
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      finalDetails = finalDetails.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term) || c.city.toLowerCase().includes(term));
+    }
+    return finalDetails;
+  }, [filteredMessages, searchTerm]);
 
   const activeChatMessages = useMemo(() => {
     return filteredMessages.filter(m => m.customerPhone === activeCustomer);
@@ -218,6 +234,13 @@ export default function Chats() {
           ))}
         </select>
 
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+          <input type="text" placeholder="Search name, phone, city..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} 
+            className="w-full bg-[#0a0a0a] border border-gray-800 text-white text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-green-500" 
+          />
+        </div>
+
         {loading ? <p>Loading chats...</p> : (
           customerDetails.map(customer => (
             <div 
@@ -226,7 +249,10 @@ export default function Chats() {
               className={`p-4 cursor-pointer rounded-xl mb-3 transition-all border ${activeCustomer === customer.phone ? 'bg-green-600/10 border-green-500' : 'bg-[#0a0a0a] border-gray-800 hover:border-gray-600'}`}
             >
               <div className="flex justify-between items-start mb-2">
-                <span className={`font-bold ${activeCustomer === customer.phone ? 'text-green-400' : 'text-gray-200'}`}>{customer.phone}</span>
+                <div>
+                  <div className={`font-bold text-sm ${activeCustomer === customer.phone ? 'text-green-400' : 'text-gray-200'}`}>{customer.name}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-1">{customer.phone} {customer.city ? `• ${customer.city}` : ''}</div>
+                </div>
                 {customer.needsReply && <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_5px_rgba(59,130,246,0.8)]" title="Needs Reply"></span>}
               </div>
               
@@ -259,7 +285,8 @@ export default function Chats() {
               <button onClick={() => setIsSidebarOpen(true)} className="md:hidden bg-gray-800 text-white p-2 rounded-lg">
                 ☰
               </button>
-              <h3 className="font-bold text-white truncate">{activeCustomer}</h3>
+              <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold text-sm">{customerDetails.find(c => c.phone === activeCustomer)?.name?.charAt(0) || 'U'}</div>
+              <h3 className="font-bold text-white truncate">{customerDetails.find(c => c.phone === activeCustomer)?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span></h3>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">

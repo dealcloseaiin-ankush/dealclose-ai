@@ -16,6 +16,7 @@ export default function CrmPage() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
+  const [searchTerm, setSearchTerm] = useState(''); // Global Search
   
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
@@ -76,15 +77,18 @@ export default function CrmPage() {
     Object.keys(pipelineData).forEach(key => {
       filtered[key] = pipelineData[key].filter(lead => {
         const ws = lead.lastSelectedWorkspaceId || 'main';
-        return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+        const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+        const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (lead.phoneNumber || lead.phone || '').includes(searchTerm) || (lead.city || '').toLowerCase().includes(searchTerm.toLowerCase());
+        return matchWs && matchSearch;
       });
     });
     return filtered;
   };
   const filteredFlatContacts = flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
-    // Bring back older leads that were saved as 'default'
-    return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+    const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+    const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (lead.phoneNumber || lead.phone || '').includes(searchTerm) || (lead.city || '').toLowerCase().includes(searchTerm.toLowerCase());
+    return matchWs && matchSearch;
   });
 
   if (loading) {
@@ -127,17 +131,25 @@ export default function CrmPage() {
             )}
           </div>
           
-          {/* View Toggles */}
-          <div className="flex bg-[#111] p-1 rounded-lg border border-gray-800 w-fit">
-            <button onClick={() => setViewMode('pipeline')} className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'pipeline' ? 'bg-sky-500/20 text-sky-400 shadow' : 'text-gray-500 hover:text-gray-300'}`}>
-              <KanbanSquare size={16}/> Kanban
-            </button>
-            <button onClick={() => setViewMode('list')} className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-sky-500/20 text-sky-400 shadow' : 'text-gray-500 hover:text-gray-300'}`}>
-              <List size={16}/> List
-            </button>
-            <button onClick={() => setViewMode('analytics')} className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'analytics' ? 'bg-sky-500/20 text-sky-400 shadow' : 'text-gray-500 hover:text-gray-300'}`}>
-              <BarChart3 size={16}/> Analytics
-            </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search Bar for CRM */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+              <input type="text" placeholder="Search by name, city, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#111] border border-gray-800 text-white text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-sky-500 shadow-sm" />
+            </div>
+            
+            {/* View Toggles */}
+            <div className="flex bg-[#111] p-1 rounded-lg border border-gray-800 w-fit">
+              <button onClick={() => setViewMode('pipeline')} className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'pipeline' ? 'bg-sky-500/20 text-sky-400 shadow' : 'text-gray-500 hover:text-gray-300'}`}>
+                <KanbanSquare size={16}/> Kanban
+              </button>
+              <button onClick={() => setViewMode('list')} className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-sky-500/20 text-sky-400 shadow' : 'text-gray-500 hover:text-gray-300'}`}>
+                <List size={16}/> List
+              </button>
+              <button onClick={() => setViewMode('analytics')} className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all flex items-center gap-2 ${viewMode === 'analytics' ? 'bg-sky-500/20 text-sky-400 shadow' : 'text-gray-500 hover:text-gray-300'}`}>
+                <BarChart3 size={16}/> Analytics
+              </button>
+            </div>
           </div>
         </div>
         

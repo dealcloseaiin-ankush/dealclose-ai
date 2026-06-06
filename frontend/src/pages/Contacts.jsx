@@ -5,6 +5,7 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../hooks/useAuth';
+import { Search } from 'lucide-react';
 
 export default function Contacts() {
   const [activeTab, setActiveTab] = useState('all');
@@ -17,6 +18,7 @@ export default function Contacts() {
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,13 +51,15 @@ export default function Contacts() {
 
   const filteredContacts = contacts.filter(c => {
     const ws = c.lastSelectedWorkspaceId || 'main';
-    // Bring back older leads that were saved as 'default'
-    return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+    const matchesWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+    const matchesSearch = searchTerm === '' || (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.phoneNumber || c.phone || '').includes(searchTerm) || (c.city || '').toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesWs && matchesSearch;
   });
 
   const columns = [
     { header: 'Name', accessor: 'name' },
     { header: 'WhatsApp Number', render: (row) => row.phoneNumber || row.phone },
+    { header: 'City', render: (row) => row.city || <span className="text-gray-600">-</span> },
     { header: 'Source', accessor: 'source' },
     { 
       header: 'Status', 
@@ -90,7 +94,13 @@ export default function Contacts() {
           </div>
           <p className="text-gray-400">Manage your address book and AI smart segments.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} variant="primary">+ Add Contact</Button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <input type="text" placeholder="Search contacts..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#111] border border-gray-800 text-white text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-blue-500 shadow-sm" />
+          </div>
+          <Button onClick={() => setIsModalOpen(true)} variant="primary" className="whitespace-nowrap">+ Add Contact</Button>
+        </div>
       </div>
 
       {/* Tabs */}
