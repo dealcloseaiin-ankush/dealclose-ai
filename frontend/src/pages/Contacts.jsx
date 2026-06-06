@@ -15,12 +15,16 @@ export default function Contacts() {
   const [smartSegments, setSmartSegments] = useState([]);
   
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const profileRes = await api.get('/users/profile').catch(() => null);
+        const u = profileRes?.data?.user || profileRes?.data;
+        if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+
         const [pipelineRes, segmentsRes] = await Promise.all([
           api.get('/crm/pipeline').catch(() => ({ data: { data: {} } })),
           api.get('/contacts/segments').catch(() => ({ data: [] }))

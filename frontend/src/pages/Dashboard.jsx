@@ -38,7 +38,7 @@ export default function Dashboard() {
   const [clients, setClients] = useState([]);
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
   const [workspaces, setWorkspaces] = useState([]);
-  const [activeBusinessId, setActiveBusinessId] = useState('main_business');
+  const [activeBusinessId, setActiveBusinessId] = useState('main');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,7 +61,7 @@ export default function Dashboard() {
             setMessageStats(userData.messageStats);
           }
           // Set the dropdown options
-          const mainBusiness = { _id: 'main_business', name: userData.businessName || 'Main Business' };
+        const mainBusiness = { _id: 'main', name: userData.businessName || 'Main Business' };
           const otherWorkspaces = userData.workspaces || [];
           setWorkspaces([mainBusiness, ...otherWorkspaces]);
         }

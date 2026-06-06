@@ -17,13 +17,17 @@ export default function Calls() {
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   useEffect(() => {
     const fetchCalls = async () => {
       setLoading(true);
       try {
+        const profileRes = await api.get('/users/profile').catch(() => null);
+        const u = profileRes?.data?.user || profileRes?.data;
+        if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+
         const res = await api.get('/calls', { params: { workspaceId: activeWorkspace } });
         setCalls(res.data);
       } catch (err) {

@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import api from '../services/api';
 
 export default function Campaigns() {
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
+
+  useEffect(() => {
+    api.get('/users/profile').then(res => {
+      const u = res.data.user || res.data;
+      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+    }).catch(console.error);
+  }, []);
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);

@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function Catalog() {
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   const [activeTab, setActiveTab] = useState('products');
@@ -31,6 +31,14 @@ export default function Catalog() {
   useEffect(() => {
     const fetchCatalog = async () => {
       setLoading(true);
+      try {
+        const profileRes = await api.get('/users/profile').catch(() => null);
+        const u = profileRes?.data?.user || profileRes?.data;
+        if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+      } catch (error) {
+        console.error("Profile fetch error:", error);
+      }
+      
       console.log("➡️ [DEBUG] Fetching Catalog items...");
       try {
         // Note: Assuming /api/catalog backend exists, if not it will catch the error smoothly

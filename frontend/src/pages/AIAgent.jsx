@@ -8,6 +8,7 @@ export default function AIAgent() {
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedBrain, setSelectedBrain] = useState('main');
   const [mainRules, setMainRules] = useState('');
+  const [mainBusinessName, setMainBusinessName] = useState('Main Business');
 
   // 🚀 NEW: Trending queries state for 1-Click Auto Flow
   const [trendingQueries, setTrendingQueries] = useState([
@@ -22,6 +23,7 @@ export default function AIAgent() {
         setQueries(Array.isArray(data.data) ? data.data : []);
         setWorkspaces(data.workspaces || []);
         setMainRules(data.aiRules || '');
+        setMainBusinessName(data.businessName || 'Main Business');
         
         // Page load hone par purana saved knowledge box me dikhana
         if (data.aiRules) {
@@ -116,7 +118,7 @@ export default function AIAgent() {
               onChange={(e) => handleBrainSwitch(e.target.value)} 
               className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
             >
-              <option value="main">Main Business (Default)</option>
+              <option value="main">🏢 {mainBusinessName} (Default)</option>
               {workspaces.map((ws) => (
                 <option key={ws._id} value={ws._id}>{ws.name || 'Workspace'}</option>
               ))}

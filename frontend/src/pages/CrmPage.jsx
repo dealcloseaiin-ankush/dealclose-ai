@@ -21,10 +21,15 @@ export default function CrmPage() {
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
   
   // Get workspaces list from user object
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
 
   useEffect(() => {
     fetchPipeline();
+    
+    api.get('/users/profile').then(res => {
+      const u = res.data.user || res.data;
+      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+    }).catch(console.error);
   }, []);
 
   const fetchPipeline = async () => {

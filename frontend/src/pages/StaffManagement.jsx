@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Edit } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import api from '../services/api';
 
 export default function StaffManagement() {
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   // Start with empty real staff list
@@ -12,6 +13,13 @@ export default function StaffManagement() {
 
   const [editMode, setEditMode] = useState(null);
   const [formData, setFormData] = useState({ name: '', phone: '', role: 'sales', projects: '' });
+
+  useEffect(() => {
+    api.get('/users/profile').then(res => {
+      const u = res.data.user || res.data;
+      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+    }).catch(console.error);
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();

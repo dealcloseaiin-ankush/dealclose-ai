@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function InstagramAutomation() {
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   const [activeTab, setActiveTab] = useState('general'); // 'general' or 'posts'
@@ -34,6 +34,10 @@ export default function InstagramAutomation() {
   useEffect(() => {
     const fetchIgData = async () => {
       try {
+        const profileRes = await api.get('/users/profile').catch(() => null);
+        const u = profileRes?.data?.user || profileRes?.data;
+        if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+
         const { data } = await api.get('/instagram/dashboard', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: {} }));
         if (data.stats) setStats(data.stats);
         if (data.config) setConfig(data.config);

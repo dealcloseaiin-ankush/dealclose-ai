@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function WhatsAppTemplates() {
   const { user } = useAuth() || {};
-  const workspaces = [{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])];
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
 
   const [templates, setTemplates] = useState([]);
@@ -20,6 +20,10 @@ export default function WhatsAppTemplates() {
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
     try {
+      const profileRes = await api.get('/users/profile').catch(() => null);
+      const u = profileRes?.data?.user || profileRes?.data;
+      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+
       const { data } = await api.get('/whatsapp/templates', { params: { workspaceId: activeWorkspace } });
       setTemplates(Array.isArray(data) ? data : []);
     } catch (error) {
