@@ -341,18 +341,20 @@ exports.handleWhatsApp = async (req, res) => {
               let finalName = extractedName;
               let finalCity = null;
               if (extractedName.includes(',')) {
-                  const parts = extractedName.split(',').map(p => p.trim());
-                  finalName = parts[0];
-                  finalCity = parts[1];
+                const parts = extractedName.split(',');
+                finalName = parts[0].trim();
+                finalCity = parts.slice(1).join(' ').trim();
               } else {
-                  const words = extractedName.split(/\s+/);
-                  if (words.length >= 2) {
-                      finalCity = words[words.length - 1];
-                      finalName = words.slice(0, words.length - 1).join(' ');
-                  }
+                const words = extractedName.split(/\s+/);
+                if (words.length >= 3) {
+                  finalCity = words.pop();
+                  finalName = words.join(' ');
+                } else {
+                  finalName = extractedName;
+                }
               }
-              const idMatch = currentLeadCheck.name.match(/(?:#|ID: )\d+/);
-              const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+              const idMatch = currentLeadCheck.name.match(/(?:#|ID:\s*)(\d+)/i);
+              const seqId = idMatch ? `#${idMatch[1]}` : `#${fromNumber.slice(-4)}`;
               const newName = `${finalName} (${seqId})`;
               const updatePayload = { name: newName };
               if (finalCity) updatePayload.city = finalCity;
