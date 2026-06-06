@@ -148,6 +148,8 @@ exports.getLeadAnalytics = async (req, res) => {
         $or: [
           { lastSelectedWorkspaceId: 'main' },
           { lastSelectedWorkspaceId: 'main_business' },
+          // Handle older chats mapped to 'default'
+          { lastSelectedWorkspaceId: 'default' },
           { lastSelectedWorkspaceId: { $exists: false } },
           { lastSelectedWorkspaceId: null },
           { lastSelectedWorkspaceId: '' }

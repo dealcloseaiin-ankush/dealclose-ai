@@ -47,7 +47,11 @@ export default function Chats() {
 
   // 🔥 Filter messages by selected Workspace
   const filteredMessages = useMemo(() => {
-    return allMessages.filter(msg => (msg.workspaceId || 'main') === activeWorkspace);
+    return allMessages.filter(msg => {
+      const ws = msg.workspaceId || 'main';
+      // Bring back older messages that were saved as 'default'
+      return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+    });
   }, [allMessages, activeWorkspace]);
 
   // Advanced logic to calculate 24-Hour Window and Needs Reply status

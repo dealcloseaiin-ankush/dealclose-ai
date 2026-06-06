@@ -1,13 +1,37 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import api from '../services/api';
 
 export default function MonthlyReport() {
   const [month] = useState('October 2023');
+  const { user } = useAuth() || {};
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
+  // Manage selected workspace filter
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
+  useEffect(() => {
+    api.get('/users/profile').then(res => {
+      const u = res.data.user || res.data;
+      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+    }).catch(console.error);
+  }, []);
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
-      <div className="mb-8 flex justify-between items-end">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white mb-2">Monthly Performance & Retargeting</h1>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-white">Monthly Performance & Retargeting</h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
           <p className="text-gray-400">Analyze your leads, sources, and plan retargeting strategies for dropped customers.</p>
         </div>
         <select className="bg-[#111] border border-gray-800 text-white px-4 py-2 rounded-lg font-bold">

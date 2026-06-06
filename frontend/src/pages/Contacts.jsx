@@ -47,7 +47,11 @@ export default function Contacts() {
     fetchData();
   }, []);
 
-  const filteredContacts = contacts.filter(c => (c.lastSelectedWorkspaceId || 'main') === activeWorkspace);
+  const filteredContacts = contacts.filter(c => {
+    const ws = c.lastSelectedWorkspaceId || 'main';
+    // Bring back older leads that were saved as 'default'
+    return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+  });
 
   const columns = [
     { header: 'Name', accessor: 'name' },

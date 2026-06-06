@@ -74,11 +74,18 @@ export default function CrmPage() {
     if (!pipelineData) return null;
     const filtered = {};
     Object.keys(pipelineData).forEach(key => {
-      filtered[key] = pipelineData[key].filter(lead => (lead.lastSelectedWorkspaceId || 'main') === activeWorkspace);
+      filtered[key] = pipelineData[key].filter(lead => {
+        const ws = lead.lastSelectedWorkspaceId || 'main';
+        return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+      });
     });
     return filtered;
   };
-  const filteredFlatContacts = flatContacts.filter(lead => (lead.lastSelectedWorkspaceId || 'main') === activeWorkspace);
+  const filteredFlatContacts = flatContacts.filter(lead => {
+    const ws = lead.lastSelectedWorkspaceId || 'main';
+    // Bring back older leads that were saved as 'default'
+    return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+  });
 
   if (loading) {
     return (

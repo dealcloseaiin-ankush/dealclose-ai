@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Users, MousePointerClick, ShoppingCart, UserCheck, X, Globe, Clock } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const KpiCard = ({ title, icon, stats, color, timeframe }) => {
   const isPositive = stats.growth?.startsWith('+') || parseFloat(stats.growth) >= 0;
@@ -52,18 +53,28 @@ export default function TrackingAnalytics() {
   const [timeframe, setTimeframe] = useState('weekly'); // daily, weekly, monthly
   const [loading, setLoading] = useState(true);
   const [realData, setRealData] = useState(null);
-  
+
+  const { user } = useAuth() || {};
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
   // New states for Live Logs feature
   const [showLogs, setShowLogs] = useState(false);
   const [liveLogs, setLiveLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
+    api.get('/users/profile').then(res => {
+      const u = res.data.user || res.data;
+      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+    }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
     const fetchRealTrackingData = async () => {
       setLoading(true);
       try {
-        // Fetch logs to generate real numbers dynamically for MVP
-        const resLogs = await api.get('/tracking/logs');
+        const resLogs = await api.get('/tracking/logs', { params: { workspaceId: activeWorkspace } });
         const logs = resLogs.data || [];
         
         const pageViews = logs.filter(l => l.event === 'page_view').length;
@@ -85,14 +96,14 @@ export default function TrackingAnalytics() {
       }
     };
     fetchRealTrackingData();
-  }, []);
+  }, [activeWorkspace]);
 
   // Function to load the deep popup logs
   const handleOpenLogs = async () => {
     setShowLogs(true);
     setLoadingLogs(true);
     try {
-      const res = await api.get('/tracking/logs');
+      const res = await api.get('/tracking/logs', { params: { workspaceId: activeWorkspace } });
       setLiveLogs(res.data || []);
     } catch (error) {
       console.error("Failed to load logs", error);
@@ -114,9 +125,20 @@ export default function TrackingAnalytics() {
       {/* Header & Timeframe Toggle */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
-            Website Tracking & Funnel
-          </h1>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+              Website Tracking & Funnel
+            </h1>
+            <select 
+              value={activeWorkspace} 
+              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-emerald-500 cursor-pointer shadow-sm"
+            >
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
           <p className="text-gray-400">Monitor live traffic, abandoned carts, and form submissions from your website pixel.</p>
         </div>
         

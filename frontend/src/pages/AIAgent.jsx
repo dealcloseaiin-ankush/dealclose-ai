@@ -118,7 +118,7 @@ export default function AIAgent() {
               onChange={(e) => handleBrainSwitch(e.target.value)} 
               className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
             >
-              <option value="main">🏢 {mainBusinessName} (Default)</option>
+              <option value="main">🏢 {mainBusinessName || 'Main Business'} (Default)</option>
               {workspaces.map((ws) => (
                 <option key={ws._id} value={ws._id}>{ws.name || 'Workspace'}</option>
               ))}

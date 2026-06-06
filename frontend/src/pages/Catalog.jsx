@@ -36,6 +36,7 @@ export default function Catalog() {
         const u = profileRes?.data?.user || profileRes?.data;
         if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
       } catch (error) {
+        // Ignore profile fetch error if it fails
         console.error("Profile fetch error:", error);
       }
       
