@@ -38,7 +38,7 @@ exports.getChats = async (req, res) => {
         }
       }
       let finalName = cleanName || 'Unknown';
-      if (seqId && !finalName.includes(seqId)) finalName += ` (${seqId})`;
+      if (seqId && !finalName.includes(seqId)) finalName += ` ${seqId}`;
       return { name: finalName, city: c };
     };
 

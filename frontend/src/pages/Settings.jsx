@@ -73,7 +73,7 @@ export default function Settings() {
     const fetchSettings = async () => {
       try {
         const { data } = await api.get('/users/profile');
-        const savedData = data.data || data; // Handle different backend response structures
+        const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
         
         if (savedData) {
           setConfig({

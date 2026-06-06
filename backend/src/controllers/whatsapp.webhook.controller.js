@@ -867,7 +867,7 @@ exports.handleWhatsApp = async (req, res) => {
                       const currentLeadForId = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
                       const idMatch = currentLeadForId && currentLeadForId.name ? currentLeadForId.name.match(/(?:#|ID:\s*)(\d+)/i) : null;
                       const seqId = idMatch ? `#${idMatch[1]}` : `#${fromNumber.slice(-4)}`;
-                      const newName = `${profileData.fullName || 'Customer'} (${seqId})`;
+                      const newName = `${profileData.fullName || 'Customer'} ${seqId}`;
                       
                       const updateFields = { name: newName };
                       if (profileData.email) updateFields.email = profileData.email;
