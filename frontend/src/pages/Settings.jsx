@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
-import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase } from 'lucide-react'; // Icons for viewing tokens
+import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap } from 'lucide-react'; // Icons for viewing tokens
 import MetaConnectButton from '../components/MetaConnectButton';
 
 export default function Settings() {
@@ -47,12 +47,14 @@ export default function Settings() {
   
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPass, setIsChangingPass] = useState(false);
+  const [expandedWebhooks, setExpandedWebhooks] = useState({});
 
   // --- Custom Webhook Functions ---
   const addCustomWebhook = () => {
     if (config.customWebhooks && config.customWebhooks.length >= 10) return alert("Maximum 10 custom actions allowed.");
     const currentWebhooks = config.customWebhooks || [];
     setConfig({ ...config, customWebhooks: [...currentWebhooks, { name: '', url: '', description: '', method: 'POST' }] });
+    setExpandedWebhooks({ ...expandedWebhooks, [currentWebhooks.length]: true });
   };
   
   const removeCustomWebhook = (index) => {
@@ -70,7 +72,7 @@ export default function Settings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data } = await api.get('/users/settings');
+        const { data } = await api.get('/users/profile');
         const savedData = data.data || data; // Handle different backend response structures
         
         if (savedData) {
@@ -213,7 +215,7 @@ export default function Settings() {
         workspaces: config.workspaces,
         customWebhooks: config.customWebhooks
       };
-      await api.post('/users/settings', payload);
+      await api.put('/users/profile', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
     } catch (error) {
       alert('Error saving settings: ' + (error.response?.data?.message || error.message));
@@ -574,27 +576,53 @@ export default function Settings() {
                 </div>
                 <p className="text-xs text-gray-400 mb-4">Teach AI to hit your specific URLs when a customer asks for it. (Limit: {(config.customWebhooks || []).length}/10)</p>
                 <div className="space-y-4">
-                  {(config.customWebhooks || []).map((webhook, index) => (
-                    <div key={index} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl relative group">
-                      <button type="button" onClick={() => removeCustomWebhook(index)} className="absolute top-3 right-3 text-gray-500 hover:text-rose-500 transition-colors p-1" title="Delete Action">
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Action Name</label>
-                          <input type="text" value={webhook.name} onChange={e => handleCustomWebhookChange(index, 'name', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="e.g. cancel_order" />
+                  {(config.customWebhooks || []).map((webhook, index) => {
+                    const isExpanded = expandedWebhooks[index] || (!webhook.name && !webhook.url);
+                    return (
+                    <div key={index} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl relative group transition-all">
+                      {isExpanded ? (
+                        <>
+                          <button type="button" onClick={() => removeCustomWebhook(index)} className="absolute top-3 right-10 text-gray-500 hover:text-rose-500 transition-colors p-1" title="Delete Action">
+                            <Trash2 size={16} />
+                          </button>
+                          <button type="button" onClick={() => setExpandedWebhooks({...expandedWebhooks, [index]: false})} className="absolute top-3 right-3 text-emerald-500 hover:text-emerald-400 transition-colors p-1" title="Save/Collapse">
+                            <CheckCircle size={16} />
+                          </button>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Action Name</label>
+                              <input type="text" value={webhook.name} onChange={e => handleCustomWebhookChange(index, 'name', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="e.g. cancel_order" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">API URL</label>
+                              <input type="url" value={webhook.url} onChange={e => handleCustomWebhookChange(index, 'url', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://api.domain.com/endpoint" />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Description (When should AI use this?)</label>
+                              <input type="text" value={webhook.description} onChange={e => handleCustomWebhookChange(index, 'description', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="e.g. Use this when the user wants to cancel their pending order." />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                              <Zap size={14} className="text-teal-400"/> {webhook.name}
+                            </h4>
+                            <p className="text-xs text-gray-400 mt-1">{webhook.url}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setExpandedWebhooks({...expandedWebhooks, [index]: true})} className="text-gray-400 hover:text-blue-400 transition-colors p-2 bg-gray-800 hover:bg-gray-700 rounded-lg" title="Edit">
+                              <Edit size={14} />
+                            </button>
+                            <button type="button" onClick={() => removeCustomWebhook(index)} className="text-gray-400 hover:text-rose-400 transition-colors p-2 bg-gray-800 hover:bg-gray-700 rounded-lg" title="Delete">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">API URL</label>
-                          <input type="url" value={webhook.url} onChange={e => handleCustomWebhookChange(index, 'url', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://api.domain.com/endpoint" />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Description (When should AI use this?)</label>
-                          <input type="text" value={webhook.description} onChange={e => handleCustomWebhookChange(index, 'description', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm focus:border-teal-500 outline-none" placeholder="e.g. Use this when the user wants to cancel their pending order." />
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
             </div>

@@ -291,6 +291,7 @@ exports.updateProfile = async (req, res) => {
       whatsappConfig,
       digitalCardConfig,
       discountConfig,
+      metaAdsConfig,
       ownerPhone,
       aiAgentEnabled,
       acceptCollabs,
@@ -322,6 +323,7 @@ exports.updateProfile = async (req, res) => {
     if (whatsappConfig !== undefined) updateData.whatsappConfig = whatsappConfig;
     if (digitalCardConfig !== undefined) updateData.digitalCardConfig = digitalCardConfig;
     if (discountConfig !== undefined) updateData.discountConfig = discountConfig;
+    if (metaAdsConfig !== undefined) updateData.metaAdsConfig = metaAdsConfig;
     if (ownerPhone !== undefined) updateData.ownerPhone = ownerPhone;
     if (aiAgentEnabled !== undefined) updateData.aiAgentEnabled = aiAgentEnabled;
     if (acceptCollabs !== undefined) updateData.acceptCollabs = acceptCollabs;
