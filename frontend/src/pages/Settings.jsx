@@ -438,6 +438,29 @@ export default function Settings() {
                   </div>
                 </div>
                 
+                {/* Automated Offers & Discounts */}
+                <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-green-500/30 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                  <h2 className="text-xl font-semibold text-green-400 mb-4 flex items-center gap-2 relative z-10">
+                     🎁 Auto-Discount & Loyalty Offer
+                  </h2>
+                  <p className="text-gray-400 text-sm mb-6 relative z-10">When AI asks for a review/follow, it will automatically send this discount code to bring the customer back.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">Discount %</label>
+                      <input type="number" name="discountPercentage" value={config.discountPercentage} onChange={handleChange} placeholder="10" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">Referral / Offer Code</label>
+                      <input type="text" name="discountCode" value={config.discountCode} onChange={handleChange} placeholder="SAVE10" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">Valid For (Days)</label>
+                      <input type="number" name="validityDays" value={config.validityDays} onChange={handleChange} placeholder="30" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Twilio & External Webhooks */}
                 <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
                   <h2 className="text-xl font-semibold text-teal-400 mb-6 flex items-center gap-2">🔗 Custom Webhooks & API Integrations</h2>
@@ -458,6 +481,28 @@ export default function Settings() {
                       </div>
                     </div>
                     
+                    <div className="mt-4 pt-4 border-t border-gray-800">
+                       <p className="text-sm text-teal-400 font-bold mb-4">Specific Custom API Endpoints</p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-xs font-medium text-gray-400 mb-1">Search/Catalog Endpoint URL</label>
+                           <input type="url" name="externalApiSearchUrl" value={config.externalApiSearchUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/search" />
+                         </div>
+                         <div>
+                           <label className="block text-xs font-medium text-gray-400 mb-1">Quick Post Endpoint URL</label>
+                           <input type="url" name="externalApiPostUrl" value={config.externalApiPostUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/post" />
+                         </div>
+                         <div>
+                           <label className="block text-xs font-medium text-gray-400 mb-1">Publish Blog Endpoint URL</label>
+                           <input type="url" name="externalApiBlogUrl" value={config.externalApiBlogUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/blog" />
+                         </div>
+                         <div>
+                           <label className="block text-xs font-medium text-gray-400 mb-1">Schedule Visit Endpoint URL</label>
+                           <input type="url" name="externalApiVisitUrl" value={config.externalApiVisitUrl} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-teal-500 outline-none" placeholder="https://yourwebsite.com/api/visit" />
+                         </div>
+                       </div>
+                    </div>
+
                     <div className="mt-6 pt-6 border-t border-gray-800">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-sm text-teal-400 font-bold">Dynamic AI Actions (Limit: {(config.customWebhooks || []).length}/10)</h3>
@@ -568,6 +613,40 @@ export default function Settings() {
                   <div className="space-y-4 mb-8 relative z-10">
                     <textarea value={activeWs.businessDescription || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'businessDescription', e.target.value)} rows="3" placeholder="AI Training Data (What does this branch do?)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-blue-500 outline-none"></textarea>
                     <textarea value={activeWs.aiRules || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'aiRules', e.target.value)} rows="2" placeholder="Custom AI Rules (e.g. Be polite, redirect to main branch if unsure)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-blue-500 outline-none"></textarea>
+                  </div>
+
+                  {/* Branch Specific Discounts */}
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10 mt-8">🎁 Auto-Discount & Offers</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 relative z-10 bg-[#1a1a1a] p-5 rounded-xl border border-gray-800">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Discount %</label>
+                       <input type="number" value={activeWs.discountPercentage || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'discountPercentage', e.target.value)} placeholder="10" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Offer Code</label>
+                       <input type="text" value={activeWs.discountCode || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'discountCode', e.target.value)} placeholder="SAVE10" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Valid Days</label>
+                       <input type="number" value={activeWs.validityDays || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'validityDays', e.target.value)} placeholder="30" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                     </div>
+                  </div>
+
+                  {/* Branch Specific External API */}
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">🔗 External Website API</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10 bg-[#1a1a1a] p-5 rounded-xl border border-gray-800">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Base Website URL</label>
+                      <input type="url" value={activeWs.externalApiUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiUrl', e.target.value)} placeholder="https://branch-domain.com" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Search/Catalog Endpoint</label>
+                      <input type="url" value={activeWs.externalApiSearchUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiSearchUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Quick Post Endpoint</label>
+                      <input type="url" value={activeWs.externalApiPostUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiPostUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
+                    </div>
                   </div>
 
                   {/* Branch Independent Meta API Connect */}
