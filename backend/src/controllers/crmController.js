@@ -97,6 +97,7 @@ exports.getPipeline = async (req, res) => {
       lead.name = norm.name;
       lead.city = norm.city;
       lead.phoneNumber = lead.phoneNumber || lead.phone || ''; // Retroactive fix for missing phone numbers
+      lead.phone = lead.phoneNumber; // Fallback for UI if it strictly expects 'phone'
       let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); // Map AI status to pipeline
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
@@ -124,6 +125,7 @@ exports.getPipeline = async (req, res) => {
         name: norm.name,
         city: norm.city,
         phoneNumber: contact.phoneNumber || contact.phone || '', // Map correct field for Kanban display
+        phone: contact.phoneNumber || contact.phone || '', // Fallback for UI
         status: stage,
         source: 'Manual Contact (Old Data)',
       };

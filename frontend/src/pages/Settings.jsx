@@ -43,13 +43,13 @@ export default function Settings() {
   const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [showExternalToken, setShowExternalToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCardId, setSelectedCardId] = useState('main');
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
   
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [expandedWebhooks, setExpandedWebhooks] = useState({});
 
-  // --- Custom Webhook Functions ---
+  // --- Functions ---
   const addCustomWebhook = () => {
     if (config.customWebhooks && config.customWebhooks.length >= 10) return alert("Maximum 10 custom actions allowed.");
     const currentWebhooks = config.customWebhooks || [];
@@ -109,6 +109,7 @@ export default function Settings() {
             customWebhooks: savedData.customWebhooks || []
           });
           if (savedData._id) setUserId(savedData._id);
+          setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
         }
       } catch (error) {
         console.error('Failed to load settings. It might be empty currently.', error);
@@ -131,7 +132,11 @@ export default function Settings() {
   };
 
   const addWorkspace = () => {
-    setConfig({ ...config, workspaces: [...config.workspaces, { name: '', description: '' }] });
+    if (config.workspaces && config.workspaces.length >= 5) {
+      return alert("Business limit reached! Please upgrade your plan to add more branches.");
+    }
+    setConfig({ ...config, workspaces: [...(config.workspaces || []), { name: 'New Branch', description: '' }] });
+    setActiveWorkspace(`ws_${(config.workspaces || []).length}`);
   };
 
   const removeWorkspace = (index) => {
@@ -341,7 +346,7 @@ export default function Settings() {
               <h2 className="text-xl font-semibold text-green-400 flex items-center">
                  WhatsApp (Meta API)
               </h2>
-              <MetaConnectButton buttonText="1-Click Connect Meta" />
+              <MetaConnectButton buttonText="1-Click Connect Meta" platform="whatsapp" workspaceId="main" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2 relative">
@@ -482,7 +487,7 @@ export default function Settings() {
             <p className="text-sm text-gray-400 mb-6">Connect your Instagram to enable Auto-DMs, Comment tracking, and AI Profile Growth Audits.</p>
             
             {!igConnected ? (
-              <MetaConnectButton buttonText="Connect Instagram via Meta" />
+              <MetaConnectButton buttonText="Connect Instagram via Meta" platform="instagram" workspaceId="main" />
             ) : (
               <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                  <p className="text-sm text-green-400 font-semibold">Your Instagram account is actively monitored by AI.</p>
@@ -638,8 +643,8 @@ export default function Settings() {
             <div className="mb-6 relative z-10">
               <label className="block text-sm font-medium text-gray-400 mb-2">Select Business to Configure & View QR</label>
               <select 
-                value={selectedCardId} 
-                onChange={(e) => setSelectedCardId(e.target.value)} 
+                value={activeWorkspace} 
+                onChange={(e) => setActiveWorkspace(e.target.value)} 
                 className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
               >
                 <option value="main">{config.businessName || 'Main Business'} (Default)</option>
@@ -650,8 +655,8 @@ export default function Settings() {
             </div>
 
             {(() => {
-              const isMainCard = selectedCardId === 'main';
-              const wsIndex = isMainCard ? -1 : parseInt(selectedCardId.replace('ws_', ''));
+              const isMainCard = activeWorkspace === 'main';
+              const wsIndex = isMainCard ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
               const activeWs = wsIndex >= 0 ? config.workspaces[wsIndex] : null;
               const qrUrl = isMainCard 
                 ? `${window.location.origin}/card/${userId}` 

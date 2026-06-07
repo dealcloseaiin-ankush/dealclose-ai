@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp' }) => {
+const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp', workspaceId = 'main' }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
   const [loading, setLoading] = useState(false);
 
@@ -108,6 +108,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
           },
           body: JSON.stringify({
             authCode: authCode, // Backend ko code bhejein
+            workspaceId: workspaceId // Branch/Workspace ID bhejein taaki wahi save ho
             // Client ki WABA ID aur Phone ID aapko backend me token exchange karne ke baad
             // 'GET /debug_token' ya 'GET /client_waba' API se nikalni hogi.
             // Frontend se directly bhejna safe/reliable nahi hota Tech Provider flow me.

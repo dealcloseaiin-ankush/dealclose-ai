@@ -110,7 +110,7 @@ exports.supabaseAuth = async (req, res) => {
 // @route   POST /api/users/settings/whatsapp-connect
 exports.whatsappConnect = async (req, res) => {
   try {
-    const { authCode } = req.body;
+    const { authCode, workspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
 
     if (!userId || !authCode) {
@@ -155,21 +155,29 @@ exports.whatsappConnect = async (req, res) => {
     const phoneNumberId = phoneResponse.data.data[0]?.id; // Picking the first phone number
     const displayPhoneNumber = phoneResponse.data.data[0]?.display_phone_number;
 
-    // 4. Save these details securely in your database for this specific user
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        $set: {
-          "whatsappConfig.accessToken": clientAccessToken,
-          "whatsappConfig.wabaId": wabaId,
-          "whatsappConfig.phoneNumberId": phoneNumberId,
-          "whatsappConfig.connectedPhone": displayPhoneNumber
-        }
-      },
-      { new: true }
-    );
+    const waConfigObj = {
+      accessToken: clientAccessToken,
+      wabaId: wabaId,
+      phoneNumberId: phoneNumberId,
+      connectedPhone: displayPhoneNumber
+    };
 
-    res.status(200).json({ success: true, message: 'WhatsApp successfully connected via Meta!', data: updatedUser.whatsappConfig });
+    // 4. Save these details securely in your database for this specific user
+    let updatedUser;
+    if (workspaceId && workspaceId !== 'main') {
+      // Save to specific workspace branch
+      updatedUser = await User.findOneAndUpdate(
+        { _id: userId, "workspaces._id": workspaceId },
+        { $set: { "workspaces.$.whatsappConfig": waConfigObj } },
+        { new: true }
+      );
+    } else {
+      // Save to main business
+      updatedUser = await User.findByIdAndUpdate(userId, { $set: { whatsappConfig: waConfigObj } }, { new: true });
+    }
+
+    const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.whatsappConfig : updatedUser.whatsappConfig;
+    res.status(200).json({ success: true, message: 'WhatsApp successfully connected via Meta!', data: savedData });
   } catch (error) {
     console.error('Meta Connect Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: 'Failed to connect Meta account. Check server logs.' });
@@ -180,7 +188,7 @@ exports.whatsappConnect = async (req, res) => {
 // @route   POST /api/users/settings/instagram-connect
 exports.instagramConnect = async (req, res) => {
   try {
-    const { authCode } = req.body;
+    const { authCode, workspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
 
     if (!userId || !authCode) {
@@ -236,20 +244,26 @@ exports.instagramConnect = async (req, res) => {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
     }
 
-    // Save to Database
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        $set: {
-          "igConfig.accessToken": clientAccessToken,
-          "igConfig.accountId": igAccountId,
-          "igConfig.pageId": connectedPageId,
-        }
-      },
-      { new: true }
-    );
+    const igConfigObj = {
+      accessToken: clientAccessToken,
+      accountId: igAccountId,
+      pageId: connectedPageId,
+    };
 
-    res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: updatedUser.igConfig });
+    // Save to Database
+    let updatedUser;
+    if (workspaceId && workspaceId !== 'main') {
+      updatedUser = await User.findOneAndUpdate(
+        { _id: userId, "workspaces._id": workspaceId },
+        { $set: { "workspaces.$.igConfig": igConfigObj } },
+        { new: true }
+      );
+    } else {
+      updatedUser = await User.findByIdAndUpdate(userId, { $set: { igConfig: igConfigObj } }, { new: true });
+    }
+
+    const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.igConfig : updatedUser.igConfig;
+    res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: savedData });
   } catch (error) {
     console.error('Instagram Connect Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: 'Failed to connect Instagram account. Try again.' });

@@ -190,11 +190,13 @@ export default function CrmPage() {
       {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
 
       {/* Right Side Drawer */}
-      <ContactDrawer 
-        isOpen={!!selectedContact} 
-        contact={selectedContact} 
-        onClose={() => setSelectedContact(null)} 
-      />
+      {selectedContact && (
+        <ContactDrawer 
+          isOpen={!!selectedContact} 
+          contact={selectedContact} 
+          onClose={() => setSelectedContact(null)} 
+        />
+      )}
     </div>
   );
 }
