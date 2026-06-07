@@ -20,10 +20,15 @@ exports.verifyInstagramWebhook = async (req, res) => {
 // @desc    Handle Instagram Webhooks (Comments & DMs)
 // @route   POST /api/webhooks/instagram
 exports.handleInstagramWebhook = async (req, res) => {
+  // 1. IMMEDIATE RESPONSE TO META: Prevents Meta from retrying
+  res.status(200).send('EVENT_RECEIVED');
+  
+  console.log("\n================ [INSTAGRAM WEBHOOK INCOMING] ================");
+  console.log("➡️ Raw Payload:", JSON.stringify(req.body, null, 2));
   try {
     const body = req.body;
 
-    if (body.object === 'instagram') {
+    if (body.object === 'instagram' || body.object === 'page') {
       for (let entry of body.entry) {
         
         // ==========================================
@@ -257,12 +262,10 @@ exports.handleInstagramWebhook = async (req, res) => {
           }
         }
       }
-      return res.sendStatus(200);
     } else {
-      return res.sendStatus(404);
+      console.log(`⚠️ [IG Webhook] Received unknown object type: ${body.object}`);
     }
   } catch (error) {
     console.error('Instagram Webhook Error:', error);
-    return res.sendStatus(500);
   }
 };
