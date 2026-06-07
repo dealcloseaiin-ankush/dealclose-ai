@@ -34,7 +34,10 @@ export default function Settings() {
     externalApiPostUrl: '',
     externalApiBlogUrl: '',
     externalApiVisitUrl: '',
-    customWebhooks: []
+    customWebhooks: [],
+    igAccessToken: '',
+    igAccountId: '',
+    fbPageId: ''
   });
   
   const [igConnected, setIgConnected] = useState(false);
@@ -105,7 +108,10 @@ export default function Settings() {
             externalApiPostUrl: savedData.externalApiPostUrl || '',
             externalApiBlogUrl: savedData.externalApiBlogUrl || '',
             externalApiVisitUrl: savedData.externalApiVisitUrl || '',
-            customWebhooks: savedData.customWebhooks || []
+            customWebhooks: savedData.customWebhooks || [],
+            igAccessToken: savedData.igConfig?.accessToken || '',
+            igAccountId: savedData.igConfig?.accountId || '',
+            fbPageId: savedData.igConfig?.pageId || ''
           });
           if (savedData._id) setUserId(savedData._id);
           setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
@@ -418,6 +424,19 @@ export default function Settings() {
                       <h2 className="text-xl font-semibold text-pink-400">Instagram Automation</h2>
                       <span className={`text-xs font-bold px-3 py-1 rounded-full ${igConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{igConnected ? 'Connected ✅' : 'Not Connected'}</span>
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">IG Access Token</label>
+                        <input type="password" value={config.igAccessToken} readOnly placeholder="IG...Token (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">FB Page / IG Account ID</label>
+                        <input type="text" value={config.igAccountId || config.fbPageId} readOnly placeholder="123456789 (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
+
                     {!igConnected ? (
                       <MetaConnectButton buttonText="Connect Instagram via Meta" platform="instagram" workspaceId="main" />
                     ) : (
