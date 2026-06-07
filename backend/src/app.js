@@ -29,6 +29,7 @@ const trackingController = require('./controllers/trackingController');
 const authRoutes = require('./routes/authRoutes');
 const scraperRoutes = require('./routes/scraperRoutes');
 const trackerRoutes = require('./routes/trackerRoutes');
+const instagramRoutes = require('./routes/instagramRoutes');
 
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
@@ -77,6 +78,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/tracker', trackerRoutes);
+app.use('/api/instagram', instagramRoutes);
 
 // 👇 YAHAN PAR HAI AAPKA IMAGE UPLOAD ROUTE 👇
 app.use('/api/upload', uploadRoutes);
