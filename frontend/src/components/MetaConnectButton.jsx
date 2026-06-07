@@ -119,6 +119,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
           console.log('➡️ [MetaConnect] Backend API response:', data);
           if (data.success) {
             alert('🎉 Meta Accounts (WhatsApp & Instagram) Connected Successfully!');
+            window.location.reload(); // Reload page to show "Connected ✅" badge instantly
           } else {
             alert('Failed to save Meta settings: ' + data.message);
           }
@@ -134,6 +135,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
         : 'instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
       response_type: 'code',
+      auth_type: 'rerequest', // 🔥 Forces Meta to re-evaluate permissions so user can change the Page for new branch
       override_default_response_type: true
     };
 

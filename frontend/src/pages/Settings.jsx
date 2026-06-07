@@ -48,45 +48,23 @@ export default function Settings() {
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [expandedWebhooks, setExpandedWebhooks] = useState({});
 
-  // --- Dynamic View Setup ---
-  const isMain = activeWorkspace === 'main';
-  const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
-  const activeWs = !isMain ? config.workspaces[wsIndex] : null;
-  const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
-
   // --- Functions ---
   const addCustomWebhook = () => {
-    const targetArray = isMain ? (config.customWebhooks || []) : (activeWs?.customWebhooks || []);
-    if (targetArray.length >= 10) return alert("Maximum 10 custom actions allowed.");
-    
-    if (isMain) {
-      setConfig({ ...config, customWebhooks: [...targetArray, { name: '', url: '', description: '', method: 'POST' }] });
-    } else {
-      handleWorkspaceChange(wsIndex, 'customWebhooks', [...targetArray, { name: '', url: '', description: '', method: 'POST' }]);
-    }
-    setExpandedWebhooks({ ...expandedWebhooks, [`${activeWorkspace}_${targetArray.length}`]: true });
+    if (config.customWebhooks && config.customWebhooks.length >= 10) return alert("Maximum 10 custom actions allowed.");
+    const currentWebhooks = config.customWebhooks || [];
+    setConfig({ ...config, customWebhooks: [...currentWebhooks, { name: '', url: '', description: '', method: 'POST' }] });
+    setExpandedWebhooks({ ...expandedWebhooks, [currentWebhooks.length]: true });
   };
   
   const removeCustomWebhook = (index) => {
-    if (isMain) {
-      const updated = config.customWebhooks.filter((_, i) => i !== index);
-      setConfig({ ...config, customWebhooks: updated });
-    } else {
-      const updated = (activeWs.customWebhooks || []).filter((_, i) => i !== index);
-      handleWorkspaceChange(wsIndex, 'customWebhooks', updated);
-    }
+    const updated = config.customWebhooks.filter((_, i) => i !== index);
+    setConfig({ ...config, customWebhooks: updated });
   };
   
   const handleCustomWebhookChange = (index, field, value) => {
-    if (isMain) {
-      const updated = [...(config.customWebhooks || [])];
-      updated[index][field] = value;
-      setConfig({ ...config, customWebhooks: updated });
-    } else {
-      const updated = [...(activeWs.customWebhooks || [])];
-      updated[index][field] = value;
-      handleWorkspaceChange(wsIndex, 'customWebhooks', updated);
-    }
+    const updated = [...config.customWebhooks];
+    updated[index][field] = value;
+    setConfig({ ...config, customWebhooks: updated });
   };
 
   // Fetch saved settings on page load
@@ -263,6 +241,12 @@ export default function Settings() {
       setIsChangingPass(false);
     }
   };
+
+  // --- Dynamic View Setup ---
+  const isMain = activeWorkspace === 'main';
+  const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
+  const activeWs = !isMain ? config.workspaces[wsIndex] : null;
+  const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
@@ -528,7 +512,7 @@ export default function Settings() {
                       </div>
                       <div className="space-y-4">
                         {(config.customWebhooks || []).map((webhook, index) => {
-                          const isExpanded = expandedWebhooks[`main_${index}`] || (!webhook.name && !webhook.url);
+                          const isExpanded = expandedWebhooks[index] || (!webhook.name && !webhook.url);
                           return (
                           <div key={index} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl relative">
                             {isExpanded ? (
@@ -548,7 +532,7 @@ export default function Settings() {
                                   <p className="text-xs text-gray-400 mt-1">{webhook.url}</p>
                                 </div>
                                 <div className="flex gap-2">
-                                  <button type="button" onClick={() => setExpandedWebhooks({...expandedWebhooks, [`main_${index}`]: true})} className="text-gray-400 hover:text-blue-400 bg-gray-800 p-2 rounded-lg"><Edit size={14} /></button>
+                                  <button type="button" onClick={() => setExpandedWebhooks({...expandedWebhooks, [index]: true})} className="text-gray-400 hover:text-blue-400 bg-gray-800 p-2 rounded-lg"><Edit size={14} /></button>
                                   <button type="button" onClick={() => removeCustomWebhook(index)} className="text-gray-400 hover:text-rose-400 bg-gray-800 p-2 rounded-lg"><Trash2 size={14} /></button>
                                 </div>
                               </div>
@@ -651,40 +635,17 @@ export default function Settings() {
                   {/* Branch Specific External API */}
                   <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">🔗 External Website API</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10 bg-[#1a1a1a] p-5 rounded-xl border border-gray-800">
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Base Website URL</label>
                       <input type="url" value={activeWs.externalApiUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiUrl', e.target.value)} placeholder="https://branch-domain.com" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">API Secret Token / Key</label>
-                      <div className="relative">
-                        <input type={showExternalToken ? "text" : "password"} value={activeWs.externalApiToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiToken', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none pr-10" placeholder="Secret Key" />
-                        <button type="button" onClick={() => setShowExternalToken(!showExternalToken)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                          {showExternalToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Search/Catalog Endpoint</label>
+                      <input type="url" value={activeWs.externalApiSearchUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiSearchUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
                     </div>
-                    
-                    <div className="md:col-span-2 border-t border-gray-800 mt-2 pt-4">
-                      <p className="text-xs text-blue-400 font-bold mb-3 uppercase tracking-wider">Specific Custom API Endpoints</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Search/Catalog Endpoint</label>
-                          <input type="url" value={activeWs.externalApiSearchUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiSearchUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Quick Post Endpoint</label>
-                          <input type="url" value={activeWs.externalApiPostUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiPostUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Publish Blog Endpoint</label>
-                          <input type="url" value={activeWs.externalApiBlogUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiBlogUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Schedule Visit Endpoint</label>
-                          <input type="url" value={activeWs.externalApiVisitUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiVisitUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
-                        </div>
-                      </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Quick Post Endpoint</label>
+                      <input type="url" value={activeWs.externalApiPostUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiPostUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
                     </div>
                   </div>
 
@@ -693,59 +654,30 @@ export default function Settings() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">IG Access Token</label>
-                      <input type="password" value={activeWs.igAccessToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'igAccessToken', e.target.value)} placeholder="IG...Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:border-blue-500 outline-none" />
+                      <input type="password" value={activeWs.igConfig?.accessToken || activeWs.igAccessToken || ''} readOnly placeholder="IG...Token (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">FB Page / IG Account ID</label>
-                      <input type="text" value={activeWs.fbPageId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'fbPageId', e.target.value)} placeholder="123456789" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs focus:border-blue-500 outline-none" />
+                      <input type="text" value={activeWs.igConfig?.accountId || activeWs.fbPageId || ''} readOnly placeholder="123456789 (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
                     </div>
                   </div>
                   
-                  {/* Branch Specific Custom Webhooks */}
-                  <div className="mt-6 pt-6 border-t border-gray-800 relative z-10">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-sm text-blue-400 font-bold">Branch AI Actions (Limit: {(activeWs.customWebhooks || []).length}/10)</h3>
-                      <button type="button" onClick={addCustomWebhook} className="text-xs bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-lg font-bold">
-                        + Add Action
-                      </button>
-                    </div>
-                    <div className="space-y-4">
-                      {(activeWs.customWebhooks || []).map((webhook, index) => {
-                        const isExpanded = expandedWebhooks[`ws_${wsIndex}_${index}`] || (!webhook.name && !webhook.url);
-                        return (
-                        <div key={index} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl relative">
-                          {isExpanded ? (
-                            <>
-                              <button type="button" onClick={() => removeCustomWebhook(index)} className="absolute top-3 right-10 text-gray-500 hover:text-rose-500"><Trash2 size={16} /></button>
-                              <button type="button" onClick={() => setExpandedWebhooks({...expandedWebhooks, [`ws_${wsIndex}_${index}`]: false})} className="absolute top-3 right-3 text-emerald-500 hover:text-emerald-400"><CheckCircle size={16} /></button>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                                <div><input type="text" value={webhook.name} onChange={e => handleCustomWebhookChange(index, 'name', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm" placeholder="Action Name" /></div>
-                                <div><input type="url" value={webhook.url} onChange={e => handleCustomWebhookChange(index, 'url', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm" placeholder="URL" /></div>
-                                <div className="md:col-span-2"><input type="text" value={webhook.description} onChange={e => handleCustomWebhookChange(index, 'description', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white text-sm" placeholder="When should AI trigger this?" /></div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <h4 className="text-sm font-bold text-white flex items-center gap-2"><Zap size={14} className="text-blue-400"/> {webhook.name}</h4>
-                                <p className="text-xs text-gray-400 mt-1">{webhook.url}</p>
-                              </div>
-                              <div className="flex gap-2">
-                                <button type="button" onClick={() => setExpandedWebhooks({...expandedWebhooks, [`ws_${wsIndex}_${index}`]: true})} className="text-gray-400 hover:text-blue-400 bg-gray-800 p-2 rounded-lg"><Edit size={14} /></button>
-                                <button type="button" onClick={() => removeCustomWebhook(index)} className="text-gray-400 hover:text-rose-400 bg-gray-800 p-2 rounded-lg"><Trash2 size={14} /></button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )})}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-800 relative z-10">
+                  <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-800 relative z-10 items-center">
                      {activeWs._id ? (
                        <>
-                         <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId={activeWs._id} />
-                         <MetaConnectButton buttonText="Connect Instagram" platform="instagram" workspaceId={activeWs._id} />
+                         <div className="w-full mb-2 flex flex-col md:flex-row gap-4">
+                           <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
+                             <p className="text-xs text-gray-400 mb-1">WhatsApp Status</p>
+                             {activeWs.whatsappConfig?.accessToken ? <span className="text-sm font-bold text-green-400">Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                           </div>
+                           <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
+                             <p className="text-xs text-gray-400 mb-1">Instagram Status</p>
+                             {activeWs.igConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                           </div>
+                         </div>
+                         <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
+                         <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs._id} />
+                         <MetaConnectButton buttonText={activeWs.igConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs._id} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">
