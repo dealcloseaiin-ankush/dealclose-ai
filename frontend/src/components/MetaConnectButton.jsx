@@ -117,6 +117,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         
       } else {
         console.warn('⚠️ [MetaConnect] User cancelled login or did not fully authorize.', response);
+        alert('Meta Login Cancelled or Failed.\n\nTips to fix:\n1. Do not use Incognito/Private mode.\n2. Ensure pop-ups are allowed.\n3. Make sure your Facebook account is added as a "Tester" in the Meta App Dashboard.');
         setLoading(false);
       }
     }, {

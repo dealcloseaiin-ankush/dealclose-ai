@@ -12,17 +12,6 @@ exports.getPipeline = async (req, res) => {
     
     console.log(`\n🔍 [CRM Debug] Fetching pipeline for user: ${userId}`);
 
-    const leads = await Lead.find({ userId })
-      .sort({ updatedAt: -1 })
-      .lean();
-      
-    // Fetch old manually created contacts as well to keep history visible
-    const contacts = await Contact.find({ userId })
-      .sort({ updatedAt: -1 })
-      .lean();
-      
-    console.log(`📊 [CRM Debug] Found ${leads.length} Leads and ${contacts.length} Contacts in DB.`);
-
     // 🚀 NEW: AUTO-SYNC OLD CHATS TO CRM
     try {
       const mongoose = require('mongoose');
@@ -55,6 +44,17 @@ exports.getPipeline = async (req, res) => {
     } catch (syncErr) {
       console.error("Old chat sync error:", syncErr);
     }
+
+    const leads = await Lead.find({ userId })
+      .sort({ updatedAt: -1 })
+      .lean();
+      
+    // Fetch old manually created contacts as well to keep history visible
+    const contacts = await Contact.find({ userId })
+      .sort({ updatedAt: -1 })
+      .lean();
+      
+    console.log(`📊 [CRM Debug] Found ${leads.length} Leads and ${contacts.length} Contacts in DB.`);
 
     // 🚀 SMART NORMALIZER: Retroactively fix Old Names and extract City dynamically
     const normalizeData = (nameStr, cityStr) => {
@@ -97,7 +97,11 @@ exports.getPipeline = async (req, res) => {
       const norm = normalizeData(lead.name, lead.city);
       lead.name = norm.name;
       lead.city = norm.city;
-      const stage = lead.status || lead.crmStage || 'new'; // Map AI status to pipeline
+      let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); // Map AI status to pipeline
+      if (stage === 'won' || stage === 'completed') stage = 'converted';
+      if (stage === 'pending') stage = 'new';
+      lead.status = stage; // Ensure lowercase for Kanban board strict match
+
       if (pipeline[stage]) {
         pipeline[stage].push(lead);
       } else {
@@ -107,7 +111,10 @@ exports.getPipeline = async (req, res) => {
     
     // Group old contacts into the pipeline too
     contacts.forEach(contact => {
-      const stage = contact.crmStage || 'new';
+      let stage = (contact.crmStage || 'new').toLowerCase();
+      if (stage === 'won' || stage === 'completed') stage = 'converted';
+      if (stage === 'pending') stage = 'new';
+
       const norm = normalizeData(contact.name, contact.city);
       // Normalize contact structure to match frontend expectations for Lead
       const normalizedContact = {
@@ -159,8 +166,8 @@ exports.updateStage = async (req, res) => {
     if (newStage && oldStage !== newStage) {
       isStageChanged = true;
       // Update contact stage & history
-      if (isLead) record.status = newStage; 
-      record.crmStage = newStage;
+      if (isLead) record.status = newStage.toLowerCase(); 
+      record.crmStage = newStage.toLowerCase();
       if (!record.crmStageHistory) record.crmStageHistory = [];
       record.crmStageHistory.push({
         from: oldStage,

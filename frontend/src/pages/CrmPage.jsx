@@ -172,7 +172,7 @@ export default function CrmPage() {
       </div>
 
       {/* Main Content Area */}
-      {viewMode === 'pipeline' && <KanbanBoard initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} />}
+      {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}`} initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}
       {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
       {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
 
