@@ -10,5 +10,7 @@ router.post('/login', authController.supabaseAuth);
 // --- Settings & Integration Routes ---
 router.get('/settings', protect, settingsController.getSettings);
 router.post('/settings', protect, settingsController.saveSettings);
+router.post('/settings/whatsapp-connect', protect, authController.whatsappConnect);
+router.post('/settings/instagram-connect', protect, authController.instagramConnect);
 
 module.exports = router;

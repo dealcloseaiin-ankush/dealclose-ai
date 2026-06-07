@@ -106,9 +106,9 @@ exports.supabaseAuth = async (req, res) => {
   }
 };
 
-// @desc    Connect Meta via Embedded Signup (Tech Provider)
-// @route   POST /api/users/settings/meta-connect
-exports.metaConnect = async (req, res) => {
+// @desc    Connect WhatsApp via Embedded Signup
+// @route   POST /api/users/settings/whatsapp-connect
+exports.whatsappConnect = async (req, res) => {
   try {
     const { authCode } = req.body;
     const userId = req.user?._id || req.user?.id;
@@ -173,6 +173,86 @@ exports.metaConnect = async (req, res) => {
   } catch (error) {
     console.error('Meta Connect Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: 'Failed to connect Meta account. Check server logs.' });
+  }
+};
+
+// @desc    Connect Instagram via Meta Login
+// @route   POST /api/users/settings/instagram-connect
+exports.instagramConnect = async (req, res) => {
+  try {
+    const { authCode } = req.body;
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId || !authCode) {
+      return res.status(400).json({ success: false, message: 'Missing authCode or unauthorized session' });
+    }
+
+    const APP_ID = process.env.META_APP_ID || '1611867760088959';
+    const APP_SECRET = process.env.META_APP_SECRET; // Ensure this is in your .env file
+
+    let clientAccessToken = authCode;
+
+    // Exchange code for token if it's a short-lived code
+    if (!authCode.startsWith('EAA') && !authCode.startsWith('EA')) {
+      const tokenResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
+        params: {
+          client_id: APP_ID,
+          client_secret: APP_SECRET,
+          code: authCode,
+          redirect_uri: '' 
+        }
+      });
+      clientAccessToken = tokenResponse.data.access_token;
+    }
+
+    // Fetch User's Facebook Pages
+    const pagesResponse = await axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
+      params: { access_token: clientAccessToken }
+    });
+
+    const pages = pagesResponse.data.data;
+    if (!pages || pages.length === 0) {
+        return res.status(400).json({ success: false, message: 'No Facebook Pages found for your account.' });
+    }
+
+    let igAccountId = null;
+    let connectedPageId = null;
+
+    // Find the connected Instagram account
+    for (const page of pages) {
+        try {
+            const igResponse = await axios.get(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${clientAccessToken}`);
+            if (igResponse.data.instagram_business_account) {
+                igAccountId = igResponse.data.instagram_business_account.id;
+                connectedPageId = page.id;
+                break;
+            }
+        } catch (err) {
+            console.log('Skipping page, no IG connected:', err.message);
+        }
+    }
+
+    if (!igAccountId) {
+        return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
+    }
+
+    // Save to Database
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          "igConfig.accessToken": clientAccessToken,
+          "igConfig.accountId": igAccountId,
+          "igConfig.pageId": connectedPageId,
+        }
+      },
+      { new: true }
+    );
+
+    res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: updatedUser.igConfig });
+  } catch (error) {
+    console.error('Instagram Connect Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Failed to connect Instagram account. Try again.' });
   }
 };
 

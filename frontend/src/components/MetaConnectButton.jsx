@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
+const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp' }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
   const [loading, setLoading] = useState(false);
 
@@ -77,7 +77,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
     console.log("➡️ [MetaConnect] Triggering FB.login popup...");
 
     // Trigger Meta Oauth Popup
-    window.FB.login((response) => {
+    const handleLoginResponse = (response) => {
       console.log("➡️ [MetaConnect] FB.login response received:", response);
       
       // 🔥 Enhanced Error Detection
@@ -100,7 +100,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         const token = localStorage.getItem('token'); // Get user session token
         
         console.log('➡️ [MetaConnect] Sending authCode to backend API...');
-        fetch('https://dealclose-ai.onrender.com/api/users/settings/meta-connect', {
+        fetch(`https://dealclose-ai.onrender.com/api/users/settings/${platform}-connect`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -125,23 +125,33 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         .catch(err => console.error('❌ [MetaConnect] Backend Fetch Error:', err))
         .finally(() => setLoading(false));
       }
-    }, {
-      config_id: CONFIG_ID,
-      scopes: 'whatsapp_business_management,whatsapp_business_messaging,instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
+    };
+
+    const fbLoginConfig = {
+      scopes: platform === 'whatsapp' 
+        ? 'whatsapp_business_management,whatsapp_business_messaging' 
+        : 'instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
-      response_type: 'code', // 🔥 IMPORTANT: Meta ko batana hai ki hume 'code' chahiye, token nahi (Tech Provider Requirement)
+      response_type: 'code',
       override_default_response_type: true
-    });
+    };
+
+    // Sirf WhatsApp ke case me config_id bhejna hai
+    if (platform === 'whatsapp') {
+      fbLoginConfig.config_id = CONFIG_ID;
+    }
+
+    window.FB.login(handleLoginResponse, fbLoginConfig);
   };
 
   return (
     <button 
       onClick={handleMetaLogin}
-      disabled={loading}
-      className="flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#166FE5] text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all disabled:opacity-50"
+      disabled={loading || !isSdkLoaded}
+      className={`flex items-center justify-center gap-2 ${platform === 'instagram' ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90' : 'bg-[#1877F2] hover:bg-[#166FE5]'} text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all disabled:opacity-50`}
     >
-      <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg" alt="Meta" className="w-5 h-5 bg-white rounded-full" />
-      {loading ? 'Connecting...' : buttonText}
+      <img src={platform === 'whatsapp' ? "https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg" : "https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg"} alt="Meta" className={`w-5 h-5 ${platform === 'whatsapp' ? 'bg-white rounded-full' : ''}`} />
+      {loading ? 'Connecting...' : (!isSdkLoaded ? 'Loading Meta SDK...' : buttonText)}
     </button>
   );
 };
