@@ -17,6 +17,7 @@ export default function CrmPage() {
   const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
@@ -41,6 +42,7 @@ export default function CrmPage() {
       const allContacts = [];
       Object.values(res.data.data).forEach(arr => allContacts.push(...arr));
       setFlatContacts(allContacts);
+      setRefreshKey(prev => prev + 1); // 🚀 Force Kanban to redraw with new column locations
     } catch (error) {
       console.error(error);
       toast.error("Failed to load CRM data");
@@ -78,21 +80,34 @@ export default function CrmPage() {
       filtered[key] = pipelineData[key].filter(lead => {
         const ws = lead.lastSelectedWorkspaceId || 'main';
         const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+        
+        let matchLeadFilter = true;
+        if (isOwner && leadFilter === 'me' && user?._id) {
+          matchLeadFilter = !lead.createdBy || lead.createdBy === user._id || lead.userId === user._id;
+        }
+
         const term = searchTerm.toLowerCase();
         const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
         const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
-        return matchWs && matchSearch;
+        return matchWs && matchSearch && matchLeadFilter;
       });
     });
     return filtered;
   };
+
   const filteredFlatContacts = flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
     const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+    
+    let matchLeadFilter = true;
+    if (isOwner && leadFilter === 'me' && user?._id) {
+      matchLeadFilter = !lead.createdBy || lead.createdBy === user._id || lead.userId === user._id;
+    }
+
     const term = searchTerm.toLowerCase();
     const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
     const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
-    return matchWs && matchSearch;
+    return matchWs && matchSearch && matchLeadFilter;
   });
 
   if (loading) {
@@ -172,7 +187,7 @@ export default function CrmPage() {
       </div>
 
       {/* Main Content Area */}
-      {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}`} initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}
+      {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}-${refreshKey}`} initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}
       {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
       {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
 

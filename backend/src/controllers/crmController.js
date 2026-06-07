@@ -14,9 +14,8 @@ exports.getPipeline = async (req, res) => {
 
     // 🚀 NEW: AUTO-SYNC OLD CHATS TO CRM
     try {
-      const mongoose = require('mongoose');
-      const userIdObj = new mongoose.Types.ObjectId(userId);
-      const distinctPhones = await Message.distinct('customerPhone', { userId: userIdObj });
+      // Direct query without ObjectId casting to prevent skipped records
+      const distinctPhones = await Message.distinct('customerPhone', { userId: userId });
       console.log(`📱 [CRM Debug] Found ${distinctPhones.length} distinct phone numbers in Chat History.`);
       for (const phone of distinctPhones) {
         if (!phone) continue;
@@ -101,6 +100,7 @@ exports.getPipeline = async (req, res) => {
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
       lead.status = stage; // Ensure lowercase for Kanban board strict match
+      lead.id = lead._id ? lead._id.toString() : lead.phoneNumber; // Ensure 'id' exists for frontend Kanban DnD
 
       if (pipeline[stage]) {
         pipeline[stage].push(lead);
@@ -119,6 +119,7 @@ exports.getPipeline = async (req, res) => {
       // Normalize contact structure to match frontend expectations for Lead
       const normalizedContact = {
         ...contact,
+        id: contact._id ? contact._id.toString() : (contact.phone || contact.phoneNumber), // Ensure 'id' exists for frontend Kanban DnD
         name: norm.name,
         city: norm.city,
         phoneNumber: contact.phone || contact.phoneNumber,
@@ -146,6 +147,7 @@ exports.updateStage = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const { id } = req.params;
     const { newStage, reason, dealValue, notes } = req.body;
+    const targetStage = newStage || req.body.stage || req.body.status;
 
     // Check in Leads first, if not found, check in old Contacts
     let record = await Lead.findOne({ _id: id, userId });
@@ -163,15 +165,15 @@ exports.updateStage = async (req, res) => {
     const oldStage = isLead ? (record.status || record.crmStage || 'new') : (record.crmStage || 'new');
 
     let isStageChanged = false;
-    if (newStage && oldStage !== newStage) {
+    if (targetStage && oldStage !== targetStage.toLowerCase()) {
       isStageChanged = true;
       // Update contact stage & history
-      if (isLead) record.status = newStage.toLowerCase(); 
-      record.crmStage = newStage.toLowerCase();
+      if (isLead) record.status = targetStage.toLowerCase(); 
+      record.crmStage = targetStage.toLowerCase();
       if (!record.crmStageHistory) record.crmStageHistory = [];
       record.crmStageHistory.push({
         from: oldStage,
-        to: newStage,
+        to: targetStage.toLowerCase(),
         changedBy: req.user?.fullName || 'system',
         reason: reason || 'Manual update via CRM Panel'
       });
