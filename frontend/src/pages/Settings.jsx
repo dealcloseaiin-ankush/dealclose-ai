@@ -357,7 +357,7 @@ export default function Settings() {
                   {/* WhatsApp Meta Config */}
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold text-green-400 flex items-center">WhatsApp (Meta API)</h2>
-                    <MetaConnectButton buttonText="1-Click Connect Meta" platform="whatsapp" workspaceId="main" />
+                    <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="md:col-span-2 relative">
