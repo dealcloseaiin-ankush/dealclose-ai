@@ -17,7 +17,6 @@ export default function CrmPage() {
   const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
-  const [refreshKey, setRefreshKey] = useState(0);
   
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
@@ -42,7 +41,6 @@ export default function CrmPage() {
       const allContacts = [];
       Object.values(res.data.data).forEach(arr => allContacts.push(...arr));
       setFlatContacts(allContacts);
-      setRefreshKey(prev => prev + 1); // 🚀 Force Kanban to redraw with new column locations
     } catch (error) {
       console.error(error);
       toast.error("Failed to load CRM data");
@@ -73,7 +71,7 @@ export default function CrmPage() {
   };
 
   // 🔥 Filter data based on selected Workspace
-  const getFilteredPipeline = () => {
+  const filteredPipeline = React.useMemo(() => {
     if (!pipelineData) return null;
     const filtered = {};
     Object.keys(pipelineData).forEach(key => {
@@ -93,7 +91,7 @@ export default function CrmPage() {
       });
     });
     return filtered;
-  };
+  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user]);
 
   const filteredFlatContacts = flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
@@ -187,7 +185,7 @@ export default function CrmPage() {
       </div>
 
       {/* Main Content Area */}
-      {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}-${refreshKey}`} initialData={getFilteredPipeline()} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}
+      {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}`} pipelineData={filteredPipeline} initialData={filteredPipeline} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}
       {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
       {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
 

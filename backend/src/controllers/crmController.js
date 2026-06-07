@@ -96,11 +96,12 @@ exports.getPipeline = async (req, res) => {
       const norm = normalizeData(lead.name, lead.city);
       lead.name = norm.name;
       lead.city = norm.city;
+      lead.phoneNumber = lead.phoneNumber || lead.phone || ''; // Retroactive fix for missing phone numbers
       let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); // Map AI status to pipeline
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
       lead.status = stage; // Ensure lowercase for Kanban board strict match
-      lead.id = lead._id ? lead._id.toString() : lead.phoneNumber; // Ensure 'id' exists for frontend Kanban DnD
+      lead.id = lead._id ? lead._id.toString() : String(lead.phoneNumber); // Ensure 'id' is strictly a string
 
       if (pipeline[stage]) {
         pipeline[stage].push(lead);
@@ -119,10 +120,10 @@ exports.getPipeline = async (req, res) => {
       // Normalize contact structure to match frontend expectations for Lead
       const normalizedContact = {
         ...contact,
-        id: contact._id ? contact._id.toString() : (contact.phone || contact.phoneNumber), // Ensure 'id' exists for frontend Kanban DnD
+        id: contact._id ? contact._id.toString() : String(contact.phone || contact.phoneNumber), // Ensure 'id' is strictly a string
         name: norm.name,
         city: norm.city,
-        phoneNumber: contact.phone || contact.phoneNumber,
+        phoneNumber: contact.phoneNumber || contact.phone || '', // Map correct field for Kanban display
         status: stage,
         source: 'Manual Contact (Old Data)',
       };
@@ -150,11 +151,31 @@ exports.updateStage = async (req, res) => {
     const targetStage = newStage || req.body.stage || req.body.status;
 
     // Check in Leads first, if not found, check in old Contacts
-    let record = await Lead.findOne({ _id: id, userId });
+    let record = null;
     let isLead = true;
 
+    try {
+      record = await Lead.findOne({ _id: id, userId });
+    } catch (e) {
+      record = null; // Prevent Mongoose CastError if id is sent as phone number
+    }
+
     if (!record) {
-      record = await Contact.findOne({ _id: id, userId });
+      try {
+        record = await Contact.findOne({ _id: id, userId });
+        isLead = false;
+      } catch (e) {
+        record = null;
+      }
+    }
+
+    // Fallback: If drag-and-drop sent phone number instead of ObjectId (For Old leads)
+    if (!record) {
+      record = await Lead.findOne({ phoneNumber: id, userId });
+      isLead = true;
+    }
+    if (!record) {
+      record = await Contact.findOne({ $or: [{ phone: id }, { phoneNumber: id }], userId });
       isLead = false;
     }
 

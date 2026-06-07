@@ -79,7 +79,17 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
     // Trigger Meta Oauth Popup
     window.FB.login((response) => {
       console.log("➡️ [MetaConnect] FB.login response received:", response);
-      if (response.authResponse) {
+      
+      // 🔥 Enhanced Error Detection
+      if (response.status === 'unknown' || response.error || !response.authResponse) {
+        console.error('❌ [MetaConnect] Meta Login Failed/Blocked. Full Response:', response);
+        console.warn('💡 [DEBUG TIP]: If popup says "JSSDK Option is Not Toggled", you MUST enable it in Meta Developer Dashboard.');
+        alert('Meta Login Failed!\n\nIf you saw a JSSDK error, you MUST enable "Login with Javascript SDK" in developers.facebook.com -> Facebook Login -> Settings.\n\nCheck Console (F12) for detailed logs.');
+        setLoading(false);
+        return;
+      }
+      
+      if (response.status === 'connected' && response.authResponse) {
         // Tech Provider (Embedded Signup) me Meta 'code' bhejta hai, 'accessToken' nahi.
         // Is code ko backend secure tarike se Meta Graph API ko bhej kar System User Access Token nikalta hai.
         const authCode = response.authResponse.code || response.authResponse.accessToken; 
@@ -114,11 +124,6 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp via Meta' }) => {
         })
         .catch(err => console.error('❌ [MetaConnect] Backend Fetch Error:', err))
         .finally(() => setLoading(false));
-        
-      } else {
-        console.warn('⚠️ [MetaConnect] User cancelled login or did not fully authorize.', response);
-        alert('Meta Login Cancelled or Failed.\n\nTips to fix:\n1. Do not use Incognito/Private mode.\n2. Ensure pop-ups are allowed.\n3. Make sure your Facebook account is added as a "Tester" in the Meta App Dashboard.');
-        setLoading(false);
       }
     }, {
       config_id: CONFIG_ID,
