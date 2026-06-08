@@ -14,6 +14,7 @@ export default function Chats() {
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
+  const [platformFilter, setPlatformFilter] = useState('all');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
@@ -52,9 +53,11 @@ export default function Chats() {
     return allMessages.filter(msg => {
       const ws = msg.workspaceId || 'main';
       // Bring back older messages that were saved as 'default'
-      return activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+      const matchesWorkspace = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
+      const matchesPlatform = platformFilter === 'all' || msg.platform === platformFilter;
+      return matchesWorkspace && matchesPlatform;
     });
-  }, [allMessages, activeWorkspace]);
+  }, [allMessages, activeWorkspace, platformFilter]);
 
   // Advanced logic to calculate 24-Hour Window, Needs Reply status, and Name/City
   const customerDetails = useMemo(() => {
@@ -234,6 +237,17 @@ export default function Chats() {
           ))}
         </select>
 
+        <select 
+          value={platformFilter} 
+          onChange={(e) => { setPlatformFilter(e.target.value); setActiveCustomer(null); }} 
+          className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-2.5 outline-none focus:border-green-500 cursor-pointer mb-4"
+        >
+          <option value="all">💬 All Platforms</option>
+          <option value="whatsapp">🟩 WhatsApp Messages</option>
+          <option value="instagram_dm">🟪 Instagram DMs</option>
+          <option value="instagram_comment">📸 Instagram Comments</option>
+        </select>
+
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
           <input type="text" placeholder="Search name, phone, city..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} 
@@ -250,7 +264,10 @@ export default function Chats() {
             >
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <div className={`font-bold text-sm ${activeCustomer === customer.phone ? 'text-green-400' : 'text-gray-200'}`}>{customer.name}</div>
+                  <div className={`font-bold text-sm ${activeCustomer === customer.phone ? 'text-green-400' : 'text-gray-200'}`}>
+                    {customer.lastMessage?.platform === 'instagram_dm' ? '🟪 ' : customer.lastMessage?.platform === 'instagram_comment' ? '📸 ' : '🟩 '}
+                    {customer.name}
+                  </div>
                   <div className="text-xs text-gray-500 flex items-center gap-1">{customer.phone} {customer.city ? `• ${customer.city}` : ''}</div>
                 </div>
                 {customer.needsReply && <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_5px_rgba(59,130,246,0.8)]" title="Needs Reply"></span>}

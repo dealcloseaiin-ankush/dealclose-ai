@@ -141,25 +141,53 @@ exports.whatsappConnect = async (req, res) => {
       }
     });
 
-    const wabaId = debugResponse.data.data.granular_scopes.find(s => s.scope === 'whatsapp_business_messaging')?.target_ids?.[0];
+    const wabaIds = debugResponse.data.data.granular_scopes.find(s => s.scope === 'whatsapp_business_messaging')?.target_ids || [];
     
-    if (!wabaId) {
+    if (wabaIds.length === 0) {
       return res.status(400).json({ success: false, message: 'Could not find a valid WhatsApp Business Account for this user.' });
     }
 
-    // 3. Fetch Phone Number ID attached to this WABA
-    const phoneResponse = await axios.get(`https://graph.facebook.com/v19.0/${wabaId}/phone_numbers`, {
-      headers: { Authorization: `Bearer ${clientAccessToken}` }
-    });
+    // 🔥 FIX: Prevent Branch from stealing Main's Meta Assets
+    const userDb = await User.findById(userId);
+    const usedPhoneIds = [];
+    if (userDb.whatsappConfig && userDb.whatsappConfig.phoneNumberId) {
+      if (workspaceId !== 'main') usedPhoneIds.push(userDb.whatsappConfig.phoneNumberId);
+    }
+    if (userDb.workspaces) {
+      userDb.workspaces.forEach(w => {
+        if (w._id.toString() !== workspaceId && w.whatsappConfig && w.whatsappConfig.phoneNumberId) {
+          usedPhoneIds.push(w.whatsappConfig.phoneNumberId);
+        }
+      });
+    }
 
-    const phoneNumberId = phoneResponse.data.data[0]?.id; // Picking the first phone number
-    const displayPhoneNumber = phoneResponse.data.data[0]?.display_phone_number;
+    let targetPhone = null;
+    let targetWaba = null;
+
+    // 3. Fetch Phone Number ID attached to this WABA
+    for (const wId of wabaIds) {
+      try {
+        const phoneResponse = await axios.get(`https://graph.facebook.com/v19.0/${wId}/phone_numbers`, {
+          headers: { Authorization: `Bearer ${clientAccessToken}` }
+        });
+        const phones = phoneResponse.data.data || [];
+        const unused = phones.find(p => !usedPhoneIds.includes(p.id));
+        if (unused) { targetPhone = unused; targetWaba = wId; break; }
+        if (!targetPhone && phones.length > 0) { targetPhone = phones[0]; targetWaba = wId; }
+      } catch (err) {
+        console.log('Skipping WABA, no phones:', err.message);
+      }
+    }
+
+    if (!targetPhone) {
+      return res.status(400).json({ success: false, message: 'No valid phone numbers found for this WABA.' });
+    }
 
     const waConfigObj = {
       accessToken: clientAccessToken,
-      wabaId: wabaId,
-      phoneNumberId: phoneNumberId,
-      connectedPhone: displayPhoneNumber
+      wabaId: targetWaba,
+      phoneNumberId: targetPhone.id,
+      connectedPhone: targetPhone.display_phone_number
     };
 
     // 4. Save these details securely in your database for this specific user
@@ -213,6 +241,24 @@ exports.instagramConnect = async (req, res) => {
       clientAccessToken = tokenResponse.data.access_token;
     }
 
+    // 🔥 FIX: Automatically exchange Short-Lived Token for a Long-Lived Token (Valid for 60 Days)
+    try {
+      const longLivedResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
+        params: {
+          grant_type: 'fb_exchange_token',
+          client_id: APP_ID,
+          client_secret: APP_SECRET,
+          fb_exchange_token: clientAccessToken
+        }
+      });
+      
+      if (longLivedResponse.data && longLivedResponse.data.access_token) {
+        clientAccessToken = longLivedResponse.data.access_token;
+      }
+    } catch (exchangeErr) {
+      console.error('Failed to get long-lived Instagram token, continuing with short-lived:', exchangeErr.message);
+    }
+
     // Fetch User's Facebook Pages
     const pagesResponse = await axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
       params: { access_token: clientAccessToken }
@@ -223,31 +269,48 @@ exports.instagramConnect = async (req, res) => {
         return res.status(400).json({ success: false, message: 'No Facebook Pages found for your account.' });
     }
 
-    let igAccountId = null;
-    let connectedPageId = null;
+    // 🔥 FIX: Prevent Branch from stealing Main's IG Account
+    const userDb = await User.findById(userId);
+    const usedIgAccountIds = [];
+    if (userDb.igConfig && userDb.igConfig.accountId) {
+      if (workspaceId !== 'main') usedIgAccountIds.push(userDb.igConfig.accountId);
+    }
+    if (userDb.workspaces) {
+      userDb.workspaces.forEach(w => {
+        if (w._id.toString() !== workspaceId && w.igConfig && w.igConfig.accountId) {
+          usedIgAccountIds.push(w.igConfig.accountId);
+        }
+      });
+    }
 
-    // Find the connected Instagram account
+    let availableAccounts = [];
+
+    // Find all connected Instagram accounts
     for (const page of pages) {
         try {
             const igResponse = await axios.get(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${clientAccessToken}`);
             if (igResponse.data.instagram_business_account) {
-                igAccountId = igResponse.data.instagram_business_account.id;
-                connectedPageId = page.id;
-                break;
+                availableAccounts.push({
+                   accountId: igResponse.data.instagram_business_account.id,
+                   pageId: page.id
+                });
             }
         } catch (err) {
             console.log('Skipping page, no IG connected:', err.message);
         }
     }
 
-    if (!igAccountId) {
+    if (availableAccounts.length === 0) {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
     }
 
+    let targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
+    if (!targetAccount) { targetAccount = availableAccounts[0]; }
+
     const igConfigObj = {
       accessToken: clientAccessToken,
-      accountId: igAccountId,
-      pageId: connectedPageId,
+      accountId: targetAccount.accountId,
+      pageId: targetAccount.pageId,
     };
 
     // Save to Database

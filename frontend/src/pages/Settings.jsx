@@ -687,11 +687,11 @@ export default function Settings() {
                          <div className="w-full mb-2 flex flex-col md:flex-row gap-4">
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
                              <p className="text-xs text-gray-400 mb-1">WhatsApp Status</p>
-                             {activeWs.whatsappConfig?.accessToken ? <span className="text-sm font-bold text-green-400">Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                             {activeWs.whatsappConfig?.accessToken ? <span className="text-sm font-bold text-green-400">Dedicated Number Connected ✅</span> : <span className="text-sm font-bold text-blue-400">Using Main Number 🔀</span>}
                            </div>
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
                              <p className="text-xs text-gray-400 mb-1">Instagram Status</p>
-                             {activeWs.igConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                             {activeWs.igConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
                            </div>
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>

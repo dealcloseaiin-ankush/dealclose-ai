@@ -35,6 +35,8 @@ exports.handleInstagramWebhook = async (req, res) => {
 
     if (body.object === 'instagram' || body.object === 'page') {
       for (let entry of body.entry) {
+        // Jis Instagram Account par message aaya hai uska ID
+        const igAccountId = entry.id;
         
         // ==========================================
         // 1. HANDLE DIRECT MESSAGES (DMs)
@@ -47,9 +49,27 @@ exports.handleInstagramWebhook = async (req, res) => {
               
               console.log(`💬 [Instagram DM] Received from ${senderId}: ${incomingText}`);
 
-              // Find the Influencer/Business Owner (In production, find via IG Account ID)
-              const user = await User.findOne({ role: 'owner' }); 
+              // Find the exact User who owns this Instagram Account
+              let user = await User.findOne({ 
+                $or: [
+                  { "igConfig.accountId": igAccountId },
+                  { "workspaces.igConfig.accountId": igAccountId }
+                ]
+              }); 
+              
+              if (!user) {
+                 console.log(`⚠️ [IG Webhook] Exact IG Account match not found for ${igAccountId}. Using fallback owner...`);
+                 user = await User.findOne({ role: 'owner' });
+              }
               if (!user) continue;
+
+              // 🚀 SMART ROUTING: Branch vs Main Page
+              let incomingWorkspaceId = 'main';
+              let activeWorkspace = null;
+              if (user.igConfig?.accountId !== igAccountId && user.workspaces) {
+                 activeWorkspace = user.workspaces.find(w => w.igConfig && w.igConfig.accountId === igAccountId);
+                 if (activeWorkspace) incomingWorkspaceId = activeWorkspace._id.toString();
+              }
 
               // Save incoming message to Inbox
               await Message.create({
@@ -113,8 +133,8 @@ exports.handleInstagramWebhook = async (req, res) => {
               const isAiEnabled = user.aiAgentEnabled !== false;
               if (isAiEnabled) {
                 try {
-                  let businessInfo = user.businessDescription || "an Instagram Creator";
-                  let ownerRules = user.aiRules || "Be professional and negotiate politely.";
+                  let businessInfo = activeWorkspace ? activeWorkspace.description : (user.businessDescription || "an Instagram Creator");
+                  let ownerRules = activeWorkspace ? activeWorkspace.aiRules : (user.aiRules || "Be professional and negotiate politely.");
                   
                   let aiContext = "";
                   
@@ -128,7 +148,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                     Your goal is to handle incoming promotion requests politely. If they agree to pricing, use the 'extract_brand_deal' tool.`;
                   } else {
                     // AI Persona 2: Sales & Support Agent (For Regular Businesses)
-                    aiContext = `You are a highly skilled Sales and Support AI Assistant for ${user.businessName || 'this business'}. 
+                    aiContext = `You are a highly skilled Sales and Support AI Assistant for ${activeWorkspace ? activeWorkspace.name : (user.businessName || 'this business')}. 
                     Business Details/Catalog: ${businessInfo}.
                     Rules: ${ownerRules}.
                     
@@ -202,8 +222,13 @@ exports.handleInstagramWebhook = async (req, res) => {
 
           console.log(`[Instagram Comment] Received from ${username}: ${commentText}`);
 
-          // Find the SaaS Owner to get their manual Auto-Replies
-          const user = await User.findOne({ role: 'owner' }); // MVP Fallback
+          // Find the exact user based on IG Account ID
+          let user = await User.findOne({ "igConfig.accountId": igAccountId });
+          if (!user) {
+             user = await User.findOne({ role: 'owner' }); 
+          }
+          if (!user) continue;
+          
           const autoReplies = user?.autoReplies || [];
 
           // 🌟 SMART LEAD EXTRACTION: Check if comment has a Phone Number

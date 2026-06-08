@@ -51,7 +51,12 @@ exports.handleWhatsApp = async (req, res) => {
         const value = changes.value;
         
         const phoneNumberId = value.metadata.phone_number_id;
-        const user = await User.findOne({ "whatsappConfig.phoneNumberId": phoneNumberId });
+        const user = await User.findOne({ 
+          $or: [
+            { "whatsappConfig.phoneNumberId": phoneNumberId },
+            { "workspaces.whatsappConfig.phoneNumberId": phoneNumberId }
+          ]
+        });
         
         if (!user) {
           console.error(`❌ [Webhook Error] No user found with phoneNumberId: ${phoneNumberId}`);
@@ -59,6 +64,15 @@ exports.handleWhatsApp = async (req, res) => {
         } else {
           console.log(`✅ [Webhook] User found: ${user.email} for Phone ID: ${phoneNumberId}`);
         }
+
+        // 🚀 SMART ROUTING: Determine if message came to Main Number or Dedicated Branch Number
+        let incomingWorkspaceId = 'main';
+        let activeWorkspace = null;
+        if (user.whatsappConfig?.phoneNumberId !== phoneNumberId && user.workspaces) {
+           activeWorkspace = user.workspaces.find(w => w.whatsappConfig && w.whatsappConfig.phoneNumberId === phoneNumberId);
+           if (activeWorkspace) incomingWorkspaceId = activeWorkspace._id.toString();
+        }
+        console.log(`🏢 [Routing] Message routed to Workspace: ${activeWorkspace ? activeWorkspace.name : 'Main Business'}`);
 
         // 1. CHECK FOR STATUS UPDATES
         if (value.statuses && value.statuses.length > 0) {
@@ -228,31 +242,35 @@ exports.handleWhatsApp = async (req, res) => {
             const incomingTextLower = incomingText.toLowerCase();
             if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
               
-              let menuRows = [
-                { 
-                  id: `workspace_default`, 
-                  title: (user.businessName || "Main Business").substring(0, 24), 
-                  description: (user.businessDescription || "Explore our products and services").substring(0, 72) 
-                }
-              ];
+              let menuRows = [];
               
-              if (user.workspaces && user.workspaces.length > 0) {
-                const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
-                if (validWs.length > 0) {
-                  const wsRows = validWs.map(w => ({
-                    id: `workspace_${w._id}`, 
-                    title: w.name.substring(0, 24), 
-                    description: (w.description || "View our services").substring(0, 72)
-                  }));
-                  menuRows = [...menuRows, ...wsRows];
-                }
-              } 
+              if (incomingWorkspaceId === 'main') {
+                  menuRows.push({ 
+                    id: `workspace_default`, 
+                    title: (user.businessName || "Main Business").substring(0, 24), 
+                    description: (user.businessDescription || "Explore our products and services").substring(0, 69) 
+                  });
+                  
+                  if (user.workspaces && user.workspaces.length > 0) {
+                    const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
+                    validWs.forEach(w => menuRows.push({
+                      id: `workspace_${w._id}`, title: w.name.substring(0, 24), description: (w.description || "View our services").substring(0, 69)
+                    }));
+                  } 
+              } else {
+                  // Branch Number: Skip main menu, show ONLY this branch
+                  menuRows.push({
+                    id: `workspace_${incomingWorkspaceId}`, 
+                    title: activeWorkspace.name.substring(0, 24), 
+                    description: (activeWorkspace.description || "View our services").substring(0, 69)
+                  });
+              }
               
               // WhatsApp API limits a section to maximum 10 rows
               menuRows = menuRows.slice(0, 10);
 
               // 🚀 SMART LINKS INJECTION
-              let bodyText = `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:`;
+              let bodyText = incomingWorkspaceId === 'main' ? `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:` : `Welcome to *${activeWorkspace.name}*! 🏢\n\nPlease select an option below:`;
               const links = user.digitalCardConfig || {};
               const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
               
@@ -269,7 +287,7 @@ exports.handleWhatsApp = async (req, res) => {
 
               const interactiveObj = {
                 type: "list",
-                header: { type: "text", text: `Welcome to ${user.fullName || 'Our Business'}` },
+                header: { type: "text", text: `Welcome to ${incomingWorkspaceId === 'main' ? (user.businessName || 'Our Business') : activeWorkspace.name}` },
                 body: { text: bodyText },
                 footer: { text: "Powered by DealClose AI" },
                 action: {
