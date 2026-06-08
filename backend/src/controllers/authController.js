@@ -179,9 +179,18 @@ exports.whatsappConnect = async (req, res) => {
       }
     }
 
-    if (requestedPhoneId) { const match = allPhones.find(p => p.id === requestedPhoneId); if (match) { targetPhone = match; targetWaba = match.wabaId; } }
-    if (!targetPhone) { const match = allPhones.find(p => !usedPhoneIds.includes(p.id)); if (match) { targetPhone = match; targetWaba = match.wabaId; } }
-    if (!targetPhone && allPhones.length > 0) { targetPhone = allPhones[0]; targetWaba = allPhones[0].wabaId; }
+    if (requestedPhoneId) { 
+      const match = allPhones.find(p => p.id === requestedPhoneId); 
+      if (match) { 
+        targetPhone = match; targetWaba = match.wabaId; 
+      } else {
+        return res.status(400).json({ success: false, message: `Target Phone ID (${requestedPhoneId}) not found in Meta's response! You clicked 'Got it' without selecting the new number. Please Reconnect, click 'Edit Settings' in the Meta popup, and TICK the new number.` });
+      }
+    } else {
+      const match = allPhones.find(p => !usedPhoneIds.includes(p.id)); 
+      if (match) { targetPhone = match; targetWaba = match.wabaId; }
+      if (!targetPhone && allPhones.length > 0) { targetPhone = allPhones[0]; targetWaba = allPhones[0].wabaId; }
+    }
 
     if (!targetPhone) {
       return res.status(400).json({ success: false, message: 'No valid phone numbers found for this WABA.' });
@@ -313,11 +322,13 @@ exports.instagramConnect = async (req, res) => {
 
     if (requestedAccountId) {
         targetAccount = availableAccounts.find(acc => acc.accountId === requestedAccountId);
-    }
-    if (!targetAccount) {
+        if (!targetAccount) {
+            return res.status(400).json({ success: false, message: `Target IG Account ID (${requestedAccountId}) not found in Meta's response! You clicked 'Got it' without selecting the new page. Please Reconnect, click 'Edit Settings' in the Meta popup, and TICK the new Instagram page!` });
+        }
+    } else {
         targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
+        if (!targetAccount) { targetAccount = availableAccounts[0]; }
     }
-    if (!targetAccount) { targetAccount = availableAccounts[0]; }
 
     const igConfigObj = {
       accessToken: clientAccessToken,
