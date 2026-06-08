@@ -143,6 +143,9 @@ exports.whatsappConnect = async (req, res) => {
 
     const wabaIds = debugResponse.data.data.granular_scopes.find(s => s.scope === 'whatsapp_business_messaging')?.target_ids || [];
     
+    console.log(`\n================== [META WHATSAPP DEBUG] ==================`);
+    console.log(`🔍 1. WABA IDs Found from Meta:`, wabaIds);
+    
     if (wabaIds.length === 0) {
       return res.status(400).json({ success: false, message: 'Could not find a valid WhatsApp Business Account for this user.' });
     }
@@ -173,11 +176,14 @@ exports.whatsappConnect = async (req, res) => {
           headers: { Authorization: `Bearer ${clientAccessToken}` }
         });
         const phones = phoneResponse.data.data || [];
+        console.log(`🔍 2. Phones found for WABA ${wId}:`, phones.map(p => `${p.display_phone_number} (ID: ${p.id})`));
         for (const p of phones) allPhones.push({ ...p, wabaId: wId });
       } catch (err) {
         console.log('Skipping WABA, no phones:', err.message);
       }
     }
+    
+    console.log(`🔍 3. Total Phones Extracted:`, allPhones.length);
 
     if (requestedPhoneId) { 
       const match = allPhones.find(p => p.id === requestedPhoneId); 
@@ -195,6 +201,9 @@ exports.whatsappConnect = async (req, res) => {
     if (!targetPhone) {
       return res.status(400).json({ success: false, message: 'No valid phone numbers found for this WABA.' });
     }
+
+    console.log(`✅ 4. TARGET PHONE SELECTED:`, targetPhone.display_phone_number);
+    console.log(`===========================================================\n`);
 
     const waConfigObj = {
       accessToken: clientAccessToken,
@@ -278,6 +287,9 @@ exports.instagramConnect = async (req, res) => {
     });
 
     const pages = pagesResponse.data.data;
+    console.log(`\n================== [META INSTAGRAM DEBUG] ==================`);
+    console.log(`🔍 1. Facebook Pages Found from Meta (${pages?.length || 0}):`, pages ? pages.map(p => `${p.name} (ID: ${p.id})`) : 'None');
+
     if (!pages || pages.length === 0) {
         return res.status(400).json({ success: false, message: 'No Facebook Pages found for your account.' });
     }
@@ -302,16 +314,22 @@ exports.instagramConnect = async (req, res) => {
     for (const page of pages) {
         try {
             const igResponse = await axios.get(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${clientAccessToken}`);
-            if (igResponse.data.instagram_business_account) {
+            const igAcc = igResponse.data.instagram_business_account;
+            console.log(`🔍 2. Checking FB Page "${page.name}": IG Account Linked? ->`, igAcc ? `YES (ID: ${igAcc.id})` : 'NO');
+            
+            if (igAcc) {
                 availableAccounts.push({
-                   accountId: igResponse.data.instagram_business_account.id,
-                   pageId: page.id
+                   accountId: igAcc.id,
+                   pageId: page.id,
+                   pageName: page.name
                 });
             }
         } catch (err) {
             console.log('Skipping page, no IG connected:', err.message);
         }
     }
+    
+    console.log(`🔍 3. Total Available IG Accounts:`, availableAccounts.map(a => `IG ID: ${a.accountId} (From FB Page: ${a.pageName})`));
 
     if (availableAccounts.length === 0) {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
@@ -329,6 +347,9 @@ exports.instagramConnect = async (req, res) => {
         targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
         if (!targetAccount) { targetAccount = availableAccounts[0]; }
     }
+    
+    console.log(`✅ 4. TARGET IG ACCOUNT SELECTED:`, targetAccount.accountId);
+    console.log(`============================================================\n`);
 
     const igConfigObj = {
       accessToken: clientAccessToken,

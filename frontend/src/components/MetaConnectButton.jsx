@@ -129,7 +129,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
         : 'instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
       response_type: 'code',
-      auth_type: 'rerequest', // 🔥 Forces Meta to re-evaluate permissions so user can change the Page for new branch
+      auth_type: 'reauthenticate', // 🔥 CHANGED to reauthenticate: Force Meta to completely reset login flow to show "Edit Settings"
       override_default_response_type: true
     };
 
