@@ -233,6 +233,7 @@ export default function Settings() {
       };
       await api.put('/users/profile', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
+      await fetchSettings(); // 🔥 Refresh background IDs instantly so Meta Connect doesn't fail
     } catch (error) {
       alert('Error saving settings: ' + (error.response?.data?.message || error.message));
     }
@@ -659,10 +660,14 @@ export default function Settings() {
 
                   {/* Branch Specific External API */}
                   <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">🔗 External Website API</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10 bg-[#1a1a1a] p-5 rounded-xl border border-gray-800">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10 bg-[#1a1a1a] p-6 rounded-xl border border-gray-800 shadow-inner">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Base Website URL</label>
                       <input type="url" value={activeWs.externalApiUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiUrl', e.target.value)} placeholder="https://branch-domain.com" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">API Secret Token / Key</label>
+                      <input type="password" value={activeWs.externalApiToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiToken', e.target.value)} placeholder="API Secret" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Search/Catalog Endpoint</label>
@@ -671,6 +676,14 @@ export default function Settings() {
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Quick Post Endpoint</label>
                       <input type="url" value={activeWs.externalApiPostUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiPostUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
+                    </div>
+                    <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Publish Blog Endpoint</label>
+                       <input type="url" value={activeWs.externalApiBlogUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiBlogUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
+                    </div>
+                    <div>
+                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Schedule Visit Endpoint</label>
+                       <input type="url" value={activeWs.externalApiVisitUrl || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'externalApiVisitUrl', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" placeholder="API endpoint" />
                     </div>
                   </div>
 

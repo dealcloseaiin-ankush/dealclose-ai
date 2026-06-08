@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import api from '../services/api';
 
 const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp', workspaceId = 'main', onSuccess }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
@@ -97,25 +98,14 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
         console.log('✅ [MetaConnect] Meta Auth Success. Auth Code extracted:', authCode);
         
         // 3. Send Credentials to our Backend API
-        const token = localStorage.getItem('token'); // Get user session token
         
         console.log('➡️ [MetaConnect] Sending authCode to backend API...');
-        fetch(`https://dealclose-ai.onrender.com/api/users/settings/${platform}-connect`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            authCode: authCode, // Backend ko code bhejein
-            workspaceId: workspaceId // Branch/Workspace ID bhejein taaki wahi save ho
-            // Client ki WABA ID aur Phone ID aapko backend me token exchange karne ke baad
-            // 'GET /debug_token' ya 'GET /client_waba' API se nikalni hogi.
-            // Frontend se directly bhejna safe/reliable nahi hota Tech Provider flow me.
-          })
+        api.post(`/users/settings/${platform}-connect`, {
+          authCode: authCode,
+          workspaceId: workspaceId
         })
-        .then(res => res.json())
-        .then(data => {
+        .then(res => {
+          const data = res.data;
           console.log('➡️ [MetaConnect] Backend API response:', data);
           if (data.success) {
             alert('🎉 Meta Accounts (WhatsApp & Instagram) Connected Successfully!');
