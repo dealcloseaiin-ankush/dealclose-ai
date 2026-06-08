@@ -15,7 +15,7 @@ exports.verifyInstagramWebhook = async (req, res) => {
     return res.status(200).send("🚀 DealClose AI Instagram Webhook is LIVE and securely running! Waiting for Meta's POST requests.");
   }
 
-  if (mode === 'subscribe' && (token === process.env.META_WEBHOOK_VERIFY_TOKEN || token === 'my_secure_webhook_token_123' || token === 'ankush@7828289433')) {
+  if (mode === 'subscribe' && (token === process.env.META_WEBHOOK_VERIFY_TOKEN || token === 'ankush@7828289433')) {
     console.log('✅ Instagram Webhook Verified Successfully!');
     return res.status(200).send(challenge);
   }
