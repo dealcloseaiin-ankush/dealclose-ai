@@ -194,12 +194,11 @@ exports.whatsappConnect = async (req, res) => {
       }
     } else {
       const match = allPhones.find(p => !usedPhoneIds.includes(p.id)); 
-      if (match) { targetPhone = match; targetWaba = match.wabaId; }
-      if (!targetPhone && allPhones.length > 0) { targetPhone = allPhones[0]; targetWaba = allPhones[0].wabaId; }
-    }
-
-    if (!targetPhone) {
-      return res.status(400).json({ success: false, message: 'No valid phone numbers found for this WABA.' });
+      if (match) { 
+        targetPhone = match; targetWaba = match.wabaId; 
+      } else {
+        return res.status(400).json({ success: false, message: `No new WhatsApp numbers found! The numbers Meta returned are already in use by your other branches. Please click 'Edit Settings' in the Meta popup and tick your NEW number.` });
+      }
     }
 
     console.log(`✅ 4. TARGET PHONE SELECTED:`, targetPhone.display_phone_number);
@@ -345,7 +344,9 @@ exports.instagramConnect = async (req, res) => {
         }
     } else {
         targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
-        if (!targetAccount) { targetAccount = availableAccounts[0]; }
+        if (!targetAccount) { 
+            return res.status(400).json({ success: false, message: `No new Instagram accounts found! The accounts Meta returned are already in use by your other branches. Please click 'Edit Settings' in the Meta popup and tick your NEW Instagram page.` });
+        }
     }
     
     console.log(`✅ 4. TARGET IG ACCOUNT SELECTED:`, targetAccount.accountId);
