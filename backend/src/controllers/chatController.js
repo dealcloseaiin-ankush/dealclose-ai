@@ -51,12 +51,24 @@ exports.getChats = async (req, res) => {
       };
     });
 
-    let enrichedMessages = messages.map(msg => ({
-      ...msg,
-      customerName: leadDataMap[msg.customerPhone]?.name || 'Unknown',
-      customerCity: leadDataMap[msg.customerPhone]?.city || '',
-      workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main'
-    }));
+    let enrichedMessages = messages.map(msg => {
+      let platform = 'whatsapp';
+      if (msg.customerPhone && msg.customerPhone.startsWith('IG_')) {
+        platform = 'instagram_dm';
+      } else if (msg.tags && msg.tags.includes('ig_comment')) {
+        platform = 'instagram_comment';
+      } else if (msg.customerPhone && isNaN(msg.customerPhone.replace('+', ''))) {
+        platform = 'instagram_comment'; // Fallback for pure text usernames
+      }
+
+      return {
+        ...msg,
+        platform, // Added Platform Tag for Frontend Filters
+        customerName: leadDataMap[msg.customerPhone]?.name || (platform !== 'whatsapp' ? msg.customerPhone.replace('IG_', '@') : 'Unknown'),
+        customerCity: leadDataMap[msg.customerPhone]?.city || '',
+        workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main'
+      };
+    });
 
     // If there's a search query, filter the results
     if (search) {
@@ -96,6 +108,22 @@ exports.sendManualMessage = async (req, res) => {
     if (!userId) {
       console.log(`❌ [DEBUG Chat Flow] Failed: User ID is missing from Auth Token.`);
       return res.status(401).json({ message: 'Session expired. Please login again.' });
+    }
+
+    // 🚀 NEW: HANDLE INSTAGRAM DIRECT MESSAGES (Manual Reply from UI)
+    if (customerPhone.startsWith('IG_') || isNaN(customerPhone.replace('+', ''))) {
+      console.log(`➡️ [DEBUG Chat Flow] Handling Manual Reply for Instagram: ${customerPhone}`);
+      
+      const newMsg = await Message.create({
+        userId, 
+        customerPhone: customerPhone, 
+        messageText, 
+        direction: 'outgoing', 
+        status: 'sent', 
+        sentBy: 'staff'
+      });
+      // TODO: Connect Meta Graph API to actually dispatch IG message to user here.
+      return res.status(201).json({ message: newMsg });
     }
 
     // 1. SMART PHONE NUMBER FORMATTING

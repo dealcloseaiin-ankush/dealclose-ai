@@ -10,6 +10,11 @@ exports.verifyInstagramWebhook = async (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
+  // Browser test fallback (So you don't see 403 Forbidden in Chrome)
+  if (!mode && !token) {
+    return res.status(200).send("🚀 DealClose AI Instagram Webhook is LIVE and securely running! Waiting for Meta's POST requests.");
+  }
+
   if (mode === 'subscribe' && (token === process.env.META_WEBHOOK_VERIFY_TOKEN || token === 'my_secure_webhook_token_123' || token === 'ankush@7828289433')) {
     console.log('✅ Instagram Webhook Verified Successfully!');
     return res.status(200).send(challenge);
