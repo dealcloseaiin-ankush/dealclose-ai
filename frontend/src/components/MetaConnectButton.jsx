@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp', workspaceId = 'main' }) => {
+const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp', workspaceId = 'main', onSuccess }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
   const [loading, setLoading] = useState(false);
 
@@ -119,7 +119,11 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
           console.log('➡️ [MetaConnect] Backend API response:', data);
           if (data.success) {
             alert('🎉 Meta Accounts (WhatsApp & Instagram) Connected Successfully!');
-            window.location.reload(); // Reload page to show "Connected ✅" badge instantly
+            if (onSuccess) {
+              onSuccess(); // Background data refresh
+            } else {
+              window.location.reload(); // Fallback
+            }
           } else {
             alert('Failed to save Meta settings: ' + data.message);
           }
@@ -148,7 +152,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
   };
 
   return (
-    <button 
+    <button type="button"
       onClick={handleMetaLogin}
       disabled={loading || !isSdkLoaded}
       className={`flex items-center justify-center gap-2 ${platform === 'instagram' ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90' : 'bg-[#1877F2] hover:bg-[#166FE5]'} text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all disabled:opacity-50`}

@@ -70,58 +70,59 @@ export default function Settings() {
     setConfig({ ...config, customWebhooks: updated });
   };
 
+  const fetchSettings = async () => {
+    try {
+      const { data } = await api.get('/users/profile');
+      const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
+      
+      if (savedData) {
+        setConfig({
+          whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || '',
+          phoneNumberId: savedData.phoneNumberId || savedData.whatsappConfig?.phoneNumberId || '',
+          wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || '',
+          twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || '',
+          twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || '',
+          twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || '',
+          instagramLink: savedData.digitalCardConfig?.instagram || '',
+          facebookLink: savedData.digitalCardConfig?.facebook || '',
+          youtubeLink: savedData.digitalCardConfig?.youtube || '',
+          googleReviewLink: savedData.digitalCardConfig?.googleReview || '',
+          websiteLink: savedData.digitalCardConfig?.website || '',
+          discountPercentage: savedData.discountConfig?.percentage || '',
+          discountCode: savedData.discountConfig?.code || '',
+          validityDays: savedData.discountConfig?.validityDays || '30',
+          workspaces: savedData.workspaces || [], // Fetch saved workspaces
+          aiAgentEnabled: savedData.aiAgentEnabled !== false,
+          acceptCollabs: savedData.acceptCollabs || false,
+          businessDescription: savedData.businessDescription || '',
+          businessName: savedData.businessName || '',
+          aiRules: savedData.aiRules || '',
+          ownerPhone: savedData.ownerPhone || '',
+          metaPixelId: savedData.metaAdsConfig?.pixelId || '',
+          metaAccessToken: savedData.metaAdsConfig?.accessToken || '',
+          externalApiUrl: savedData.externalApiUrl || '',
+          externalApiToken: savedData.externalApiToken || '',
+          externalApiSearchUrl: savedData.externalApiSearchUrl || '',
+          externalApiPostUrl: savedData.externalApiPostUrl || '',
+          externalApiBlogUrl: savedData.externalApiBlogUrl || '',
+          externalApiVisitUrl: savedData.externalApiVisitUrl || '',
+          customWebhooks: savedData.customWebhooks || [],
+          igAccessToken: savedData.igConfig?.accessToken || '',
+          igAccountId: savedData.igConfig?.accountId || '',
+          fbPageId: savedData.igConfig?.pageId || ''
+        });
+        if (savedData._id) setUserId(savedData._id);
+        setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
+      }
+    } catch (error) {
+      console.error('Failed to load settings. It might be empty currently.', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Fetch saved settings on page load
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const { data } = await api.get('/users/profile');
-        const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
-        
-        if (savedData) {
-          setConfig({
-            whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || '',
-            phoneNumberId: savedData.phoneNumberId || savedData.whatsappConfig?.phoneNumberId || '',
-            wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || '',
-            twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || '',
-            twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || '',
-            twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || '',
-            instagramLink: savedData.digitalCardConfig?.instagram || '',
-            facebookLink: savedData.digitalCardConfig?.facebook || '',
-            youtubeLink: savedData.digitalCardConfig?.youtube || '',
-            googleReviewLink: savedData.digitalCardConfig?.googleReview || '',
-            websiteLink: savedData.digitalCardConfig?.website || '',
-            discountPercentage: savedData.discountConfig?.percentage || '',
-            discountCode: savedData.discountConfig?.code || '',
-            validityDays: savedData.discountConfig?.validityDays || '30',
-            workspaces: savedData.workspaces || [], // Fetch saved workspaces
-            aiAgentEnabled: savedData.aiAgentEnabled !== false,
-            acceptCollabs: savedData.acceptCollabs || false,
-            businessDescription: savedData.businessDescription || '',
-            businessName: savedData.businessName || '',
-            aiRules: savedData.aiRules || '',
-            ownerPhone: savedData.ownerPhone || '',
-            metaPixelId: savedData.metaAdsConfig?.pixelId || '',
-            metaAccessToken: savedData.metaAdsConfig?.accessToken || '',
-            externalApiUrl: savedData.externalApiUrl || '',
-            externalApiToken: savedData.externalApiToken || '',
-            externalApiSearchUrl: savedData.externalApiSearchUrl || '',
-            externalApiPostUrl: savedData.externalApiPostUrl || '',
-            externalApiBlogUrl: savedData.externalApiBlogUrl || '',
-            externalApiVisitUrl: savedData.externalApiVisitUrl || '',
-            customWebhooks: savedData.customWebhooks || [],
-            igAccessToken: savedData.igConfig?.accessToken || '',
-            igAccountId: savedData.igConfig?.accountId || '',
-            fbPageId: savedData.igConfig?.pageId || ''
-          });
-          if (savedData._id) setUserId(savedData._id);
-          setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
-        }
-      } catch (error) {
-        console.error('Failed to load settings. It might be empty currently.', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchSettings();
   }, []);
 
@@ -216,6 +217,11 @@ export default function Settings() {
           pixelId: config.metaPixelId,
           accessToken: config.metaAccessToken
         },
+      igConfig: {
+        accessToken: config.igAccessToken,
+        accountId: config.igAccountId,
+        pageId: config.fbPageId
+      },
         externalApiUrl: config.externalApiUrl,
         externalApiToken: config.externalApiToken,
         externalApiSearchUrl: config.externalApiSearchUrl,
@@ -363,7 +369,7 @@ export default function Settings() {
                   {/* WhatsApp Meta Config */}
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold text-green-400 flex items-center">WhatsApp (Meta API)</h2>
-                    <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" />
+                  <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="md:col-span-2 relative">
@@ -427,18 +433,18 @@ export default function Settings() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">IG Access Token</label>
-                        <input type="password" value={config.igAccessToken} readOnly placeholder="IG...Token (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
+                    <input type="password" name="igAccessToken" value={config.igAccessToken} onChange={handleChange} placeholder="IG Token (Auto-filled or Paste here)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">FB Page / IG Account ID</label>
-                        <input type="text" value={config.igAccountId || config.fbPageId} readOnly placeholder="123456789 (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
+                    <input type="text" name="igAccountId" value={config.igAccountId} onChange={handleChange} placeholder="Target Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
                       </div>
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
 
                     {!igConnected ? (
-                      <MetaConnectButton buttonText="Connect Instagram via Meta" platform="instagram" workspaceId="main" />
+                  <MetaConnectButton buttonText="Connect Instagram via Meta" platform="instagram" workspaceId="main" onSuccess={fetchSettings} />
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
@@ -668,16 +674,24 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  {/* Branch Independent Meta API Connect */}
-                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">Independent Connections</h3>
+              {/* Branch Independent Meta API Connect (Target Specific Accounts) */}
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">Target Meta Connections</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">IG Access Token</label>
-                      <input type="password" value={activeWs.igConfig?.accessToken || activeWs.igAccessToken || ''} readOnly placeholder="IG...Token (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WhatsApp Phone ID</label>
+                  <input type="text" value={activeWs.whatsappConfig?.phoneNumberId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'whatsappConfig', { ...activeWs.whatsappConfig, phoneNumberId: e.target.value })} placeholder="Target Phone ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WABA ID</label>
+                  <input type="text" value={activeWs.whatsappConfig?.wabaId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'whatsappConfig', { ...activeWs.whatsappConfig, wabaId: e.target.value })} placeholder="Target WABA ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
+                  <input type="password" value={activeWs.igConfig?.accessToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'igConfig', { ...activeWs.igConfig, accessToken: e.target.value })} placeholder="IG Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">FB Page / IG Account ID</label>
-                      <input type="text" value={activeWs.igConfig?.accountId || activeWs.fbPageId || ''} readOnly placeholder="123456789 (Auto-filled by Meta)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-gray-400 text-xs outline-none cursor-not-allowed" />
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
+                  <input type="text" value={activeWs.igConfig?.accountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'igConfig', { ...activeWs.igConfig, accountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
                     </div>
                   </div>
                   
@@ -695,8 +709,8 @@ export default function Settings() {
                            </div>
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
-                         <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs._id} />
-                         <MetaConnectButton buttonText={activeWs.igConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs._id} />
+                     <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs._id} onSuccess={fetchSettings} />
+                     <MetaConnectButton buttonText={activeWs.igConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs._id} onSuccess={fetchSettings} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

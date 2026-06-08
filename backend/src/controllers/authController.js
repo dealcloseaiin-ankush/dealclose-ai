@@ -163,7 +163,9 @@ exports.whatsappConnect = async (req, res) => {
 
     let targetPhone = null;
     let targetWaba = null;
+    let requestedPhoneId = workspaceId && workspaceId !== 'main' ? userDb.workspaces.find(w => w._id.toString() === workspaceId)?.whatsappConfig?.phoneNumberId : userDb.whatsappConfig?.phoneNumberId;
 
+    const allPhones = [];
     // 3. Fetch Phone Number ID attached to this WABA
     for (const wId of wabaIds) {
       try {
@@ -171,13 +173,15 @@ exports.whatsappConnect = async (req, res) => {
           headers: { Authorization: `Bearer ${clientAccessToken}` }
         });
         const phones = phoneResponse.data.data || [];
-        const unused = phones.find(p => !usedPhoneIds.includes(p.id));
-        if (unused) { targetPhone = unused; targetWaba = wId; break; }
-        if (!targetPhone && phones.length > 0) { targetPhone = phones[0]; targetWaba = wId; }
+        for (const p of phones) allPhones.push({ ...p, wabaId: wId });
       } catch (err) {
         console.log('Skipping WABA, no phones:', err.message);
       }
     }
+
+    if (requestedPhoneId) { const match = allPhones.find(p => p.id === requestedPhoneId); if (match) { targetPhone = match; targetWaba = match.wabaId; } }
+    if (!targetPhone) { const match = allPhones.find(p => !usedPhoneIds.includes(p.id)); if (match) { targetPhone = match; targetWaba = match.wabaId; } }
+    if (!targetPhone && allPhones.length > 0) { targetPhone = allPhones[0]; targetWaba = allPhones[0].wabaId; }
 
     if (!targetPhone) {
       return res.status(400).json({ success: false, message: 'No valid phone numbers found for this WABA.' });
@@ -304,7 +308,15 @@ exports.instagramConnect = async (req, res) => {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
     }
 
-    let targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
+    let requestedAccountId = workspaceId && workspaceId !== 'main' ? userDb.workspaces.find(w => w._id.toString() === workspaceId)?.igConfig?.accountId : userDb.igConfig?.accountId;
+    let targetAccount = null;
+
+    if (requestedAccountId) {
+        targetAccount = availableAccounts.find(acc => acc.accountId === requestedAccountId);
+    }
+    if (!targetAccount) {
+        targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
+    }
     if (!targetAccount) { targetAccount = availableAccounts[0]; }
 
     const igConfigObj = {
