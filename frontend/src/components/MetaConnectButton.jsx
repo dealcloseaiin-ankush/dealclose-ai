@@ -129,6 +129,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
         : 'instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
       return_scopes: true,
       response_type: 'code',
+      auth_type: 'rerequest',
       override_default_response_type: true
     };
 

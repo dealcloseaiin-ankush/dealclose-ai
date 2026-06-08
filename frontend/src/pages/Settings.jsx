@@ -141,7 +141,7 @@ export default function Settings() {
     if (config.workspaces && config.workspaces.length >= 5) {
       return alert("Business limit reached! Please upgrade your plan to add more branches.");
     }
-    setConfig({ ...config, workspaces: [...(config.workspaces || []), { name: 'New Branch', description: '' }] });
+    setConfig({ ...config, workspaces: [...(config.workspaces || []), { name: 'New Branch', description: '', email: '' }] });
     setActiveWorkspace(`ws_${(config.workspaces || []).length}`);
   };
 
@@ -613,6 +613,10 @@ export default function Settings() {
                     <div>
                       <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Short Menu Description <span className="text-rose-500">*</span></label>
                       <input type="text" required value={activeWs.description} onChange={(e) => handleWorkspaceChange(wsIndex, 'description', e.target.value)} placeholder="e.g. Real Estate Sales" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Branch Email ID</label>
+                      <input type="email" value={activeWs.email || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'email', e.target.value)} placeholder="branch@yourbusiness.com" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
                     </div>
                   </div>
 

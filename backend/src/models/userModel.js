@@ -73,6 +73,7 @@ const userSchema = new Schema({
   workspaces: [{ 
     name: { type: String }, 
     description: { type: String }, // E.g., "Real Estate", "Electronics" for Cross-Selling
+    email: { type: String }, // Branch Email ID
     // --- Separate AI Brain for each Workspace ---
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
