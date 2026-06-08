@@ -5,9 +5,9 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
   const [loading, setLoading] = useState(false);
 
-  // 🔥 SAFE FALLBACK: Agar Render environment variables kaam na karein, toh yahan direct paste kar dein!
-  const APP_ID = import.meta.env.VITE_META_APP_ID || '1611867760088959'; 
-  const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID || '1559471809111797';
+  // 🔥 IMPORTANT: Sirf .env se hi aapki actual Meta App ID aani chahiye!
+  const APP_ID = import.meta.env.VITE_META_APP_ID; 
+  const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
 
   // 1. Load Facebook SDK for Meta Embedded Signup
   useEffect(() => {
@@ -58,7 +58,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     }
 
     if (!APP_ID) {
-      alert("⚠️ Meta App ID is missing! Please paste your actual App ID in MetaConnectButton.jsx");
+      alert("⚠️ VITE_META_APP_ID is missing! Please add it to your frontend/.env file.");
       return;
     }
 

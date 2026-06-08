@@ -117,9 +117,10 @@ exports.whatsappConnect = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing authCode or unauthorized session' });
     }
 
-    // TODO: Apne Meta App ka ID aur Secret yahan dalein (Ya .env se lein)
-    const APP_ID = process.env.META_APP_ID || 'YOUR_APP_ID';
-    const APP_SECRET = process.env.META_APP_SECRET || 'YOUR_APP_SECRET';
+    const APP_ID = process.env.META_APP_ID;
+    const APP_SECRET = process.env.META_APP_SECRET;
+    
+    if (!APP_ID || !APP_SECRET) return res.status(400).json({ success: false, message: 'Backend .env is missing META_APP_ID or META_APP_SECRET' });
 
     // 1. Exchange the authCode for a System User Access Token
     const tokenResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
@@ -244,8 +245,10 @@ exports.instagramConnect = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing authCode or unauthorized session' });
     }
 
-    const APP_ID = process.env.META_APP_ID || '1611867760088959';
-    const APP_SECRET = process.env.META_APP_SECRET; // Ensure this is in your .env file
+    const APP_ID = process.env.META_APP_ID;
+    const APP_SECRET = process.env.META_APP_SECRET;
+    
+    if (!APP_ID || !APP_SECRET) return res.status(400).json({ success: false, message: 'Backend .env is missing META_APP_ID or META_APP_SECRET' });
 
     let clientAccessToken = authCode;
 
