@@ -10,6 +10,8 @@ exports.verifyInstagramWebhook = async (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
+  console.log(`\n🔍 [IG Webhook Verify Request] Mode: ${mode}, Token: ${token}`);
+
   // Browser test fallback (So you don't see 403 Forbidden in Chrome)
   if (!mode && !token) {
     return res.status(200).send("🚀 DealClose AI Instagram Webhook is LIVE and securely running! Waiting for Meta's POST requests.");
@@ -18,6 +20,8 @@ exports.verifyInstagramWebhook = async (req, res) => {
   if (mode === 'subscribe' && (token === process.env.META_WEBHOOK_VERIFY_TOKEN || token === 'ankush@7828289433')) {
     console.log('✅ Instagram Webhook Verified Successfully!');
     return res.status(200).send(challenge);
+  } else {
+    console.error('❌ Instagram Webhook Verification Failed! Token Mismatch.');
   }
   return res.sendStatus(403);
 };
@@ -29,6 +33,7 @@ exports.handleInstagramWebhook = async (req, res) => {
   res.status(200).send('EVENT_RECEIVED');
   
   console.log("\n================ [INSTAGRAM WEBHOOK INCOMING] ================");
+  console.log("➡️ Headers:", JSON.stringify(req.headers));
   console.log("➡️ Raw Payload:", JSON.stringify(req.body, null, 2));
   try {
     const body = req.body;
