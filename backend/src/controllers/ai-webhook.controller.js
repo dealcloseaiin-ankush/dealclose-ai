@@ -21,6 +21,11 @@ exports.verifyWhatsAppWebhook = async (req, res) => {
 
   const mySecretToken = "ankush@7828289433";
 
+  // Browser test fallback (So you don't see Bad Request in Chrome)
+  if (!mode && !token) {
+    return res.status(200).send("🚀 DealClose AI WhatsApp Webhook is LIVE and securely running! Waiting for Meta's POST requests.");
+  }
+
   if (mode && token) {
     if (mode === 'subscribe' && (token === process.env.META_WEBHOOK_VERIFY_TOKEN || token === mySecretToken)) {
       console.log('✅ Meta Webhook Verified Successfully!');

@@ -293,7 +293,22 @@ export default function Chats() {
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden absolute top-4 left-4 bg-gray-800 text-white px-3 py-2 rounded-lg font-bold">☰ Chats</button>
             <p className="text-6xl mb-4">💬</p>
             <h3 className="text-2xl font-bold text-white mb-2">No Chat Selected</h3>
-            <p>Select a chat from the sidebar or click "+ New Chat" to start messaging.</p>
+            <p className="mb-6">Select a chat from the sidebar or click "+ New Chat" to start messaging.</p>
+            
+            {allMessages.length === 0 && (
+              <div className="bg-gray-900/80 border border-gray-700 p-6 rounded-2xl max-w-lg text-left mt-4 shadow-xl">
+                <h4 className="text-lg font-bold text-yellow-500 mb-3 flex items-center gap-2">🛠️ Not receiving Meta messages?</h4>
+                <p className="text-sm text-gray-300 mb-3">Settings shows <strong>"Connected ✅"</strong> but Inbox is empty? This is a common Meta Webhook issue. Please check:</p>
+                <ul className="text-sm text-gray-400 space-y-2 list-disc pl-5">
+                  <li><strong>Instagram App:</strong> Go to Settings &gt; Messages and story replies &gt; Message controls &gt; Turn ON <strong className="text-white">"Allow access to messages"</strong>.</li>
+                  <li><strong>Meta App Mode:</strong> Your App in developers.facebook.com might be in "Development" mode. Switch it to "Live".</li>
+                  <li><strong>Webhook Subscriptions:</strong> Ensure your Meta App Webhook is subscribed to <code>messages</code> and <code>comments</code>.</li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-4 border-t border-gray-800 pt-3">
+                  Once Meta successfully sends the first webhook, your messages will instantly appear here!
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <>
