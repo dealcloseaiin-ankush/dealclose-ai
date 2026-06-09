@@ -115,8 +115,16 @@ exports.sendManualMessage = async (req, res) => {
     if (customerPhone.startsWith('IG_') || isNaN(customerPhone.replace('+', ''))) {
       console.log(`➡️ [DEBUG Chat Flow] Handling Manual Reply for Instagram: ${customerPhone}`);
       
-      const user = await User.findById(userId);
-      if (!user || !user.igConfig || !user.igConfig.accessToken) {
+      // .lean() is REQUIRED to read fields bypassing Mongoose strict schema
+      const user = await User.findById(userId).lean();
+      
+      let igToken = user?.igConfig?.accessToken;
+      if (!igToken && user?.workspaces) {
+         const wsWithToken = user.workspaces.find(w => w.igConfig && w.igConfig.accessToken);
+         if (wsWithToken) igToken = wsWithToken.igConfig.accessToken;
+      }
+
+      if (!user || !igToken) {
         console.log(`❌ [DEBUG Chat Flow] Instagram config missing.`);
         return res.status(400).json({ message: 'Instagram connection missing. Please link Instagram in Settings.' });
       }
@@ -133,7 +141,7 @@ exports.sendManualMessage = async (req, res) => {
       // Dispatch IG message via Meta Graph API
       try {
         let recipientId = customerPhone.replace('IG_', '');
-        await metaAdsService.sendInstagramDM(user.igConfig.accessToken, recipientId, messageText);
+        await metaAdsService.sendInstagramDM(igToken, recipientId, messageText);
         console.log(`✅ [DEBUG Chat Flow] Manual IG DM sent successfully to ${recipientId}`);
       } catch (igError) {
         newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
@@ -178,16 +186,23 @@ exports.sendManualMessage = async (req, res) => {
     );
     console.log(`⏸️ [DEBUG Chat Flow] AI Paused for customer ${formattedPhone} for 24 hours.`);
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).lean();
+    
+    let waToken = user?.whatsappConfig?.accessToken;
+    let waPhoneId = user?.whatsappConfig?.phoneNumberId;
+    if ((!waToken || !waPhoneId) && user?.workspaces) {
+       const wsWithWa = user.workspaces.find(w => w.whatsappConfig && w.whatsappConfig.accessToken);
+       if (wsWithWa) { waToken = wsWithWa.whatsappConfig.accessToken; waPhoneId = wsWithWa.whatsappConfig.phoneNumberId; }
+    }
     
     console.log(`➡️ [DEBUG Chat Flow] 5. Database Check - User Found: ${user ? 'Yes' : 'No'}`);
     if (user) {
-      console.log(`   - WhatsApp Config Exists: ${!!user.whatsappConfig}`);
-      console.log(`   - Access Token Present: ${!!user.whatsappConfig?.accessToken}`);
-      console.log(`   - Phone Number ID Present: ${!!user.whatsappConfig?.phoneNumberId}`);
+      console.log(`   - WhatsApp Config Exists: ${!!waToken}`);
+      console.log(`   - Access Token Present: ${!!waToken}`);
+      console.log(`   - Phone Number ID Present: ${!!waPhoneId}`);
     }
 
-    if (!user || !user.whatsappConfig?.accessToken || !user.whatsappConfig?.phoneNumberId) {
+    if (!user || !waToken || !waPhoneId) {
       console.log(`❌ [DEBUG Chat Flow] Failed at Step 5: WhatsApp config is missing in DB for this user.`);
       newMsg.messageText = `${messageText}\n\n[⚠️ Failed: WhatsApp keys not found. Please save them in Settings.]`;
       await newMsg.save();
@@ -199,8 +214,8 @@ exports.sendManualMessage = async (req, res) => {
     console.log(`➡️ [DEBUG Chat Flow] 6. Calling Meta WhatsApp API now for ${formattedPhone}...`);
     try {
       await whatsappService.sendTextMessage(
-        user.whatsappConfig.accessToken,
-        user.whatsappConfig.phoneNumberId,
+        waToken,
+        waPhoneId,
         formattedPhone,
         messageText
       );
