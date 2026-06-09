@@ -2,6 +2,7 @@ const aiService = require('../services/aiService');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel'); // Lead model import kiya gaya
+const Flow = require('../models/flowModel'); // 🚀 Flow model imported
 const metaAdsService = require('../services/metaAdsService');
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
