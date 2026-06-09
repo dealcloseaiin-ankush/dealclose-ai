@@ -74,7 +74,12 @@ exports.handleInstagramWebhook = async (req, res) => {
               
               if (!user) {
                  console.log(`⚠️ [IG Webhook] Exact IG Account match not found for ${igAccountId}. Using fallback owner...`);
-                 user = await User.findOne({ role: 'owner' });
+                 // 🚀 SMART FALLBACK: Find the most recently active user who actually connected an IG Token!
+                 // This prevents saving messages to old dead/dummy accounts in the database.
+                 user = await User.findOne({ "igConfig.accessToken": { $exists: true, $ne: "" } }).sort({ updatedAt: -1 });
+                 if (!user) {
+                   user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 });
+                 }
               }
               if (!user) continue;
 
@@ -123,6 +128,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;
                   
+                try {
+                  await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, menuMessage);
+                  console.log(`🤖 [IG Basic Bot]: Sent Menu to ${senderId}`);
+                } catch (apiErr) {
+                  console.error(`❌ [IG Send Error]: Failed to send Menu to ${senderId}`, apiErr.response?.data || apiErr.message);
+                }
+
                 await Message.create({ 
                   userId: user._id, 
                   customerPhone: `IG_${senderId}`, 
@@ -132,7 +144,6 @@ exports.handleInstagramWebhook = async (req, res) => {
                   sentBy: 'auto-reply',
                   timestamp: new Date()
                 });
-                console.log(`🤖 [IG Basic Bot]: Sent Menu to ${senderId}`);
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
 
@@ -140,6 +151,14 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (isCreator && (incomingTextLower === '2' || incomingTextLower.includes('collaboration'))) {
                 // 0 COST COLLAB CAPTURE
                 const collabMsg = `Thank you for your interest in collaborating! 🤝 Our team has received your request and will review your profile soon.`;
+                
+                try {
+                  await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, collabMsg);
+                  console.log(`🤖 [IG Basic Bot]: Sent Collab Response to ${senderId}`);
+                } catch (apiErr) {
+                  console.error(`❌ [IG Send Error]: Failed to send Collab Msg to ${senderId}`);
+                }
+
                 await Message.create({ 
                   userId: user._id, 
                   customerPhone: `IG_${senderId}`, 
@@ -170,6 +189,14 @@ exports.handleInstagramWebhook = async (req, res) => {
               // General Query / Human Fallback
               if (incomingTextLower === '3' || incomingTextLower.includes('general') || incomingTextLower.includes('human') || incomingTextLower.includes('team')) {
                 const generalMessage = isCreator ? `Your query has been recorded. Our team will review it shortly.` : `Thanks! I've notified our team. A human representative will get back to you shortly. ⏳`;
+                
+                try {
+                  await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, generalMessage);
+                  console.log(`🤖 [IG Basic Bot]: Sent General Response to ${senderId}`);
+                } catch (apiErr) {
+                  console.error(`❌ [IG Send Error]: Failed to send General Msg to ${senderId}`);
+                }
+
                 await Message.create({ 
                   userId: user._id, 
                   customerPhone: `IG_${senderId}`, 
@@ -179,7 +206,6 @@ exports.handleInstagramWebhook = async (req, res) => {
                   sentBy: 'auto-reply',
                   timestamp: new Date()
                 });
-                console.log(`🤖 [IG Basic Bot]: Sent General Response to ${senderId}`);
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
 
@@ -288,7 +314,11 @@ exports.handleInstagramWebhook = async (req, res) => {
              ]
           });
           if (!user) {
-             user = await User.findOne({ role: 'owner' }); 
+             // 🚀 SMART FALLBACK for Comments too
+             user = await User.findOne({ "igConfig.accessToken": { $exists: true, $ne: "" } }).sort({ updatedAt: -1 });
+             if (!user) {
+               user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 });
+             }
           }
           if (!user) continue;
           

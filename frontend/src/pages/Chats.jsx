@@ -33,6 +33,10 @@ export default function Chats() {
 
         const { data } = await api.get('/chats');
         const messages = Array.isArray(data) ? data : data.data || [];
+        
+        console.log("➡️ [Chats Debug] Total raw messages fetched from DB:", messages.length);
+        console.log("➡️ [Chats Debug] Message payload sample:", messages.slice(0, 3));
+        
         setAllMessages(messages);
         if (messages.length > 0) {
           setActiveCustomer(messages[0].customerPhone);
@@ -65,6 +69,8 @@ export default function Chats() {
 
     filteredMessages.forEach(msg => {
       const phone = msg.customerPhone;
+      if (!phone) return; // Prevent crashes on corrupt data
+      
       if (!map.has(phone)) {
         map.set(phone, { 
           phone, 
@@ -77,13 +83,17 @@ export default function Chats() {
       }
 
       const data = map.get(phone);
+      const msgDate = new Date(msg.timestamp || msg.createdAt || 0);
+      const lastMsgDate = new Date(data.lastMessage.timestamp || data.lastMessage.createdAt || 0);
+      
       // Track the latest message overall
-      if (new Date(msg.timestamp || msg.createdAt) > new Date(data.lastMessage.timestamp || data.lastMessage.createdAt)) {
+      if (msgDate > lastMsgDate) {
         data.lastMessage = msg;
       }
       // Track the latest INCOMING message to calculate 24-hour window
       if (msg.direction === 'incoming') {
-        if (!data.lastIncoming || new Date(msg.timestamp || msg.createdAt) > new Date(data.lastIncoming.timestamp || data.lastIncoming.createdAt)) {
+        const lastIncDate = data.lastIncoming ? new Date(data.lastIncoming.timestamp || data.lastIncoming.createdAt || 0) : new Date(0);
+        if (!data.lastIncoming || msgDate > lastIncDate) {
           data.lastIncoming = msg;
         }
       }
