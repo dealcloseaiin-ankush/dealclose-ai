@@ -38,9 +38,6 @@ export default function Chats() {
         console.log("➡️ [Chats Debug] Message payload sample:", messages.slice(0, 3));
         
         setAllMessages(messages);
-        if (messages.length > 0) {
-          setActiveCustomer(messages[0].customerPhone);
-        }
 
       } catch (error) {
         console.error("Failed to fetch chats", error);
@@ -54,13 +51,15 @@ export default function Chats() {
 
   // 🔥 Filter messages by selected Workspace
   const filteredMessages = useMemo(() => {
-    return allMessages.filter(msg => {
+    const filtered = allMessages.filter(msg => {
       const ws = msg.workspaceId || 'main';
       // Bring back older messages that were saved as 'default'
       const matchesWorkspace = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
       const matchesPlatform = platformFilter === 'all' || msg.platform === platformFilter;
       return matchesWorkspace && matchesPlatform;
     });
+    console.log(`➡️ [Chats Debug] Messages after Workspace/Platform Filter: ${filtered.length}`);
+    return filtered;
   }, [allMessages, activeWorkspace, platformFilter]);
 
   // Advanced logic to calculate 24-Hour Window, Needs Reply status, and Name/City
@@ -83,17 +82,19 @@ export default function Chats() {
       }
 
       const data = map.get(phone);
-      const msgDate = new Date(msg.timestamp || msg.createdAt || 0);
-      const lastMsgDate = new Date(data.lastMessage.timestamp || data.lastMessage.createdAt || 0);
+      
+      // SAFE DATE PARSING (Prevents 'Invalid Date' crashes)
+      const msgDate = new Date(msg.timestamp || msg.createdAt || 0).getTime();
+      const lastMsgDate = new Date(data.lastMessage.timestamp || data.lastMessage.createdAt || 0).getTime();
       
       // Track the latest message overall
-      if (msgDate > lastMsgDate) {
+      if (!isNaN(msgDate) && !isNaN(lastMsgDate) && msgDate > lastMsgDate) {
         data.lastMessage = msg;
       }
       // Track the latest INCOMING message to calculate 24-hour window
       if (msg.direction === 'incoming') {
-        const lastIncDate = data.lastIncoming ? new Date(data.lastIncoming.timestamp || data.lastIncoming.createdAt || 0) : new Date(0);
-        if (!data.lastIncoming || msgDate > lastIncDate) {
+        const lastIncDate = data.lastIncoming ? new Date(data.lastIncoming.timestamp || data.lastIncoming.createdAt || 0).getTime() : 0;
+        if (!data.lastIncoming || (!isNaN(msgDate) && msgDate > lastIncDate)) {
           data.lastIncoming = msg;
         }
       }
@@ -103,22 +104,43 @@ export default function Chats() {
       let windowOpen = false;
       let timeLeft = "";
       if (data.lastIncoming) {
-        const diffHours = (new Date() - new Date(data.lastIncoming.timestamp || data.lastIncoming.createdAt)) / (1000 * 60 * 60);
-        if (diffHours <= 24) {
-          windowOpen = true;
-          timeLeft = `${Math.floor(24 - diffHours)}h ${Math.floor((24 - diffHours) * 60 % 60)}m`;
+        const incTime = new Date(data.lastIncoming.timestamp || data.lastIncoming.createdAt || 0).getTime();
+        if (!isNaN(incTime)) {
+           const diffHours = (new Date().getTime() - incTime) / (1000 * 60 * 60);
+           if (diffHours <= 24) {
+             windowOpen = true;
+             timeLeft = `${Math.floor(24 - diffHours)}h ${Math.floor((24 - diffHours) * 60 % 60)}m`;
+           }
         }
       }
       return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' };
-    }).sort((a, b) => new Date(b.lastMessage.timestamp || b.lastMessage.createdAt) - new Date(a.lastMessage.timestamp || a.lastMessage.createdAt));
+    }).sort((a, b) => {
+       // SAFE NUMERIC SORTING (Ignores NaNs)
+       const dateA = new Date(a.lastMessage.timestamp || a.lastMessage.createdAt || 0).getTime();
+       const dateB = new Date(b.lastMessage.timestamp || b.lastMessage.createdAt || 0).getTime();
+       return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+    });
+    
+    console.log(`➡️ [Chats Debug] Sidebar Final Customers Built: ${finalDetails.length}`);
     
     // Search Filter Logic
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      finalDetails = finalDetails.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term) || c.city.toLowerCase().includes(term) || (c.lastMessage && new Date(c.lastMessage.timestamp || c.lastMessage.createdAt).toLocaleDateString().toLowerCase().includes(term)));
+      finalDetails = finalDetails.filter(c => 
+        (c.name && c.name.toLowerCase().includes(term)) || 
+        (c.phone && c.phone.includes(term)) || 
+        (c.city && c.city.toLowerCase().includes(term))
+      );
     }
     return finalDetails;
   }, [filteredMessages, searchTerm]);
+
+  // 🔥 Auto-select the first chat if none is active
+  useEffect(() => {
+    if (!activeCustomer && customerDetails.length > 0) {
+      setActiveCustomer(customerDetails[0].phone);
+    }
+  }, [customerDetails, activeCustomer]);
 
   const activeChatMessages = useMemo(() => {
     return filteredMessages.filter(m => m.customerPhone === activeCustomer);
@@ -265,8 +287,8 @@ export default function Chats() {
           />
         </div>
 
-        {loading ? <p>Loading chats...</p> : (
-          customerDetails.map(customer => (
+        {loading ? <p className="text-gray-400 text-sm text-center mt-4">Loading chats...</p> : (
+          customerDetails.length > 0 ? customerDetails.map(customer => (
             <div 
               key={customer.phone}
               onClick={() => { setActiveCustomer(customer.phone); setIsSidebarOpen(false); }}
@@ -291,7 +313,7 @@ export default function Chats() {
                 )}
               </div>
             </div>
-          ))
+          )) : <p className="text-gray-500 text-sm text-center mt-10">No chats found for the selected workspace or filter.</p>
         )}
       </div>
 
