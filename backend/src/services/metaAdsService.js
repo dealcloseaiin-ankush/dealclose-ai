@@ -7,6 +7,45 @@ const hashData = (str) => {
   return crypto.createHash('sha256').update(str.trim().toLowerCase()).digest('hex');
 };
 
+// 1. Send Instagram Direct Message (DM)
+exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: { text: messageText }
+      },
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("❌ Meta Graph API DM Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// 2. Send Private DM Reply to an Instagram Comment
+exports.sendInstagramCommentPrivateReply = async (accessToken, commentId, messageText) => {
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${commentId}/private_replies`,
+      {
+        message: messageText
+      },
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("❌ Meta Graph API Comment Reply Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
 exports.sendConversionEvent = async (pixelId, accessToken, phone, eventName = 'Purchase') => {
   try {
     if (!pixelId || !accessToken || !phone) return;

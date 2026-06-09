@@ -2,6 +2,7 @@ const aiService = require('../services/aiService');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel'); // Lead model import kiya gaya
+const metaAdsService = require('../services/metaAdsService');
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/instagram
@@ -194,18 +195,21 @@ exports.handleInstagramWebhook = async (req, res) => {
                   }
 
                   if (responseMessage) {
-                    // Note: Here you will integrate Meta Graph API to send the DM back
-                    // await metaAdsService.sendInstagramDM(user.igAccessToken, senderId, responseMessage);
-                    
-                    console.log(`🤖 [Instagram DM Reply]: ${responseMessage}`);
-                    await Message.create({
-                      userId: user._id,
-                      customerPhone: `IG_${senderId}`,
-                      messageText: responseMessage,
-                      direction: 'outgoing',
-                      status: 'sent',
-                      sentBy: 'ai'
-                    });
+                    try {
+                      await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, responseMessage);
+                      console.log(`🤖 [Instagram DM Reply Sent Successfully]: ${responseMessage}`);
+                      
+                      await Message.create({
+                        userId: user._id,
+                        customerPhone: `IG_${senderId}`,
+                        messageText: responseMessage,
+                        direction: 'outgoing',
+                        status: 'sent',
+                        sentBy: 'ai'
+                      });
+                    } catch (sendErr) {
+                      console.error("❌ [Instagram Send DM Error]:", sendErr.response?.data || sendErr.message);
+                    }
                   }
 
                 } catch (aiErr) {
@@ -265,12 +269,17 @@ exports.handleInstagramWebhook = async (req, res) => {
              console.log(`✅ [Instagram] Manual Keyword Matched: '${matchedRule.triggerWord}'`);
              console.log(`💬 [Instagram] Sending DM to ${username}: ${matchedRule.replyMessage}`);
              
-             // In production: You will use Meta Graph API here to send the actual DM
+             try {
+               await metaAdsService.sendInstagramCommentPrivateReply(user.igConfig.accessToken, commentData.id, matchedRule.replyMessage);
+               console.log(`✅ [Instagram] Private DM sent for comment!`);
+             } catch (replyErr) {
+               console.error("❌ [Instagram Private Reply Error]:", replyErr.response?.data || replyErr.message);
+             }
              
              // CRM me kachra nahi bharenge! Sirf Inbox (Chats) me save karenge
              await Message.create({
                 userId: user._id,
-                customerPhone: username, // For IG, we use username as the identifier
+                customerPhone: `IG_${igUserId}`, // Keep ID consistent for Dashboard Manual Replies
                 messageText: `[💬 IG Comment]: ${commentText}`,
                 direction: 'incoming',
                 status: 'received',
@@ -278,13 +287,24 @@ exports.handleInstagramWebhook = async (req, res) => {
                 tags: ['ig_comment', 'auto_replied'],
                 expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Auto-delete after 30 days
              });
+             
+             // Dashboard me reply bhi toh dikhna chahiye
+             await Message.create({
+                userId: user._id,
+                customerPhone: `IG_${igUserId}`,
+                messageText: matchedRule.replyMessage,
+                direction: 'outgoing',
+                status: 'sent',
+                sentBy: 'auto-reply',
+                tags: ['ig_private_reply']
+             });
           } else {
              console.log(`⚠️ [Instagram] No manual keyword matched for: "${commentText}"`);
              
              // Track as Unmatched Comment in Inbox so owner can read & reply manually
              await Message.create({
                 userId: user._id,
-                customerPhone: username,
+                customerPhone: `IG_${igUserId}`,
                 messageText: `[💬 IG Comment - Unhandled]: ${commentText}`,
                 direction: 'incoming',
                 status: 'received',

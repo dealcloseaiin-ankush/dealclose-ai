@@ -2,6 +2,7 @@ const Message = require('../models/messageModel');
 const User = require('../models/userModel');
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
+const metaAdsService = require('../services/metaAdsService');
 
 // @desc    Get all chat history for a user (Grouped by customer)
 exports.getChats = async (req, res) => {
@@ -114,6 +115,12 @@ exports.sendManualMessage = async (req, res) => {
     if (customerPhone.startsWith('IG_') || isNaN(customerPhone.replace('+', ''))) {
       console.log(`➡️ [DEBUG Chat Flow] Handling Manual Reply for Instagram: ${customerPhone}`);
       
+      const user = await User.findById(userId);
+      if (!user || !user.igConfig || !user.igConfig.accessToken) {
+        console.log(`❌ [DEBUG Chat Flow] Instagram config missing.`);
+        return res.status(400).json({ message: 'Instagram connection missing. Please link Instagram in Settings.' });
+      }
+
       const newMsg = await Message.create({
         userId, 
         customerPhone: customerPhone, 
@@ -122,7 +129,19 @@ exports.sendManualMessage = async (req, res) => {
         status: 'sent', 
         sentBy: 'staff'
       });
-      // TODO: Connect Meta Graph API to actually dispatch IG message to user here.
+
+      // Dispatch IG message via Meta Graph API
+      try {
+        let recipientId = customerPhone.replace('IG_', '');
+        await metaAdsService.sendInstagramDM(user.igConfig.accessToken, recipientId, messageText);
+        console.log(`✅ [DEBUG Chat Flow] Manual IG DM sent successfully to ${recipientId}`);
+      } catch (igError) {
+        newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
+        newMsg.status = 'failed';
+        await newMsg.save();
+        console.error(`❌ [DEBUG Chat Flow] Error sending IG DM:`, igError.response?.data || igError.message);
+      }
+
       return res.status(201).json({ message: newMsg });
     }
 
