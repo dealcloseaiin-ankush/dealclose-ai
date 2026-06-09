@@ -91,6 +91,19 @@ exports.handleInstagramWebhook = async (req, res) => {
                  if (activeWorkspace) incomingWorkspaceId = activeWorkspace._id.toString();
               }
 
+              // 🌟 Fetch Real Instagram Profile (Name/Username)
+              let realName = `IG User ${senderId.slice(-4)}`;
+              if (user.igConfig && user.igConfig.accessToken) {
+                try {
+                  const profile = await metaAdsService.getInstagramProfile(user.igConfig.accessToken, senderId);
+                  if (profile && (profile.name || profile.username)) {
+                    realName = profile.name || profile.username;
+                  }
+                } catch (e) {
+                  console.log("⚠️ Could not fetch IG profile details for", senderId);
+                }
+              }
+
               // Save incoming message to Inbox
               await Message.create({
                 userId: user._id,
@@ -106,8 +119,8 @@ exports.handleInstagramWebhook = async (req, res) => {
               await Lead.findOneAndUpdate(
                 { phoneNumber: `IG_${senderId}`, userId: user._id },
                 { 
+                  $set: { name: realName },
                   $setOnInsert: { 
-                    name: `IG User ${senderId.slice(-4)}`, 
                     source: 'Instagram DM', 
                     status: 'new',
                     createdBy: user._id 

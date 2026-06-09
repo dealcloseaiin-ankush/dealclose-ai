@@ -46,6 +46,22 @@ exports.sendInstagramCommentPrivateReply = async (accessToken, commentId, messag
   }
 };
 
+// 3. Fetch Instagram User Profile (Name, Username)
+exports.getInstagramProfile = async (accessToken, igSid) => {
+  try {
+    const response = await axios.get(
+      `https://graph.facebook.com/v19.0/${igSid}?fields=name,username,profile_pic`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("❌ Meta Graph API Profile Fetch Error:", error.response?.data?.error?.message || error.message);
+    return null;
+  }
+};
+
 exports.sendConversionEvent = async (pixelId, accessToken, phone, eventName = 'Purchase') => {
   try {
     if (!pixelId || !accessToken || !phone) return;
