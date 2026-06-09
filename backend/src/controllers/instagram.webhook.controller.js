@@ -50,6 +50,13 @@ exports.handleInstagramWebhook = async (req, res) => {
         if (entry.messaging && entry.messaging.length > 0) {
           for (let event of entry.messaging) {
             if (event.message && event.message.text) {
+              
+              // 🚫 ANTI-LOOP: Ignore echo messages (Bot's own replies)
+              if (event.message.is_echo) {
+                 console.log(`🔇 [IG Webhook] Ignoring echo message (Bot/Owner's own reply).`);
+                 continue;
+              }
+
               const senderId = event.sender.id;
               const incomingText = event.message.text.trim();
               
@@ -86,8 +93,23 @@ exports.handleInstagramWebhook = async (req, res) => {
                 messageText: incomingText,
                 direction: 'incoming',
                 status: 'received',
-                sentBy: 'customer'
+                sentBy: 'customer',
+                timestamp: new Date()
               });
+
+              // 🚀 NEW: AUTO-ADD IG SENDER TO CRM (So it shows in Chats sidebar instantly)
+              await Lead.findOneAndUpdate(
+                { phoneNumber: `IG_${senderId}`, userId: user._id },
+                { 
+                  $setOnInsert: { 
+                    name: `IG User ${senderId.slice(-4)}`, 
+                    source: 'Instagram DM', 
+                    status: 'new',
+                    createdBy: user._id 
+                  } 
+                },
+                { upsert: true }
+              );
 
               // 🛑 STAGE 1: GATEKEEPER / SPAM FILTER BOT (0 Cost - Saves AI Limits)
               const incomingTextLower = incomingText.toLowerCase();
@@ -101,7 +123,15 @@ exports.handleInstagramWebhook = async (req, res) => {
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;
                   
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: menuMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                await Message.create({ 
+                  userId: user._id, 
+                  customerPhone: `IG_${senderId}`, 
+                  messageText: menuMessage, 
+                  direction: 'outgoing', 
+                  status: 'sent', 
+                  sentBy: 'auto-reply',
+                  timestamp: new Date()
+                });
                 console.log(`🤖 [IG Basic Bot]: Sent Menu to ${senderId}`);
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
@@ -110,7 +140,15 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (isCreator && (incomingTextLower === '2' || incomingTextLower.includes('collaboration'))) {
                 // 0 COST COLLAB CAPTURE
                 const collabMsg = `Thank you for your interest in collaborating! 🤝 Our team has received your request and will review your profile soon.`;
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: collabMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                await Message.create({ 
+                  userId: user._id, 
+                  customerPhone: `IG_${senderId}`, 
+                  messageText: collabMsg, 
+                  direction: 'outgoing', 
+                  status: 'sent', 
+                  sentBy: 'auto-reply',
+                  timestamp: new Date()
+                });
                 
                 // Seedha CRM me Lead bana do (Bina AI ke)
                 await Lead.findOneAndUpdate(
@@ -132,7 +170,15 @@ exports.handleInstagramWebhook = async (req, res) => {
               // General Query / Human Fallback
               if (incomingTextLower === '3' || incomingTextLower.includes('general') || incomingTextLower.includes('human') || incomingTextLower.includes('team')) {
                 const generalMessage = isCreator ? `Your query has been recorded. Our team will review it shortly.` : `Thanks! I've notified our team. A human representative will get back to you shortly. ⏳`;
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: generalMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                await Message.create({ 
+                  userId: user._id, 
+                  customerPhone: `IG_${senderId}`, 
+                  messageText: generalMessage, 
+                  direction: 'outgoing', 
+                  status: 'sent', 
+                  sentBy: 'auto-reply',
+                  timestamp: new Date()
+                });
                 console.log(`🤖 [IG Basic Bot]: Sent General Response to ${senderId}`);
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
@@ -207,7 +253,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                         messageText: responseMessage,
                         direction: 'outgoing',
                         status: 'sent',
-                        sentBy: 'ai'
+                        sentBy: 'ai',
+                        timestamp: new Date()
                       });
                     } catch (sendErr) {
                       console.error("❌ [Instagram Send DM Error]:", sendErr.response?.data || sendErr.message);
@@ -292,6 +339,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 status: 'received',
                 sentBy: 'customer',
                 tags: ['ig_comment', 'auto_replied'],
+                timestamp: new Date(),
                 expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Auto-delete after 30 days
              });
              
@@ -303,7 +351,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                 direction: 'outgoing',
                 status: 'sent',
                 sentBy: 'auto-reply',
-                tags: ['ig_private_reply']
+                tags: ['ig_private_reply'],
+                timestamp: new Date()
              });
           } else {
              console.log(`⚠️ [Instagram] No manual keyword matched for: "${commentText}"`);
@@ -317,6 +366,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 status: 'received',
                 sentBy: 'customer',
                 tags: ['ig_comment', 'needs_reply'],
+                timestamp: new Date(),
                 expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Auto-delete after 30 days
             });
             
