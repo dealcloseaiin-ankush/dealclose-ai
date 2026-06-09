@@ -219,11 +219,11 @@ exports.whatsappConnect = async (req, res) => {
       updatedUser = await User.findOneAndUpdate(
         { _id: userId, "workspaces._id": workspaceId },
         { $set: { "workspaces.$.whatsappConfig": waConfigObj } },
-        { new: true }
+        { new: true, strict: false }
       );
     } else {
-      // Save to main business
-      updatedUser = await User.findByIdAndUpdate(userId, { $set: { whatsappConfig: waConfigObj } }, { new: true });
+      // Save to main business (strict: false forces Mongoose to save dynamic fields)
+      updatedUser = await User.findByIdAndUpdate(userId, { $set: { whatsappConfig: waConfigObj } }, { new: true, strict: false });
     }
 
     const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.whatsappConfig : updatedUser.whatsappConfig;
@@ -371,7 +371,7 @@ exports.instagramConnect = async (req, res) => {
         console.error(`❌ Webhook Subscription Failed:`, subErr.response?.data || subErr.message);
     }
 
-    console.log(`➡️ [DEBUG] Saving IG Config to Database...`);
+    console.log(`➡️ [DEBUG Meta Connect] Saving IG Config to Database for user ${userId}...`);
 
     const igConfigObj = {
       accessToken: clientAccessToken,
@@ -385,11 +385,13 @@ exports.instagramConnect = async (req, res) => {
       updatedUser = await User.findOneAndUpdate(
         { _id: userId, "workspaces._id": workspaceId },
         { $set: { "workspaces.$.igConfig": igConfigObj } },
-        { new: true }
+        { new: true, strict: false }
       );
     } else {
-      updatedUser = await User.findByIdAndUpdate(userId, { $set: { igConfig: igConfigObj } }, { new: true });
+      updatedUser = await User.findByIdAndUpdate(userId, { $set: { igConfig: igConfigObj } }, { new: true, strict: false });
     }
+
+    console.log(`✅ [DEBUG Meta Connect] IG Config SAVED to Database! Token Present: ${updatedUser?.igConfig?.accessToken ? 'YES' : 'NO'}`);
 
     const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.igConfig : updatedUser.igConfig;
     res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: savedData });
@@ -561,6 +563,8 @@ exports.updateProfile = async (req, res) => {
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
     if (igConfig !== undefined) updateData.igConfig = igConfig;
+    
+    console.log(`➡️ [DEBUG Profile Update] Data being set in DB:`, updateData);
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -596,7 +600,8 @@ exports.getProfile = async (req, res) => {
     
     console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
     - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
-    - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}`);
+    - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
+    - IG Connected Token Exist?: ${user.igConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
     if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
     res.status(200).json({ success: true, user });

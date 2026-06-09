@@ -234,6 +234,9 @@ export default function Settings() {
         workspaces: config.workspaces,
         customWebhooks: config.customWebhooks
       };
+
+      console.log("➡️ [DEBUG] Sending this payload to backend on Save:", payload);
+
       await api.put('/users/profile', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
       await fetchSettings(); // 🔥 Refresh background IDs instantly so Meta Connect doesn't fail
