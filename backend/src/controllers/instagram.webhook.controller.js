@@ -52,6 +52,7 @@ exports.handleInstagramWebhook = async (req, res) => {
           for (let event of entry.messaging) {
             if (event.message && event.message.text) {
               
+              // --- CLEAN CODE START (Replace your duplicate lines with this) ---
               const isEcho = event.message.is_echo;
               const appId = event.message.app_id;
               const myAppId = process.env.META_APP_ID;
@@ -122,6 +123,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                   timestamp: new Date()
                 });
               }
+              // --- CLEAN CODE END ---
 
               // 🚀 NEW: AUTO-ADD IG SENDER TO CRM (So it shows in Chats sidebar instantly)
               await Lead.findOneAndUpdate(
