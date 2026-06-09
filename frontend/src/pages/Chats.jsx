@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
-import { Search, Instagram, MessageSquare, MessageCircle } from 'lucide-react';
+import { Search, Camera, MessageSquare, MessageCircle } from 'lucide-react';
 
 export default function Chats() {
   const [allMessages, setAllMessages] = useState([]);
@@ -328,7 +328,7 @@ export default function Chats() {
                       : 'text-gray-200'
                   }`}>
                     {customer.lastMessage?.platform === 'instagram_dm' ? (
-                      <Instagram size={14} className={activeCustomer === customer.phone ? "text-pink-400" : "text-pink-500"} />
+                  <Camera size={14} className={activeCustomer === customer.phone ? "text-pink-400" : "text-pink-500"} />
                     ) : customer.lastMessage?.platform === 'instagram_comment' ? (
                       <MessageCircle size={14} className={activeCustomer === customer.phone ? "text-pink-400" : "text-pink-500"} />
                     ) : (
@@ -394,7 +394,7 @@ export default function Chats() {
               </button>
               
               <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isActiveIg ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
-                {isActiveIg ? <Instagram size={16} /> : <MessageSquare size={16} />}
+                {isActiveIg ? <Camera size={16} /> : <MessageSquare size={16} />}
               </div>
               <h3 className="font-bold text-white truncate">
                 {activeCustomerData?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span>
