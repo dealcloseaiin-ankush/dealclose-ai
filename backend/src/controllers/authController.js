@@ -375,7 +375,7 @@ exports.instagramConnect = async (req, res) => {
     console.log(`➡️ [DEBUG Meta Connect] Saving IG Config to Database for user ${userId}...`);
 
     const igConfigObj = {
-      accessToken: clientAccessToken,
+      accessToken: targetAccount.pageToken || clientAccessToken,
       accountId: targetAccount.accountId,
       pageId: targetAccount.pageId,
     };

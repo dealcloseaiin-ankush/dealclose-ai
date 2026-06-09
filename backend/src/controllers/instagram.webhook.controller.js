@@ -144,19 +144,23 @@ exports.handleInstagramWebhook = async (req, res) => {
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;
                   
+                let deliveryStatus = 'sent';
+                let displayMsg = menuMessage;
                 try {
                   await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, menuMessage);
                   console.log(`🤖 [IG Basic Bot]: Sent Menu to ${senderId}`);
                 } catch (apiErr) {
                   console.error(`❌ [IG Send Error]: Failed to send Menu to ${senderId}`, apiErr.response?.data || apiErr.message);
+                  deliveryStatus = 'failed';
+                  displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.response?.data?.error?.message || apiErr.message}]`;
                 }
 
                 await Message.create({ 
                   userId: user._id, 
                   customerPhone: `IG_${senderId}`, 
-                  messageText: menuMessage, 
+                  messageText: displayMsg, 
                   direction: 'outgoing', 
-                  status: 'sent', 
+                  status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date()
                 });
@@ -168,19 +172,23 @@ exports.handleInstagramWebhook = async (req, res) => {
                 // 0 COST COLLAB CAPTURE
                 const collabMsg = `Thank you for your interest in collaborating! 🤝 Our team has received your request and will review your profile soon.`;
                 
+                let deliveryStatus = 'sent';
+                let displayMsg = collabMsg;
                 try {
                   await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, collabMsg);
                   console.log(`🤖 [IG Basic Bot]: Sent Collab Response to ${senderId}`);
                 } catch (apiErr) {
                   console.error(`❌ [IG Send Error]: Failed to send Collab Msg to ${senderId}`);
+                  deliveryStatus = 'failed';
+                  displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.response?.data?.error?.message || apiErr.message}]`;
                 }
 
                 await Message.create({ 
                   userId: user._id, 
                   customerPhone: `IG_${senderId}`, 
-                  messageText: collabMsg, 
+                  messageText: displayMsg, 
                   direction: 'outgoing', 
-                  status: 'sent', 
+                  status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date()
                 });
@@ -206,19 +214,23 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (incomingTextLower === '3' || incomingTextLower.includes('general') || incomingTextLower.includes('human') || incomingTextLower.includes('team')) {
                 const generalMessage = isCreator ? `Your query has been recorded. Our team will review it shortly.` : `Thanks! I've notified our team. A human representative will get back to you shortly. ⏳`;
                 
+                let deliveryStatus = 'sent';
+                let displayMsg = generalMessage;
                 try {
                   await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, generalMessage);
                   console.log(`🤖 [IG Basic Bot]: Sent General Response to ${senderId}`);
                 } catch (apiErr) {
                   console.error(`❌ [IG Send Error]: Failed to send General Msg to ${senderId}`);
+                  deliveryStatus = 'failed';
+                  displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.response?.data?.error?.message || apiErr.message}]`;
                 }
 
                 await Message.create({ 
                   userId: user._id, 
                   customerPhone: `IG_${senderId}`, 
-                  messageText: generalMessage, 
+                  messageText: displayMsg, 
                   direction: 'outgoing', 
-                  status: 'sent', 
+                  status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date()
                 });
@@ -284,22 +296,26 @@ exports.handleInstagramWebhook = async (req, res) => {
                   }
 
                   if (responseMessage) {
+                    let deliveryStatus = 'sent';
+                    let displayMsg = responseMessage;
                     try {
                       await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, responseMessage);
                       console.log(`🤖 [Instagram DM Reply Sent Successfully]: ${responseMessage}`);
-                      
-                      await Message.create({
-                        userId: user._id,
-                        customerPhone: `IG_${senderId}`,
-                        messageText: responseMessage,
-                        direction: 'outgoing',
-                        status: 'sent',
-                        sentBy: 'ai',
-                        timestamp: new Date()
-                      });
                     } catch (sendErr) {
                       console.error("❌ [Instagram Send DM Error]:", sendErr.response?.data || sendErr.message);
+                      deliveryStatus = 'failed';
+                      displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${sendErr.response?.data?.error?.message || sendErr.message}]`;
                     }
+                    
+                    await Message.create({
+                      userId: user._id,
+                      customerPhone: `IG_${senderId}`,
+                      messageText: displayMsg,
+                      direction: 'outgoing',
+                      status: deliveryStatus,
+                      sentBy: 'ai',
+                      timestamp: new Date()
+                    });
                   }
 
                 } catch (aiErr) {
