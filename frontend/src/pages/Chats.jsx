@@ -221,6 +221,10 @@ export default function Chats() {
     return sentBy || 'Unknown';
   };
 
+  // 🚀 CLEAN CODE: Moving logic out of JSX to prevent Vercel/Rollup Build Crashes
+  const activeCustomerData = customerDetails.find(c => c.phone === activeCustomer);
+  const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
+
   return (
     <div className="flex h-[calc(100vh-4rem)] p-0 md:p-6 bg-[#050505] text-gray-200 relative overflow-hidden">
       
@@ -388,20 +392,13 @@ export default function Chats() {
               <button onClick={() => setIsSidebarOpen(true)} className="md:hidden bg-gray-800 text-white p-2 rounded-lg">
                 ☰
               </button>
-              {(() => {
-                 const cData = customerDetails.find(c => c.phone === activeCustomer);
-                 const isIg = cData?.lastMessage?.platform?.startsWith('instagram');
-                 return (
-                   <>
-                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isIg ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
-                       {isIg ? <Instagram size={16} /> : <MessageSquare size={16} />}
-                     </div>
-                     <h3 className="font-bold text-white truncate">
-                       {cData?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span>
-                     </h3>
-                   </>
-                 );
-              })()}
+              
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isActiveIg ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
+                {isActiveIg ? <Instagram size={16} /> : <MessageSquare size={16} />}
+              </div>
+              <h3 className="font-bold text-white truncate">
+                {activeCustomerData?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span>
+              </h3>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -419,17 +416,11 @@ export default function Chats() {
             </div>
             
             {/* Active Customer Status Warning */}
-            {(() => {
-               const currentData = customerDetails.find(c => c.phone === activeCustomer);
-               if (currentData && !currentData.windowOpen) {
-                 return (
-                   <div className="px-4 py-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-xs font-semibold text-center">
-                     ⚠️ 24-Hour window closed. Normal messages might fail. Please use Meta Templates to initiate contact.
-                   </div>
-                 )
-               }
-               return null;
-            })()}
+            {activeCustomerData && !activeCustomerData.windowOpen && (
+               <div className="px-4 py-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-xs font-semibold text-center">
+                 ⚠️ 24-Hour window closed. Normal messages might fail. Please use Meta Templates to initiate contact.
+               </div>
+            )}
 
             <div className="p-4 bg-[#111] border-t border-gray-800 rounded-br-2xl flex items-center gap-3">
               <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Send Approved Template">
