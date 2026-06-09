@@ -75,6 +75,9 @@ export default function Settings() {
       const { data } = await api.get('/users/profile');
       const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
       
+      console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
+      console.log("➡️ [Settings Debug] IG Token status:", savedData.igConfig?.accessToken ? "Exists ✅" : "Missing ❌");
+      
       if (savedData) {
         setConfig({
           whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || '',

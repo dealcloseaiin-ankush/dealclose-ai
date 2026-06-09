@@ -323,7 +323,8 @@ exports.instagramConnect = async (req, res) => {
                 availableAccounts.push({
                    accountId: igAcc.id,
                    pageId: page.id,
-                   pageName: page.name
+                       pageName: page.name,
+                       pageToken: page.access_token
                 });
             }
         } catch (err) {
@@ -354,6 +355,23 @@ exports.instagramConnect = async (req, res) => {
     
     console.log(`✅ 4. TARGET IG ACCOUNT SELECTED:`, targetAccount.accountId);
     console.log(`============================================================\n`);
+
+    // 🚀 NEW: Auto-Subscribe the Facebook Page to the Webhook!
+    // Meta will not send real DMs/Comments to our webhook unless the page is explicitly subscribed.
+    try {
+        console.log(`📡 5. Subscribing App to Facebook Page Webhooks...`);
+        await axios.post(`https://graph.facebook.com/v19.0/${targetAccount.pageId}/subscribed_apps`, null, {
+            params: {
+                subscribed_fields: 'messages,comments',
+                access_token: targetAccount.pageToken
+            }
+        });
+        console.log(`✅ Webhook Subscribed Successfully for Page!`);
+    } catch (subErr) {
+        console.error(`❌ Webhook Subscription Failed:`, subErr.response?.data || subErr.message);
+    }
+
+    console.log(`➡️ [DEBUG] Saving IG Config to Database...`);
 
     const igConfigObj = {
       accessToken: clientAccessToken,
@@ -508,7 +526,8 @@ exports.updateProfile = async (req, res) => {
       externalApiPostUrl,
       externalApiBlogUrl,
       externalApiVisitUrl,
-      customWebhooks
+      customWebhooks,
+      igConfig
     } = req.body;
 
     // Assuming you have an auth middleware that sets req.user
@@ -541,6 +560,7 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
+    if (igConfig !== undefined) updateData.igConfig = igConfig;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
