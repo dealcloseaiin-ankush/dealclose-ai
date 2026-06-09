@@ -161,6 +161,152 @@ exports.handleInstagramWebhook = async (req, res) => {
               // 🛑 STAGE 1: GATEKEEPER / SPAM FILTER BOT (0 Cost - Saves AI Limits)
               const incomingTextLower = incomingText.toLowerCase();
               
+              // ==========================================================
+              // 🚀 NEW: INSTAGRAM FLOW EXECUTION ENGINE
+              // ==========================================================
+              let flowReplyHandled = false;
+              const currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
+              
+              const formatFlowMsg = (text) => {
+                if (!text) return "";
+                let cName = realName.startsWith('IG User') ? '' : realName.split(' ')[0];
+                return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
+              };
+
+              let flowQuery = { userId: user._id };
+              if (incomingWorkspaceId !== 'main') flowQuery.workspaceId = incomingWorkspaceId;
+              const userFlows = await Flow.find(flowQuery);
+
+              // STEP 1: Check if customer is currently inside an active "Ask Question" or "Menu" Flow block
+              if (currentLeadCheck && currentLeadCheck.activeFlowState && currentLeadCheck.activeFlowState.flowId) {
+                const activeFlow = userFlows.find(f => f._id.toString() === currentLeadCheck.activeFlowState.flowId);
+                if (activeFlow && activeFlow.flowData) {
+                  const nodes = activeFlow.flowData.nodes || [];
+                  const edges = activeFlow.flowData.edges || [];
+                  const activeNode = nodes.find(n => n.id === currentLeadCheck.activeFlowState.nodeId);
+
+                  if (activeNode) {
+                     let chosenEdge = null;
+                     if (activeNode.type === 'askQuestion') {
+                       if (activeNode.data.replyType === 'open') {
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } }, { strict: false });
+                         chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
+                       } else {
+                         if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
+                           chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'yes');
+                         } else if (['no', 'n', 'na', 'nahi', 'nahin'].includes(incomingTextLower)) {
+                           chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'no');
+                         } else {
+                           chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'other');
+                         }
+                       }
+                     } else if (activeNode.type === 'menu') {
+                       const num = parseInt(incomingText.trim());
+                       if (num === 1) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0');
+                       else if (num === 2) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_1');
+                       else if (num === 3) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_2');
+                       else chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0'); // fallback
+                     }
+
+                     await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
+
+                     let currNodeId = chosenEdge ? chosenEdge.target : null;
+                     while (currNodeId) {
+                       const nextNode = nodes.find(n => n.id === currNodeId);
+                       if (!nextNode) break;
+                       if (nextNode.type === 'message') {
+                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
+                         await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         let nextE = edges.find(e => e.source === nextNode.id);
+                         currNodeId = nextE ? nextE.target : null;
+                       } else if (nextNode.type === 'askQuestion') {
+                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
+                         await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         currNodeId = null; 
+                       } else if (nextNode.type === 'menu') {
+                         let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
+                         const options = [nextNode.data.opt1, nextNode.data.opt2, nextNode.data.opt3].filter(opt => opt && opt.trim() !== '');
+                         if (options.length > 0) {
+                           msgText += "\n";
+                           options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
+                           msgText += "\n\n(Type a number)";
+                           await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
+                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                           await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         }
+                         currNodeId = null; 
+                       } else { break; }
+                     }
+                     flowReplyHandled = true;
+                  }
+                }
+              }
+
+              // STEP 2: Check for Keyword Triggers
+              if (!flowReplyHandled) {
+                for (const flow of userFlows) {
+                  if (!flow.flowData) continue;
+                  const nodes = flow.flowData.nodes || [];
+                  const edges = flow.flowData.edges || [];
+                  const triggerNodes = nodes.filter(n => n.type === 'trigger' && n.data.triggerType === 'keyword');
+                  
+                  let matchedTrigger = null;
+                  for (const trigger of triggerNodes) {
+                    const keywords = (trigger.data.keyword || "").split(',').map(k => k.trim().toLowerCase());
+                    if (keywords.includes(incomingTextLower)) {
+                      matchedTrigger = trigger;
+                      break;
+                    }
+                  }
+
+                  if (matchedTrigger) {
+                    console.log(`[IG Flow Engine] 🚀 Trigger matched in Flow: ${flow.name}`);
+                    let nextEdge = edges.find(e => e.source === matchedTrigger.id);
+                    let currNodeId = nextEdge ? nextEdge.target : null;
+                    
+                    while (currNodeId) {
+                       const nextNode = nodes.find(n => n.id === currNodeId);
+                       if (!nextNode) break;
+                       if (nextNode.type === 'message') {
+                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
+                         await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         let nextE = edges.find(e => e.source === nextNode.id);
+                         currNodeId = nextE ? nextE.target : null;
+                       } else if (nextNode.type === 'askQuestion') {
+                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
+                         await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         currNodeId = null; 
+                       } else if (nextNode.type === 'menu') {
+                         let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
+                         const options = [nextNode.data.opt1, nextNode.data.opt2, nextNode.data.opt3].filter(opt => opt && opt.trim() !== '');
+                         if (options.length > 0) {
+                           msgText += "\n";
+                           options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
+                           msgText += "\n\n(Type a number)";
+                           await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
+                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                           await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         }
+                         currNodeId = null; 
+                       } else { break; }
+                    }
+                    flowReplyHandled = true;
+                    break;
+                  }
+                }
+              }
+
+              if (flowReplyHandled) {
+                continue; // 🚀 Flow Engine handled this, Skip the Heavy AI & Gatekeeper!
+              }
+              // ==========================================================
+
               // Check if user is an Influencer or a Regular Business
               // (Assuming acceptCollabs=true means it's a Creator profile)
               const isCreator = user.acceptCollabs === true;

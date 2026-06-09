@@ -135,7 +135,8 @@ exports.sendManualMessage = async (req, res) => {
         messageText, 
         direction: 'outgoing', 
         status: 'sent', 
-        sentBy: 'staff'
+        sentBy: 'staff',
+        timestamp: new Date()
       });
 
       // Dispatch IG message via Meta Graph API
@@ -171,7 +172,8 @@ exports.sendManualMessage = async (req, res) => {
       messageText, 
       direction: 'outgoing', 
       status: 'sent', 
-      sentBy: 'staff'
+      sentBy: 'staff',
+      timestamp: new Date()
     });
 
     console.log(`➡️ [DEBUG Chat Flow] 4. Message saved to DB (ID: ${newMsg._id})`);
