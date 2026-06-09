@@ -405,7 +405,6 @@ export default function Chats() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* --- CLEAN CODE START (Replace your duplicate lines with this) --- */}
               {activeChatMessages.map(msg => (
                 <div key={msg._id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`p-4 max-w-sm rounded-2xl ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
@@ -417,7 +416,6 @@ export default function Chats() {
                   </div>
                 </div>
               ))}
-              {/* --- CLEAN CODE END --- */}
             </div>
             
             {/* Active Customer Status Warning */}
