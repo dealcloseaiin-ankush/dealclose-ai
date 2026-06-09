@@ -203,6 +203,24 @@ export default function Chats() {
     }
   };
 
+  // 🚀 Helper to format Time (e.g., 10:30 AM)
+  const formatTime = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // 🚀 Helper to format Sender Badges
+  const formatSender = (sentBy, direction) => {
+    if (sentBy === 'ai') return '🤖 AI Agent';
+    if (sentBy === 'auto-reply') return '⚡ Bot / Flow';
+    if (sentBy === 'owner_app') return '📱 You (IG App)';
+    if (sentBy === 'staff') return '💻 You (Dashboard)';
+    if (sentBy === 'system') return '⚙️ System';
+    if (direction === 'incoming') return '👤 Customer';
+    return sentBy || 'Unknown';
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] p-0 md:p-6 bg-[#050505] text-gray-200 relative overflow-hidden">
       
@@ -390,8 +408,11 @@ export default function Chats() {
               {activeChatMessages.map(msg => (
                 <div key={msg._id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`p-4 max-w-sm rounded-2xl ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
-                    <p>{msg.messageText}</p>
-                    <span className="text-xs opacity-75 mt-1 block capitalize">Sent by: {msg.sentBy}</span>
+                    <p className="whitespace-pre-wrap">{msg.messageText}</p>
+                    <div className="flex justify-between items-center gap-4 mt-2">
+                      <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
+                      <span className="text-[10px] opacity-70">{formatTime(msg.timestamp || msg.createdAt)}</span>
+                    </div>
                   </div>
                 </div>
               ))}

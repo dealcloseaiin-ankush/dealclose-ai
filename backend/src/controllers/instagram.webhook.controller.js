@@ -52,16 +52,21 @@ exports.handleInstagramWebhook = async (req, res) => {
           for (let event of entry.messaging) {
             if (event.message && event.message.text) {
               
-              // 🚫 ANTI-LOOP: Ignore echo messages (Bot's own replies)
-              if (event.message.is_echo) {
-                 console.log(`🔇 [IG Webhook] Ignoring echo message (Bot/Owner's own reply).`);
+              const isEcho = event.message.is_echo;
+              const appId = event.message.app_id;
+              const myAppId = process.env.META_APP_ID;
+
+              // 🚫 ANTI-LOOP: Ignore API echoes (Bot's own replies sent via Meta Graph API)
+              if (isEcho && appId && myAppId && appId.toString() === myAppId.toString()) {
+                 console.log(`🔇 [IG Webhook] Ignoring API echo message (Bot's own API reply).`);
                  continue;
               }
 
-              const senderId = event.sender.id;
+              // If it's an echo from the IG Mobile App, the recipient is the customer
+              const senderId = isEcho ? event.recipient.id : event.sender.id;
               const incomingText = event.message.text.trim();
               
-              console.log(`💬 [Meta DM (IG/FB)] Received from ${senderId}: ${incomingText}`);
+              console.log(`💬 [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
 
               // Find the exact User who owns this Instagram/Facebook Account
               let user = await User.findOne({ 
@@ -105,16 +110,18 @@ exports.handleInstagramWebhook = async (req, res) => {
                 }
               }
 
-              // Save incoming message to Inbox
-              await Message.create({
-                userId: user._id,
-                customerPhone: `IG_${senderId}`, 
-                messageText: incomingText,
-                direction: 'incoming',
-                status: 'received',
-                sentBy: 'customer',
-                timestamp: new Date()
-              });
+              if (!isEcho) {
+                // Save incoming message to Inbox
+                await Message.create({
+                  userId: user._id,
+                  customerPhone: `IG_${senderId}`, 
+                  messageText: incomingText,
+                  direction: 'incoming',
+                  status: 'received',
+                  sentBy: 'customer',
+                  timestamp: new Date()
+                });
+              }
 
               // 🚀 NEW: AUTO-ADD IG SENDER TO CRM (So it shows in Chats sidebar instantly)
               await Lead.findOneAndUpdate(
@@ -129,6 +136,27 @@ exports.handleInstagramWebhook = async (req, res) => {
                 },
                 { upsert: true }
               );
+
+              // 🚀 NEW: HANDLE OWNER REPLIES FROM INSTAGRAM APP
+              if (isEcho) {
+                 await Message.create({
+                    userId: user._id,
+                    customerPhone: `IG_${senderId}`,
+                    messageText: incomingText,
+                    direction: 'outgoing',
+                    status: 'sent',
+                    sentBy: 'owner_app',
+                    timestamp: new Date()
+                 });
+
+                 // Pause AI for 24 hours so it doesn't interrupt the human
+                 await Lead.findOneAndUpdate(
+                    { phoneNumber: `IG_${senderId}`, userId: user._id },
+                    { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }
+                 );
+                 console.log(`⏸️ [IG Webhook] Owner replied from IG App. Message saved & AI Paused.`);
+                 continue; // Stop further processing, go to next message
+              }
 
               // 🛑 STAGE 1: GATEKEEPER / SPAM FILTER BOT (0 Cost - Saves AI Limits)
               const incomingTextLower = incomingText.toLowerCase();
