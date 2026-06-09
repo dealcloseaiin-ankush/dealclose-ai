@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
-import { Search } from 'lucide-react';
+import { Search, Instagram, MessageSquare, MessageCircle } from 'lucide-react';
 
 export default function Chats() {
   const [allMessages, setAllMessages] = useState([]);
@@ -292,17 +292,31 @@ export default function Chats() {
             <div 
               key={customer.phone}
               onClick={() => { setActiveCustomer(customer.phone); setIsSidebarOpen(false); }}
-              className={`p-4 cursor-pointer rounded-xl mb-3 transition-all border ${activeCustomer === customer.phone ? 'bg-green-600/10 border-green-500' : 'bg-[#0a0a0a] border-gray-800 hover:border-gray-600'}`}
+              className={`p-4 cursor-pointer rounded-xl mb-3 transition-all border ${
+                activeCustomer === customer.phone 
+                  ? (customer.lastMessage?.platform?.startsWith('instagram') ? 'bg-pink-600/10 border-pink-500' : 'bg-green-600/10 border-green-500') 
+                  : 'bg-[#0a0a0a] border-gray-800 hover:border-gray-600'
+              }`}
             >
               <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className={`font-bold text-sm ${activeCustomer === customer.phone ? 'text-green-400' : 'text-gray-200'}`}>
-                    {customer.lastMessage?.platform === 'instagram_dm' ? '🟪 ' : customer.lastMessage?.platform === 'instagram_comment' ? '📸 ' : '🟩 '}
-                    {customer.name}
+                <div className="overflow-hidden pr-2">
+                  <div className={`font-bold text-sm flex items-center gap-1.5 ${
+                    activeCustomer === customer.phone 
+                      ? (customer.lastMessage?.platform?.startsWith('instagram') ? 'text-pink-400' : 'text-green-400') 
+                      : 'text-gray-200'
+                  }`}>
+                    {customer.lastMessage?.platform === 'instagram_dm' ? (
+                      <Instagram size={14} className={activeCustomer === customer.phone ? "text-pink-400" : "text-pink-500"} />
+                    ) : customer.lastMessage?.platform === 'instagram_comment' ? (
+                      <MessageCircle size={14} className={activeCustomer === customer.phone ? "text-pink-400" : "text-pink-500"} />
+                    ) : (
+                      <MessageSquare size={14} className={activeCustomer === customer.phone ? "text-green-400" : "text-green-500"} />
+                    )}
+                    <span className="truncate">{customer.name}</span>
                   </div>
-                  <div className="text-xs text-gray-500 flex items-center gap-1">{customer.phone} {customer.city ? `• ${customer.city}` : ''}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate">{customer.phone} {customer.city ? `• ${customer.city}` : ''}</div>
                 </div>
-                {customer.needsReply && <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_5px_rgba(59,130,246,0.8)]" title="Needs Reply"></span>}
+                {customer.needsReply && <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_5px_rgba(59,130,246,0.8)] shrink-0 mt-1" title="Needs Reply"></span>}
               </div>
               
               <div className="flex items-center gap-2">
@@ -349,8 +363,20 @@ export default function Chats() {
               <button onClick={() => setIsSidebarOpen(true)} className="md:hidden bg-gray-800 text-white p-2 rounded-lg">
                 ☰
               </button>
-              <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold text-sm">{customerDetails.find(c => c.phone === activeCustomer)?.name?.charAt(0) || 'U'}</div>
-              <h3 className="font-bold text-white truncate">{customerDetails.find(c => c.phone === activeCustomer)?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span></h3>
+              {(() => {
+                 const cData = customerDetails.find(c => c.phone === activeCustomer);
+                 const isIg = cData?.lastMessage?.platform?.startsWith('instagram');
+                 return (
+                   <>
+                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isIg ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
+                       {isIg ? <Instagram size={16} /> : <MessageSquare size={16} />}
+                     </div>
+                     <h3 className="font-bold text-white truncate">
+                       {cData?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span>
+                     </h3>
+                   </>
+                 );
+              })()}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
