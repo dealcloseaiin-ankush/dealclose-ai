@@ -2,6 +2,7 @@ const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Flow = require('../models/flowModel');
+const mongoose = require('mongoose');
 const axios = require('axios');
 
 // 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
@@ -212,19 +213,19 @@ exports.whatsappConnect = async (req, res) => {
       connectedPhone: targetPhone.display_phone_number
     };
 
-    // 4. Save these details securely in your database for this specific user
-    let updatedUser;
+    // 4. Mongoose Model strict-mode Bypass: Using updateOne to force save
     if (workspaceId && workspaceId !== 'main') {
-      // Save to specific workspace branch
-      updatedUser = await User.findOneAndUpdate(
+      await User.updateOne(
         { _id: userId, "workspaces._id": workspaceId },
         { $set: { "workspaces.$.whatsappConfig": waConfigObj } },
-        { new: true, strict: false }
+        { strict: false }
       );
     } else {
-      // Save to main business (strict: false forces Mongoose to save dynamic fields)
-      updatedUser = await User.findByIdAndUpdate(userId, { $set: { whatsappConfig: waConfigObj } }, { new: true, strict: false });
+      await User.updateOne({ _id: userId }, { $set: { whatsappConfig: waConfigObj } }, { strict: false });
     }
+
+    // Fetch fresh raw object
+    const updatedUser = await User.findById(userId).lean();
 
     const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.whatsappConfig : updatedUser.whatsappConfig;
     res.status(200).json({ success: true, message: 'WhatsApp successfully connected via Meta!', data: savedData });
@@ -379,17 +380,18 @@ exports.instagramConnect = async (req, res) => {
       pageId: targetAccount.pageId,
     };
 
-    // Save to Database
-    let updatedUser;
+    // Mongoose Model strict-mode Bypass: Force save
     if (workspaceId && workspaceId !== 'main') {
-      updatedUser = await User.findOneAndUpdate(
+      await User.updateOne(
         { _id: userId, "workspaces._id": workspaceId },
         { $set: { "workspaces.$.igConfig": igConfigObj } },
-        { new: true, strict: false }
+        { strict: false }
       );
     } else {
-      updatedUser = await User.findByIdAndUpdate(userId, { $set: { igConfig: igConfigObj } }, { new: true, strict: false });
+      await User.updateOne({ _id: userId }, { $set: { igConfig: igConfigObj } }, { strict: false });
     }
+
+    const updatedUser = await User.findById(userId).lean();
 
     console.log(`✅ [DEBUG Meta Connect] IG Config SAVED to Database! Token Present: ${updatedUser?.igConfig?.accessToken ? 'YES' : 'NO'}`);
 
