@@ -135,8 +135,11 @@ exports.handleInstagramWebhook = async (req, res) => {
               // Check if user is an Influencer or a Regular Business
               // (Assuming acceptCollabs=true means it's a Creator profile)
               const isCreator = user.acceptCollabs === true;
+              
+              const isAiEnabled = user.aiAgentEnabled !== false;
 
-              if (['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
+              // Agar AI enabled hai, toh hardcoded menu mat dikhao, seedha AI se baat karwao!
+              if (!isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
                 const menuMessage = isCreator 
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;
@@ -223,7 +226,6 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               // 🟢 STAGE 2: AI INFLUENCER MANAGER (Only triggers for Brands or Complex text)
-              const isAiEnabled = user.aiAgentEnabled !== false;
               if (isAiEnabled) {
                 try {
                   let businessInfo = activeWorkspace ? activeWorkspace.description : (user.businessDescription || "an Instagram Creator");

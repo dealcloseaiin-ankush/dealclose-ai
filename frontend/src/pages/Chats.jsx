@@ -316,7 +316,14 @@ export default function Chats() {
                   </div>
                   <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate">{customer.phone} {customer.city ? `• ${customer.city}` : ''}</div>
                 </div>
-                {customer.needsReply && <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_5px_rgba(59,130,246,0.8)] shrink-0 mt-1" title="Needs Reply"></span>}
+                {customer.needsReply && (
+                  <span className="relative flex h-3 w-3 shrink-0 mt-1" title="Needs Reply">
+                    {activeCustomer !== customer.phone && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    )}
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                  </span>
+                )}
               </div>
               
               <div className="flex items-center gap-2">
