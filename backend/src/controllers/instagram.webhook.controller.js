@@ -53,13 +53,15 @@ exports.handleInstagramWebhook = async (req, res) => {
               const senderId = event.sender.id;
               const incomingText = event.message.text.trim();
               
-              console.log(`💬 [Instagram DM] Received from ${senderId}: ${incomingText}`);
+              console.log(`💬 [Meta DM (IG/FB)] Received from ${senderId}: ${incomingText}`);
 
-              // Find the exact User who owns this Instagram Account
+              // Find the exact User who owns this Instagram/Facebook Account
               let user = await User.findOne({ 
                 $or: [
                   { "igConfig.accountId": igAccountId },
-                  { "workspaces.igConfig.accountId": igAccountId }
+                  { "workspaces.igConfig.accountId": igAccountId },
+                  { "igConfig.pageId": igAccountId },
+                  { "workspaces.igConfig.pageId": igAccountId }
                 ]
               }); 
               
@@ -69,11 +71,11 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
               if (!user) continue;
 
-              // 🚀 SMART ROUTING: Branch vs Main Page
+              // 🚀 SMART ROUTING: Branch vs Main Page (Check both IG and FB Page IDs)
               let incomingWorkspaceId = 'main';
               let activeWorkspace = null;
-              if (user.igConfig?.accountId !== igAccountId && user.workspaces) {
-                 activeWorkspace = user.workspaces.find(w => w.igConfig && w.igConfig.accountId === igAccountId);
+              if (user.igConfig?.accountId !== igAccountId && user.igConfig?.pageId !== igAccountId && user.workspaces) {
+                 activeWorkspace = user.workspaces.find(w => w.igConfig && (w.igConfig.accountId === igAccountId || w.igConfig.pageId === igAccountId));
                  if (activeWorkspace) incomingWorkspaceId = activeWorkspace._id.toString();
               }
 
@@ -229,10 +231,15 @@ exports.handleInstagramWebhook = async (req, res) => {
           const igUserId = commentData.from.id;
           const username = commentData.from.username || `IG_User_${igUserId}`;
 
-          console.log(`[Instagram Comment] Received from ${username}: ${commentText}`);
+          console.log(`[Meta Comment (IG/FB)] Received from ${username}: ${commentText}`);
 
-          // Find the exact user based on IG Account ID
-          let user = await User.findOne({ "igConfig.accountId": igAccountId });
+          // Find the exact user based on IG or FB Account ID
+          let user = await User.findOne({ 
+             $or: [
+               { "igConfig.accountId": igAccountId },
+               { "igConfig.pageId": igAccountId }
+             ]
+          });
           if (!user) {
              user = await User.findOne({ role: 'owner' }); 
           }
