@@ -109,6 +109,18 @@ const userSchema = new Schema({
     triggerWord: { type: String },
     replyMessage: { type: String }
   }],
+  postAutomations: [{
+    postId: { type: String }, // Instagram media ID
+    thumbnailUrl: { type: String }, // To display in UI
+    triggerWord: { type: String },
+    replyMessage: { type: String },
+    fileUrl: { type: String }, // Cloudinary PDF/Image link
+    deliveryMode: { type: String, enum: ['direct', 'button'], default: 'button' },
+    stats: {
+      sentCount: { type: Number, default: 0 },
+      clickedCount: { type: Number, default: 0 }
+    }
+  }],
   trainingData: [{
     question: { type: String, required: true },
     status: { type: String, enum: ['unanswered', 'answered'], default: 'unanswered' },
@@ -119,6 +131,12 @@ const userSchema = new Schema({
     sent: { type: Number, default: 0 },
     delivered: { type: Number, default: 0 },
     read: { type: Number, default: 0 }
+  },
+  // --- Cloud Storage & Backup Integrations ---
+  googleSheetsConfig: {
+    accessToken: { type: String },
+    refreshToken: { type: String },
+    spreadsheetId: { type: String } // User ki Google Sheet ka ID jahan data jayega
   }
   // You might want to add roles, profile pictures, etc.
 });

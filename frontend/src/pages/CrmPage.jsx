@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import KanbanBoard from '../components/crm/KanbanBoard';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { Search, Plus, FileDown, Printer, KanbanSquare, List, BarChart3 } from 'lucide-react';
+import { Search, Plus, FileDown, Printer, KanbanSquare, List, BarChart3, Share2, AlertTriangle, CloudLightning } from 'lucide-react';
 import ContactDrawer from '../components/crm/ContactDrawer';
 import CrmList from '../components/crm/CrmList';
 import CrmAnalytics from '../components/crm/CrmAnalytics';
@@ -18,6 +18,7 @@ export default function CrmPage() {
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
   
+  const [isGoogleSynced, setIsGoogleSynced] = useState(false);
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
   
@@ -29,7 +30,10 @@ export default function CrmPage() {
     
     api.get('/users/profile').then(res => {
       const u = res.data.user || res.data;
-      if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+      if (u) {
+         setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+         setIsGoogleSynced(!!(u.googleSheetsConfig && u.googleSheetsConfig.accessToken));
+      }
     }).catch(console.error);
   }, []);
 
@@ -63,6 +67,20 @@ export default function CrmPage() {
     } catch (error) {
       console.error("Export Error:", error);
       toast.error("Failed to export leads.");
+    }
+  };
+
+  // Function to Share Backup directly to WhatsApp
+  const handleShareWhatsApp = async () => {
+    const ownerPhone = prompt("Enter the WhatsApp number where you want to receive the backup (e.g., 919876543210):");
+    if (!ownerPhone) return;
+    try {
+      const res = await api.post('/leads/share-whatsapp', { targetPhoneNumber: ownerPhone });
+      if (res.data.success) {
+        toast.success('✅ Backup successfully sent to your WhatsApp!');
+      }
+    } catch (err) {
+      toast.error('❌ Failed to share: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -107,6 +125,13 @@ export default function CrmPage() {
     const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
     return matchWs && matchSearch && matchLeadFilter;
   });
+
+  // Logic for the Expiry Warning Banner
+  const expiringLeadsCount = flatContacts.filter(l => {
+     if (!l.expiresAt) return false;
+     const diffDays = (new Date(l.expiresAt) - new Date()) / (1000 * 60 * 60 * 24);
+     return diffDays > 0 && diffDays <= 3;
+  }).length;
 
   if (loading) {
     return (
@@ -177,12 +202,36 @@ export default function CrmPage() {
           <button onClick={handleExportCSV} className="bg-gray-800 hover:bg-gray-700 p-2 rounded-md border border-gray-700 transition-colors" title="Download Excel">
             <FileDown size={18} className="text-green-400" />
           </button>
+          <button onClick={handleShareWhatsApp} className="bg-green-600/20 text-green-400 border border-green-500/30 hover:bg-green-600 hover:text-white px-3 py-2 rounded-md flex items-center gap-2 shadow-lg transition-colors" title="Share via WhatsApp">
+            <Share2 size={16} /> <span className="hidden sm:inline text-sm font-medium">Backup</span>
+          </button>
+          {isGoogleSynced && (
+            <div className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-md flex items-center gap-2 shadow-lg" title="Live Auto-Syncing to Google Sheets">
+              <CloudLightning size={16} /> <span className="hidden sm:inline text-sm font-medium">Cloud Synced</span>
+            </div>
+          )}
           <button className="bg-sky-500 hover:bg-sky-600 px-4 py-2 rounded-md flex items-center gap-2 text-white shadow-lg transition-colors">
             <Plus size={16} /> 
             <span className="text-sm font-medium">Add Lead</span>
           </button>
         </div>
       </div>
+      
+      {/* Expiring Leads Banner */}
+      {expiringLeadsCount > 0 && (
+        <div className="mb-4 bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-rose-500/20 text-rose-400 rounded-lg"><AlertTriangle size={20} /></div>
+            <div>
+              <h3 className="text-rose-400 font-bold">Data Expiry Warning</h3>
+              <p className="text-gray-400 text-sm">You have <b>{expiringLeadsCount} Leads</b> expiring in less than 3 days. Please upgrade to a Premium Plan for 30-day retention or export them now.</p>
+            </div>
+          </div>
+          <button onClick={handleShareWhatsApp} className="whitespace-nowrap px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold rounded-lg transition-colors">
+            Share Backup to WA
+          </button>
+        </div>
+      )}
 
       {/* Main Content Area */}
       {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}`} pipelineData={filteredPipeline} initialData={filteredPipeline} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}

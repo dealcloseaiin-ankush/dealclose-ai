@@ -30,6 +30,8 @@ export default function InstagramAutomation() {
   const [commentGroups, setCommentGroups] = useState([]);
   const [processingId, setProcessingId] = useState(null);
   const [sendingBulkId, setSendingBulkId] = useState(null);
+  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [iceBreakers, setIceBreakers] = useState('');
 
   useEffect(() => {
     const fetchIgData = async () => {
@@ -68,6 +70,26 @@ export default function InstagramAutomation() {
     } finally {
       setSendingBulkId(null);
     }
+  };
+
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastMsg) return;
+    try {
+      const res = await api.post('/instagram/broadcast', { messageText: broadcastMsg });
+      toast.success(res.data.message);
+      setBroadcastMsg('');
+    } catch (err) { toast.error(err.response?.data?.message || 'Broadcast failed.'); }
+  };
+
+  const handleSetIceBreakers = async (e) => {
+    e.preventDefault();
+    if (!iceBreakers) return;
+    try {
+      const questions = iceBreakers.split(',').map(q => q.trim()).filter(q => q);
+      await api.post('/instagram/icebreakers', { questions });
+      toast.success('Ice Breakers updated on Instagram!');
+  } catch (err) { toast.error(err.response?.data?.message || 'Failed to update Ice Breakers.'); }
   };
 
   const generateAIReply = (id, theme) => {
@@ -212,6 +234,24 @@ export default function InstagramAutomation() {
                 </div>
               </div>
             </div>
+
+          <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-lg mt-6">
+            <h2 className="text-lg font-semibold text-white mb-2">Ice Breakers (FAQ Buttons)</h2>
+            <p className="text-xs text-gray-400 mb-4">Show buttons to new users before they type. Comma separated.</p>
+            <form onSubmit={handleSetIceBreakers} className="flex gap-2">
+              <input type="text" value={iceBreakers} onChange={(e) => setIceBreakers(e.target.value)} placeholder="e.g. Chat with Sales, Collab Request" className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg p-2 text-sm text-white outline-none focus:border-purple-500" />
+              <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-500 transition-colors">Set</button>
+            </form>
+          </div>
+
+          <div className="bg-gradient-to-br from-[#1a1525] to-[#111] border border-purple-500/30 rounded-2xl p-6 shadow-lg mt-6">
+            <h2 className="text-lg font-semibold text-purple-400 mb-2">24H Marketing Broadcast</h2>
+            <p className="text-xs text-gray-400 mb-4">Send a bulk DM to everyone who messaged you in the last 24 hours.</p>
+            <form onSubmit={handleSendBroadcast} className="flex flex-col gap-3">
+              <textarea value={broadcastMsg} onChange={(e) => setBroadcastMsg(e.target.value)} rows="3" placeholder="Hey! Check out our new reel..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-sm text-white outline-none focus:border-purple-500"></textarea>
+              <button type="submit" className="bg-purple-600 text-white py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-500/20 hover:bg-purple-500 transition-colors">Send Broadcast 🚀</button>
+            </form>
+          </div>
           </div>
 
           {/* 3. IG Leads Tracker */}

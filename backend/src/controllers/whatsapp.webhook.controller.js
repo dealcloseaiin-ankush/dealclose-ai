@@ -108,10 +108,22 @@ exports.handleWhatsApp = async (req, res) => {
               const seqId = String(leadCount + 1).padStart(4, '0');
               savedLead = await Lead.create({
                 userId: user._id, phoneNumber: fromNumber, name: `User #${seqId}`,
-                source: 'WhatsApp Inbound', status: 'new', createdBy: user._id
+                source: 'WhatsApp Inbound', status: 'new', createdBy: user._id, // 🐛 FIXED: Added missing comma
+                ...(getExpiry('junk') && { expiresAt: getExpiry('junk') }) // Only add if not null
               });
             }
             console.log(`✅ [Webhook Debug] Lead saved/verified in CRM (ID: ${savedLead._id})`);
+            
+            // 🚀 MAGIC: If lead is an 'interested' customer, extend their TTL (or make Lifetime for Premium)
+            const type = ['interested', 'negotiating', 'converted'].includes(savedLead.status) ? 'lead' : 'junk';
+            const newExpiry = getExpiry(type);
+            
+            if (newExpiry) {
+               await Lead.updateOne({ _id: savedLead._id }, { $set: { expiresAt: newExpiry } });
+            } else {
+               await Lead.updateOne({ _id: savedLead._id }, { $unset: { expiresAt: 1 } }); // Remove expiry entirely
+            }
+            
           } catch (leadErr) {
             console.error("❌ [Webhook] Error auto-saving Lead to CRM:", leadErr.message);
           }
@@ -501,7 +513,9 @@ exports.handleWhatsApp = async (req, res) => {
                 let matchedTrigger = null;
                 for (const trigger of triggerNodes) {
                   const keywords = (trigger.data.keyword || "").split(',').map(k => k.trim().toLowerCase());
-                  if (keywords.includes(incomingTextLower)) {
+                  const words = incomingTextLower.split(/[\s,]+/);
+                  // 🚀 SMART KEYWORD MATCHING
+                  if (keywords.some(k => incomingTextLower === k || words.includes(k))) {
                     matchedTrigger = trigger;
                     break;
                   }

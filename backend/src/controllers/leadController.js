@@ -4,6 +4,7 @@ const Message = require('../models/messageModel');
 const User = require('../models/userModel');
 const aiService = require('../services/aiService');
 const mongoose = require('mongoose');
+const whatsappService = require('../services/whatsappService');
 
 // @desc    Get all leads
 // @route   GET /api/leads
@@ -138,6 +139,49 @@ exports.exportLeads = async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="leads_export.csv"');
     res.status(200).send(csvRows.join('\n'));
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Share Leads to WhatsApp (Manual Backup)
+// @route   POST /api/leads/share-whatsapp
+exports.shareLeadsToWhatsApp = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { targetPhoneNumber } = req.body;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    if (!targetPhoneNumber) return res.status(400).json({ message: 'Target phone number is required.' });
+
+    const user = await User.findById(userId).lean();
+    if (!user || !user.whatsappConfig || !user.whatsappConfig.accessToken) {
+      return res.status(400).json({ message: 'WhatsApp configuration missing.' });
+    }
+
+    // Get the latest 50 CRM leads
+    const leads = await Lead.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
+    
+    if (leads.length === 0) return res.status(400).json({ message: 'No leads found to share.' });
+
+    let messageText = `📊 *Your CRM Leads Backup*\nHere are your latest leads:\n\n`;
+    
+    leads.forEach((lead, index) => {
+      messageText += `*${index + 1}. ${lead.name}*\n`;
+      messageText += `📞 ${lead.phoneNumber}\n`;
+      messageText += `🔖 Status: ${lead.status}\n`;
+      if (lead.notes) messageText += `📝 Notes: ${lead.notes.substring(0, 50)}...\n`;
+      messageText += `\n`;
+    });
+
+    messageText += `\n_Generated via DealClose AI_`;
+
+    let formattedPhone = targetPhoneNumber.replace(/\D/g, ''); 
+    if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;
+
+    await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, formattedPhone, messageText);
+
+    res.status(200).json({ success: true, message: 'Leads shared successfully via WhatsApp!' });
+  } catch (error) {
+    console.error('Share Leads Error:', error);
     res.status(500).json({ message: error.message });
   }
 };

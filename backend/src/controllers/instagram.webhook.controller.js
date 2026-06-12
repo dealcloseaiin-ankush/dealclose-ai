@@ -111,6 +111,38 @@ exports.handleInstagramWebhook = async (req, res) => {
                 }
               }
 
+              // 🚀 SMART TTL: Calculate Data Expiry based on User Plan
+              const isPremium = user.isPremium === true;
+              const getExpiry = (type) => {
+                if (type === 'lead') {
+                  // Premium users keep CRM leads forever. Free users keep for 14 days.
+                  return isPremium ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+                }
+                // DMs/Comments: Premium keeps for 30 days. Free keeps for 1 day.
+                return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+              };
+
+              // 🚀 TWO-STEP LINK TRACKING: Handle Quick Reply Button Clicks
+              const quickReplyPayload = event.message.quick_reply ? event.message.quick_reply.payload : null;
+              if (quickReplyPayload && quickReplyPayload.startsWith('GET_AUTO_LINK_')) {
+                const postId = quickReplyPayload.replace('GET_AUTO_LINK_', '');
+                const matchedRule = user.postAutomations?.find(r => r.postId === postId);
+                
+                if (matchedRule && matchedRule.fileUrl) {
+                   const linkMsg = `Here is your requested link/file: ${matchedRule.fileUrl}\n\nLet me know if you need anything else!`;
+                   await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, linkMsg).catch(e => console.error(e));
+                   
+                   // Update Clicked Count (Intrested Leads!)
+                   await User.updateOne(
+                     { _id: user._id, "postAutomations.postId": postId },
+                     { $inc: { "postAutomations.$.stats.clickedCount": 1 } }
+                   );
+                   
+                   await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: linkMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                   continue; // Stop further processing, job done!
+                }
+              }
+
               if (!isEcho) {
                 // Save incoming message to Inbox
                 await Message.create({
@@ -120,7 +152,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   direction: 'incoming',
                   status: 'received',
                   sentBy: 'customer',
-                  timestamp: new Date()
+                  timestamp: new Date(),
+                  expiresAt: getExpiry('junk')
                 });
               }
 
@@ -129,11 +162,11 @@ exports.handleInstagramWebhook = async (req, res) => {
                 { phoneNumber: `IG_${senderId}`, userId: user._id },
                 { 
                   $set: { name: realName },
-                  $setOnInsert: { 
+                  $setOnInsert: Object.assign({ 
                     source: 'Instagram DM', 
                     status: 'visitor', // CHANGED FROM 'new' to avoid CRM clutter for normal fans
-                    createdBy: user._id 
-                  } 
+                    createdBy: user._id
+                  }, getExpiry('junk') ? { expiresAt: getExpiry('junk') } : {})
                 },
                 { upsert: true }
               );
@@ -147,7 +180,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                     direction: 'outgoing',
                     status: 'sent',
                     sentBy: 'owner_app',
-                    timestamp: new Date()
+                    timestamp: new Date(),
+                    expiresAt: getExpiry('junk')
                  });
 
                  // Pause AI for 24 hours so it doesn't interrupt the human
@@ -195,7 +229,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                          
                          // 🔥 Convert to proper lead if they answer a business/collab related flow question
                          if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('business') || qLower.includes('name'))) {
-                            updatePayload.$set = { status: 'new' };
+                            updatePayload.$set = { status: 'new', expiresAt: getExpiry('lead') };
                          }
                          await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
                          chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
@@ -218,7 +252,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                        const options = [activeNode.data.opt1, activeNode.data.opt2, activeNode.data.opt3];
                        const selectedOpt = options[num - 1] || options[0];
                        if (selectedOpt && currentLeadCheck.status === 'visitor' && (selectedOpt.toLowerCase().includes('brand') || selectedOpt.toLowerCase().includes('collab') || selectedOpt.toLowerCase().includes('buy') || selectedOpt.toLowerCase().includes('order'))) {
-                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { status: 'new' } }, { strict: false });
+                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { status: 'new', expiresAt: getExpiry('lead') } }, { strict: false });
                        }
                      }
 
@@ -231,13 +265,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                          await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                          await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
@@ -248,7 +282,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
                            await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
-                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                            await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                          }
                          currNodeId = null; 
@@ -289,13 +323,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                          await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                          await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
@@ -306,7 +340,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
                            await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, msgText).catch(e=>console.log(e.message));
-                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                            await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
                          }
                          currNodeId = null; 
@@ -323,6 +357,37 @@ exports.handleInstagramWebhook = async (req, res) => {
                 continue; // 🚀 Flow Engine handled this, Skip the Heavy AI & Gatekeeper!
               }
               // ==========================================================
+
+              // 🚀 TWO-STEP LINK DELIVERY: Send Button if user DM'd a keyword
+              if (!flowReplyHandled && user.postAutomations) {
+                const matchedAuto = user.postAutomations.find(rule => incomingTextLower.includes(rule.triggerWord.toLowerCase()));
+                if (matchedAuto && matchedAuto.fileUrl) {
+                  try {
+                    if (matchedAuto.deliveryMode === 'button') {
+                      await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
+                        recipient: { id: senderId },
+                        message: {
+                          text: `${matchedAuto.replyMessage}\n\nTap the button below to receive the file/link:`,
+                          quick_replies: [{ content_type: "text", title: "Get Link 🔗", payload: `GET_AUTO_LINK_${matchedAuto.postId}` }]
+                        }
+                      }, { params: { access_token: user.igConfig.accessToken }});
+                    } else {
+                      // Direct Mode (Send Link instantly)
+                      const directLinkMsg = `${matchedAuto.replyMessage}\n\n📄 Link: ${matchedAuto.fileUrl}`;
+                      await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, directLinkMsg);
+                      // Auto-increment click count as well since it was sent directly
+                      await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.clickedCount": 1 } });
+                    }
+                    
+                    // Update Sent Count
+                    await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.sentCount": 1 } });
+                    await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: `[Button Sent] ${matchedAuto.replyMessage}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                  } catch(e) {
+                    console.error("Quick Reply DM Error:", e.response?.data || e.message);
+                  }
+                  continue; // Handled
+                }
+              }
 
               // Check if user is an Influencer or a Regular Business
               // (Assuming acceptCollabs=true means it's a Creator profile)
@@ -354,7 +419,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   direction: 'outgoing', 
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
-                  timestamp: new Date()
+                  timestamp: new Date(),
+                  expiresAt: getExpiry('junk')
                 });
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
@@ -382,18 +448,22 @@ exports.handleInstagramWebhook = async (req, res) => {
                   direction: 'outgoing', 
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
-                  timestamp: new Date()
+                  timestamp: new Date(),
+                  expiresAt: getExpiry('junk')
                 });
                 
                 // Seedha CRM me Lead bana do (Bina AI ke)
                 await Lead.findOneAndUpdate(
                   { phoneNumber: `IG_${senderId}` }, 
                   { 
-                    userId: user._id, 
-                    name: `IG User ${senderId}`, 
-                    source: 'Instagram DM (Collab)', 
-                    status: 'new', 
-                    notes: `IG Handle: @${senderId}\nDeal Type: Collab\nAwaiting Influencer's manual review.` 
+                    $set: {
+                      userId: user._id, 
+                      name: `IG User ${senderId}`, 
+                      source: 'Instagram DM (Collab)', 
+                      status: 'new', 
+                      notes: `IG Handle: @${senderId}\nDeal Type: Collab\nAwaiting Influencer's manual review.`,
+                      expiresAt: getExpiry('lead')
+                    }
                   }, 
                   { upsert: true }
                 );
@@ -424,7 +494,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   direction: 'outgoing', 
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
-                  timestamp: new Date()
+                  timestamp: new Date(),
+                  expiresAt: getExpiry('junk')
                 });
                 
                 continue; // 🚫 Stops here, status remains 'visitor', no lead created in CRM pipeline.
@@ -452,7 +523,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   direction: 'outgoing', 
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
-                  timestamp: new Date()
+                  timestamp: new Date(),
+                  expiresAt: getExpiry('junk')
                 });
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
@@ -503,7 +575,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                             name: dealData.brandName || "New Brand Deal", 
                             source: 'Instagram DM (Promotion)', 
                             status: 'interested', 
-                            notes: `Deliverables: ${dealData.itemName || dealData.deliverables} | Offered Budget: ${dealData.budget} | Notes: ${dealData.notes || 'N/A'}` 
+                        notes: `Deliverables: ${dealData.itemName || dealData.deliverables} | Offered Budget: ${dealData.budget} | Notes: ${dealData.notes || 'N/A'}`,
+                        expiresAt: getExpiry('lead')
                           }, 
                           { upsert: true }
                         );
@@ -534,7 +607,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                       direction: 'outgoing',
                       status: deliveryStatus,
                       sentBy: 'ai',
-                      timestamp: new Date()
+                      timestamp: new Date(),
+                      expiresAt: getExpiry('junk')
                     });
                   }
 
@@ -554,6 +628,7 @@ exports.handleInstagramWebhook = async (req, res) => {
           const commentText = commentData.text;
           const igUserId = commentData.from.id;
           const username = commentData.from.username || `IG_User_${igUserId}`;
+          const mediaId = commentData.media ? commentData.media.id : null;
 
           console.log(`[Meta Comment (IG/FB)] Received from ${username}: ${commentText}`);
 
@@ -573,6 +648,17 @@ exports.handleInstagramWebhook = async (req, res) => {
           }
           if (!user) continue;
           
+          // 🚀 SMART TTL: Calculate Expiry for Comments
+          const isPremium = user.isPremium === true;
+          const getExpiry = (type) => {
+            if (type === 'lead') {
+              // Premium users keep CRM leads forever. Free users keep for 14 days.
+              return isPremium ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+            }
+            // DMs/Comments: Premium keeps for 30 days. Free keeps for 1 day.
+            return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+          };
+
           const autoReplies = user?.autoReplies || [];
 
           // 🌟 SMART LEAD EXTRACTION: Check if comment has a Phone Number
@@ -590,22 +676,46 @@ exports.handleInstagramWebhook = async (req, res) => {
                  userId: user._id, 
                  name: username, 
                  source: 'Instagram Comment', 
-                 status: 'new', 
-                 notes: `Left number in comment: "${commentText}"` 
+                 status: 'new',
+                 notes: `Left number in comment: "${commentText}"`,
+                 expiresAt: getExpiry('lead')
                },
                { upsert: true, new: true }
              );
           }
 
-          // 1. MANUAL KEYWORD MATCHING (e.g. checking if comment contains "link", "price", etc.)
-          const matchedRule = autoReplies.find(rule => commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+          // 1. 🚀 SMART MATCHING: POST-SPECIFIC AUTOMATION FIRST, THEN GLOBAL
+          let matchedRule = null;
+          let isPostSpecific = false;
+          
+          // Pehle check karo ki kya is specific reel/post ke liye koi rule bana hai?
+          if (mediaId && user.postAutomations) {
+             matchedRule = user.postAutomations.find(rule => rule.postId === mediaId && commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+             if (matchedRule) isPostSpecific = true;
+          }
+
+          // Agar post-specific rule nahi mila, toh Global rule (autoReplies) check karo
+          if (!matchedRule) {
+             matchedRule = autoReplies.find(rule => commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+          }
 
           if (matchedRule) {
-             console.log(`✅ [Instagram] Manual Keyword Matched: '${matchedRule.triggerWord}'`);
-             console.log(`💬 [Instagram] Sending DM to ${username}: ${matchedRule.replyMessage}`);
+             console.log(`✅ [Instagram] Keyword Matched: '${matchedRule.triggerWord}' (Post Specific: ${isPostSpecific})`);
              
+             // 🚀 Handle PDF/Link injection for Post Specific automations
+             let finalReplyMsg = matchedRule.replyMessage;
+             if (matchedRule.fileUrl) {
+                 finalReplyMsg += `\n\n📄 Here is your link/file: ${matchedRule.fileUrl}`;
+             }
+             
+             // Track Sent Count for Post Automation
+             if (isPostSpecific) {
+               await User.updateOne({ _id: user._id, "postAutomations.postId": matchedRule.postId }, { $inc: { "postAutomations.$.stats.sentCount": 1 } }).catch(e => console.log(e));
+             }
+
+             console.log(`💬 [Instagram] Sending DM to ${username}: ${finalReplyMsg}`);
              try {
-               await metaAdsService.sendInstagramCommentPrivateReply(user.igConfig.accessToken, commentData.id, matchedRule.replyMessage);
+               await metaAdsService.sendInstagramCommentPrivateReply(user.igConfig.accessToken, commentData.id, finalReplyMsg);
                console.log(`✅ [Instagram] Private DM sent for comment!`);
              } catch (replyErr) {
                console.error("❌ [Instagram Private Reply Error]:", replyErr.response?.data || replyErr.message);
@@ -632,19 +742,20 @@ exports.handleInstagramWebhook = async (req, res) => {
                 sentBy: 'customer',
                 tags: ['ig_comment', 'auto_replied'],
                 timestamp: new Date(),
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Auto-delete after 30 days
+                expiresAt: getExpiry('junk') // 🚀 Uses smart expiry now
              });
              
              // Dashboard me reply bhi toh dikhna chahiye
              await Message.create({
                 userId: user._id,
                 customerPhone: `IG_${igUserId}`,
-                messageText: matchedRule.replyMessage,
+                messageText: finalReplyMsg,
                 direction: 'outgoing',
                 status: 'sent',
                 sentBy: 'auto-reply',
                 tags: ['ig_private_reply'],
-                timestamp: new Date()
+                timestamp: new Date(),
+                expiresAt: getExpiry('junk')
              });
           } else {
              console.log(`⚠️ [Instagram] No manual keyword matched for: "${commentText}"`);
@@ -665,7 +776,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                         userId: user._id, customerPhone: `IG_${igUserId}`,
                         messageText: `[Public AI Reply]: ${aiReply}`,
                         direction: 'outgoing', status: 'sent', sentBy: 'ai',
-                        tags: ['ig_comment_reply'], timestamp: new Date()
+                        tags: ['ig_comment_reply'], timestamp: new Date(), expiresAt: getExpiry('junk')
                      });
                  } catch (aiCommentErr) {
                      console.error("❌ [Instagram AI Comment Reply Error]:", aiCommentErr.response?.data?.error?.message || aiCommentErr.message);
@@ -682,7 +793,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 sentBy: 'customer',
                 tags: ['ig_comment', 'needs_reply'],
                 timestamp: new Date(),
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Auto-delete after 30 days
+                expiresAt: getExpiry('junk') // 🚀 Uses smart expiry now
             });
             
             // FUTURE PHASE: Yahan hum Premium Users ke liye AI Trigger karenge jo spelling mistake samajh sake

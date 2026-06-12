@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
-import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap } from 'lucide-react'; // Icons for viewing tokens
+import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database } from 'lucide-react'; 
 import MetaConnectButton from '../components/MetaConnectButton';
 
 export default function Settings() {
@@ -41,6 +41,7 @@ export default function Settings() {
   });
   
   const [igConnected, setIgConnected] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
   const [userId, setUserId] = useState('demo-business'); // Used for QR code link
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showExternalToken, setShowExternalToken] = useState(false);
@@ -68,6 +69,34 @@ export default function Settings() {
     const updated = [...config.customWebhooks];
     updated[index][field] = value;
     setConfig({ ...config, customWebhooks: updated });
+  };
+
+  // --- Google Sheets OAuth Handlers ---
+  useEffect(() => {
+    // Catch Google OAuth Redirect Code from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      setIsLoading(true);
+      api.post('/settings/google/connect', { code })
+        .then(() => {
+          alert('🎉 Google Sheets Connected Successfully! Auto-sync is now ACTIVE.');
+          window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+          fetchSettings();
+        })
+        .catch(err => {
+          alert(err.response?.data?.message || 'Failed to connect Google Sheets.');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setIsLoading(false);
+        });
+    }
+  }, []);
+
+  const handleGoogleAuth = async () => {
+    try {
+      const res = await api.get('/settings/google/auth-url');
+      if (res.data.success) window.location.href = res.data.url; // Redirect to Google Login
+    } catch (err) { alert(err.response?.data?.message || 'Error generating Auth URL.'); }
   };
 
   const fetchSettings = async () => {
@@ -116,6 +145,7 @@ export default function Settings() {
         });
         if (savedData._id) setUserId(savedData._id);
         setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
+        setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
       }
     } catch (error) {
       console.error('Failed to load settings. It might be empty currently.', error);
@@ -397,6 +427,24 @@ export default function Settings() {
                       <input type="text" name="wabaId" value={config.wabaId} onChange={handleChange} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none" placeholder="1234567890" />
                     </div>
                   </div>
+                </div>
+
+                {/* Google Sheets Integration (Premium) */}
+                <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-emerald-500/30 relative overflow-hidden mt-8">
+                  <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                  <div className="flex justify-between items-center mb-4 relative z-10">
+                    <h2 className="text-xl font-semibold text-emerald-400 flex items-center gap-2"><Database size={20}/> Google Sheets Auto-Sync</h2>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${googleConnected ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{googleConnected ? 'Connected & Active ✅' : 'Not Connected'}</span>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-6 relative z-10">Automatically backup every new Lead (from WhatsApp & Instagram) directly into your Google Sheets to save data forever (BYOS).</p>
+                  
+                  {!googleConnected ? (
+                    <button type="button" onClick={handleGoogleAuth} className="px-6 py-2 bg-white hover:bg-gray-200 text-black font-bold rounded-lg transition-colors flex items-center gap-2 shadow-md relative z-10">
+                       <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" className="w-4 h-4" alt="Google" /> Connect Google Account
+                    </button>
+                  ) : (
+                    <p className="text-sm font-semibold text-emerald-500 relative z-10">✅ Your leads are automatically syncing to your Drive.</p>
+                  )}
                 </div>
 
                 {/* Branch Management Section */}

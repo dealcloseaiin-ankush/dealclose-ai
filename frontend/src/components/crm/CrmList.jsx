@@ -13,11 +13,12 @@ export default function CrmList({ contacts, onContactClick }) {
               <th className="p-5 font-semibold">Stage</th>
               <th className="p-5 font-semibold">AI Score</th>
               <th className="p-5 font-semibold">Deal Value</th>
+              <th className="p-5 font-semibold">Expires</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
             {contacts.length === 0 ? (
-              <tr><td colSpan="5" className="text-center p-8 text-gray-500">No leads found.</td></tr>
+              <tr><td colSpan="6" className="text-center p-8 text-gray-500">No leads found.</td></tr>
             ) : (
               contacts.map(contact => (
                 <tr 
@@ -41,6 +42,15 @@ export default function CrmList({ contacts, onContactClick }) {
                   </td>
                   <td className="p-5 font-semibold text-white">
                     ₹{contact.dealValue?.toLocaleString('en-IN') || 0}
+                  </td>
+                  <td className="p-5 text-gray-500 text-xs font-semibold">
+                    {contact.expiresAt ? (
+                      <span className={`px-2 py-1 rounded ${new Date(contact.expiresAt) - new Date() < 3 * 86400000 ? 'bg-red-500/10 text-red-400' : 'bg-gray-800 text-gray-400'}`}>
+                        {Math.max(1, Math.ceil((new Date(contact.expiresAt) - new Date()) / 86400000))} Days
+                      </span>
+                    ) : (
+                      'Never'
+                    )}
                   </td>
                 </tr>
               ))

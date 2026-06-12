@@ -140,6 +140,41 @@ const automationWorker = new Worker('automationQueue', async job => {
       console.error(`❌ [Worker Failed] Could not send feedback request:`, error.message);
     }
   }
+
+  // ==========================================
+  // 4. DAILY AUTO-BACKUP & EXPIRY WARNING
+  // ==========================================
+  if (job.name === 'daily_auto_backup') {
+    console.log(`⏳ [Worker Started] Running Daily Auto-Backup & Expiry Check...`);
+    
+    // Find leads expiring in the next 3 days
+    const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const expiringLeads = await Lead.find({ expiresAt: { $lte: threeDaysFromNow, $gt: new Date() } });
+
+    // Group by userId
+    const userLeads = {};
+    for (const lead of expiringLeads) {
+      if (!userLeads[lead.userId]) userLeads[lead.userId] = [];
+      userLeads[lead.userId].push(lead);
+    }
+
+    for (const userId in userLeads) {
+      const user = await User.findById(userId);
+      if (user && user.whatsappConfig && user.whatsappConfig.accessToken && user.ownerPhone) {
+        const leads = userLeads[userId];
+        let msg = `🚨 *DealClose AI Backup Alert*\n\nYou have ${leads.length} leads that will be auto-deleted soon due to your current plan's data retention policy.\n\n*Top Expiring Leads:*\n`;
+        leads.slice(0, 5).forEach(l => {
+          msg += `- ${l.name} (${l.phoneNumber})\n`;
+        });
+        msg += `\n*Action Required:* Please open your Dashboard -> CRM and click 'Share via WhatsApp' or 'Export' to save them!`;
+
+        let formattedPhone = user.ownerPhone.replace(/\D/g, ''); 
+        if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;
+
+        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, formattedPhone, msg).catch(e => console.log(e.message));
+      }
+    }
+  }
 }, { 
   connection,
   // 🔴 TRICK: Stop the "Tick-Tick" polling!
@@ -152,6 +187,15 @@ const automationWorker = new Worker('automationQueue', async job => {
 // 🔴 PREVENT CRASH: Worker fail hone par process kill hone se bachayega
 automationWorker.on('error', err => {
   console.error('⚠️ [BullMQ Worker Error]:', err.message);
+});
+
+// 🚀 NEW: Start the Daily Cron Job for Auto Backups
+// This runs every day at 10:00 AM automatically
+automationQueue.add('daily_auto_backup', {}, {
+  repeat: {
+    pattern: '0 10 * * *' // Cron syntax for 10:00 AM daily
+  },
+  jobId: 'system_daily_backup'
 });
 
 module.exports = { automationQueue, automationWorker };

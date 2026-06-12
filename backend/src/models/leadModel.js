@@ -67,7 +67,17 @@ const leadSchema = new Schema({
     type: Map,
     of: String,
   },
+  expiresAt: {
+    type: Date
+  },
+  // --- Retention & Cold Storage (For 120-Day Rule) ---
+  isArchived: { type: Boolean, default: false }, // Hides from UI but stays in DB
+  archivedAt: { type: Date },
+  archiveUrl: { type: String } // AWS S3 / Cloud Link if moved to cold storage
 });
+
+// TTL Index: MongoDB will automatically delete the document when current time > expiresAt
+leadSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Lead = mongoose.model('Lead', leadSchema);
 

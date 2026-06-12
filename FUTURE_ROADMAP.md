@@ -18,24 +18,24 @@ This file tracks all the advanced features that are currently disabled (Coming S
 - **Description:** Generate marketing videos, lip-sync avatars, and product motion ads.
 - **Current Status:** UI built (`AIVideoDashboard.jsx`). Replicate API integration needs to be connected with a Pay-Per-Video billing system.
 
-## 4. Advanced Instagram Automation
-- **Description:** Smart comment clustering, auto-DMs, and silent phone number extraction from IG DMs.
-- **Current Status:** ✅ Webhooks verified. Scopes added to Embedded Signup. Needs final Graph API send DM code activation after Meta App Review is approved.
-
-## 5. B2B Lead Extractor
+## 4. B2B Lead Extractor
 - **Description:** Scrape verified business numbers from Google Maps and import them directly to CRM.
 - **Current Status:** UI built (`LeadExtractor.jsx`). Backend scraper (Puppeteer/Google Places API) integration required.
 
-## 6. AI Voice Calling (Outbound)
+## 5. AI Voice Calling (Outbound)
 - **Description:** Call high-ticket leads automatically using Twilio WebSockets.
 - **Current Status:** Twilio WebSocket stream handler (`twilioStreamHandler.js`) is built to catch live audio. Needs integration with Deepgram/ElevenLabs for real-time AI voice processing.
 
-## 7. Advanced AI Analytics & Monthly Reports
+## 6. Advanced AI Analytics & Monthly Reports
 - **Description:** Provide users with PDF reports on how much ROI the AI generated.
 - **Current Status:** Disabled in MVP sidebar.
 
 ---
 ## ✅ MVP Core - Completed & Active (Foundation Ready)
+- **Advanced Instagram Automation:** Full funnel active! Smart comment clustering, Post-specific automations with 2-step button links, Auto-DMs, and silent phone number extraction.
+- **Instagram Marketing Tools:** 24H Broadcasts and Ice Breakers (FAQ buttons) deployed natively via Meta Graph API.
+- **Smart Data Retention (TTL) & Auto-Backups:** Free users' data auto-expires in 1/14 days, Premium data retained. Automatic WhatsApp warning sent 3 days prior.
+- **BYOS (Bring Your Own Storage) / Google Sheets Sync:** Premium users can connect their Google accounts to auto-sync CRM leads to Google Sheets for lifetime free storage.
 - **Meta Embedded Signup (1-Click Connect):** Unified popup for users to connect their WhatsApp and Instagram accounts securely without copy-pasting raw tokens (`MetaConnectButton.jsx`).
 - **AI Flow Builder:** Powered by Gemini 2.5 Flash for prompt-to-flow generation (`aiController.js`).
 - **Magic Onboarding:** Auto-creates dynamic logic flows (E-commerce / Real Estate / Influencer) upon user sign-up (`authController.js`).
