@@ -8,6 +8,7 @@ const callService = require('../services/callService');
 const billing = require('../utils/billing');
 const metaAdsService = require('../services/metaAdsService');
 const Flow = require('../models/flowModel');
+const googleSheetsController = require('./googleSheetsController');
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
@@ -112,6 +113,9 @@ exports.handleWhatsApp = async (req, res) => {
                 ...(getExpiry('junk') && { expiresAt: getExpiry('junk') }) // Only add if not null
               });
             }
+            
+            // 🚀 NEW: Auto-Sync New WhatsApp Leads to Google Sheets
+            googleSheetsController.appendLeadToSheet(user._id, savedLead).catch(e => console.log('Sheets sync error:', e.message));
             console.log(`✅ [Webhook Debug] Lead saved/verified in CRM (ID: ${savedLead._id})`);
             
             // 🚀 MAGIC: If lead is an 'interested' customer, extend their TTL (or make Lifetime for Premium)
@@ -804,7 +808,9 @@ exports.handleWhatsApp = async (req, res) => {
                         notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` 
                       };
                       
-                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { $set: updateFields }, { returnDocument: 'after', upsert: true });
+                      const updatedLead = await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { $set: updateFields }, { returnDocument: 'after', upsert: true });
+                      
+                      googleSheetsController.appendLeadToSheet(user._id, updatedLead).catch(e => console.log('Sheets sync error:', e.message));
                       responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`;
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "search_catalog") {

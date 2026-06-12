@@ -5,6 +5,7 @@ const Lead = require('../models/leadModel'); // Lead model import kiya gaya
 const Flow = require('../models/flowModel'); // 🚀 Flow model imported
 const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); // 🚀 Required for Public Comment Replies
+const googleSheetsController = require('./googleSheetsController');
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/instagram
@@ -112,7 +113,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               // 🚀 SMART TTL: Calculate Data Expiry based on User Plan
-              const isPremium = user.isPremium === true;
+              const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
               const getExpiry = (type) => {
                 if (type === 'lead') {
                   // Premium users keep CRM leads forever. Free users keep for 14 days.
@@ -158,7 +159,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               // 🚀 NEW: AUTO-ADD IG SENDER TO CRM (So it shows in Chats sidebar instantly)
-              await Lead.findOneAndUpdate(
+              const savedIgLead = await Lead.findOneAndUpdate(
                 { phoneNumber: `IG_${senderId}`, userId: user._id },
                 { 
                   $set: { name: realName },
@@ -168,8 +169,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                     createdBy: user._id
                   }, getExpiry('junk') ? { expiresAt: getExpiry('junk') } : {})
                 },
-                { upsert: true }
+                { upsert: true, returnDocument: 'after' }
               );
+              
+              // 🚀 NEW: Auto-Sync New IG Leads to Google Sheets
+              if (savedIgLead && savedIgLead.status === 'visitor' && savedIgLead.createdAt && (Date.now() - new Date(savedIgLead.createdAt).getTime() < 10000)) {
+                 googleSheetsController.appendLeadToSheet(user._id, savedIgLead).catch(e => console.log('Sheets sync error:', e.message));
+              }
 
               // 🚀 NEW: HANDLE OWNER REPLIES FROM INSTAGRAM APP
               if (isEcho) {
@@ -568,7 +574,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                       if (toolCall.function.name === "extract_brand_deal" || toolCall.function.name === "extract_lead_requirements") {
                         const dealData = JSON.parse(toolCall.function.arguments);
                         
-                        await Lead.findOneAndUpdate(
+                        const updatedIgLead = await Lead.findOneAndUpdate(
                           { phoneNumber: `IG_${senderId}` }, 
                           { 
                             userId: user._id, 
@@ -578,8 +584,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                         notes: `Deliverables: ${dealData.itemName || dealData.deliverables} | Offered Budget: ${dealData.budget} | Notes: ${dealData.notes || 'N/A'}`,
                         expiresAt: getExpiry('lead')
                           }, 
-                          { upsert: true }
+                          { upsert: true, returnDocument: 'after' }
                         );
+                        
+                        googleSheetsController.appendLeadToSheet(user._id, updatedIgLead).catch(e => console.log('Sheets sync error:', e.message));
                         
                         responseMessage = `Thank you! I have noted down the details (Budget: ${dealData.budget}). I will forward this to the influencer and we will get back to you shortly to finalize the collaboration!`;
                       }
@@ -649,7 +657,7 @@ exports.handleInstagramWebhook = async (req, res) => {
           if (!user) continue;
           
           // 🚀 SMART TTL: Calculate Expiry for Comments
-          const isPremium = user.isPremium === true;
+          const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
           const getExpiry = (type) => {
             if (type === 'lead') {
               // Premium users keep CRM leads forever. Free users keep for 14 days.
@@ -670,7 +678,7 @@ exports.handleInstagramWebhook = async (req, res) => {
              console.log(`📞 [Instagram] High Intent Lead! Phone number detected: ${extractedPhone}`);
              
              // Extract number and save to CRM as a Lead
-             await Lead.findOneAndUpdate(
+             const newCommentLead = await Lead.findOneAndUpdate(
                { phoneNumber: extractedPhone },
                { 
                  userId: user._id, 
@@ -682,6 +690,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                },
                { upsert: true, new: true }
              );
+             
+             googleSheetsController.appendLeadToSheet(user._id, newCommentLead).catch(e => console.log('Sheets sync error:', e.message));
           }
 
           // 1. 🚀 SMART MATCHING: POST-SPECIFIC AUTOMATION FIRST, THEN GLOBAL

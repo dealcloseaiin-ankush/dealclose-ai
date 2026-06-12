@@ -16,8 +16,9 @@ exports.getAuthUrl = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const user = await User.findById(userId);
 
-    // 🚀 RESTRICTION: Only Premium Users can use this!
-    if (!user.isPremium) {
+    // 🚀 RESTRICTION WITH DEVELOPER BYPASS
+    const hasPremiumAccess = user.isPremium || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
+    if (!hasPremiumAccess) {
       return res.status(403).json({ success: false, message: 'Google Sheets sync is a Premium Feature. Please upgrade your plan.' });
     }
 
@@ -45,7 +46,8 @@ exports.connectGoogleAccount = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     
     const user = await User.findById(userId);
-    if (!user.isPremium) return res.status(403).json({ success: false, message: 'Premium Feature Only.' });
+    const hasPremiumAccess = user.isPremium || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
+    if (!hasPremiumAccess) return res.status(403).json({ success: false, message: 'Premium Feature Only.' });
 
     const oauth2Client = getOAuth2Client();
     const { tokens } = await oauth2Client.getToken(code);
@@ -99,8 +101,9 @@ exports.appendLeadToSheet = async (userId, leadData) => {
   try {
     const user = await User.findById(userId);
     
-    // Only Premium users with active connection get auto-sync
-    if (!user || !user.isPremium || !user.googleSheetsConfig || !user.googleSheetsConfig.accessToken) {
+    // Only Premium (or Developer) users with active connection get auto-sync
+    const hasPremiumAccess = user && (user.isPremium || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com');
+    if (!hasPremiumAccess || !user.googleSheetsConfig || !user.googleSheetsConfig.accessToken) {
       return; 
     }
 
