@@ -6,7 +6,7 @@ import { ChevronLeft, Menu } from 'lucide-react';
 
 export default function Sidebar() {
   const location = useLocation();
-  const { user } = useAuth() || { user: { role: 'owner', fullName: 'Admin User', businessName: 'DealClose AI', workspaces: [] } }; // Fallback for MVP
+  const { user, logout } = useAuth() || { user: { role: 'owner', fullName: 'Admin User', businessName: 'DealClose AI', workspaces: [] } }; // Fallback for MVP
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
   const { unreadCount } = useInboxStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -19,6 +19,12 @@ export default function Sidebar() {
   }, [user]);
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(workspaces[0]?._id);
+
+  const handleLogout = (e) => {
+    e.preventDefault();
+    if (logout) logout();
+    window.location.href = '/login';
+  };
 
   const navCategories = [
     {
@@ -158,7 +164,7 @@ export default function Sidebar() {
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-bold text-white leading-tight truncate">{user?.fullName || 'User'}</p>
               <p className="text-xs text-gray-400 capitalize truncate">{user?.role || 'owner'}</p>
-              <Link to="/login" className="text-xs text-gray-500 hover:text-rose-400 transition-colors">Logout</Link>
+              <button onClick={handleLogout} className="text-xs text-gray-500 hover:text-rose-400 transition-colors bg-transparent border-none p-0 cursor-pointer">Logout</button>
             </div>
           )}
         </div>
