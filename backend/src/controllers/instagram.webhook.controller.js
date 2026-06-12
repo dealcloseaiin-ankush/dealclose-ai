@@ -4,6 +4,7 @@ const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel'); // Lead model import kiya gaya
 const Flow = require('../models/flowModel'); // 🚀 Flow model imported
 const metaAdsService = require('../services/metaAdsService');
+const axios = require('axios'); // 🚀 Required for Public Comment Replies
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/instagram
@@ -130,7 +131,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                   $set: { name: realName },
                   $setOnInsert: { 
                     source: 'Instagram DM', 
-                    status: 'new',
+                    status: 'visitor', // CHANGED FROM 'new' to avoid CRM clutter for normal fans
                     createdBy: user._id 
                   } 
                 },
@@ -189,7 +190,14 @@ exports.handleInstagramWebhook = async (req, res) => {
                      let chosenEdge = null;
                      if (activeNode.type === 'askQuestion') {
                        if (activeNode.data.replyType === 'open') {
-                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } }, { strict: false });
+                         const qLower = (activeNode.data.question || '').toLowerCase();
+                         const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } };
+                         
+                         // 🔥 Convert to proper lead if they answer a business/collab related flow question
+                         if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('business') || qLower.includes('name'))) {
+                            updatePayload.$set = { status: 'new' };
+                         }
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
                          chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
                        } else {
                          if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
@@ -206,6 +214,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                        else if (num === 2) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_1');
                        else if (num === 3) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_2');
                        else chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0'); // fallback
+
+                       const options = [activeNode.data.opt1, activeNode.data.opt2, activeNode.data.opt3];
+                       const selectedOpt = options[num - 1] || options[0];
+                       if (selectedOpt && currentLeadCheck.status === 'visitor' && (selectedOpt.toLowerCase().includes('brand') || selectedOpt.toLowerCase().includes('collab') || selectedOpt.toLowerCase().includes('buy') || selectedOpt.toLowerCase().includes('order'))) {
+                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { status: 'new' } }, { strict: false });
+                       }
                      }
 
                      await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
@@ -256,7 +270,9 @@ exports.handleInstagramWebhook = async (req, res) => {
                   let matchedTrigger = null;
                   for (const trigger of triggerNodes) {
                     const keywords = (trigger.data.keyword || "").split(',').map(k => k.trim().toLowerCase());
-                    if (keywords.includes(incomingTextLower)) {
+                    const words = incomingTextLower.split(/[\s,]+/);
+                    // 🚀 SMART KEYWORD MATCHING: Matches exact word or if sentence contains the keyword
+                    if (keywords.some(k => incomingTextLower === k || words.includes(k))) {
                       matchedTrigger = trigger;
                       break;
                     }
@@ -297,6 +313,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                        } else { break; }
                     }
                     flowReplyHandled = true;
+                    console.log(`[IG Flow Engine] ✅ Successfully executed flow nodes for IG DM.`);
                     break;
                   }
                 }
@@ -342,10 +359,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                 continue; // 🚫 Stops here, does NOT call OpenAI
               }
 
-              // Creator specific fast-path
-              if (isCreator && (incomingTextLower === '2' || incomingTextLower.includes('collaboration'))) {
-                // 0 COST COLLAB CAPTURE
-                const collabMsg = `Thank you for your interest in collaborating! 🤝 Our team has received your request and will review your profile soon.`;
+              // Creator specific fast-path - Brand Promotion / Collab
+              if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('collab') || incomingTextLower.includes('brand') || incomingTextLower.includes('promotion'))) {
+                // 0 COST COLLAB CAPTURE (Convert to Lead)
+                const collabMsg = `Thank you for your interest in collaborating! 🤝 Our team has received your request and will review it soon.`;
                 
                 let deliveryStatus = 'sent';
                 let displayMsg = collabMsg;
@@ -375,7 +392,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                     userId: user._id, 
                     name: `IG User ${senderId}`, 
                     source: 'Instagram DM (Collab)', 
-                    status: 'interested', 
+                    status: 'new', 
                     notes: `IG Handle: @${senderId}\nDeal Type: Collab\nAwaiting Influencer's manual review.` 
                   }, 
                   { upsert: true }
@@ -383,6 +400,34 @@ exports.handleInstagramWebhook = async (req, res) => {
                 
                 console.log(`🤖 [IG Basic Bot]: Saved Collab Lead & Sent Wait Response to ${senderId}`);
                 continue; // 🚫 Stops here, saves AI token!
+              }
+
+              // Creator specific fast-path - Just a Fan
+              if (isCreator && (incomingTextLower === '2' || incomingTextLower.includes('fan'))) {
+                const fanMsg = `Aww! Thank you so much for the love and support! Means the world to me. ❤️✨`;
+                
+                let deliveryStatus = 'sent';
+                let displayMsg = fanMsg;
+                try {
+                  await metaAdsService.sendInstagramDM(user.igConfig.accessToken, senderId, fanMsg);
+                  console.log(`🤖 [IG Basic Bot]: Sent Fan Response to ${senderId}`);
+                } catch (apiErr) {
+                  console.error(`❌ [IG Send Error]: Failed to send Fan Msg to ${senderId}`);
+                  deliveryStatus = 'failed';
+                  displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.response?.data?.error?.message || apiErr.message}]`;
+                }
+
+                await Message.create({ 
+                  userId: user._id, 
+                  customerPhone: `IG_${senderId}`, 
+                  messageText: displayMsg, 
+                  direction: 'outgoing', 
+                  status: deliveryStatus, 
+                  sentBy: 'auto-reply',
+                  timestamp: new Date()
+                });
+                
+                continue; // 🚫 Stops here, status remains 'visitor', no lead created in CRM pipeline.
               }
 
               // General Query / Human Fallback
@@ -565,6 +610,17 @@ exports.handleInstagramWebhook = async (req, res) => {
              } catch (replyErr) {
                console.error("❌ [Instagram Private Reply Error]:", replyErr.response?.data || replyErr.message);
              }
+
+             // 🚀 NEW: PUBLIC COMMENT REPLY (If keyword matches, tell them to check DM publicly)
+             try {
+               await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
+                   message: `Hey @${username}, we've sent you a DM with the details! 📩`,
+                   access_token: user.igConfig.accessToken
+               });
+               console.log(`✅ [Instagram] Public Reply sent to comment telling them to check DM!`);
+             } catch (publicErr) {
+               console.error("❌ [Instagram Public Reply Error]:", publicErr.response?.data?.error?.message || publicErr.message);
+             }
              
              // CRM me kachra nahi bharenge! Sirf Inbox (Chats) me save karenge
              await Message.create({
@@ -593,6 +649,29 @@ exports.handleInstagramWebhook = async (req, res) => {
           } else {
              console.log(`⚠️ [Instagram] No manual keyword matched for: "${commentText}"`);
              
+             // 🚀 NEW: AI PUBLIC COMMENT REPLY (If no keyword matches)
+             if (user.aiAgentEnabled !== false) {
+                 try {
+                     const aiContext = `You are the friendly social media manager for ${user.businessName || 'this page'}. Reply to this Instagram comment: "${commentText}". Be very short, engaging, and use 1-2 emojis. Do not ask questions. Keep it under 15 words.`;
+                     const aiReply = await aiService.generateAIResponse(commentText, aiContext);
+                     
+                     await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
+                         message: aiReply,
+                         access_token: user.igConfig.accessToken
+                     });
+                     console.log(`✅ [Instagram] Public AI Reply sent to comment: ${aiReply}`);
+                     
+                     await Message.create({
+                        userId: user._id, customerPhone: `IG_${igUserId}`,
+                        messageText: `[Public AI Reply]: ${aiReply}`,
+                        direction: 'outgoing', status: 'sent', sentBy: 'ai',
+                        tags: ['ig_comment_reply'], timestamp: new Date()
+                     });
+                 } catch (aiCommentErr) {
+                     console.error("❌ [Instagram AI Comment Reply Error]:", aiCommentErr.response?.data?.error?.message || aiCommentErr.message);
+                 }
+             }
+
              // Track as Unmatched Comment in Inbox so owner can read & reply manually
              await Message.create({
                 userId: user._id,

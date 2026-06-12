@@ -93,6 +93,9 @@ exports.getPipeline = async (req, res) => {
 
     // Group contacts by their current stage
     leads.forEach(lead => {
+      // Exclude IG users/fans who haven't shown business intent yet
+      if (lead.status === 'visitor' || lead.status === 'unqualified') return;
+
       const norm = normalizeData(lead.name, lead.city);
       lead.name = norm.name;
       lead.city = norm.city;

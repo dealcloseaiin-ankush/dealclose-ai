@@ -68,6 +68,48 @@ exports.updateLeadStatus = async (req, res) => {
   }
 };
 
+// @desc    Update lead details (Manual Edit by User)
+// @route   PUT /api/leads/:id
+exports.updateLead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { id } = req.params;
+    const updates = req.body;
+
+    const updatedLead = await Lead.findOneAndUpdate(
+      { _id: id, userId },
+      { $set: updates },
+      { new: true }
+    );
+
+    if (!updatedLead) return res.status(404).json({ message: 'Lead not found' });
+
+    res.status(200).json({ success: true, lead: updatedLead, message: 'Lead updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete a lead manually
+// @route   DELETE /api/leads/:id
+exports.deleteLead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { id } = req.params;
+    const deletedLead = await Lead.findOneAndDelete({ _id: id, userId });
+
+    if (!deletedLead) return res.status(404).json({ message: 'Lead not found' });
+
+    res.status(200).json({ success: true, message: 'Lead deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Export leads to CSV
 // @route   GET /api/leads/export
 exports.exportLeads = async (req, res) => {
