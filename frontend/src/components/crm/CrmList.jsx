@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bot } from 'lucide-react';
+import { Bot, Trash2 } from 'lucide-react';
 
-export default function CrmList({ contacts, onContactClick }) {
+export default function CrmList({ contacts, onContactClick, onDeleteContact }) {
   return (
     <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden mt-4">
       <div className="overflow-x-auto">
@@ -14,11 +14,12 @@ export default function CrmList({ contacts, onContactClick }) {
               <th className="p-5 font-semibold">AI Score</th>
               <th className="p-5 font-semibold">Deal Value</th>
               <th className="p-5 font-semibold">Expires</th>
+              <th className="p-5 font-semibold text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
             {contacts.length === 0 ? (
-              <tr><td colSpan="6" className="text-center p-8 text-gray-500">No leads found.</td></tr>
+              <tr><td colSpan="7" className="text-center p-8 text-gray-500">No leads found.</td></tr>
             ) : (
               contacts.map(contact => (
                 <tr 
@@ -51,6 +52,15 @@ export default function CrmList({ contacts, onContactClick }) {
                     ) : (
                       'Never'
                     )}
+                  </td>
+                  <td className="p-5 text-right">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onDeleteContact(contact.id); }}
+                      className="text-gray-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                      title="Permanent Delete"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))

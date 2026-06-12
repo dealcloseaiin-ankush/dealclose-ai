@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router-dom';
 
 export default function InstagramAutomation() {
   const { user } = useAuth() || {};
@@ -154,11 +155,14 @@ export default function InstagramAutomation() {
           <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide">Comments Analyzed</p>
           <p className="text-3xl font-bold text-white mt-2">{stats.totalCommentsAnalyzed}</p>
         </div>
-        <div className="bg-[#111111] border border-pink-500/30 p-5 rounded-2xl shadow-lg relative overflow-hidden">
+        <div className="bg-[#111111] border border-pink-500/30 p-5 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 right-0 w-16 h-16 bg-pink-500/10 rounded-bl-full"></div>
           <p className="text-pink-400 text-sm font-semibold uppercase tracking-wide">Hidden Leads Found</p>
           <p className="text-3xl font-bold text-white mt-2">{stats.leadsExtracted}</p>
-          <p className="text-xs text-gray-400 mt-1">Numbers extracted from comments</p>
+          <div className="flex justify-between items-end mt-1">
+            <p className="text-xs text-gray-400">Numbers extracted</p>
+            <Link to="/crm" className="text-xs font-bold text-pink-400 hover:text-pink-300 transition-colors relative z-10">View in CRM ↗</Link>
+          </div>
         </div>
         <div className="bg-[#111111] border border-green-500/30 p-5 rounded-2xl shadow-lg">
           <p className="text-green-400 text-sm font-semibold uppercase tracking-wide">WA Chats Started</p>

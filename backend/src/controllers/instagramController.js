@@ -15,7 +15,11 @@ exports.getDashboardData = async (req, res) => {
     // Fetch real metrics from DB
     const totalComments = await Message.countDocuments({ userId, tags: { $in: ['ig_comment'] } });
     const dmsSent = await Message.countDocuments({ userId, direction: 'outgoing', customerPhone: { $regex: /^IG_/ } });
-    const leadsExtracted = await Lead.countDocuments({ userId, source: { $regex: /Instagram/i } });
+    const leadsExtracted = await Lead.countDocuments({ 
+      userId, 
+      source: { $regex: /Instagram/i },
+      status: { $nin: ['visitor', 'unqualified'] } // 🚀 FIX: Ignore hidden/junk leads from total count
+    });
 
     res.status(200).json({
       success: true,

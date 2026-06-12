@@ -84,6 +84,21 @@ export default function CrmPage() {
     }
   };
 
+  // 🚀 NEW: Permanent Delete Functionality for Single Lead
+  const handleDeleteContact = async (contactId) => {
+    if (!window.confirm("🚨 Are you sure you want to permanently delete this lead? This action cannot be undone.")) return;
+    try {
+      const res = await api.delete(`/leads/${contactId}`);
+      if (res.data.success) {
+        toast.success("✅ Lead deleted permanently.");
+        fetchPipeline(); // Refresh the board/list automatically
+        if (selectedContact && selectedContact.id === contactId) setSelectedContact(null);
+      }
+    } catch (err) {
+      toast.error("❌ Failed to delete lead: " + (err.response?.data?.message || err.message));
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -235,7 +250,7 @@ export default function CrmPage() {
 
       {/* Main Content Area */}
       {viewMode === 'pipeline' && <KanbanBoard key={`${activeWorkspace}-${searchTerm}`} pipelineData={filteredPipeline} initialData={filteredPipeline} onContactClick={(contact) => setSelectedContact(contact)} onStageChange={fetchPipeline} />}
-      {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} />}
+      {viewMode === 'list' && <CrmList contacts={filteredFlatContacts} onContactClick={(contact) => setSelectedContact(contact)} onDeleteContact={handleDeleteContact} />}
       {viewMode === 'analytics' && <CrmAnalytics contacts={filteredFlatContacts} />}
 
       {/* Right Side Drawer */}
