@@ -55,7 +55,7 @@ export default function CrmList({ contacts, onContactClick, onDeleteContact }) {
                   </td>
                   <td className="p-5 text-right">
                     <button 
-                      onClick={(e) => { e.stopPropagation(); onDeleteContact(contact.id); }}
+                      onClick={(e) => { e.stopPropagation(); onDeleteContact(contact._id || contact.id); }}
                       className="text-gray-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
                       title="Permanent Delete"
                     >

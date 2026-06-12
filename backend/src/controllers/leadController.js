@@ -101,11 +101,29 @@ exports.deleteLead = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     const { id } = req.params;
-    const deletedLead = await Lead.findOneAndDelete({ _id: id, userId });
+    let deletedRecord = null;
 
-    if (!deletedLead) return res.status(404).json({ message: 'Lead not found' });
+    // 1. Check and Delete from New Lead model
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        deletedRecord = await Lead.findOneAndDelete({ _id: id, userId });
+      }
+    } catch (e) {}
 
-    res.status(200).json({ success: true, message: 'Lead deleted successfully' });
+    // 2. Check and Delete from Old Contact model (Manual Data)
+    if (!deletedRecord) {
+      try {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          deletedRecord = await Contact.findOneAndDelete({ _id: id, userId });
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback to phone number deletion (just in case)
+    if (!deletedRecord) deletedRecord = await Lead.findOneAndDelete({ phoneNumber: id, userId });
+    if (!deletedRecord) deletedRecord = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
+    if (!deletedRecord) return res.status(404).json({ message: 'Lead or Contact not found' });
+    res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
