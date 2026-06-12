@@ -223,8 +223,9 @@ exports.getLeadAnalytics = async (req, res) => {
     } catch (syncErr) { }
 
     // 🔥 DYNAMIC WORKSPACE FILTER LOGIC
-    const leadQuery = { userId };
-    const aggLeadQuery = { userId: userIdObj }; // For Aggregations
+    // 🚀 FIX: 'visitor' aur 'unqualified' ko Analytics ki counting se hamesha bahar rakhein
+    const leadQuery = { userId, status: { $nin: ['visitor', 'unqualified'] } };
+    const aggLeadQuery = { userId: userIdObj, status: { $nin: ['visitor', 'unqualified'] } };
     
     if (workspaceId && workspaceId !== 'main_business' && workspaceId !== 'main' && workspaceId !== 'all') {
       leadQuery.lastSelectedWorkspaceId = workspaceId;
