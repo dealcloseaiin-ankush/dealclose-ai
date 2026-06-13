@@ -238,13 +238,13 @@ export default function Chats() {
   const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] p-0 md:p-6 bg-[#050505] text-gray-200 relative overflow-hidden">
+    <main className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#050505] p-0 text-gray-200 md:p-6">
       
-      {/* New Chat Modal */}
+      {/* Modal Overlay for New Chat */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white text-xl">✕</button>
+        <section role="dialog" aria-modal="true" className="fixed z-[60] inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-lg">
+          <article className="relative w-full max-w-md p-6 bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl">
+            <button onClick={() => setIsModalOpen(false)} aria-label="Close Modal" className="absolute right-4 top-4 text-xl text-gray-500 hover:text-white transition-colors">✕</button>
             <h2 className="text-2xl font-bold text-white mb-6">Start New Chat</h2>
             <form onSubmit={handleStartChatSubmit} className="space-y-4">
               <div>
@@ -478,6 +478,6 @@ export default function Chats() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }
