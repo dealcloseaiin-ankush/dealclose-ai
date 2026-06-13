@@ -210,6 +210,18 @@ export default function Chats() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // 🚀 Helper to format Date Badge (e.g., Today, Yesterday, 12 Oct 2023)
+  const formatDateBadge = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
   // 🚀 Helper to format Sender Badges
   const formatSender = (sentBy, direction) => {
     if (sentBy === 'ai') return '🤖 AI Agent';
@@ -402,17 +414,32 @@ export default function Chats() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {activeChatMessages.map(msg => (
-                <div key={msg._id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-4 max-w-sm rounded-2xl ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
-                    <p className="whitespace-pre-wrap">{msg.messageText}</p>
-                    <div className="flex justify-between items-center gap-4 mt-2">
-                      <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
-                      <span className="text-[10px] opacity-70">{formatTime(msg.timestamp || msg.createdAt)}</span>
+              {activeChatMessages.map((msg, index) => {
+                const msgDateStr = new Date(msg.timestamp || msg.createdAt || 0).toDateString();
+                const prevMsgDateStr = index > 0 ? new Date(activeChatMessages[index - 1].timestamp || activeChatMessages[index - 1].createdAt || 0).toDateString() : null;
+                const showDateBadge = msgDateStr !== prevMsgDateStr;
+
+                return (
+                  <div key={msg._id} className="flex flex-col w-full">
+                    {showDateBadge && (
+                      <div className="flex justify-center my-4">
+                        <span className="bg-[#1a1a1a] border border-gray-800 text-gray-400 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+                          {formatDateBadge(msg.timestamp || msg.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                    <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`p-4 max-w-sm rounded-2xl ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
+                        <p className="whitespace-pre-wrap">{msg.messageText}</p>
+                        <div className="flex justify-between items-center gap-4 mt-2">
+                          <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
+                          <span className="text-[10px] opacity-70">{formatTime(msg.timestamp || msg.createdAt)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* Active Customer Status Warning */}

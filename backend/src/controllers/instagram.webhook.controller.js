@@ -5,9 +5,7 @@ const Lead = require('../models/leadModel'); // Lead model import kiya gaya
 const Flow = require('../models/flowModel'); // 🚀 Flow model imported
 const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); // 🚀 Required for Public Comment Replies
-const googleSheetsController = require('./googleSheetsController');
-
-// 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
+const googleSheetsController = require('./googleSheetsController');// 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
 metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
   if (!token) return;
   return axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
@@ -111,30 +109,30 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
               if (!user) continue;
 
-              // 🚀 ULTIMATE TOKEN EXTRACTOR (Bulletproof to prevent undefined crashes)
+              // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents TypeError on undefined)
               let igToken = null;
               let incomingWorkspaceId = 'main';
               let activeWorkspace = null;
               
-              // 1. Check if the token belongs to a specific branch/workspace
-              if (user.workspaces && user.workspaces.length > 0) {
-                 activeWorkspace = user.workspaces.find(w => w.igConfig && (w.igConfig.accountId === igAccountId || w.igConfig.pageId === igAccountId));
-                 if (activeWorkspace && activeWorkspace.igConfig?.accessToken) {
+              if (user && user.workspaces && user.workspaces.length > 0) {
+                 activeWorkspace = user.workspaces.find(w => w && w.igConfig && (w.igConfig.accountId === igAccountId || w.igConfig.pageId === igAccountId));
+                 if (activeWorkspace && activeWorkspace.igConfig && activeWorkspace.igConfig.accessToken) {
                     igToken = activeWorkspace.igConfig.accessToken;
-                    incomingWorkspaceId = activeWorkspace._id.toString();
+                    incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
                  }
               }
               
-              // 2. Check main business config
-              if (!igToken && user.igConfig && user.igConfig.accessToken) {
+              if (!igToken && user && user.igConfig && user.igConfig.accessToken) {
                  igToken = user.igConfig.accessToken;
                  incomingWorkspaceId = 'main';
               }
 
-              // 3. Super Fallback: Grab ANY valid IG token we can find in this user's account
-              if (!igToken) {
-                 if (user.igConfig?.accessToken) igToken = user.igConfig.accessToken;
-                 else if (user.workspaces) igToken = user.workspaces.find(w => w.igConfig?.accessToken)?.igConfig?.accessToken;
+              if (!igToken && user && user.workspaces) {
+                 const fallbackWs = user.workspaces.find(w => w && w.igConfig && w.igConfig.accessToken);
+                 if (fallbackWs) {
+                    igToken = fallbackWs.igConfig.accessToken;
+                    incomingWorkspaceId = fallbackWs._id ? fallbackWs._id.toString() : 'main';
+                 }
               }
 
               // 🌟 Fetch Real Instagram Profile (Name/Username)

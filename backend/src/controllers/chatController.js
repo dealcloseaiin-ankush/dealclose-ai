@@ -48,7 +48,9 @@ exports.getChats = async (req, res) => {
       leadDataMap[lead.phoneNumber] = {
         name: norm.name,
         city: norm.city,
-        workspaceId: lead.lastSelectedWorkspaceId || 'main'
+        workspaceId: lead.lastSelectedWorkspaceId || 'main',
+        isAiPaused: lead.isAiPaused || false,
+        aiPausedUntil: lead.aiPausedUntil || null
       };
     });
 
@@ -67,7 +69,9 @@ exports.getChats = async (req, res) => {
         platform, // Added Platform Tag for Frontend Filters
         customerName: leadDataMap[msg.customerPhone]?.name || (platform !== 'whatsapp' ? msg.customerPhone.replace('IG_', '@') : 'Unknown'),
         customerCity: leadDataMap[msg.customerPhone]?.city || '',
-        workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main'
+        workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main',
+        isAiPaused: leadDataMap[msg.customerPhone]?.isAiPaused || false,
+        aiPausedUntil: leadDataMap[msg.customerPhone]?.aiPausedUntil || null
       };
     });
 
@@ -122,21 +126,18 @@ exports.sendManualMessage = async (req, res) => {
       const leadForIg = await Lead.findOne({ phoneNumber: customerPhone, userId: userId }).lean();
       const wsIdIg = leadForIg?.lastSelectedWorkspaceId || 'main';
       
+      // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents 'Cannot read properties of undefined' crashes)
       let igToken = null;
-      
-      // 1. Target exact Branch token
-      if (wsIdIg !== 'main' && user?.workspaces) {
-         const ws = user.workspaces.find(w => w._id.toString() === wsIdIg);
-         if (ws?.igConfig?.accessToken) igToken = ws.igConfig.accessToken;
+      if (user && user.workspaces && wsIdIg !== 'main') {
+         const ws = user.workspaces.find(w => w && w._id && w._id.toString() === wsIdIg);
+         if (ws && ws.igConfig && ws.igConfig.accessToken) igToken = ws.igConfig.accessToken;
       }
-      
-      // 2. Fallback to Main Business
-      if (!igToken) igToken = user?.igConfig?.accessToken;
-      
-      // 3. Super Fallback (Any available token)
-      if (!igToken && user?.workspaces) {
-         const wsWithToken = user.workspaces.find(w => w.igConfig?.accessToken);
-         if (wsWithToken) igToken = wsWithToken.igConfig?.accessToken;
+      if (!igToken && user && user.igConfig && user.igConfig.accessToken) {
+         igToken = user.igConfig.accessToken;
+      }
+      if (!igToken && user && user.workspaces) {
+         const wsWithToken = user.workspaces.find(w => w && w.igConfig && w.igConfig.accessToken);
+         if (wsWithToken) igToken = wsWithToken.igConfig.accessToken;
       }
 
       if (!user || !igToken) {
@@ -216,19 +217,18 @@ exports.sendManualMessage = async (req, res) => {
     let waToken = null;
     let waPhoneId = null;
 
-    // 1. Target exact Branch token
-    if (wsIdWa !== 'main' && user?.workspaces) {
-       const ws = user.workspaces.find(w => w._id.toString() === wsIdWa);
-       if (ws?.whatsappConfig?.accessToken) {
+    // 🛡️ BULLETPROOF WHATSAPP EXTRACTION
+    if (user && user.workspaces && wsIdWa !== 'main') {
+       const ws = user.workspaces.find(w => w && w._id && w._id.toString() === wsIdWa);
+       if (ws && ws.whatsappConfig && ws.whatsappConfig.accessToken) {
            waToken = ws.whatsappConfig.accessToken;
            waPhoneId = ws.whatsappConfig.phoneNumberId;
        }
     }
     
-    // 2. Fallback to Main Business (This handles your Shared Number logic automatically!)
-    if (!waToken) {
-       waToken = user?.whatsappConfig?.accessToken;
-       waPhoneId = user?.whatsappConfig?.phoneNumberId;
+    if (!waToken && user && user.whatsappConfig && user.whatsappConfig.accessToken) {
+       waToken = user.whatsappConfig.accessToken;
+       waPhoneId = user.whatsappConfig.phoneNumberId;
     }
     
     console.log(`➡️ [DEBUG Chat Flow] 5. Database Check - User Found: ${user ? 'Yes' : 'No'}`);
