@@ -302,14 +302,14 @@ export default function Chats() {
         </div>
       )}
 
-      {/* Mobile Sidebar Overlay */}
-      {isSidebarOpen && (
+      {/* Mobile Sidebar Overlay Background */}
+      {isSidebarOpen ? (
         <div
-          aria-hidden="true" 
+          aria-hidden="true"
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/80 backdrop-blur-sm md:hidden"
-        />
-      )}
+          className="fixed z-30 w-full h-full inset-0 bg-black/80 backdrop-blur-sm block md:hidden cursor-pointer"
+        ></div>
+      ) : null}
 
       {/* Sidebar for Customers */}
       <div className={`absolute md:relative z-40 w-4/5 md:w-1/3 h-full bg-[#111] border-r border-gray-800 md:rounded-l-2xl p-4 overflow-y-auto transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>

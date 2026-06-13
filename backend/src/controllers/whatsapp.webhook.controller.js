@@ -337,9 +337,9 @@ exports.handleWhatsApp = async (req, res) => {
                 const rating = parseInt(ratingStr);
                 const logMsg = `[Customer Feedback] Rated AI Assistant: ${rating} Stars ⭐`;
                 
+                const existingNotes = currentLeadCheck.notes || "";
                 await Lead.updateOne({ _id: currentLeadCheck._id }, { 
-                  $set: { awaitingFeedback: false, aiFeedbackScore: rating },
-                  $push: { notes: logMsg }
+                  $set: { awaitingFeedback: false, aiFeedbackScore: rating, notes: existingNotes ? `${existingNotes}\n${logMsg}` : logMsg }
                 }, { strict: false });
                 
                 let replyMsg = `Thank you for your feedback (${rating} ⭐)! We are constantly learning to serve you better. Have a great day!`;
@@ -426,8 +426,9 @@ exports.handleWhatsApp = async (req, res) => {
                    
                    if (questionNode.data.replyType === 'open') {
                      // 🚀 SYSTEM ZERO-COST PARSER: Extract Name/City without AI!
-                     let updatePayload = { $push: { notes: `Flow Answer (${questionNode.data.question}): ${incomingText}` } };
-                     let setPayload = {};
+                     const existingNotes = currentLeadCheck.notes || "";
+                     const newNote = `Flow Answer (${questionNode.data.question}): ${incomingText}`;
+                     let setPayload = { notes: existingNotes ? `${existingNotes}\n${newNote}` : newNote };
                      const qText = (questionNode.data.question || '').toLowerCase();
                      
                      if (qText.includes('name') && qText.includes('city')) {
@@ -450,9 +451,8 @@ exports.handleWhatsApp = async (req, res) => {
                      if (qText.includes('email') && incomingText.includes('@')) {
                          setPayload.email = incomingText.trim();
                      }
-                     if (Object.keys(setPayload).length > 0) updatePayload.$set = setPayload;
                      
-                     await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
+                     await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: setPayload }, { strict: false });
                      chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'replied');
                    } else {
                      // Yes / No Choice Evaluator
@@ -906,7 +906,7 @@ exports.handleWhatsApp = async (req, res) => {
 
                       await Lead.findOneAndUpdate(
                         { phoneNumber: fromNumber, userId: user._id }, 
-                        { $set: updateFields, $push: { notes: aiLog } }
+                        { $set: updateFields }
                       );
                       
                       responseMessage = `Thanks, ${profileData.fullName}! I've updated your profile. How can I help you today?`;

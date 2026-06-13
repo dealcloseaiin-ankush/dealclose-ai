@@ -24,9 +24,11 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text)
 metaAdsService.getInstagramProfile = async (token, igsid) => {
   if (!token) return null;
   try {
-    const res = await axios.get(`https://graph.facebook.com/v19.0/${igsid}?fields=name,username,profile_pic&access_token=${token}`);
+    // 🚀 FIX: Removed profile_pic to prevent Meta from blocking the request due to privacy settings
+    const res = await axios.get(`https://graph.facebook.com/v19.0/${igsid}?fields=name,username&access_token=${token}`);
     return res.data;
   } catch (e) {
+    console.error(`❌ IG Profile Fetch Error for ${igsid}:`, e.response?.data?.error?.message || e.message);
     return null;
   }
 };
@@ -310,11 +312,14 @@ exports.handleInstagramWebhook = async (req, res) => {
                      if (activeNode.type === 'askQuestion') {
                        if (activeNode.data.replyType === 'open') {
                          const qLower = (activeNode.data.question || '').toLowerCase();
-                         const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } };
+                         const existingNotes = currentLeadCheck.notes || "";
+                         const newNote = `Flow Answer (${activeNode.data.question}): ${incomingText}`;
+                         const updatePayload = { $set: { notes: existingNotes ? `${existingNotes}\n${newNote}` : newNote } };
                          
                          // 🔥 Convert to proper lead if they answer a business/collab related flow question
                          if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('business') || qLower.includes('name'))) {
-                            updatePayload.$set = { status: 'new', expiresAt: getExpiry('lead') };
+                            updatePayload.$set.status = 'new';
+                            updatePayload.$set.expiresAt = getExpiry('lead');
                          }
                          await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
                          chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
