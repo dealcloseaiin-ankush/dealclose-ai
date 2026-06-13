@@ -118,7 +118,10 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
             alert('Failed to save Meta settings: ' + data.message);
           }
         })
-        .catch(err => console.error('❌ [MetaConnect] Backend Fetch Error:', err))
+        .catch(err => {
+          console.error('❌ [MetaConnect] Backend Fetch Error:', err);
+          alert('Error: ' + (err.response?.data?.message || 'Failed to connect. Please try again.'));
+        })
         .finally(() => setLoading(false));
       }
     };

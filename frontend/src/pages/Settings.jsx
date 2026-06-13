@@ -439,8 +439,9 @@ export default function Settings() {
                   <p className="text-sm text-gray-400 mb-6 relative z-10">Automatically backup every new Lead (from WhatsApp & Instagram) directly into your Google Sheets to save data forever (BYOS).</p>
                   
                   {!googleConnected ? (
-                    <button type="button" onClick={handleGoogleAuth} className="px-6 py-2 bg-white hover:bg-gray-200 text-black font-bold rounded-lg transition-colors flex items-center gap-2 shadow-md relative z-10">
-                       <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" className="w-4 h-4" alt="Google" /> Connect Google Account
+                    <button type="button" onClick={handleGoogleAuth} className="px-6 py-3 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-xl transition-all flex items-center gap-3 shadow-lg border border-gray-200 relative z-10 hover:-translate-y-1">
+                       <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" className="w-5 h-5" alt="Google" /> 
+                       <span>Connect Google Sheets</span>
                     </button>
                   ) : (
                     <p className="text-sm font-semibold text-emerald-500 relative z-10">✅ Your leads are automatically syncing to your Drive.</p>

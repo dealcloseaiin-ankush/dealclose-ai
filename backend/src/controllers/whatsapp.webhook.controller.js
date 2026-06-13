@@ -50,6 +50,14 @@ exports.handleWhatsApp = async (req, res) => {
         const changes = entry.changes[0];
         const value = changes.value;
         
+        // 🚀 SAFEGUARD: Meta sends Account Update events (like MM_LITE_TERMS_SIGNED) without metadata
+        if (!value.metadata || !value.metadata.phone_number_id) {
+          if (value.event) {
+            console.log(`ℹ️ [WhatsApp Webhook] Received Meta Account Update Event: ${value.event}. Safely ignoring.`);
+          }
+          continue; // Skip processing as a message
+        }
+
         const phoneNumberId = value.metadata.phone_number_id;
         const user = await User.findOne({ "whatsappConfig.phoneNumberId": phoneNumberId });
         

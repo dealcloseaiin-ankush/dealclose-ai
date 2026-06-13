@@ -1,11 +1,13 @@
 const { google } = require('googleapis');
 const User = require('../models/userModel');
 
-const getOAuth2Client = () => {
+const getOAuth2Client = (req = null) => {
+  // 🚀 FIX: Automatically generate correct Redirect URL to prevent Google 400 Error
+  const defaultRedirect = req && req.headers.origin ? `${req.headers.origin}/settings` : 'https://dealclose-ai.onrender.com/settings';
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'postmessage' // Frontend se aane wale token ke liye
+    process.env.GOOGLE_REDIRECT_URI || defaultRedirect
   );
 };
 
@@ -13,6 +15,10 @@ const getOAuth2Client = () => {
 // @route   GET /api/settings/google/auth-url
 exports.getAuthUrl = async (req, res) => {
   try {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(400).json({ success: false, message: 'Google Client ID is missing in backend .env' });
+    }
+
     const userId = req.user?._id || req.user?.id;
     const user = await User.findById(userId);
 
@@ -22,7 +28,7 @@ exports.getAuthUrl = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Google Sheets sync is a Premium Feature. Please upgrade your plan.' });
     }
 
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline', // Important for getting refresh_token
       scope: [
@@ -49,7 +55,7 @@ exports.connectGoogleAccount = async (req, res) => {
     const hasPremiumAccess = user.isPremium || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
     if (!hasPremiumAccess) return res.status(403).json({ success: false, message: 'Premium Feature Only.' });
 
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     const { tokens } = await oauth2Client.getToken(code);
     
     oauth2Client.setCredentials(tokens);
