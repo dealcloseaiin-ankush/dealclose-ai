@@ -242,10 +242,10 @@ export default function Chats() {
       
       {/* Modal Overlay for New Chat */}
       {isModalOpen && (
-        <section role="dialog" aria-modal="true" className="fixed z-[60] inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-lg">
-          <article className="relative w-full max-w-md p-6 bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl">
-            <button onClick={() => setIsModalOpen(false)} aria-label="Close Modal" className="absolute right-4 top-4 text-xl text-gray-500 hover:text-white transition-colors">✕</button>
-            <h2 className="text-2xl font-bold text-white mb-6">Start New Chat</h2>
+        <div data-modal-overlay="true" className="fixed top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" className="relative w-full max-w-[450px] rounded-[1rem] border border-gray-800 bg-[#111] p-6 shadow-2xl">
+            <button onClick={() => setIsModalOpen(false)} className="absolute right-5 top-5 text-lg text-gray-500 hover:text-white transition-colors">✕</button>
+            <h2 className="mb-5 text-2xl font-bold text-white">Start New Chat</h2>
             <form onSubmit={handleStartChatSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">WhatsApp Number <span className="text-red-500">*</span></label>
