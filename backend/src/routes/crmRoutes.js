@@ -16,4 +16,7 @@ router.get('/pipeline', crmController.getPipeline);
 // @route PUT /api/crm/contacts/:id/stage - Drag & drop ke baad stage update karne ke liye
 router.put('/contacts/:id/stage', crmController.updateStage);
 
+// @route DELETE /api/crm/contacts/:id - Lead ya Contact ko permanently delete karne ke liye
+router.delete('/contacts/:id', crmController.deleteContact);
+
 module.exports = router;

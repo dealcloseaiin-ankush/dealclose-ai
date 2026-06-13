@@ -17,6 +17,7 @@ export default function CrmPage() {
   const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
+  const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'whatsapp', 'instagram'
   
   const [isGoogleSynced, setIsGoogleSynced] = useState(false);
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
@@ -24,6 +25,15 @@ export default function CrmPage() {
   
   // Get workspaces list from user object
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
+
+  // 🚀 Calculate available platforms dynamically based on user's active leads
+  const availablePlatforms = React.useMemo(() => {
+    const platforms = new Set();
+    flatContacts.forEach(c => {
+      if (c.platform) platforms.add(c.platform);
+    });
+    return Array.from(platforms);
+  }, [flatContacts]);
 
   useEffect(() => {
     fetchPipeline();
@@ -88,7 +98,7 @@ export default function CrmPage() {
   const handleDeleteContact = async (contactId) => {
     if (!window.confirm("🚨 Are you sure you want to permanently delete this lead? This action cannot be undone.")) return;
     try {
-      const res = await api.delete(`/leads/${contactId}`);
+      const res = await api.delete(`/crm/contacts/${contactId}`);
       if (res.data.success) {
         toast.success("✅ Lead deleted permanently.");
         fetchPipeline(); // Refresh the board/list automatically
@@ -120,11 +130,12 @@ export default function CrmPage() {
         const term = searchTerm.toLowerCase();
         const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
         const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
-        return matchWs && matchSearch && matchLeadFilter;
+        const matchPlatform = platformFilter === 'all' || lead.platform === platformFilter;
+        return matchWs && matchSearch && matchLeadFilter && matchPlatform;
       });
     });
     return filtered;
-  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user]);
+  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter]);
 
   const filteredFlatContacts = flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
@@ -138,7 +149,8 @@ export default function CrmPage() {
     const term = searchTerm.toLowerCase();
     const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
     const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
-    return matchWs && matchSearch && matchLeadFilter;
+    const matchPlatform = platformFilter === 'all' || lead.platform === platformFilter;
+    return matchWs && matchSearch && matchLeadFilter && matchPlatform;
   });
 
   // Logic for the Expiry Warning Banner
@@ -174,6 +186,19 @@ export default function CrmPage() {
                 <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
               ))}
             </select>
+
+            {/* 🚀 NEW: Platform Dropdown Filter */}
+            {availablePlatforms.length > 0 && (
+              <select 
+                value={platformFilter} 
+                onChange={(e) => setPlatformFilter(e.target.value)} 
+                className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 cursor-pointer shadow-sm"
+              >
+                <option value="all">🌐 All Platforms</option>
+                {availablePlatforms.includes('whatsapp') && <option value="whatsapp">🟩 WhatsApp</option>}
+                {availablePlatforms.includes('instagram') && <option value="instagram">🟪 Instagram</option>}
+              </select>
+            )}
 
             {/* Team vs My Leads Filter (Only for Owners/Managers) */}
             {isOwner && (

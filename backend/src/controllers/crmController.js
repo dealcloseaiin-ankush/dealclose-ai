@@ -81,6 +81,15 @@ exports.getPipeline = async (req, res) => {
       return { name: finalName, city: c };
     };
 
+    // 🚀 NEW: Platform Determiner (WhatsApp vs Instagram)
+    const determinePlatform = (phone, source) => {
+      let strPhone = String(phone || '');
+      if (strPhone.startsWith('IG_') || /[a-zA-Z]/.test(strPhone) || (source && String(source).toLowerCase().includes('instagram'))) {
+        return 'instagram';
+      }
+      return 'whatsapp';
+    };
+
     // Default pipeline structure
     const pipeline = {
       new: [],
@@ -101,6 +110,7 @@ exports.getPipeline = async (req, res) => {
       lead.city = norm.city;
       lead.phoneNumber = lead.phoneNumber || lead.phone || ''; // Retroactive fix for missing phone numbers
       lead.phone = lead.phoneNumber; // Fallback for UI if it strictly expects 'phone'
+      lead.platform = determinePlatform(lead.phoneNumber, lead.source);
       let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); // Map AI status to pipeline
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
@@ -121,6 +131,7 @@ exports.getPipeline = async (req, res) => {
       if (stage === 'pending') stage = 'new';
 
       const norm = normalizeData(contact.name, contact.city);
+      const platform = determinePlatform(contact.phone || contact.phoneNumber, contact.source);
       // Normalize contact structure to match frontend expectations for Lead
       const normalizedContact = {
         ...contact,
@@ -131,6 +142,7 @@ exports.getPipeline = async (req, res) => {
         phone: contact.phoneNumber || contact.phone || '', // Fallback for UI
         status: stage,
         source: 'Manual Contact (Old Data)',
+        platform: platform,
       };
       if (pipeline[stage]) {
         pipeline[stage].push(normalizedContact);
@@ -237,6 +249,28 @@ exports.updateStage = async (req, res) => {
     res.status(200).json({ success: true, message: 'Record updated successfully', data: record });
   } catch (error) {
     console.error('Error updating CRM stage:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+// @desc    Delete a contact/lead permanently
+// @route   DELETE /api/crm/contacts/:id
+exports.deleteContact = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { id } = req.params;
+    
+    // Try to delete from both collections since CRM shows mixed data
+    const leadResult = await Lead.findOneAndDelete({ _id: id, userId });
+    const contactResult = await Contact.findOneAndDelete({ _id: id, userId });
+    
+    if (!leadResult && !contactResult) {
+      return res.status(404).json({ success: false, message: 'Record not found or already deleted' });
+    }
+    
+    res.status(200).json({ success: true, message: 'Deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting contact:', error);
     res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
