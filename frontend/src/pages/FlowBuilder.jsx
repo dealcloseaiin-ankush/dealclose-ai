@@ -359,11 +359,6 @@ export default function FlowBuilder() {
       if (userData && userData.workspaces) {
         setWorkspaces(userData.workspaces);
       }
-      
-      // 🚀 SAAS LOGIC: If multiple businesses exist, auto-switch trigger to "Business Selected"
-      if (userData && userData.workspaces && userData.workspaces.length > 0) {
-        setNodes((nds) => nds.map(n => n.id === '1' ? { ...n, data: { ...n.data, triggerType: 'business_selected', keyword: '' } } : n));
-      }
 
       if (userData) {
         const bName = (userData.businessName && userData.businessName !== 'Main Business') ? userData.businessName : 'DealClose AI (Main)';

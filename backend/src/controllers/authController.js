@@ -267,6 +267,7 @@ exports.instagramConnect = async (req, res) => {
     }
 
     // 🔥 FIX: Automatically exchange Short-Lived Token for a Long-Lived Token (Valid for 60 Days)
+    let expiresInDays = 60; // Default Meta long-lived token
     try {
       const longLivedResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
         params: {
@@ -279,6 +280,9 @@ exports.instagramConnect = async (req, res) => {
       
       if (longLivedResponse.data && longLivedResponse.data.access_token) {
         clientAccessToken = longLivedResponse.data.access_token;
+        if (longLivedResponse.data.expires_in) {
+           expiresInDays = Math.floor(longLivedResponse.data.expires_in / (60 * 60 * 24));
+        }
       }
     } catch (exchangeErr) {
       console.error('Failed to get long-lived Instagram token, continuing with short-lived:', exchangeErr.message);
@@ -374,10 +378,12 @@ exports.instagramConnect = async (req, res) => {
 
     console.log(`➡️ [DEBUG Meta Connect] Saving IG Config to Database for user ${userId}...`);
 
+    const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
     const igConfigObj = {
       accessToken: targetAccount.pageToken || clientAccessToken,
       accountId: targetAccount.accountId,
       pageId: targetAccount.pageId,
+      tokenExpiresAt: tokenExpiresAt
     };
 
     // Mongoose Model strict-mode Bypass: Force save

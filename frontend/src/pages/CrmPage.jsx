@@ -88,6 +88,18 @@ export default function CrmPage() {
   // 🚀 NEW: Permanent Delete Functionality for Single Lead
   const handleDeleteContact = async (contactId) => {
     if (!window.confirm("🚨 Are you sure you want to permanently delete this lead? This action cannot be undone.")) return;
+    
+    // 🚀 Optimistic UI Update: Hide instantly to prevent double-clicks and make UI blazing fast
+    setFlatContacts(prev => prev.filter(c => c._id !== contactId && c.id !== contactId));
+    setPipelineData(prev => {
+      if (!prev) return prev;
+      const newData = { ...prev };
+      Object.keys(newData).forEach(key => {
+        newData[key] = newData[key].filter(c => c._id !== contactId && c.id !== contactId);
+      });
+      return newData;
+    });
+
     try {
       const res = await api.delete(`/crm/contacts/${contactId}`);
       if (res.data.success) {
@@ -96,7 +108,13 @@ export default function CrmPage() {
         if (selectedContact && selectedContact.id === contactId) setSelectedContact(null);
       }
     } catch (err) {
-      toast.error("❌ Failed to delete lead: " + (err.response?.data?.message || err.message));
+      // If 404, it means it's already deleted (double click). Don't show red error.
+      if (err.response?.status === 404) {
+        fetchPipeline(); // Just sync silently
+      } else {
+        toast.error("❌ Failed to delete lead: " + (err.response?.data?.message || err.message));
+        fetchPipeline(); // Revert UI if there's a real server error
+      }
     }
   };
 

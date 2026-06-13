@@ -175,6 +175,35 @@ const automationWorker = new Worker('automationQueue', async job => {
       }
     }
   }
+
+  // ==========================================
+  // 5. PROACTIVE META TOKEN AUTO-REFRESH
+  // ==========================================
+  if (job.name === 'daily_token_refresh') {
+    console.log(`⏳ [Worker Started] Running Daily Meta Token Auto-Refresh...`);
+    
+    // Find users whose token is expiring in the next 5 days
+    const expiringSoonDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    const usersToRefresh = await User.find({ "igConfig.tokenExpiresAt": { $lte: expiringSoonDate, $gt: new Date() } });
+    
+    for (const user of usersToRefresh) {
+      try {
+         console.log(`🔄 Refreshing IG Token for User: ${user.email}`);
+         
+         // Call Meta to exchange old token for a fresh 60-day token
+         const response = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${user.igConfig.accessToken}`);
+         const data = await response.json();
+         
+         if (data.access_token) {
+            const newExpiry = data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+            await User.updateOne({ _id: user._id }, { $set: { "igConfig.accessToken": data.access_token, "igConfig.tokenExpiresAt": newExpiry } }, { strict: false });
+            console.log(`✅ Successfully auto-refreshed IG Token for User: ${user.email}`);
+         }
+      } catch (err) {
+         console.error(`❌ Auto-refresh failed for user ${user.email}:`, err.message);
+      }
+    }
+  }
 }, { 
   connection,
   // 🔴 TRICK: Stop the "Tick-Tick" polling!
@@ -196,6 +225,15 @@ automationQueue.add('daily_auto_backup', {}, {
     pattern: '0 10 * * *' // Cron syntax for 10:00 AM daily
   },
   jobId: 'system_daily_backup'
+});
+
+// 🚀 NEW: Start the Daily Cron Job for Token Refresh
+// Runs every day at 02:00 AM automatically (Low traffic time)
+automationQueue.add('daily_token_refresh', {}, {
+  repeat: {
+    pattern: '0 2 * * *' // Cron syntax for 02:00 AM daily
+  },
+  jobId: 'system_token_refresh'
 });
 
 module.exports = { automationQueue, automationWorker };

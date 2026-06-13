@@ -5,9 +5,9 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { useAuth } from '../hooks/useAuth';
 import DashboardAIAssistant from '../components/DashboardAIAssistant'; // Import the AI Chat Assistant
 
-function StatCard({ title, value, trend, trendUp, icon, color }) {
-  return (
-    <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-gray-700 transition-all duration-300">
+function StatCard({ title, value, trend, trendUp, icon, color, linkTo, subtitle }) {
+  const cardContent = (
+    <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-gray-700 transition-all duration-300 h-full">
       <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
       <div className="relative z-10 flex justify-between items-start">
         <div>
@@ -21,11 +21,13 @@ function StatCard({ title, value, trend, trendUp, icon, color }) {
               <span className="text-xs text-gray-500">vs last week</span>
             </div>
           )}
+          {subtitle && <p className="text-[10px] text-gray-500 mt-3 font-semibold">{subtitle}</p>}
         </div>
         <div className="text-3xl opacity-80">{icon}</div>
       </div>
     </div>
   );
+  return linkTo ? <Link to={linkTo} className="block h-full">{cardContent}</Link> : cardContent;
 }
 
 export default function Dashboard() {
@@ -113,16 +115,22 @@ export default function Dashboard() {
           title="Total Leads CRM" 
           value={data.stats.totalLeads} 
           trend="+14.5%" trendUp={true} icon="👥" color="from-blue-500/20 to-blue-500/5" 
+          linkTo="/crm"
+          subtitle="Click to view all leads in CRM"
         />
         <StatCard 
           title="Conversion Rate" 
           value={`${data.stats.conversionRate}%`} 
           trend="+22.4%" trendUp={true} icon="📞" color="from-green-500/20 to-green-500/5" 
+          linkTo="/crm"
+          subtitle="Linked to Kanban 'Converted' stage"
         />
         <StatCard 
           title="Cost Per Lead" 
           value={`₹${data.stats.costPerLead}`} 
           trend="+8.2%" trendUp={true} icon="🔥" color="from-purple-500/20 to-purple-500/5" 
+          linkTo="/analytics"
+          subtitle="Calculated: ₹0.80 per WA message sent"
         />
       </div>
 

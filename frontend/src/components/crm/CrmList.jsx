@@ -13,6 +13,7 @@ export default function CrmList({ contacts, onContactClick, onDeleteContact }) {
               <th className="p-5 font-semibold">Stage</th>
               <th className="p-5 font-semibold">AI Score</th>
               <th className="p-5 font-semibold">Deal Value</th>
+              <th className="p-5 font-semibold">Date & Time</th>
               <th className="p-5 font-semibold">Expires</th>
               <th className="p-5 font-semibold text-right">Actions</th>
             </tr>
@@ -43,6 +44,11 @@ export default function CrmList({ contacts, onContactClick, onDeleteContact }) {
                   </td>
                   <td className="p-5 font-semibold text-white">
                     ₹{contact.dealValue?.toLocaleString('en-IN') || 0}
+                  </td>
+                  <td className="p-5 text-gray-400 text-xs font-semibold whitespace-nowrap">
+                    {contact.createdAt ? new Date(contact.createdAt).toLocaleString('en-IN', {
+                      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    }) : 'N/A'}
                   </td>
                   <td className="p-5 text-gray-500 text-xs font-semibold">
                     {contact.expiresAt ? (

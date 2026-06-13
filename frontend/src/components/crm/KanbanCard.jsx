@@ -40,7 +40,15 @@ export default function KanbanCard({ contact, onClick }) {
         </div>
       </div>
 
-      <div className="text-sm text-gray-400 mb-3">{contact.phone}</div>
+      <div className="text-sm text-gray-400 mb-1">{contact.phone}</div>
+      
+      <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-500 mb-3">
+        <CalendarClock size={12} />
+        {contact.createdAt ? new Date(contact.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+        {contact.source && contact.source.toLowerCase().includes('website') && (
+          <span className="ml-auto bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded">🌐 Website</span>
+        )}
+      </div>
       
       {/* Bottom section: Value & Quick Actions */}
       <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-700/50">
