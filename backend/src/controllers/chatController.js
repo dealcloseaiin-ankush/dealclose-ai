@@ -118,10 +118,25 @@ exports.sendManualMessage = async (req, res) => {
       // .lean() is REQUIRED to read fields bypassing Mongoose strict schema
       const user = await User.findById(userId).lean();
       
-      let igToken = user?.igConfig?.accessToken;
+      // 🚀 FIX: Find the exact workspace this lead belongs to
+      const leadForIg = await Lead.findOne({ phoneNumber: customerPhone, userId: userId }).lean();
+      const wsIdIg = leadForIg?.lastSelectedWorkspaceId || 'main';
+      
+      let igToken = null;
+      
+      // 1. Target exact Branch token
+      if (wsIdIg !== 'main' && user?.workspaces) {
+         const ws = user.workspaces.find(w => w._id.toString() === wsIdIg);
+         if (ws?.igConfig?.accessToken) igToken = ws.igConfig.accessToken;
+      }
+      
+      // 2. Fallback to Main Business
+      if (!igToken) igToken = user?.igConfig?.accessToken;
+      
+      // 3. Super Fallback (Any available token)
       if (!igToken && user?.workspaces) {
-         const wsWithToken = user.workspaces.find(w => w.igConfig && w.igConfig.accessToken);
-         if (wsWithToken) igToken = wsWithToken.igConfig.accessToken;
+         const wsWithToken = user.workspaces.find(w => w.igConfig?.accessToken);
+         if (wsWithToken) igToken = wsWithToken.igConfig?.accessToken;
       }
 
       if (!user || !igToken) {
@@ -142,7 +157,13 @@ exports.sendManualMessage = async (req, res) => {
       // Dispatch IG message via Meta Graph API
       try {
         let recipientId = customerPhone.replace('IG_', '');
-        await metaAdsService.sendInstagramDM(igToken, recipientId, messageText);
+          
+          // 🚀 DIRECT AXIOS CALL TO BYPASS ANY HIDDEN BUGS IN META_ADS_SERVICE
+          await require('axios').post(`https://graph.facebook.com/v19.0/me/messages`, {
+             recipient: { id: recipientId },
+             message: { text: messageText }
+          }, { params: { access_token: igToken } });
+          
         console.log(`✅ [DEBUG Chat Flow] Manual IG DM sent successfully to ${recipientId}`);
       } catch (igError) {
         newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
@@ -189,12 +210,25 @@ exports.sendManualMessage = async (req, res) => {
     console.log(`⏸️ [DEBUG Chat Flow] AI Paused for customer ${formattedPhone} for 24 hours.`);
 
     const user = await User.findById(userId).lean();
+    const leadForWa = await Lead.findOne({ phoneNumber: formattedPhone, userId: userId }).lean();
+    const wsIdWa = leadForWa?.lastSelectedWorkspaceId || 'main';
     
-    let waToken = user?.whatsappConfig?.accessToken;
-    let waPhoneId = user?.whatsappConfig?.phoneNumberId;
-    if ((!waToken || !waPhoneId) && user?.workspaces) {
-       const wsWithWa = user.workspaces.find(w => w.whatsappConfig && w.whatsappConfig.accessToken);
-       if (wsWithWa) { waToken = wsWithWa.whatsappConfig.accessToken; waPhoneId = wsWithWa.whatsappConfig.phoneNumberId; }
+    let waToken = null;
+    let waPhoneId = null;
+
+    // 1. Target exact Branch token
+    if (wsIdWa !== 'main' && user?.workspaces) {
+       const ws = user.workspaces.find(w => w._id.toString() === wsIdWa);
+       if (ws?.whatsappConfig?.accessToken) {
+           waToken = ws.whatsappConfig.accessToken;
+           waPhoneId = ws.whatsappConfig.phoneNumberId;
+       }
+    }
+    
+    // 2. Fallback to Main Business (This handles your Shared Number logic automatically!)
+    if (!waToken) {
+       waToken = user?.whatsappConfig?.accessToken;
+       waPhoneId = user?.whatsappConfig?.phoneNumberId;
     }
     
     console.log(`➡️ [DEBUG Chat Flow] 5. Database Check - User Found: ${user ? 'Yes' : 'No'}`);

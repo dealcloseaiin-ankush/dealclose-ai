@@ -7,6 +7,21 @@ const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); // 🚀 Required for Public Comment Replies
 const googleSheetsController = require('./googleSheetsController');
 
+// 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
+metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
+  if (!token) return;
+  return axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
+    recipient: { id: recipientId },
+    message: { text: text }
+  }, { params: { access_token: token } });
+};
+metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text) => {
+  if (!token) return;
+  return axios.post(`https://graph.facebook.com/v19.0/${commentId}/private_replies`, {
+    message: text
+  }, { params: { access_token: token } });
+};
+
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/instagram
 exports.verifyInstagramWebhook = async (req, res) => {
@@ -238,7 +253,10 @@ exports.handleInstagramWebhook = async (req, res) => {
               };
 
               let flowQuery = { userId: user._id };
-              if (incomingWorkspaceId !== 'main') flowQuery.workspaceId = incomingWorkspaceId;
+              // 🚀 FIX: Allow "Main" flows to work across all sub-workspaces as a fallback!
+              if (incomingWorkspaceId !== 'main') {
+                 flowQuery = { userId: user._id, workspaceId: { $in: [incomingWorkspaceId, 'main'] } };
+              }
               const userFlows = await Flow.find(flowQuery);
 
               // STEP 1: Check if customer is currently inside an active "Ask Question" or "Menu" Flow block
