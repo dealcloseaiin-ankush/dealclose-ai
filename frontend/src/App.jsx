@@ -1,4 +1,7 @@
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import api from './services/api';
 import MainLayout from './layouts/MainLayout';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -55,9 +58,46 @@ const RootRoute = ({ children }) => {
   return user ? <Navigate to="/dashboard" replace /> : children;
 };
 
+// 🚀 GLOBAL NOTIFICATION SYSTEM: Plays sound and shows popup on ALL pages
+const GlobalNotification = () => {
+  const auth = useAuth();
+  const user = auth?.user;
+  const [lastMsgId, setLastMsgId] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const checkMessages = async () => {
+      try {
+        const { data } = await api.get('/chats');
+        const messages = Array.isArray(data) ? data : data.data || [];
+        if (messages.length === 0) return;
+        
+        const latest = messages[messages.length - 1];
+        
+        if (latest.direction === 'incoming' && lastMsgId && latest._id !== lastMsgId) {
+          const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+          audio.play().catch(() => {});
+          toast(`💬 New message from ${latest.customerName || latest.customerPhone}:\n"${latest.messageText}"`, {
+            duration: 5000,
+            style: { background: '#111', color: '#fff', border: '1px solid #333' }
+          });
+        }
+        if (!lastMsgId || latest._id !== lastMsgId) setLastMsgId(latest._id);
+      } catch(error) {
+        console.debug('Background chat check skipped.', error.message);
+      }
+    };
+    checkMessages();
+    const interval = setInterval(checkMessages, 4000);
+    return () => clearInterval(interval);
+  }, [user, lastMsgId]);
+  return null;
+};
+
 export default function App() {
   return (
     <Router>
+      <GlobalNotification />
       <Routes>
         <Route path="/" element={<RootRoute><LandingPage /></RootRoute>} />
         <Route path="/home" element={<LandingPage />} /> {/* Extra route for logged in users to view landing page */}

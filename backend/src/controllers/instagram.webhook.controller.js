@@ -10,7 +10,8 @@ metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
   if (!token) return;
   return axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
     recipient: { id: recipientId },
-    message: { text: text }
+    message: { text: text },
+    messaging_type: "RESPONSE"
   }, { params: { access_token: token } });
 };
 metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text) => {

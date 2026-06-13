@@ -162,7 +162,8 @@ exports.sendManualMessage = async (req, res) => {
           // 🚀 DIRECT AXIOS CALL TO BYPASS ANY HIDDEN BUGS IN META_ADS_SERVICE
           await require('axios').post(`https://graph.facebook.com/v19.0/me/messages`, {
              recipient: { id: recipientId },
-             message: { text: messageText }
+             message: { text: messageText },
+             messaging_type: "RESPONSE"
           }, { params: { access_token: igToken } });
           
         console.log(`✅ [DEBUG Chat Flow] Manual IG DM sent successfully to ${recipientId}`);
