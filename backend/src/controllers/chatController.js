@@ -159,15 +159,20 @@ exports.sendManualMessage = async (req, res) => {
       try {
         let recipientId = customerPhone.replace('IG_', '');
           
-          // 🚀 DIRECT AXIOS CALL TO BYPASS ANY HIDDEN BUGS IN META_ADS_SERVICE
-          await require('axios').post(`https://graph.facebook.com/v19.0/me/messages`, {
+          console.log(`\n================== [MANUAL REPLY MEGA DEBUG] ==================`);
+          console.log(`Sending manual reply to IG ID: ${recipientId}`);
+          
+          const response = await require('axios').post(`https://graph.facebook.com/v19.0/me/messages`, {
              recipient: { id: recipientId },
              message: { text: messageText },
              messaging_type: "RESPONSE"
           }, { params: { access_token: igToken } });
           
-        console.log(`✅ [DEBUG Chat Flow] Manual IG DM sent successfully to ${recipientId}`);
+          console.log(`✅ META RETURNED SUCCESS (200 OK)! Response:`, JSON.stringify(response.data));
+          console.log(`⚠️ IF THIS IS INVISIBLE IN IG APP, CHECK MESSAGE REQUESTS FOLDER OR META APP MODE.`);
+          console.log(`===============================================================\n`);
       } catch (igError) {
+        console.error(`❌ META REJECTED MANUAL REPLY:`, igError.response?.data || igError.message);
         newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
         newMsg.status = 'failed';
         await newMsg.save();

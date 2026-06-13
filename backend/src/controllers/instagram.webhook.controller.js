@@ -127,6 +127,10 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
               if (!user) continue;
 
+              console.log(`\n🔍 [DEBUG: TOKEN EXTRACTION TRACER]`);
+              console.log(`   👉 Webhook Arrived for IG Account ID: ${igAccountId}`);
+              console.log(`   👉 Mapped to SaaS User: ${user.email}`);
+
               // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents TypeError on undefined)
               let igToken = null;
               let incomingWorkspaceId = 'main';
@@ -137,12 +141,14 @@ exports.handleInstagramWebhook = async (req, res) => {
                  if (activeWorkspace && activeWorkspace.igConfig && activeWorkspace.igConfig.accessToken) {
                     igToken = activeWorkspace.igConfig.accessToken;
                     incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
+                    console.log(`   ✅ Token Source Used: Exact Branch/Workspace -> '${activeWorkspace.name}'`);
                  }
               }
               
               if (!igToken && user && user.igConfig && user.igConfig.accessToken) {
                  igToken = user.igConfig.accessToken;
                  incomingWorkspaceId = 'main';
+                 console.log(`   ✅ Token Source Used: Main Business Config`);
               }
 
               if (!igToken && user && user.workspaces) {
@@ -150,8 +156,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                  if (fallbackWs) {
                     igToken = fallbackWs.igConfig.accessToken;
                     incomingWorkspaceId = fallbackWs._id ? fallbackWs._id.toString() : 'main';
+                    console.log(`   ⚠️ Token Source Used: FALLBACK Branch -> '${fallbackWs.name}' (Because exact match failed!)`);
                  }
               }
+              console.log(`   👉 Final Token Passed to Sender: ${igToken ? igToken.substring(0, 15) + '...' : 'NULL'}\n`);
 
               // 🌟 Fetch Real Instagram Profile (Name/Username)
               let realName = `IG User ${senderId.slice(-4)}`;
@@ -182,14 +190,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                  let dStatus = 'sent';
                  let dMsg = msgText;
                  
-                 console.log(`\n▶️ [MEGA DEBUG: TRACING ID BEFORE FLOW SEND]`);
-                 console.log(`   👉 Original Incoming Sender ID was: ${senderId}`);
-                 console.log(`   👉 Now passing to Meta as Recipient ID: ${senderId}`);
-                 if (senderId !== event.sender.id && !isEcho) console.error(`   🚨 ALARM! CUSTOMER ID CHANGED DURING EXECUTION!`);
                  
                  try {
-                   await metaAdsService.sendInstagramDM(igToken, senderId, msgText);
-                   console.log(`✅ [Flow Engine] Message delivered successfully to Meta.`);
+                   const metaResponse = await metaAdsService.sendInstagramDM(igToken, senderId, msgText);
+                   // Important: We only mark as 'sent' IF Meta doesn't throw an error.
+                   // If Meta returns 200 OK, the code reaches here.
+                   console.log(`✅ [Flow Engine] Message delivered to Meta. Message ID: ${metaResponse.data?.message_id}`);
                  } catch(e) {
                    dStatus = 'failed';
                    const metaErrorMsg = e.response?.data?.error?.message || e.message;
