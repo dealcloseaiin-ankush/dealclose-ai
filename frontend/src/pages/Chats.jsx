@@ -24,8 +24,17 @@ export default function Chats() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
+    let isFirstLoad = true;
+    
+    const playNotificationSound = () => {
+      try {
+        const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+        audio.play().catch(e => console.log('Audio autoplay blocked', e));
+      } catch(e) {}
+    };
+
     const fetchChats = async () => {
-      setLoading(true);
+      if (isFirstLoad) setLoading(true);
       try {
         const profileRes = await api.get('/users/profile').catch(() => null);
         const u = profileRes?.data?.user || profileRes?.data;
@@ -34,19 +43,30 @@ export default function Chats() {
         const { data } = await api.get('/chats');
         const messages = Array.isArray(data) ? data : data.data || [];
         
-        console.log("➡️ [Chats Debug] Total raw messages fetched from DB:", messages.length);
-        console.log("➡️ [Chats Debug] Message payload sample:", messages.slice(0, 3));
-        
-        setAllMessages(messages);
+        setAllMessages(prev => {
+          // 🚀 PLAY SOUND IF NEW INCOMING MESSAGE DETECTED
+          if (!isFirstLoad && prev.length > 0 && messages.length > prev.length) {
+             const newMsgs = messages.slice(prev.length);
+             if (newMsgs.some(m => m.direction === 'incoming')) {
+                playNotificationSound();
+             }
+          }
+          return messages;
+        });
 
       } catch (error) {
         console.error("Failed to fetch chats", error);
-        toast.error("Failed to load chats data");
       } finally {
-        setLoading(false);
+        if (isFirstLoad) {
+          setLoading(false);
+          isFirstLoad = false;
+        }
       }
     };
+    
     fetchChats();
+    const intervalId = setInterval(fetchChats, 4000); // 🚀 Auto-refresh data every 4 seconds silently
+    return () => clearInterval(intervalId); // Cleanup
   }, []);
 
   // 🔥 Filter messages by selected Workspace
