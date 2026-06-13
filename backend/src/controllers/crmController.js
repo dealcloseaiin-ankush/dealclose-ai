@@ -17,6 +17,7 @@ exports.getPipeline = async (req, res) => {
       // Direct query without ObjectId casting to prevent skipped records
       const distinctPhones = await Message.distinct('customerPhone', { userId: userId });
       console.log(`📱 [CRM Debug] Found ${distinctPhones.length} distinct phone numbers in Chat History.`);
+      let leadCount = await Lead.countDocuments({ userId });
       for (const phone of distinctPhones) {
         if (!phone) continue;
         try {
@@ -24,7 +25,7 @@ exports.getPipeline = async (req, res) => {
           const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
           
           if (!leadExists && !contactExists) {
-            const leadCount = await Lead.countDocuments({ userId });
+            leadCount++;
             const seqId = String(leadCount + 1).padStart(4, '0');
             await Lead.create({
               userId,
@@ -261,8 +262,16 @@ exports.deleteContact = async (req, res) => {
     const { id } = req.params;
     
     // Try to delete from both collections since CRM shows mixed data
-    const leadResult = await Lead.findOneAndDelete({ _id: id, userId });
-    const contactResult = await Contact.findOneAndDelete({ _id: id, userId });
+    let leadResult = null;
+    let contactResult = null;
+    try {
+      leadResult = await Lead.findOneAndDelete({ _id: id, userId });
+      if (!leadResult) contactResult = await Contact.findOneAndDelete({ _id: id, userId });
+    } catch (e) {
+      // Fallback if ID is a phone number or IG string (Mongoose CastError)
+      leadResult = await Lead.findOneAndDelete({ phoneNumber: id, userId });
+      if (!leadResult) contactResult = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
+    }
     
     if (!leadResult && !contactResult) {
       return res.status(404).json({ success: false, message: 'Record not found or already deleted' });

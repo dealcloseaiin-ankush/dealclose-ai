@@ -26,15 +26,6 @@ export default function CrmPage() {
   // Get workspaces list from user object
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
 
-  // 🚀 Calculate available platforms dynamically based on user's active leads
-  const availablePlatforms = React.useMemo(() => {
-    const platforms = new Set();
-    flatContacts.forEach(c => {
-      if (c.platform) platforms.add(c.platform);
-    });
-    return Array.from(platforms);
-  }, [flatContacts]);
-
   useEffect(() => {
     fetchPipeline();
     
@@ -188,17 +179,15 @@ export default function CrmPage() {
             </select>
 
             {/* 🚀 NEW: Platform Dropdown Filter */}
-            {availablePlatforms.length > 0 && (
-              <select 
-                value={platformFilter} 
-                onChange={(e) => setPlatformFilter(e.target.value)} 
-                className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 cursor-pointer shadow-sm"
-              >
-                <option value="all">🌐 All Platforms</option>
-                {availablePlatforms.includes('whatsapp') && <option value="whatsapp">🟩 WhatsApp</option>}
-                {availablePlatforms.includes('instagram') && <option value="instagram">🟪 Instagram</option>}
-              </select>
-            )}
+            <select 
+              value={platformFilter} 
+              onChange={(e) => setPlatformFilter(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 cursor-pointer shadow-sm"
+            >
+              <option value="all">🌐 All Platforms</option>
+              <option value="whatsapp">🟩 WhatsApp</option>
+              <option value="instagram">🟪 Instagram</option>
+            </select>
 
             {/* Team vs My Leads Filter (Only for Owners/Managers) */}
             {isOwner && (

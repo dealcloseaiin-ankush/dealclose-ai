@@ -6,8 +6,8 @@ const messageSchema = new Schema({
   customerPhone: { type: String, required: true },
   messageText: { type: String },
   direction: { type: String, enum: ['incoming', 'outgoing'], required: true }, // Chat aayi ya gayi
-  status: { type: String, enum: ['sent', 'delivered', 'read', 'received'], default: 'sent' },
-  sentBy: { type: String, enum: ['ai', 'auto-reply', 'staff', 'customer'], required: true }, // Kisne bheja
+  status: { type: String, enum: ['sent', 'delivered', 'read', 'received', 'failed'], default: 'sent' },
+  sentBy: { type: String, enum: ['ai', 'auto-reply', 'staff', 'customer', 'owner_app', 'system', 'crm_broadcast'], required: true }, // Kisne bheja
   timestamp: { type: Date, default: Date.now },
   tags: [{ type: String }], // For CRM categorization like 'inquiry', 'complaint'
   isResolved: { type: Boolean, default: false }, // To mark chats as settled/closed
