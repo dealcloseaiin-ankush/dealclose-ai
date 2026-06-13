@@ -367,7 +367,7 @@ exports.instagramConnect = async (req, res) => {
         console.log(`📡 5. Subscribing App to Facebook Page Webhooks...`);
         await axios.post(`https://graph.facebook.com/v19.0/${targetAccount.pageId}/subscribed_apps`, null, {
             params: {
-                subscribed_fields: 'messages,comments',
+                subscribed_fields: 'messages',
                 access_token: targetAccount.pageToken
             }
         });

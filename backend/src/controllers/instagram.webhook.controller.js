@@ -20,6 +20,17 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text)
   }, { params: { access_token: token } });
 };
 
+// 🚀 OVERRIDE FOR SAFETY: Fetch Real Instagram Profile (Name/Username)
+metaAdsService.getInstagramProfile = async (token, igsid) => {
+  if (!token) return null;
+  try {
+    const res = await axios.get(`https://graph.facebook.com/v19.0/${igsid}?fields=name,username,profile_pic&access_token=${token}`);
+    return res.data;
+  } catch (e) {
+    return null;
+  }
+};
+
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/instagram
 exports.verifyInstagramWebhook = async (req, res) => {
@@ -81,7 +92,11 @@ exports.handleInstagramWebhook = async (req, res) => {
               const senderId = isEcho ? event.recipient.id : event.sender.id;
               const incomingText = event.message.text.trim();
               
-              console.log(`💬 [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
+              console.log(`\n📥 [MEGA DEBUG: INCOMING MESSAGE TRACER]`);
+              console.log(`   👉 Message arrived ON Business Page ID (igAccountId): ${igAccountId}`);
+              console.log(`   👉 Message sent FROM Customer ID (senderId): ${senderId}`);
+              console.log(`   👉 Is this an Owner Reply? (isEcho): ${isEcho}`);
+              console.log(`   👉 Message Text: "${incomingText}"`);
 
               // Find the exact User who owns this Instagram/Facebook Account
               let user = await User.findOne({ 
@@ -158,6 +173,32 @@ exports.handleInstagramWebhook = async (req, res) => {
                 // DMs/Comments: Premium keeps for 30 days. Free keeps for 1 day.
                 return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
               };
+              
+              // 🚀 SMART HELPER: Sends message and correctly records FAILED status if Meta blocks it
+              const sendFlowMessage = async (msgText, nextNodeId = null, flowId = null) => {
+                 let dStatus = 'sent';
+                 let dMsg = msgText;
+                 
+                 console.log(`\n▶️ [MEGA DEBUG: TRACING ID BEFORE FLOW SEND]`);
+                 console.log(`   👉 Original Incoming Sender ID was: ${senderId}`);
+                 console.log(`   👉 Now passing to Meta as Recipient ID: ${senderId}`);
+                 if (senderId !== event.sender.id && !isEcho) console.error(`   🚨 ALARM! CUSTOMER ID CHANGED DURING EXECUTION!`);
+                 
+                 try {
+                   await metaAdsService.sendInstagramDM(igToken, senderId, msgText);
+                   console.log(`✅ [Flow Engine] Message delivered successfully to Meta.`);
+                 } catch(e) {
+                   dStatus = 'failed';
+                   const metaErrorMsg = e.response?.data?.error?.message || e.message;
+                   dMsg += `\n\n[⚠️ Meta Blocked: ${metaErrorMsg}]`;
+                   console.error(`❌ [Flow Engine] Failed to send message. Saving as FAILED in dashboard. Error: ${metaErrorMsg}`);
+                 }
+                 await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: dMsg, direction: 'outgoing', status: dStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                 
+                 if (nextNodeId && flowId) {
+                   await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flowId, nodeId: nextNodeId } } }, { strict: false });
+                 }
+              };
 
               // 🚀 TWO-STEP LINK TRACKING: Handle Quick Reply Button Clicks
               const quickReplyPayload = event.message.quick_reply ? event.message.quick_reply.payload : null;
@@ -167,7 +208,6 @@ exports.handleInstagramWebhook = async (req, res) => {
                 
                 if (matchedRule && matchedRule.fileUrl) {
                    const linkMsg = `Here is your requested link/file: ${matchedRule.fileUrl}\n\nLet me know if you need anything else!`;
-                   if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, linkMsg).catch(e => console.error("IG Flow Meta Error:", e.response?.data || e.message));
                    
                    // Update Clicked Count (Intrested Leads!)
                    await User.updateOne(
@@ -175,7 +215,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                      { $inc: { "postAutomations.$.stats.clickedCount": 1 } }
                    );
                    
-                   await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: linkMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                   await sendFlowMessage(linkMsg);
                    continue; // Stop further processing, job done!
                 }
               }
@@ -309,15 +349,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                         if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, msgText).catch(e=>console.error("IG Flow Meta Error:", e.response?.data || e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                         await sendFlowMessage(msgText);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, msgText).catch(e=>console.error("IG Flow Meta Error:", e.response?.data || e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
-                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         await sendFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -326,9 +363,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, msgText).catch(e=>console.error("IG Flow Meta Error:", e.response?.data || e.message));
-                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
-                           await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                           await sendFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
                          }
                          currNodeId = null; 
                        } else { break; }
@@ -367,15 +402,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                         if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, msgText).catch(e=>console.error("IG Flow Meta Error:", e.response?.data || e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                         await sendFlowMessage(msgText);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, msgText).catch(e=>console.error("IG Flow Meta Error:", e.response?.data || e.message));
-                         await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
-                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         await sendFlowMessage(msgText, nextNode.id, flow._id.toString());
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -384,9 +416,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, msgText).catch(e=>console.error("IG Flow Meta Error:", e.response?.data || e.message));
-                           await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
-                           await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                           await sendFlowMessage(msgText, nextNode.id, flow._id.toString());
                          }
                          currNodeId = null; 
                        } else { break; }
@@ -638,6 +668,11 @@ exports.handleInstagramWebhook = async (req, res) => {
                   if (responseMessage) {
                     let deliveryStatus = 'sent';
                     let displayMsg = responseMessage;
+                    
+                    console.log(`\n▶️ [MEGA DEBUG: TRACING ID BEFORE AI SEND]`);
+                    console.log(`   👉 Original Incoming Sender ID was: ${senderId}`);
+                    console.log(`   👉 Now passing to Meta as Recipient ID: ${senderId}`);
+                    
                     try {
                       if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, responseMessage);
                       console.log(`🤖 [Instagram DM Reply Sent Successfully]: ${responseMessage}`);

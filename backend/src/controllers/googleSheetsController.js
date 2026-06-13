@@ -2,12 +2,22 @@ const { google } = require('googleapis');
 const User = require('../models/userModel');
 
 const getOAuth2Client = (req = null) => {
-  // 🚀 FIX: Automatically generate correct Redirect URL to prevent Google 400 Error
-  const defaultRedirect = req && req.headers.origin ? `${req.headers.origin}/settings` : 'https://dealclose-ai.onrender.com/settings';
+  // 🚀 MEGA DEBUG & FIX: Automatically generate correct Redirect URL to prevent Google 400 Error
+  let redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  if (!redirectUri || redirectUri === 'postmessage' || redirectUri === '') {
+    redirectUri = req && req.headers.origin ? `${req.headers.origin}/settings` : 'https://dealclose-ai.onrender.com/settings';
+  }
+  
+  console.log(`\n================== [MEGA DEBUG: GOOGLE AUTH] ==================`);
+  console.log(`1. Client ID: ${process.env.GOOGLE_CLIENT_ID ? 'Present ✅' : 'Missing ❌'}`);
+  console.log(`2. Client Secret: ${process.env.GOOGLE_CLIENT_SECRET ? 'Present ✅' : 'Missing ❌'}`);
+  console.log(`3. Using Redirect URI: ${redirectUri}`);
+  console.log(`===============================================================\n`);
+
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || defaultRedirect
+    redirectUri
   );
 };
 
@@ -15,6 +25,7 @@ const getOAuth2Client = (req = null) => {
 // @route   GET /api/settings/google/auth-url
 exports.getAuthUrl = async (req, res) => {
   try {
+    console.log("\n▶️ [MEGA DEBUG: GOOGLE] Hit /google/auth-url route from Frontend!");
     if (!process.env.GOOGLE_CLIENT_ID) {
       return res.status(400).json({ success: false, message: 'Google Client ID is missing in backend .env' });
     }
@@ -48,6 +59,7 @@ exports.getAuthUrl = async (req, res) => {
 // @route   POST /api/settings/google/connect
 exports.connectGoogleAccount = async (req, res) => {
   try {
+    console.log("\n▶️ [MEGA DEBUG: GOOGLE] Hit /google/connect route from Frontend (Saving Token)!");
     const { code } = req.body;
     const userId = req.user?._id || req.user?.id;
     
