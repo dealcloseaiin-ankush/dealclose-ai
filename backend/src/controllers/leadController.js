@@ -103,28 +103,55 @@ exports.deleteLead = async (req, res) => {
     const { id } = req.params;
     let deletedRecord = null;
 
+    console.log(`\n🗑️ [DEBUG DELETE] Attempting to delete Lead/Contact with ID: ${id} for User: ${userId}`);
+
     // 1. Check and Delete from New Lead model
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
         deletedRecord = await Lead.findOneAndDelete({ _id: id, userId });
+        if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Lead Model via ObjectId`);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log(`⚠️ [DEBUG DELETE] Error querying Lead by ObjectId:`, e.message);
+    }
 
     // 2. Check and Delete from Old Contact model (Manual Data)
     if (!deletedRecord) {
       try {
         if (mongoose.Types.ObjectId.isValid(id)) {
           deletedRecord = await Contact.findOneAndDelete({ _id: id, userId });
+          if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Contact Model via ObjectId`);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log(`⚠️ [DEBUG DELETE] Error querying Contact by ObjectId:`, e.message);
+      }
     }
 
     // 3. Fallback to phone number deletion (just in case)
-    if (!deletedRecord) deletedRecord = await Lead.findOneAndDelete({ phoneNumber: id, userId });
-    if (!deletedRecord) deletedRecord = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
-    if (!deletedRecord) return res.status(404).json({ message: 'Lead or Contact not found' });
+    if (!deletedRecord) {
+      deletedRecord = await Lead.findOneAndDelete({ phoneNumber: id, userId });
+      if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Lead Model via Phone Number`);
+    }
+    if (!deletedRecord) {
+      deletedRecord = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
+      if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Contact Model via Phone Number`);
+    }
+    
+    if (!deletedRecord) {
+      console.log(`❌ [DEBUG DELETE] Failed: No record found for ID/Phone: ${id}`);
+      return res.status(404).json({ message: 'Lead or Contact not found' });
+    }
+
+    // 🚀 FIX: Delete associated messages so Auto-Sync doesn't resurrect them like Zombies!
+    const phoneToClear = deletedRecord.phoneNumber || deletedRecord.phone;
+    if (phoneToClear) {
+      const msgDeleteResult = await Message.deleteMany({ customerPhone: phoneToClear, userId });
+      console.log(`🧹 [DEBUG DELETE] Cleared ${msgDeleteResult.deletedCount} old messages for phone: ${phoneToClear} to prevent Auto-Sync zombie resurrection.`);
+    }
+    
     res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
+    console.error(`🚨 [DEBUG DELETE] Critical Error:`, error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -260,6 +260,8 @@ exports.deleteContact = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { id } = req.params;
+
+    console.log(`\n🗑️ [CRM DEBUG DELETE] Attempting to delete Contact/Lead with ID: ${id} for User: ${userId}`);
     
     // Try to delete from both collections since CRM shows mixed data
     let leadResult = null;
@@ -269,17 +271,28 @@ exports.deleteContact = async (req, res) => {
       if (!leadResult) contactResult = await Contact.findOneAndDelete({ _id: id, userId });
     } catch (e) {
       // Fallback if ID is a phone number or IG string (Mongoose CastError)
+      console.log(`⚠️ [CRM DEBUG DELETE] Mongoose CastError. ID is likely a Phone/IG Number. Falling back to Phone search...`);
       leadResult = await Lead.findOneAndDelete({ phoneNumber: id, userId });
       if (!leadResult) contactResult = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
     }
     
     if (!leadResult && !contactResult) {
+      console.log(`❌ [CRM DEBUG DELETE] Failed: No record found for ID/Phone: ${id}. It may already be deleted.`);
       return res.status(404).json({ success: false, message: 'Record not found or already deleted' });
+    }
+
+    console.log(`🗑️ [CRM DEBUG DELETE] Success: Record deleted from Database.`);
+    
+    // 🚀 FIX: Delete associated messages so Auto-Sync doesn't resurrect them like Zombies!
+    const phoneToClear = leadResult ? (leadResult.phoneNumber || leadResult.phone) : (contactResult?.phone || contactResult?.phoneNumber);
+    if (phoneToClear) {
+      const msgDeleteResult = await Message.deleteMany({ customerPhone: phoneToClear, userId });
+      console.log(`🧹 [CRM DEBUG DELETE] Cleared ${msgDeleteResult.deletedCount} old messages for phone: ${phoneToClear} to prevent Auto-Sync zombie resurrection.`);
     }
     
     res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
-    console.error('Error deleting contact:', error);
+    console.error('🚨 [CRM DEBUG DELETE] Critical Error:', error);
     res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
