@@ -29,8 +29,10 @@ export default function Chats() {
     const playNotificationSound = () => {
       try {
         const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-        audio.play().catch(e => console.log('Audio autoplay blocked', e));
-      } catch(e) {}
+        audio.play().catch(err => console.log('Audio autoplay blocked', err));
+      } catch (error) {
+        console.debug('Audio initialization failed', error);
+      }
     };
 
     const fetchChats = async () => {
@@ -260,12 +262,14 @@ export default function Chats() {
   return (
     <main className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#050505] p-0 text-gray-200 md:p-6">
       
-      {/* Modal Overlay for New Chat */}
+      {/* New Chat Modal Box */}
       {isModalOpen && (
-        <div data-modal-overlay="true" className="fixed top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
-          <div role="dialog" aria-modal="true" className="relative w-full max-w-[450px] rounded-[1rem] border border-gray-800 bg-[#111] p-6 shadow-2xl">
-            <button onClick={() => setIsModalOpen(false)} className="absolute right-5 top-5 text-lg text-gray-500 hover:text-white transition-colors">✕</button>
-            <h2 className="mb-5 text-2xl font-bold text-white">Start New Chat</h2>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+          <section role="dialog" aria-modal="true" className="relative w-full max-w-md rounded-2xl border border-gray-800 bg-[#111] p-7 shadow-2xl">
+            <header className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Start New Chat</h2>
+              <button onClick={() => setIsModalOpen(false)} aria-label="Close dialog" className="text-gray-400 hover:text-white transition-colors p-1">✕</button>
+            </header>
             <form onSubmit={handleStartChatSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">WhatsApp Number <span className="text-red-500">*</span></label>
@@ -294,15 +298,16 @@ export default function Chats() {
                 <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-colors">Start Chat</button>
               </div>
             </form>
-          </div>
+          </section>
         </div>
       )}
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
-          className="absolute inset-0 bg-black/70 z-30 md:hidden"
+        <div
+          aria-hidden="true" 
           onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/80 backdrop-blur-sm md:hidden"
         />
       )}
 

@@ -126,7 +126,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     const fbLoginConfig = {
       scopes: platform === 'whatsapp' 
         ? 'whatsapp_business_management,whatsapp_business_messaging' 
-        : 'instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_manage_metadata',
+        : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_manage_metadata,pages_messaging,instagram_manage_messages',
       return_scopes: true,
       response_type: 'code',
       auth_type: 'rerequest',
