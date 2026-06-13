@@ -83,26 +83,43 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (!user) {
                  console.log(`⚠️ [IG Webhook] Exact IG Account match not found for ${igAccountId}. Using fallback owner...`);
                  // 🚀 SMART FALLBACK: Find the most recently active user who actually connected an IG Token!
-                 // This prevents saving messages to old dead/dummy accounts in the database.
-                 user = await User.findOne({ "igConfig.accessToken": { $exists: true, $ne: "" } }).sort({ updatedAt: -1 });
+                 user = await User.findOne({ 
+                   $or: [
+                     { "igConfig.accessToken": { $exists: true, $ne: "" } },
+                     { "workspaces.igConfig.accessToken": { $exists: true, $ne: "" } }
+                   ]
+                 }).sort({ updatedAt: -1 });
+                 
                  if (!user) {
                    user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 });
                  }
               }
               if (!user) continue;
 
-              // 🚀 SMART ROUTING: Branch vs Main Page (Check both IG and FB Page IDs)
+              // 🚀 ULTIMATE TOKEN EXTRACTOR (Bulletproof to prevent undefined crashes)
+              let igToken = null;
               let incomingWorkspaceId = 'main';
               let activeWorkspace = null;
-              if (user.igConfig?.accountId !== igAccountId && user.igConfig?.pageId !== igAccountId && user.workspaces) {
+              
+              // 1. Check if the token belongs to a specific branch/workspace
+              if (user.workspaces && user.workspaces.length > 0) {
                  activeWorkspace = user.workspaces.find(w => w.igConfig && (w.igConfig.accountId === igAccountId || w.igConfig.pageId === igAccountId));
-                 if (activeWorkspace) incomingWorkspaceId = activeWorkspace._id.toString();
+                 if (activeWorkspace && activeWorkspace.igConfig?.accessToken) {
+                    igToken = activeWorkspace.igConfig.accessToken;
+                    incomingWorkspaceId = activeWorkspace._id.toString();
+                 }
+              }
+              
+              // 2. Check main business config
+              if (!igToken && user.igConfig && user.igConfig.accessToken) {
+                 igToken = user.igConfig.accessToken;
+                 incomingWorkspaceId = 'main';
               }
 
-              // Safely extract IG Token to prevent crashes
-              let igToken = user.igConfig?.accessToken;
-              if (!igToken && activeWorkspace?.igConfig?.accessToken) {
-                igToken = activeWorkspace.igConfig.accessToken;
+              // 3. Super Fallback: Grab ANY valid IG token we can find in this user's account
+              if (!igToken) {
+                 if (user.igConfig?.accessToken) igToken = user.igConfig.accessToken;
+                 else if (user.workspaces) igToken = user.workspaces.find(w => w.igConfig?.accessToken)?.igConfig?.accessToken;
               }
 
               // 🌟 Fetch Real Instagram Profile (Name/Username)

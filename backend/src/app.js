@@ -65,6 +65,7 @@ app.use('/uploads', express.static('public/uploads'));
 
 // API Routes
 // Link all routes to the Main App
+app.use('/api/settings', settingsRoutes); // 🔥 FIX: Google Auth 404 Error resolved here
 app.use('/api/leads', leadRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/forms', formRoutes);
