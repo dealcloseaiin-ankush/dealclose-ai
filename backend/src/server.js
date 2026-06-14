@@ -40,11 +40,17 @@ wssTwilio.on('connection', (ws) => {
 
 wssMobile.on('connection', (ws) => {
   console.log('📱 [WebSocket] Mobile/Web Stream Connection established');
-  require('./websockets/mobileStreamHandler')(ws);
+  try {
+    require('./websockets/mobileStreamHandler')(ws);
+  } catch (error) {
+    console.error('❌ [WebSocket] Mobile Stream Handler Error:', error.message);
+    ws.close();
+  }
 });
 
 server.on('upgrade', (request, socket, head) => {
-  const pathname = request.url;
+  // Safely parse URL to ignore query parameters that might break routing
+  const pathname = request.url.split('?')[0];
   if (pathname === '/api/webhooks/twilio/stream') {
     wssTwilio.handleUpgrade(request, socket, head, (ws) => wssTwilio.emit('connection', ws, request));
   } else if (pathname === '/api/webhooks/mobile/stream') {

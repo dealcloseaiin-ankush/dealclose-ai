@@ -14,6 +14,7 @@ exports.getDashboardData = async (req, res) => {
     
     // Fetch real metrics from DB
     const totalComments = await Message.countDocuments({ userId, tags: { $in: ['ig_comment'] } });
+    const totalDMsReceived = await Message.countDocuments({ userId, direction: 'incoming', customerPhone: { $regex: /^IG_/ } });
     const dmsSent = await Message.countDocuments({ userId, direction: 'outgoing', customerPhone: { $regex: /^IG_/ } });
     const leadsExtracted = await Lead.countDocuments({ 
       userId, 

@@ -9,20 +9,33 @@ module.exports = function (ws) {
   let conversationHistory = [];
   
   // 1. Initialize APIs
-  const deepgram = createClient(process.env.DEEPGRAM_API_KEY || 'dummy');
+  if (!process.env.DEEPGRAM_API_KEY) {
+    console.error("❌ DEEPGRAM_API_KEY is missing in Env! Closing WebSocket.");
+    if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'error', data: 'DEEPGRAM_API_KEY missing on server' }));
+    return ws.close();
+  }
+
+  const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
   console.log(`📱 [Mobile Stream] New connection from Android App! Call ID: ${callSid}`);
 
   // 2. Setup Deepgram Live Transcription
-  const deepgramLive = deepgram.listen.live({
-    model: 'nova-2',
-    language: 'en-IN',
-    smart_format: true,
-    encoding: 'linear16', // Mobile devices usually stream raw PCM/Linear16 audio
-    sample_rate: 16000,   // Standard mobile mic sample rate
-  });
+  let deepgramLive;
+  try {
+    deepgramLive = deepgram.listen.live({
+      model: 'nova-2',
+      language: 'en-IN',
+      smart_format: true,
+      encoding: 'linear16',
+      sample_rate: 16000,
+    });
+  } catch (err) {
+    console.error("❌ Deepgram Initialization Error:", err.message);
+    if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'error', data: 'Failed to connect to AI Ears' }));
+    return ws.close();
+  }
 
   deepgramLive.on('Results', async (data) => {
     const transcript = data.channel.alternatives[0].transcript;
