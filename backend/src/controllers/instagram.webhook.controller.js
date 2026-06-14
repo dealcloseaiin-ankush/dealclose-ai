@@ -5,33 +5,38 @@ const Lead = require('../models/leadModel'); // Lead model import kiya gaya
 const Flow = require('../models/flowModel'); // 🚀 Flow model imported
 const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); // 🚀 Required for Public Comment Replies
-const googleSheetsController = require('./googleSheetsController');// 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
+const googleSheetsController = require('./googleSheetsController');
+
+// 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
 metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
-  if (!token) return;
-  return axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
-    recipient: { id: recipientId },
-    message: { text: text },
-    messaging_type: "RESPONSE"
-  }, { params: { access_token: token } });
+  if (!token) {
+    throw new Error("No Access Token found (Token is NULL)");
+  }
+  
+  console.log(`\n▶️ [MEGA DEBUG: ID TRACKER FOR SENDING]`);
+  console.log(`   👉 Attempting to send to Meta Recipient ID: ${recipientId}`);
+  
+  try {
+    const response = await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
+      recipient: { id: recipientId },
+      message: { text: text },
+      messaging_type: "RESPONSE"
+    }, { params: { access_token: token } });
+    
+    console.log(`   ✅ [META API SUCCESS] Meta accepted the message for ID ${recipientId}. Message ID: ${response.data?.message_id}`);
+    return response;
+  } catch (error) {
+    const metaErr = error.response?.data?.error;
+    console.error(`   ❌ [META API REJECTED] Failed to send to ID ${recipientId}.`);
+    console.error(`   ⚠️ Reason from Meta: Code: ${metaErr?.code}, Subcode: ${metaErr?.error_subcode}, Message: ${metaErr?.message || error.message}`);
+    throw error;
+  }
 };
 metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text) => {
   if (!token) return;
   return axios.post(`https://graph.facebook.com/v19.0/${commentId}/private_replies`, {
     message: text
   }, { params: { access_token: token } });
-};
-
-// 🚀 OVERRIDE FOR SAFETY: Fetch Real Instagram Profile (Name/Username)
-metaAdsService.getInstagramProfile = async (token, igsid) => {
-  if (!token) return null;
-  try {
-    // 🚀 FIX: Removed profile_pic to prevent Meta from blocking the request due to privacy settings
-    const res = await axios.get(`https://graph.facebook.com/v19.0/${igsid}?fields=name,username&access_token=${token}`);
-    return res.data;
-  } catch (e) {
-    console.error(`❌ IG Profile Fetch Error for ${igsid}:`, e.response?.data?.error?.message || e.message);
-    return null;
-  }
 };
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
@@ -95,11 +100,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               const senderId = isEcho ? event.recipient.id : event.sender.id;
               const incomingText = event.message.text.trim();
               
-              console.log(`\n📥 [MEGA DEBUG: INCOMING MESSAGE TRACER]`);
-              console.log(`   👉 Message arrived ON Business Page ID (igAccountId): ${igAccountId}`);
-              console.log(`   👉 Message sent FROM Customer ID (senderId): ${senderId}`);
-              console.log(`   👉 Is this an Owner Reply? (isEcho): ${isEcho}`);
-              console.log(`   👉 Message Text: "${incomingText}"`);
+              console.log(` [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
 
               // Find the exact User who owns this Instagram/Facebook Account
               let user = await User.findOne({ 
@@ -109,7 +110,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                   { "igConfig.pageId": igAccountId },
                   { "workspaces.igConfig.pageId": igAccountId }
                 ]
-              }); 
+              }).lean(); // 🚀 FIX: .lean() is REQUIRED to expose 'igConfig' which is not in the strict schema!
               
               if (!user) {
                  console.log(`⚠️ [IG Webhook] Exact IG Account match not found for ${igAccountId}. Using fallback owner...`);
@@ -119,17 +120,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                      { "igConfig.accessToken": { $exists: true, $ne: "" } },
                      { "workspaces.igConfig.accessToken": { $exists: true, $ne: "" } }
                    ]
-                 }).sort({ updatedAt: -1 });
+                 }).sort({ updatedAt: -1 }).lean(); // 🚀 FIX: Added .lean()
                  
                  if (!user) {
-                   user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 });
+                   user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 }).lean(); // 🚀 FIX: Added .lean()
                  }
               }
               if (!user) continue;
-
-              console.log(`\n🔍 [DEBUG: TOKEN EXTRACTION TRACER]`);
-              console.log(`   👉 Webhook Arrived for IG Account ID: ${igAccountId}`);
-              console.log(`   👉 Mapped to SaaS User: ${user.email}`);
 
               // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents TypeError on undefined)
               let igToken = null;
@@ -141,14 +138,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                  if (activeWorkspace && activeWorkspace.igConfig && activeWorkspace.igConfig.accessToken) {
                     igToken = activeWorkspace.igConfig.accessToken;
                     incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
-                    console.log(`   ✅ Token Source Used: Exact Branch/Workspace -> '${activeWorkspace.name}'`);
                  }
               }
               
               if (!igToken && user && user.igConfig && user.igConfig.accessToken) {
                  igToken = user.igConfig.accessToken;
                  incomingWorkspaceId = 'main';
-                 console.log(`   ✅ Token Source Used: Main Business Config`);
               }
 
               if (!igToken && user && user.workspaces) {
@@ -156,18 +151,16 @@ exports.handleInstagramWebhook = async (req, res) => {
                  if (fallbackWs) {
                     igToken = fallbackWs.igConfig.accessToken;
                     incomingWorkspaceId = fallbackWs._id ? fallbackWs._id.toString() : 'main';
-                    console.log(`   ⚠️ Token Source Used: FALLBACK Branch -> '${fallbackWs.name}' (Because exact match failed!)`);
                  }
               }
-              console.log(`   👉 Final Token Passed to Sender: ${igToken ? igToken.substring(0, 15) + '...' : 'NULL'}\n`);
 
               // 🌟 Fetch Real Instagram Profile (Name/Username)
               let realName = `IG User ${senderId.slice(-4)}`;
               if (igToken) {
                 try {
                   const profile = await metaAdsService.getInstagramProfile(igToken, senderId);
-                  if (profile) {
-                    realName = profile.username ? `@${profile.username}` : (profile.name || `IG User ${senderId.slice(-4)}`);
+                  if (profile && (profile.name || profile.username)) {
+                    realName = profile.name || profile.username;
                   }
                 } catch (e) {
                   console.log("⚠️ Could not fetch IG profile details for", senderId);
@@ -184,30 +177,6 @@ exports.handleInstagramWebhook = async (req, res) => {
                 // DMs/Comments: Premium keeps for 30 days. Free keeps for 1 day.
                 return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
               };
-              
-              // 🚀 SMART HELPER: Sends message and correctly records FAILED status if Meta blocks it
-              const sendFlowMessage = async (msgText, nextNodeId = null, flowId = null) => {
-                 let dStatus = 'sent';
-                 let dMsg = msgText;
-                 
-                 
-                 try {
-                   const metaResponse = await metaAdsService.sendInstagramDM(igToken, senderId, msgText);
-                   // Important: We only mark as 'sent' IF Meta doesn't throw an error.
-                   // If Meta returns 200 OK, the code reaches here.
-                   console.log(`✅ [Flow Engine] Message delivered to Meta. Message ID: ${metaResponse.data?.message_id}`);
-                 } catch(e) {
-                   dStatus = 'failed';
-                   const metaErrorMsg = e.response?.data?.error?.message || e.message;
-                   dMsg += `\n\n[⚠️ Meta Blocked: ${metaErrorMsg}]`;
-                   console.error(`❌ [Flow Engine] Failed to send message. Saving as FAILED in dashboard. Error: ${metaErrorMsg}`);
-                 }
-                 await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: dMsg, direction: 'outgoing', status: dStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
-                 
-                 if (nextNodeId && flowId) {
-                   await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flowId, nodeId: nextNodeId } } }, { strict: false });
-                 }
-              };
 
               // 🚀 TWO-STEP LINK TRACKING: Handle Quick Reply Button Clicks
               const quickReplyPayload = event.message.quick_reply ? event.message.quick_reply.payload : null;
@@ -217,6 +186,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 
                 if (matchedRule && matchedRule.fileUrl) {
                    const linkMsg = `Here is your requested link/file: ${matchedRule.fileUrl}\n\nLet me know if you need anything else!`;
+                   if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, linkMsg).catch(e => console.error(e));
                    
                    // Update Clicked Count (Intrested Leads!)
                    await User.updateOne(
@@ -224,7 +194,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                      { $inc: { "postAutomations.$.stats.clickedCount": 1 } }
                    );
                    
-                   await sendFlowMessage(linkMsg);
+                   await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: linkMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                    continue; // Stop further processing, job done!
                 }
               }
@@ -299,6 +269,23 @@ exports.handleInstagramWebhook = async (req, res) => {
                 return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
               };
 
+              const sendIGFlowMessage = async (text, nodeToPauseAt = null, flowIdToPauseAt = null) => {
+                  let deliveryStatus = 'sent';
+                  let displayMsg = text;
+                  try {
+                      if (!igToken) throw new Error("IG Token is missing or invalid");
+                      await metaAdsService.sendInstagramDM(igToken, senderId, text);
+                  } catch (e) {
+                      console.error("❌ [IG Flow DM Error]:", e.response?.data?.error?.message || e.message);
+                      deliveryStatus = 'failed';
+                      displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${e.response?.data?.error?.message || e.message}]`;
+                  }
+                  await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                  if (nodeToPauseAt && flowIdToPauseAt) {
+                      await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flowIdToPauseAt, nodeId: nodeToPauseAt } } }, { strict: false });
+                  }
+              };
+
               let flowQuery = { userId: user._id };
               // 🚀 FIX: Allow "Main" flows to work across all sub-workspaces as a fallback!
               if (incomingWorkspaceId !== 'main') {
@@ -319,14 +306,11 @@ exports.handleInstagramWebhook = async (req, res) => {
                      if (activeNode.type === 'askQuestion') {
                        if (activeNode.data.replyType === 'open') {
                          const qLower = (activeNode.data.question || '').toLowerCase();
-                         const existingNotes = currentLeadCheck.notes || "";
-                         const newNote = `Flow Answer (${activeNode.data.question}): ${incomingText}`;
-                         const updatePayload = { $set: { notes: existingNotes ? `${existingNotes}\n${newNote}` : newNote } };
+                         const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } };
                          
                          // 🔥 Convert to proper lead if they answer a business/collab related flow question
                          if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('business') || qLower.includes('name'))) {
-                            updatePayload.$set.status = 'new';
-                            updatePayload.$set.expiresAt = getExpiry('lead');
+                            updatePayload.$set = { status: 'new', expiresAt: getExpiry('lead') };
                          }
                          await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
                          chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
@@ -361,12 +345,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                         await sendFlowMessage(msgText);
+                         await sendIGFlowMessage(msgText);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         await sendFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
+                         await sendIGFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -375,7 +359,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           await sendFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
+                           await sendIGFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
                          }
                          currNodeId = null; 
                        } else { break; }
@@ -414,12 +398,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                         await sendFlowMessage(msgText);
+                         await sendIGFlowMessage(msgText);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         await sendFlowMessage(msgText, nextNode.id, flow._id.toString());
+                         await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString());
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -428,7 +412,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           await sendFlowMessage(msgText, nextNode.id, flow._id.toString());
+                           await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString());
                          }
                          currNodeId = null; 
                        } else { break; }
@@ -680,11 +664,6 @@ exports.handleInstagramWebhook = async (req, res) => {
                   if (responseMessage) {
                     let deliveryStatus = 'sent';
                     let displayMsg = responseMessage;
-                    
-                    console.log(`\n▶️ [MEGA DEBUG: TRACING ID BEFORE AI SEND]`);
-                    console.log(`   👉 Original Incoming Sender ID was: ${senderId}`);
-                    console.log(`   👉 Now passing to Meta as Recipient ID: ${senderId}`);
-                    
                     try {
                       if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, responseMessage);
                       console.log(`🤖 [Instagram DM Reply Sent Successfully]: ${responseMessage}`);
