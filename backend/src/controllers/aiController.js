@@ -2,6 +2,8 @@ const User = require('../models/userModel');
 const aiService = require('../services/aiService');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Flow = require('../models/flowModel');
+const Lead = require('../models/leadModel');
+const whatsappService = require('../services/whatsappService');
 
 // @desc    Get unanswered queries for AI training
 // @route   GET /api/ai/training-data
@@ -25,7 +27,9 @@ exports.getTrainingData = async (req, res) => {
       businessDescription: user?.businessDescription || '',
       fallbackAction: user?.fallbackAction || 'notify_owner',
       businessName: user?.businessName || 'Main Business',
-      workspaces: user?.workspaces || []
+      workspaces: user?.workspaces || [],
+      aiCredits: user?.aiCredits || 0,
+      aiObservations: user?.aiObservations || []
     });
   } catch (error) {
     console.error('AI Training Data Error:', error);
@@ -195,7 +199,12 @@ exports.handleDashboardAssistant = async (req, res) => {
     
     Use your tools to update rules, profile, or draft templates immediately when they agree. Talk like a friendly, intelligent human business partner.
     
-    CRITICAL RULE: Always reply in the EXACT same language the user is speaking. If the user types in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish. Do not reply in English if the user asks a question in Hindi.`;
+    CRITICAL RULES:
+    1. STRICT SCOPE: You are a B2B AI Assistant. You must STRICTLY REFUSE to answer any questions that are unrelated to DealClose AI, marketing automation, CRM, or the user's specific business. If asked about random topics, politely decline and steer the conversation back to business growth.
+    2. CRM ANALYTICS: If asked about leads or analytics, base your answers ONLY on the platform's summarized CRM metrics. Do not invent raw data.
+    3. MATCH LANGUAGE: Always reply in the EXACT same language the user is speaking. If the user types in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish. Do not reply in English if the user asks a question in Hindi.
+    4. BULK MESSAGING: If the user explicitly asks you to send a message to certain leads (e.g. "send this template to lost leads" or "sabko bhej do"), you MUST output EXACTLY this JSON format and NOTHING ELSE:
+    {"action": "send_bulk", "status": "lost", "message": "Your crafted message here"}`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext);
 
@@ -296,6 +305,32 @@ exports.handleDashboardAssistant = async (req, res) => {
       }
     } else {
       responseMessage = aiMessage.content;
+    }
+
+    // 🚀 NEW: CATCH BULK SEND JSON COMMAND
+    if (responseMessage && responseMessage.includes('"action":') && responseMessage.includes('"send_bulk"')) {
+        try {
+            const jsonMatch = responseMessage.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const bulkCmd = JSON.parse(jsonMatch[0]);
+                if (bulkCmd.action === 'send_bulk') {
+                    const leads = await Lead.find({ userId: userId, status: bulkCmd.status, phoneNumber: { $exists: true, $ne: "" } });
+                    let sentCount = 0;
+                    for (let l of leads) {
+                        let phone = l.phoneNumber.replace(/\D/g, '');
+                        if (phone.length === 10) phone = '91' + phone;
+                        if (!l.phoneNumber.startsWith('IG_') && user.whatsappConfig?.accessToken) {
+                            await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, phone, bulkCmd.message).catch(e => console.log(e.message));
+                            sentCount++;
+                        }
+                    }
+                    responseMessage = `✅ Done! Maine successfully **${sentCount} ${bulkCmd.status} leads** ko aapka message (retargeting) bhej diya hai! 🚀\n\n**Message Sent:**\n"${bulkCmd.message}"`;
+                    actionTaken = "bulk_sent";
+                }
+            }
+        } catch (e) {
+            console.log("Failed to parse bulk command", e.message);
+        }
     }
 
     res.status(200).json({ success: true, reply: responseMessage, actionTaken });

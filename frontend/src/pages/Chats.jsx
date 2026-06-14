@@ -3,6 +3,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { Search, Camera, MessageSquare, MessageCircle } from 'lucide-react';
+import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function Chats() {
   const [allMessages, setAllMessages] = useState([]);
@@ -503,6 +504,8 @@ export default function Chats() {
           </>
         )}
       </div>
+      
+      <DashboardAIAssistant />
     </main>
   );
 }

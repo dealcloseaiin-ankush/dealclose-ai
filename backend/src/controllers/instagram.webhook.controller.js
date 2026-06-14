@@ -227,10 +227,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                 { upsert: true, returnDocument: 'after' }
               );
               
-              // 🚀 NEW: Auto-Sync New IG Leads to Google Sheets
-              if (savedIgLead && savedIgLead.status === 'visitor' && savedIgLead.createdAt && (Date.now() - new Date(savedIgLead.createdAt).getTime() < 10000)) {
-                 googleSheetsController.appendLeadToSheet(user._id, savedIgLead).catch(e => console.log('Sheets sync error:', e.message));
-              }
+              //  REMOVED: Auto-Sync for 'visitor' stopped! 
+              // Ab Google Sheet mein data tabhi jayega jab AI successfully Name aur Number nikal lega.
 
               // 🚀 NEW: HANDLE OWNER REPLIES FROM INSTAGRAM APP
               if (isEcho) {
@@ -618,16 +616,15 @@ exports.handleInstagramWebhook = async (req, res) => {
                     Your goal is to handle incoming promotion requests politely. If they agree to pricing, use the 'extract_brand_deal' tool.`;
                   } else {
                     // AI Persona 2: Sales & Support Agent (For Regular Businesses)
-                    aiContext = `You are a highly skilled Sales and Support AI Assistant for ${activeWorkspace ? activeWorkspace.name : (user.businessName || 'this business')}. 
+                    aiContext = `You are a highly skilled Sales AI Assistant for ${activeWorkspace ? activeWorkspace.name : (user.businessName || 'this business')}. 
                     Business Details/Catalog: ${businessInfo}.
                     Rules: ${ownerRules}.
                     
-                    IMPORTANT:
-                    1. Your main goal is to assist customers, answer product/service questions, and close sales politely.
-                    2. If a user wants to buy something (or types "1"), ask for their specific requirements.
-                    3. Use the 'extract_lead_requirements' tool to save their details and budget into the CRM once they show clear purchase intent.
-                    4. If they have a support issue (or type "2"), try to resolve it based on the Business Details provided.
-                    Be warm, helpful, and concise in your responses.`;
+                    IMPORTANT RULES:
+                    1. Do NOT treat the user as a lead immediately. Greet them politely and ALWAYS ask for their Name, City, and WhatsApp Number.
+                    2. Answer their basic questions based on the Business Details, but gently steer the conversation to collect their contact details.
+                    3. ONLY use the 'extract_lead_requirements' tool AFTER the user has provided their Name and Mobile Number.
+                    4. Our goal is to capture their phone number so we can move the conversation to WhatsApp.`;
                   }
 
                   const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
@@ -643,7 +640,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                           { phoneNumber: `IG_${senderId}` }, 
                           { 
                             userId: user._id, 
-                            name: dealData.brandName || "New Brand Deal", 
+                            name: dealData.name || dealData.brandName || realName || "New Lead", 
                             source: 'Instagram DM (Promotion)', 
                             status: 'interested', 
                         notes: `Deliverables: ${dealData.itemName || dealData.deliverables} | Offered Budget: ${dealData.budget} | Notes: ${dealData.notes || 'N/A'}`,

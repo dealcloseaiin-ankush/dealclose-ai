@@ -3,6 +3,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
+import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function InstagramAutomation() {
   const { user } = useAuth() || {};
@@ -13,6 +14,7 @@ export default function InstagramAutomation() {
 
   const [stats, setStats] = useState({
     totalCommentsAnalyzed: 0,
+    totalDMsReceived: 0,
     leadsExtracted: 0,
     dmsSent: 0,
     whatsappConversationsStarted: 0,
@@ -152,25 +154,25 @@ export default function InstagramAutomation() {
       {/* 1. Analytics Section (The "Value" Prover) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
         <div className="bg-[#111111] border border-gray-800 p-5 rounded-2xl shadow-lg">
-          <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide">Comments Analyzed</p>
-          <p className="text-3xl font-bold text-white mt-2">{stats.totalCommentsAnalyzed}</p>
+          <p className="text-gray-500 text-sm font-semibold uppercase tracking-wide">Total DMs Received</p>
+          <p className="text-3xl font-bold text-white mt-2">{stats.totalDMsReceived}</p>
         </div>
         <div className="bg-[#111111] border border-pink-500/30 p-5 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 right-0 w-16 h-16 bg-pink-500/10 rounded-bl-full"></div>
-          <p className="text-pink-400 text-sm font-semibold uppercase tracking-wide">Hidden Leads Found</p>
+          <p className="text-pink-400 text-sm font-semibold uppercase tracking-wide">Leads Generated</p>
           <p className="text-3xl font-bold text-white mt-2">{stats.leadsExtracted}</p>
           <div className="flex justify-between items-end mt-1">
-            <p className="text-xs text-gray-400">Numbers extracted</p>
+            <p className="text-xs text-gray-400">Moved to CRM pipeline</p>
             <Link to="/crm" className="text-xs font-bold text-pink-400 hover:text-pink-300 transition-colors relative z-10">View in CRM ↗</Link>
           </div>
         </div>
         <div className="bg-[#111111] border border-green-500/30 p-5 rounded-2xl shadow-lg">
-          <p className="text-green-400 text-sm font-semibold uppercase tracking-wide">WA Chats Started</p>
-          <p className="text-3xl font-bold text-white mt-2">{stats.whatsappConversationsStarted}</p>
-          <p className="text-xs text-gray-400 mt-1">Users moved from IG to WA</p>
+          <p className="text-green-400 text-sm font-semibold uppercase tracking-wide">Bot/AI Replies Sent</p>
+          <p className="text-3xl font-bold text-white mt-2">{stats.dmsSent}</p>
+          <p className="text-xs text-gray-400 mt-1">Automated DMs delivered</p>
         </div>
         <div className="bg-gradient-to-br from-pink-600 to-purple-700 p-5 rounded-2xl shadow-lg text-white">
-          <p className="text-white/80 text-sm font-semibold uppercase tracking-wide">IG to WA Conversion</p>
+          <p className="text-white/80 text-sm font-semibold uppercase tracking-wide">Lead Conversion Rate</p>
           <p className="text-4xl font-extrabold mt-1">{stats.conversionRate}</p>
         </div>
       </div>
@@ -442,6 +444,8 @@ export default function InstagramAutomation() {
           </div>
         </div>
       )}
+
+      <DashboardAIAssistant />
     </div>
   );
 }

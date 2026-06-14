@@ -9,6 +9,7 @@ export default function AIAgent() {
   const [selectedBrain, setSelectedBrain] = useState('main');
   const [mainRules, setMainRules] = useState('');
   const [mainBusinessName, setMainBusinessName] = useState('Main Business');
+  const [aiCredits, setAiCredits] = useState(0);
 
   // 🚀 NEW: Trending queries state for 1-Click Auto Flow
   const [trendingQueries, setTrendingQueries] = useState([
@@ -24,6 +25,7 @@ export default function AIAgent() {
         setWorkspaces(data.workspaces || []);
         setMainRules(data.aiRules || '');
         setMainBusinessName(data.businessName || 'Main Business');
+        setAiCredits(data.aiCredits || 0);
         
         // Page load hone par purana saved knowledge box me dikhana
         if (data.aiRules) {
@@ -97,9 +99,14 @@ export default function AIAgent() {
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
       <div className="mb-8 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 mb-2">
-            AI Master Agent
-          </h1>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">
+              AI Master Agent
+            </h1>
+            <span className="bg-purple-600/20 text-purple-400 border border-purple-500/30 px-4 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-purple-500/20">
+              ⚡ AI Credits Left: {aiCredits}
+            </span>
+          </div>
           <p className="text-gray-400">View smart insights and train your AI to handle complex customer queries.</p>
         </div>
       </div>

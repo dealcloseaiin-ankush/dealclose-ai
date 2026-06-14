@@ -25,10 +25,11 @@ exports.getDashboardData = async (req, res) => {
       success: true,
       stats: {
         totalCommentsAnalyzed: totalComments,
+        totalDMsReceived: totalDMsReceived,
         leadsExtracted: leadsExtracted,
         dmsSent: dmsSent,
         whatsappConversationsStarted: 0, // Tracked later if IG to WA redirection happens
-        conversionRate: leadsExtracted > 0 && dmsSent > 0 ? ((leadsExtracted / dmsSent) * 100).toFixed(1) + '%' : '0%'
+        conversionRate: totalDMsReceived > 0 ? ((leadsExtracted / totalDMsReceived) * 100).toFixed(1) + '%' : '0%'
       },
       config: {
         aiSmartReply: user?.aiAgentEnabled !== false,

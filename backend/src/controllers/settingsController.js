@@ -14,14 +14,14 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
         const isInfluencer = /influencer|creator|collab|youtube|instagram|vlog|artist|model/i.test(businessDescription || '');
         const isRealEstate = /property|real estate|flat|plot|realtor/i.test(businessDescription || '');
 
-        let flowName = "Lead Generation Auto";
+        let flowName = "Business Lead Capture";
         let flowData = {
             nodes: [
-              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog, order' }, position: { x: 400, y: 50 } },
-              { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our store'}! 🏢 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
-              { id: '3', type: 'menu', data: { message: 'Thanks {{name}}! What would you like to do today?', opt1: 'View Catalog 📦', opt2: 'Track My Order 🚚', opt3: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
-              { id: '4', type: 'message', data: { message: 'Great! Here is our latest catalog: [Your Catalog Link Here]. Let us know your requirements!' }, position: { x: 100, y: 500 } },
-              { id: '5', type: 'message', data: { message: 'Please reply with your Order ID to get the latest tracking status.' }, position: { x: 400, y: 500 } },
+              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, info, catalog, order, support' }, position: { x: 400, y: 50 } },
+              { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our business'}! 👋 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
+              { id: '3', type: 'menu', data: { message: 'Thanks {{name}}! What would you like to do today?', opt1: 'Explore Services/Products 📦', opt2: 'Customer Support 🎧', opt3: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
+              { id: '4', type: 'message', data: { message: 'Great! Here is our catalog/details: [Your Link Here]. Let us know what you need!' }, position: { x: 100, y: 500 } },
+              { id: '5', type: 'message', data: { message: 'Please drop your query here, and our support team will review it shortly.' }, position: { x: 400, y: 500 } },
               { id: '6', type: 'message', data: { message: 'Our sales expert has been notified and will contact you shortly!' }, position: { x: 700, y: 500 } }
             ],
             edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'opt_0' }, { id: 'e3-5', source: '3', target: '5', sourceHandle: 'opt_1' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'opt_2' } ]

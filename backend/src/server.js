@@ -29,13 +29,29 @@ const port = process.env.PORT || 5000;
 
 const server = http.createServer(app);
 
-// 🚀 NEW: Setup WebSocket Server for Twilio Fast AI Calling
-const wss = new WebSocket.Server({ server, path: '/api/webhooks/twilio/stream' });
+// 🚀 MULTI-WEBSOCKET SETUP: Twilio Calling & Mobile/Web App Calling
+const wssTwilio = new WebSocket.Server({ noServer: true });
+const wssMobile = new WebSocket.Server({ noServer: true });
 
-wss.on('connection', (ws) => {
-  console.log('🔗 [WebSocket] New Twilio Stream Connection established');
-  const twilioStreamHandler = require('./websockets/twilioStreamHandler');
-  twilioStreamHandler(ws);
+wssTwilio.on('connection', (ws) => {
+  console.log('🔗 [WebSocket] Twilio Stream Connection established');
+  require('./websockets/twilioStreamHandler')(ws);
+});
+
+wssMobile.on('connection', (ws) => {
+  console.log('📱 [WebSocket] Mobile/Web Stream Connection established');
+  require('./websockets/mobileStreamHandler')(ws);
+});
+
+server.on('upgrade', (request, socket, head) => {
+  const pathname = request.url;
+  if (pathname === '/api/webhooks/twilio/stream') {
+    wssTwilio.handleUpgrade(request, socket, head, (ws) => wssTwilio.emit('connection', ws, request));
+  } else if (pathname === '/api/webhooks/mobile/stream') {
+    wssMobile.handleUpgrade(request, socket, head, (ws) => wssMobile.emit('connection', ws, request));
+  } else {
+    socket.destroy();
+  }
 });
 
 // Pehle server start kar dete hain taaki Render "No open ports" ka error na de

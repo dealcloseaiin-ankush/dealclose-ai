@@ -28,7 +28,6 @@ import StaffManagement from './pages/StaffManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import Forms from './pages/Forms';
 import InstagramAutomation from './pages/InstagramAutomation';
-import InstagramAutomations from './pages/InstagramAutomations';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import AboutUs from './pages/AboutUs';
@@ -147,7 +146,6 @@ export default function App() {
             <Route path="staff" element={<StaffManagement />} />
             <Route path="forms" element={<Forms />} />
             <Route path="instagram-automation" element={<InstagramAutomation />} />
-            <Route path="post-automation" element={<InstagramAutomations />} />
             <Route path="whatsapp-rules" element={<WhatsAppRules />} />
             <Route path="scaniq" element={<ScanIQ />} />
           </Route>
