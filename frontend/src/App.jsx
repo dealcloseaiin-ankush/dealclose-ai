@@ -120,8 +120,8 @@ const PWAInstallPopup = () => {
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       console.log('📱 App Installed Successfully!');
-      // API call karke backend me count badha sakte hain
-      api.post('/tracking/event', { event: 'app_installed', pageUrl: window.location.href }).catch(() => {});
+      // Future Update: API call karke backend me count badha sakte hain jab backend route ready ho
+      // api.post('/tracking/event', { event: 'app_installed', pageUrl: window.location.href }).catch(() => {});
     }
     setDeferredPrompt(null);
     setShowPopup(false);
