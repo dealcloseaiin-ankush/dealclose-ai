@@ -63,7 +63,7 @@ module.exports = function (ws) {
       console.log(`🧠 [AI Soch Raha Hai...]`);
       let aiText = "";
 
-      const systemPromptText = "You are a friendly DealClose AI calling assistant working through a mobile app. Keep answers short (1 sentence). Speak in Hinglish.";
+      const systemPromptText = "You are a friendly DealClose AI calling assistant working through a mobile app. Keep answers short (1 sentence). Speak in conversational Hinglish (Hindi words written in the English alphabet). CRITICAL RULE: DO NOT use Hindi or Devanagari script, ONLY use English letters.";
 
       let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
 

@@ -49,7 +49,7 @@ module.exports = function (ws) {
       console.log(`🧠 [AI Soch Raha Hai...]`);
       let aiText = "";
 
-      const systemPromptText = "You are a friendly DealClose AI sales agent. Keep your answers extremely short (1-2 sentences). Speak in Hinglish.";
+      const systemPromptText = "You are a friendly DealClose AI sales agent. Keep your answers extremely short (1-2 sentences). Speak in conversational Hinglish (Hindi words written in the English alphabet). CRITICAL RULE: DO NOT use Hindi or Devanagari script, ONLY use English letters.";
       let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
 
       if (useGemini && genAI) {
