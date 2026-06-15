@@ -30,6 +30,8 @@ const authRoutes = require('./routes/authRoutes');
 const scraperRoutes = require('./routes/scraperRoutes');
 const trackerRoutes = require('./routes/trackerRoutes');
 const instagramRoutes = require('./routes/instagramRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const inboundWebhookRoutes = require('./routes/inboundWebhookRoutes');
 
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
@@ -80,6 +82,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/tracker', trackerRoutes);
 app.use('/api/instagram', instagramRoutes);
+app.use('/api/admin', adminRoutes); // Super Admin Routes
+app.use('/api/webhooks/inbound', inboundWebhookRoutes); // Developer API
 
 // 👇 YAHAN PAR HAI AAPKA IMAGE UPLOAD ROUTE 👇
 app.use('/api/upload', uploadRoutes);

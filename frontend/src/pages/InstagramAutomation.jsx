@@ -35,6 +35,17 @@ export default function InstagramAutomation() {
   const [sendingBulkId, setSendingBulkId] = useState(null);
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [iceBreakers, setIceBreakers] = useState('');
+  
+  // 🚀 NEW: Post Automation Form State
+  const [newAuto, setNewAuto] = useState({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩' });
+  const handleAddPostAuto = async (e) => {
+    e.preventDefault();
+    try {
+       await api.put('/users/profile', { postAutomations: [...(user?.postAutomations || []), newAuto] });
+       toast.success("Post Automation Rule Added!");
+       setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩' });
+    } catch { toast.error("Failed to add rule."); }
+  };
 
   useEffect(() => {
     const fetchIgData = async () => {
@@ -191,6 +202,7 @@ export default function InstagramAutomation() {
       </div>
 
       {activeTab === 'general' && (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* 2. Automation Settings */}
@@ -295,6 +307,24 @@ export default function InstagramAutomation() {
             </div>
           </div>
         </div>
+        
+        {/* 🚀 NEW: Send Link in DM & Public Comment Reply Builder */}
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-lg p-6 mt-8">
+          <h2 className="text-xl font-bold text-white mb-2">🎁 Auto-DM Link Delivery (Lead Magnet)</h2>
+          <p className="text-gray-400 text-sm mb-6">When users comment a specific keyword on your post, publicly reply to their comment and secretly DM them the link!</p>
+          
+          <form onSubmit={handleAddPostAuto} className="bg-[#1a1a1a] p-5 rounded-xl border border-gray-800 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className="block text-xs font-bold text-gray-400 mb-1">Post/Reel ID (Optional)</label><input type="text" value={newAuto.postId} onChange={e=>setNewAuto({...newAuto, postId: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="Leave empty for all posts" /></div>
+              <div><label className="block text-xs font-bold text-gray-400 mb-1">Trigger Keyword <span className="text-rose-500">*</span></label><input type="text" required value={newAuto.triggerWord} onChange={e=>setNewAuto({...newAuto, triggerWord: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="e.g. LINK" /></div>
+            </div>
+            <div><label className="block text-xs font-bold text-gray-400 mb-1">Public Comment Reply <span className="text-rose-500">*</span></label><input type="text" required value={newAuto.publicReply} onChange={e=>setNewAuto({...newAuto, publicReply: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="Hey! I've sent you a DM 📩" /></div>
+            <div><label className="block text-xs font-bold text-gray-400 mb-1">DM Message <span className="text-rose-500">*</span></label><textarea required value={newAuto.replyMessage} onChange={e=>setNewAuto({...newAuto, replyMessage: e.target.value})} rows="2" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="Here is the link you asked for!"></textarea></div>
+            <div><label className="block text-xs font-bold text-gray-400 mb-1">File / Website Link <span className="text-rose-500">*</span></label><input type="url" required value={newAuto.fileUrl} onChange={e=>setNewAuto({...newAuto, fileUrl: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="https://..." /></div>
+            <button type="submit" className="bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg w-full md:w-auto">Add Automation Rule</button>
+          </form>
+        </div>
+        </>
       )}
       
       {activeTab === 'posts' && (

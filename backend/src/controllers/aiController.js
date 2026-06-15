@@ -194,7 +194,8 @@ exports.handleDashboardAssistant = async (req, res) => {
     2. If their credits are 50 or below, kindly inform them.
     3. Ask them to define their personal AI Rules (e.g., "Do you want me to offer discounts?", "Should I talk in English or Hindi?").
     3. Ask for a fallback plan: "If a customer asks a question I don't know the answer to, should I notify your personal WhatsApp number, or just say 'Please wait for our team'?"
-    4. Suggest features actively: Tell them they should set up a Star Rating/Instagram Follow template to grow their business.
+    4. Suggest features actively: Tell them they should set up a Star Rating template to grow their business, OR set up an AI Voice IVR Campaign!
+    5. IVR CAMPAIGN GENERATOR: If the user asks to create an IVR or Voice campaign (e.g. "Create a campaign saying Press 1 for AI"), ask them what the AI should speak. Once they tell you, you MUST output EXACTLY this JSON format and NOTHING ELSE: {"action": "create_ivr", "campaignName": "Custom Name", "ttsText": "The text to speak", "menuOptions": {"1": {"action": "connect_to_ai"}}}
     5. Observe their business needs and log any knowledge gaps you notice.
     
     Use your tools to update rules, profile, or draft templates immediately when they agree. Talk like a friendly, intelligent human business partner.
@@ -331,6 +332,35 @@ exports.handleDashboardAssistant = async (req, res) => {
         } catch (e) {
             console.log("Failed to parse bulk command", e.message);
         }
+    }
+
+    // 🚀 NEW: CATCH IVR CAMPAIGN JSON COMMAND & GENERATE VOICE
+    if (responseMessage && responseMessage.includes('"action":') && responseMessage.includes('"create_ivr"')) {
+        try {
+            const jsonMatch = responseMessage.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const ivrCmd = JSON.parse(jsonMatch[0]);
+                if (ivrCmd.action === 'create_ivr') {
+                    const cloudinary = require('cloudinary').v2;
+                    console.log(`🔊 Generating TTS for IVR via Deepgram...`);
+                    const ttsResponse = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=mp3', {
+                      method: 'POST',
+                      headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ text: ivrCmd.ttsText })
+                    });
+                    const arrayBuffer = await ttsResponse.arrayBuffer();
+                    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+                    
+                    const uploadRes = await cloudinary.uploader.upload(`data:audio/mp3;base64,${base64Audio}`, { resource_type: 'video', folder: 'dealclose_assets' });
+                    
+                    const IvrCampaign = require('../models/ivrCampaignModel');
+                    await IvrCampaign.create({ userId, name: ivrCmd.campaignName, audioUrl: uploadRes.secure_url, menuOptions: ivrCmd.menuOptions, isActive: true });
+                    
+                    responseMessage = `🎙️ Success! I generated the voice using AI, saved it permanently, and created your IVR Campaign "${ivrCmd.campaignName}". It's ready to handle calls at Zero extra TTS cost! 🚀`;
+                    actionTaken = "ivr_created";
+                }
+            }
+        } catch (e) { console.log("Failed to parse IVR command", e.message); }
     }
 
     res.status(200).json({ success: true, reply: responseMessage, actionTaken });

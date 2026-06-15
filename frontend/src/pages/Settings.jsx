@@ -40,6 +40,7 @@ export default function Settings() {
     fbPageId: ''
   });
   
+  const [devApiKey, setDevApiKey] = useState('');
   const [igConnected, setIgConnected] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [userId, setUserId] = useState('demo-business'); // Used for QR code link
@@ -144,6 +145,7 @@ export default function Settings() {
           fbPageId: savedData.igConfig?.pageId || ''
         });
         if (savedData._id) setUserId(savedData._id);
+        if (savedData._id) setDevApiKey(savedData._id);
         setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
       }
@@ -641,6 +643,19 @@ export default function Settings() {
                     <button type="button" onClick={handlePasswordSubmit} disabled={isChangingPass || !passData.oldPassword} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-lg">
                       {isChangingPass ? 'Updating...' : 'Update Password'}
                     </button>
+                  </div>
+                </div>
+
+                {/* 🚀 NEW: Developer API & Pabbly/Zapier Integration */}
+                <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-blue-500/30 relative overflow-hidden mt-8">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                  <h2 className="text-xl font-semibold text-blue-400 flex items-center gap-2 relative z-10"><Database size={20}/> Developer API & Webhooks (Zapier/Pabbly)</h2>
+                  <p className="text-sm text-gray-400 mb-6 relative z-10">Connect JustDial, IndiaMart, Facebook Lead Ads, or any CRM. Send a POST request to this Webhook URL, and DealClose AI will auto-capture the lead and trigger a WhatsApp message.</p>
+                  
+                  <div className="bg-[#0a0a0a] border border-gray-700 p-4 rounded-xl relative z-10">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Your Webhook URL (POST)</label>
+                    <code className="text-sm text-blue-300 break-all select-all">{window.location.origin}/api/webhooks/inbound/{devApiKey}</code>
+                    <p className="text-xs text-gray-500 mt-4 font-mono">Payload Format: <br/>{`{ "name": "John Doe", "phone": "919876543210", "source": "IndiaMart", "customMessage": "Hi John, we got your inquiry!" }`}</p>
                   </div>
                 </div>
 

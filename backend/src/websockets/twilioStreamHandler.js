@@ -5,6 +5,9 @@ const Order = require('../models/orderModel');
 const Lead = require('../models/leadModel');
 const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 
+// 🚀 GLOBAL CACHE: Twilio calls (mulaw) ke liye alag cache
+let cachedTwilioFallbackAudio = null;
+
 module.exports = function (ws) {
   let streamSid = null;
   let callSid = null; 
@@ -125,6 +128,26 @@ module.exports = function (ws) {
 
     } catch (error) {
       console.error("❌ AI/TTS Error:", error.message);
+      // 🚀 NEW: FALLBACK AUDIO IF AI SERVER IS DOWN
+      try {
+        if (cachedTwilioFallbackAudio) {
+          console.log(`🔊 [Fallback TTS] Using CACHED audio for Twilio (Zero Cost)...`);
+          sendAudioToTwilio(cachedTwilioFallbackAudio);
+        } else {
+          const fallbackText = "I am sorry, our systems are currently very busy. Please try calling again in a few minutes.";
+          console.log(`🔊 [Fallback TTS] Generating busy message via Deepgram...`);
+          const fallbackTts = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=mulaw&sample_rate=8000', {
+            method: 'POST',
+            headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: fallbackText })
+          });
+          if (fallbackTts.ok) {
+            const arrayBuffer = await fallbackTts.arrayBuffer();
+            cachedTwilioFallbackAudio = Buffer.from(arrayBuffer).toString('base64');
+            sendAudioToTwilio(cachedTwilioFallbackAudio);
+          }
+        }
+      } catch (fallbackErr) {}
     }
   }
 

@@ -39,6 +39,8 @@ import AIVideoLanding from './pages/AIVideoLanding';
 import ScanIQ from './pages/ScanIQ';
 import AIVideoDashboard from './pages/AIVideoDashboard';
 import WhatsAppRules from './pages/WhatsAppRules';
+import SuperAdmin from './pages/SuperAdmin';
+import SolutionRecommender from './pages/SolutionRecommender';
 import { useAuth } from './hooks/useAuth';
 
 // Placeholder component for Change Password until we build the real one
@@ -93,10 +95,67 @@ const GlobalNotification = () => {
   return null;
 };
 
+// 🚀 SMART PWA APP INSTALL POPUP
+const PWAInstallPopup = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showPopup, setShowPopup] = useState(false);
+
+  useEffect(() => {
+    const isDismissed = localStorage.getItem('dealclose_app_dismissed');
+    if (isDismissed) return;
+
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowPopup(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('📱 App Installed Successfully!');
+      // API call karke backend me count badha sakte hain
+      api.post('/tracking/event', { event: 'app_installed', pageUrl: window.location.href }).catch(() => {});
+    }
+    setDeferredPrompt(null);
+    setShowPopup(false);
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem('dealclose_app_dismissed', 'true');
+    setShowPopup(false);
+  };
+
+  if (!showPopup) return null;
+
+  return (
+    <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-96 bg-[#111] border border-gray-700 p-5 rounded-3xl shadow-2xl z-[100] flex flex-col gap-4 animate-fade-in-up">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">📱</div>
+        <div className="flex-1">
+          <h4 className="text-white font-bold text-md">Install DealClose AI</h4>
+          <p className="text-gray-400 text-xs mt-0.5">Get faster access & notifications</p>
+        </div>
+        <button onClick={handleDismiss} className="text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 w-8 h-8 rounded-full flex items-center justify-center transition-colors">✕</button>
+      </div>
+      <button onClick={handleInstall} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-500/30 text-sm">
+        Install App Now
+      </button>
+    </div>
+  );
+};
+
 export default function App() {
   return (
     <Router>
       <GlobalNotification />
+      <PWAInstallPopup />
       <Routes>
         <Route path="/" element={<RootRoute><LandingPage /></RootRoute>} />
         <Route path="/home" element={<LandingPage />} /> {/* Extra route for logged in users to view landing page */}
@@ -121,6 +180,7 @@ export default function App() {
         
         {/* Onboarding Page (Replaces Setup) */}
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/discover" element={<SolutionRecommender />} />
         <Route path="/setup" element={<Onboarding />} /> {/* Supabase ke purane redirects handle karne ke liye */}
         
         {/* Dashboard Layout Routes */}
@@ -148,6 +208,7 @@ export default function App() {
             <Route path="instagram-automation" element={<InstagramAutomation />} />
             <Route path="whatsapp-rules" element={<WhatsAppRules />} />
             <Route path="scaniq" element={<ScanIQ />} />
+            <Route path="super-admin" element={<SuperAdmin />} />
           </Route>
         </Route>
       </Routes>

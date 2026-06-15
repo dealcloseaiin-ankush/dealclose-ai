@@ -9,10 +9,10 @@ cloudinary.config({
 
 exports.uploadImage = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ success: false, message: "No image file provided." });
+    if (!req.file) return res.status(400).json({ success: false, message: "No media file provided." });
 
-    // Upload file to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, { folder: 'dealclose_templates' });
+    // 🚀 FIX: resource_type 'auto' allows Images, Videos, AND Audio (MP3 for IVR)
+    const result = await cloudinary.uploader.upload(req.file.path, { folder: 'dealclose_assets', resource_type: 'auto' });
 
     // Delete the temporary file from server memory
     fs.unlinkSync(req.file.path);

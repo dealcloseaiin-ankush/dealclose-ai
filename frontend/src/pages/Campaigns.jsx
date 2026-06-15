@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight } from 'lucide-react';
+import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight, Mic, Play, PhoneCall } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 
@@ -29,6 +29,16 @@ export default function Campaigns() {
   const [interests, setInterests] = useState('');
   const [campaignMode, setCampaignMode] = useState('automatic'); // 'automatic' or 'manual'
   const [retargetType, setRetargetType] = useState('none'); // 'none', 'pixel', or 'csv'
+
+  // 🚀 Voice Campaign States
+  const [ivrTab, setIvrTab] = useState('meta'); // 'meta' or 'ivr'
+  const [ivrName, setIvrName] = useState('');
+  const [ivrText, setIvrText] = useState('');
+  const [isIvrGenerating, setIsIvrGenerating] = useState(false);
+  
+  const [ivrCampaigns, setIvrCampaigns] = useState([]);
+  const [testPhone, setTestPhone] = useState('');
+  const [testingId, setTestingId] = useState(null);
 
   const handleGenerateAd = async (e) => {
     e.preventDefault();
@@ -62,6 +72,69 @@ export default function Campaigns() {
       alert('Something went wrong connecting to the AI.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Fetch Voice Campaigns
+  const fetchIvrCampaigns = async () => {
+    try {
+      const res = await api.get('/campaigns/ivr');
+      if (res.data.success) setIvrCampaigns(res.data.campaigns);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => {
+    if (ivrTab === 'ivr') fetchIvrCampaigns();
+  }, [ivrTab]);
+
+  // 🚀 Generate Voice Campaign
+  const handleGenerateIvr = async (e) => {
+    e.preventDefault();
+    if (!ivrText) return;
+    setIsIvrGenerating(true);
+    try {
+      const commandMsg = `{"action": "create_ivr", "campaignName": "${ivrName || 'My Voice Campaign'}", "ttsText": "${ivrText.replace(/"/g, "'")}", "menuOptions": {"1": {"action": "connect_to_ai"}}}`;
+      const res = await api.post('/ai/dashboard-assistant', { message: commandMsg });
+      if (res.data.actionTaken === 'ivr_created') {
+        alert("🎉 Success! Your AI Voice Campaign is ready and saved permanently at Zero Cost.");
+        setIvrName('');
+        setIvrText('');
+        fetchIvrCampaigns(); // Refresh the list
+      } else {
+        alert("Error: " + res.data.reply);
+      }
+    } catch { alert('Failed to generate Voice Campaign.'); }
+    finally { setIsIvrGenerating(false); }
+  };
+
+  // 🚀 Test IVR Call
+  const handleTestCall = async (campaignId) => {
+    if (!testPhone || testPhone.length < 10) {
+      return alert("Please enter a valid phone number to receive the test call.");
+    }
+    setTestingId(campaignId);
+    try {
+      let formattedPhone = testPhone;
+      if (!formattedPhone.startsWith('+')) formattedPhone = '+91' + formattedPhone; // Assuming India default
+      
+      const res = await api.post(`/campaigns/ivr/${campaignId}/test`, { testNumber: formattedPhone });
+      if (res.data.success) alert("📞 " + res.data.message);
+      else alert(res.data.message);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to initiate test call. Check your Twilio settings.');
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  // 🚀 Bulk Auto-Dialer
+  const handleBulkDial = async (campaignId) => {
+    if (!window.confirm("Start Bulk Auto-Dialer? AI will call up to 50 new/unconverted leads. Leads called 3 times won't be called again (Loop Prevention).")) return;
+    try {
+      const res = await api.post(`/campaigns/ivr/${campaignId}/bulk-dial`);
+      alert("🚀 " + res.data.message);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to start bulk dialer.');
     }
   };
 
@@ -118,6 +191,13 @@ export default function Campaigns() {
         </div>
       </div>
 
+      {/* Campaign Tabs */}
+      <div className="flex space-x-4 mb-6 border-b border-gray-800 pb-px">
+        <button onClick={() => setIvrTab('meta')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${ivrTab === 'meta' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>Meta Ad Campaigns</button>
+        <button onClick={() => setIvrTab('ivr')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${ivrTab === 'ivr' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-500 hover:text-gray-300'}`}>AI Voice Campaigns (IVR)</button>
+      </div>
+
+      {ivrTab === 'meta' && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* AI Ad Creator */}
         <div className="bg-[#111] border border-blue-500/20 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
@@ -296,6 +376,79 @@ export default function Campaigns() {
           </div>
         </div>
       </div>
+      )}
+
+      {ivrTab === 'ivr' && (
+        <div className="flex flex-col gap-8 max-w-4xl mx-auto">
+        <div className="bg-[#111] border border-green-500/20 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden max-w-4xl mx-auto">
+          <div className="absolute top-0 left-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="relative z-10">
+            <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><Mic className="text-green-400"/> AI Voice Campaign Builder</h2>
+            <p className="text-gray-400 text-sm mb-8">Don't have a recorded MP3? Just type your script. Our AI will instantly convert it to a natural human voice, save it permanently to the cloud, and deploy your IVR campaign at ZERO ongoing text-to-speech costs.</p>
+            
+            <form onSubmit={handleGenerateIvr} className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Campaign Name</label>
+                <input type="text" value={ivrName} onChange={e => setIvrName(e.target.value)} required placeholder="e.g. Diwali Offer Outreach" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-green-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">AI Voice Script (Text to Speech)</label>
+                <textarea value={ivrText} onChange={e => setIvrText(e.target.value)} required rows="4" placeholder="Hello! We have a special offer for you. Press 1 to speak with our AI agent..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-green-500 outline-none resize-none"></textarea>
+                <p className="text-xs text-gray-500 mt-2">💡 Tip: Use simple English for the best American accent pronunciation.</p>
+              </div>
+
+              <div className="bg-[#0a0a0a] p-4 rounded-xl border border-gray-800">
+                <p className="text-sm font-bold text-gray-300 mb-2">Routing Rules Automatically Applied:</p>
+                <p className="text-xs text-gray-500"><span className="bg-gray-800 text-white px-2 py-1 rounded font-mono mr-2">Press 1</span> ➔ Connects to your Smart AI Agent</p>
+              </div>
+
+              <button type="submit" disabled={isIvrGenerating} className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 flex justify-center items-center gap-2 disabled:opacity-50">
+                {isIvrGenerating ? 'Generating Studio-Quality Voice...' : <><Play size={18}/> Generate Voice & Deploy Campaign</>}
+              </button>
+            </form>
+          </div>
+        </div>
+        
+        {/* Active Campaigns List & Testing UI */}
+        {ivrCampaigns.length > 0 && (
+          <div className="bg-[#111] border border-gray-800 rounded-3xl p-6 md:p-8 shadow-2xl">
+            <h2 className="text-xl font-bold text-white mb-6">Your Voice Campaigns</h2>
+            <div className="space-y-4">
+              {ivrCampaigns.map(camp => (
+                <div key={camp._id} className="bg-[#0a0a0a] border border-gray-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-center gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-green-400">{camp.name}</h3>
+                    <p className="text-sm text-gray-500 mt-1">Status: {camp.isActive ? '🟢 Active' : '🔴 Inactive'} • Created: {new Date(camp.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                    <input 
+                      type="text" 
+                      placeholder="Enter Mobile No." 
+                      value={testPhone} 
+                      onChange={e => setTestPhone(e.target.value)} 
+                      className="bg-[#111] border border-gray-700 rounded-xl px-4 py-2 text-sm text-white focus:border-green-500 outline-none w-full md:w-40" 
+                    />
+                    <button 
+                      onClick={() => handleTestCall(camp._id)} 
+                      disabled={testingId === camp._id}
+                      className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50"
+                    >
+                      {testingId === camp._id ? 'Calling...' : <><PhoneCall size={16} /> Test Call</>}
+                    </button>
+                    <button 
+                      onClick={() => handleBulkDial(camp._id)} 
+                      className="px-6 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      🚀 Bulk Auto-Dial
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        </div>
+      )}
     </div>
   );
 }

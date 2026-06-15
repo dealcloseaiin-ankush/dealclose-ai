@@ -803,22 +803,28 @@ exports.handleInstagramWebhook = async (req, res) => {
              }
 
              console.log(`💬 [Instagram] Sending DM to ${username}: ${finalReplyMsg}`);
+             let dmSentSuccessfully = false;
              try {
                if (igToken) await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, finalReplyMsg);
                console.log(`✅ [Instagram] Private DM sent for comment!`);
+               dmSentSuccessfully = true;
              } catch (replyErr) {
                console.error("❌ [Instagram Private Reply Error]:", replyErr.response?.data || replyErr.message);
              }
 
-             // 🚀 NEW: PUBLIC COMMENT REPLY (If keyword matches, tell them to check DM publicly)
-             try {
-               await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
-                   message: `Hey @${username}, we've sent you a DM with the details! 📩`,
-                   access_token: igToken
-               });
-               console.log(`✅ [Instagram] Public Reply sent to comment telling them to check DM!`);
-             } catch (publicErr) {
-               console.error("❌ [Instagram Public Reply Error]:", publicErr.response?.data?.error?.message || publicErr.message);
+             if (dmSentSuccessfully) {
+               // 🚀 NEW: PUBLIC COMMENT REPLY (If keyword matches, tell them to check DM publicly)
+               try {
+                 await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
+                     message: matchedRule.publicReply || `Hey @${username}, we've sent you a DM with the details! 📩`,
+                     access_token: igToken
+                 });
+                 console.log(`✅ [Instagram] Public Reply sent to comment telling them to check DM!`);
+               } catch (publicErr) {
+                 console.error("❌ [Instagram Public Reply Error]:", publicErr.response?.data?.error?.message || publicErr.message);
+               }
+             } else {
+                 console.log(`⚠️ [Instagram] Skipping public reply because private DM failed.`);
              }
              
              // CRM me kachra nahi bharenge! Sirf Inbox (Chats) me save karenge

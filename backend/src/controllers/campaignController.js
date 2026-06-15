@@ -1,5 +1,8 @@
 const Campaign = require('../models/campaignModel');
 const aiService = require('../services/aiService');
+const IvrCampaign = require('../models/ivrCampaignModel');
+const User = require('../models/userModel');
+const Lead = require('../models/leadModel');
 
 // @desc    Generate AI Ad Strategy & Save Campaign
 // @route   POST /api/campaigns/generate
@@ -55,6 +58,85 @@ exports.generateCampaign = async (req, res) => {
     console.error('Campaign Generation Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+// @desc    Get All IVR Voice Campaigns
+// @route   GET /api/campaigns/ivr
+exports.getIvrCampaigns = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const campaigns = await IvrCampaign.find({ userId }).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, campaigns });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Trigger Test Call for IVR Campaign
+// @route   POST /api/campaigns/ivr/:id/test
+exports.testIvrCampaign = async (req, res) => {
+  try {
+    const { testNumber } = req.body;
+    const campaignId = req.params.id;
+    const userId = req.user?._id || req.user?.id;
+    
+    const user = await User.findById(userId);
+    const campaign = await IvrCampaign.findOne({ _id: campaignId, userId });
+    
+    if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+    if (!testNumber) return res.status(400).json({ success: false, message: 'Test phone number is required' });
+    
+    // Initiate Twilio Call
+    if (user && user.twilioConfig && user.twilioConfig.accountSid && user.twilioConfig.authToken && user.twilioConfig.phoneNumber) {
+      const twilio = require('twilio')(user.twilioConfig.accountSid, user.twilioConfig.authToken);
+      
+      const host = req.headers.host || (process.env.BASE_URL ? process.env.BASE_URL.replace(/^https?:\/\//, '') : '');
+      const webhookUrl = `https://${host}/api/webhooks/twilio/ivr?campaignId=${campaign._id}`;
+      
+      await twilio.calls.create({ url: webhookUrl, to: testNumber, from: user.twilioConfig.phoneNumber });
+      
+      return res.status(200).json({ success: true, message: 'Test call initiated successfully! Your phone is ringing.' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Twilio config missing. Please set up Twilio in settings first.' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Bulk Auto-Dialer for IVR Campaign with Loop Prevention
+// @route   POST /api/campaigns/ivr/:id/bulk-dial
+exports.bulkDialIvr = async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    const userId = req.user?._id || req.user?.id;
+    
+    const user = await User.findById(userId);
+    const campaign = await IvrCampaign.findOne({ _id: campaignId, userId });
+    
+    if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+    if (!user || !user.twilioConfig || !user.twilioConfig.accountSid) return res.status(400).json({ success: false, message: 'Twilio config missing.' });
+
+    // 🚀 LOOP PREVENTION: Fetch only leads not converted, and called less than 3 times
+    const leads = await Lead.find({ userId, status: { $nin: ['converted', 'won', 'ignored'] }, $or: [{ callCount: { $lt: 3 } }, { callCount: { $exists: false } }] }).limit(50);
+    
+    if (leads.length === 0) return res.status(400).json({ success: false, message: 'No eligible leads found for calling (Max 3 retries reached or already converted).' });
+
+    const twilio = require('twilio')(user.twilioConfig.accountSid, user.twilioConfig.authToken);
+    const host = req.headers.host || (process.env.BASE_URL ? process.env.BASE_URL.replace(/^https?:\/\//, '') : '');
+    const webhookUrl = `https://${host}/api/webhooks/twilio/ivr?campaignId=${campaign._id}`;
+
+    let dialed = 0;
+    for (const lead of leads) {
+      if (lead.phoneNumber) {
+         let formatted = lead.phoneNumber.startsWith('+') ? lead.phoneNumber : '+' + (lead.phoneNumber.length === 10 ? '91' + lead.phoneNumber : lead.phoneNumber);
+         await twilio.calls.create({ url: webhookUrl, to: formatted, from: user.twilioConfig.phoneNumber }).catch(() => {});
+         await Lead.findByIdAndUpdate(lead._id, { $inc: { callCount: 1 }, lastCalledAt: new Date() }, { strict: false });
+         dialed++;
+      }
+    }
+    res.status(200).json({ success: true, message: `Successfully queued ${dialed} calls. Loop prevention active (Max 3 calls per lead).` });
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
 // @desc    Get All User Campaigns

@@ -3,6 +3,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
 const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 
+// 🚀 GLOBAL CACHE: Taki Fallback Audio ka kharcha baar baar na aaye
+let cachedMobileFallbackAudio = null;
+
 module.exports = function (ws) {
   let callSid = 'MOBILE_' + Date.now(); 
   let rawTranscript = []; 
@@ -125,6 +128,33 @@ module.exports = function (ws) {
       }
     } catch (error) {
       console.error("❌ AI/TTS Error:", error.message);
+      // 🚀 NEW: FALLBACK AUDIO IF AI SERVER IS DOWN
+      try {
+        if (cachedMobileFallbackAudio) {
+          console.log(`🔊 [Fallback TTS] Using CACHED busy message (Zero Cost)...`);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'audio', data: cachedMobileFallbackAudio }));
+            setTimeout(() => { if (ws.readyState === WebSocket.OPEN) ws.close(); }, 5000);
+          }
+        } else {
+          const fallbackText = "I am sorry, our systems are currently very busy. Please try calling again in a few minutes.";
+          console.log(`🔊 [Fallback TTS] Generating busy message via Deepgram...`);
+          const fallbackTts = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=linear16&sample_rate=16000', {
+            method: 'POST',
+            headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: fallbackText })
+          });
+          if (fallbackTts.ok && ws.readyState === WebSocket.OPEN) {
+            const arrayBuffer = await fallbackTts.arrayBuffer();
+            cachedMobileFallbackAudio = Buffer.from(arrayBuffer).toString('base64');
+            ws.send(JSON.stringify({ event: 'audio', data: cachedMobileFallbackAudio }));
+          // Call automatically close kar do 5 seconds baad taaki aawaz poori sunayi de
+          setTimeout(() => { if (ws.readyState === WebSocket.OPEN) ws.close(); }, 5000);
+          }
+        }
+      } catch (fallbackErr) {
+        console.error("❌ Fallback TTS Error:", fallbackErr.message);
+      }
     }
   }
 
@@ -168,11 +198,15 @@ module.exports = function (ws) {
     // Save Call Transcript to DB
     if (rawTranscript.length > 0) {
       try {
+        // 🚀 FIX: Map 'AI' to 'Agent' and add missing 'to' field to satisfy MongoDB Schema
+        const formattedTranscript = rawTranscript.map(t => ({ ...t, speaker: t.speaker === 'AI' ? 'Agent' : t.speaker }));
         await Call.create({ 
             sid: callSid, 
+            to: 'Mobile App',
+            from: 'Customer',
             status: 'completed', 
             provider: 'android_app',
-            transcript: rawTranscript,
+            transcript: formattedTranscript,
             summary: 'Call handled via Mobile App' 
         });
         console.log("💾 [DB] Mobile Call Transcript saved successfully.");
