@@ -1,4 +1,4 @@
-const deepgramSdk = require('@deepgram/sdk');
+const { createClient } = require('@deepgram/sdk');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
@@ -14,17 +14,8 @@ module.exports = function (ws) {
   let conversationHistory = [];
   
   // 1. Initialize API Clients (STT/TTS via Deepgram, Brain via Gemini/OpenAI)
-  let deepgram;
   const apiKey = process.env.DEEPGRAM_API_KEY || 'dummy';
-  if (typeof deepgramSdk.createClient === 'function') {
-    deepgram = deepgramSdk.createClient(apiKey);
-  } else if (typeof deepgramSdk.Deepgram === 'function') {
-    deepgram = new deepgramSdk.Deepgram(apiKey);
-  } else if (typeof deepgramSdk.DeepgramClient === 'function') {
-    deepgram = new deepgramSdk.DeepgramClient(apiKey);
-  } else {
-    deepgram = new deepgramSdk.DefaultDeepgramClient(apiKey);
-  }
+  const deepgram = createClient(apiKey);
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 

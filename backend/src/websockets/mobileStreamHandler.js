@@ -1,4 +1,4 @@
-const deepgramSdk = require('@deepgram/sdk');
+const { createClient } = require('@deepgram/sdk');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
@@ -20,16 +20,7 @@ module.exports = function (ws) {
     return ws.close();
   }
 
-  let deepgram;
-  if (typeof deepgramSdk.createClient === 'function') {
-    deepgram = deepgramSdk.createClient(process.env.DEEPGRAM_API_KEY);
-  } else if (typeof deepgramSdk.Deepgram === 'function') {
-    deepgram = new deepgramSdk.Deepgram(process.env.DEEPGRAM_API_KEY);
-  } else if (typeof deepgramSdk.DeepgramClient === 'function') {
-    deepgram = new deepgramSdk.DeepgramClient(process.env.DEEPGRAM_API_KEY);
-  } else {
-    deepgram = new deepgramSdk.DefaultDeepgramClient(process.env.DEEPGRAM_API_KEY);
-  }
+  const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
