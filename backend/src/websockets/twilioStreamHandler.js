@@ -15,11 +15,15 @@ module.exports = function (ws) {
   
   // 1. Initialize API Clients (STT/TTS via Deepgram, Brain via Gemini/OpenAI)
   let deepgram;
+  const apiKey = process.env.DEEPGRAM_API_KEY || 'dummy';
   if (typeof deepgramSdk.createClient === 'function') {
-    deepgram = deepgramSdk.createClient(process.env.DEEPGRAM_API_KEY || 'dummy');
+    deepgram = deepgramSdk.createClient(apiKey);
+  } else if (typeof deepgramSdk.Deepgram === 'function') {
+    deepgram = new deepgramSdk.Deepgram(apiKey);
+  } else if (typeof deepgramSdk.DeepgramClient === 'function') {
+    deepgram = new deepgramSdk.DeepgramClient(apiKey);
   } else {
-    console.error("📦 [Deepgram Error] Available Exports:", Object.keys(deepgramSdk));
-    throw new Error("createClient is missing! Render is using an old cached node_modules. Please use 'Clear build cache & deploy' on Render.");
+    deepgram = new deepgramSdk.DefaultDeepgramClient(apiKey);
   }
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;

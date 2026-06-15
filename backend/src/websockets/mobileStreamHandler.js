@@ -23,9 +23,12 @@ module.exports = function (ws) {
   let deepgram;
   if (typeof deepgramSdk.createClient === 'function') {
     deepgram = deepgramSdk.createClient(process.env.DEEPGRAM_API_KEY);
+  } else if (typeof deepgramSdk.Deepgram === 'function') {
+    deepgram = new deepgramSdk.Deepgram(process.env.DEEPGRAM_API_KEY);
+  } else if (typeof deepgramSdk.DeepgramClient === 'function') {
+    deepgram = new deepgramSdk.DeepgramClient(process.env.DEEPGRAM_API_KEY);
   } else {
-    console.error("📦 [Deepgram Error] Available Exports:", Object.keys(deepgramSdk));
-    throw new Error("createClient is missing! Render is using an old cached node_modules. Please use 'Clear build cache & deploy' on Render.");
+    deepgram = new deepgramSdk.DefaultDeepgramClient(process.env.DEEPGRAM_API_KEY);
   }
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
