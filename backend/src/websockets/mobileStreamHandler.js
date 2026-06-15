@@ -1,4 +1,4 @@
-const { createClient } = require('@deepgram/sdk');
+const deepgramSdk = require('@deepgram/sdk');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
@@ -20,7 +20,13 @@ module.exports = function (ws) {
     return ws.close();
   }
 
-  const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
+  let deepgram;
+  if (typeof deepgramSdk.createClient === 'function') {
+    deepgram = deepgramSdk.createClient(process.env.DEEPGRAM_API_KEY);
+  } else {
+    console.error("📦 [Deepgram Error] Available Exports:", Object.keys(deepgramSdk));
+    throw new Error("createClient is missing! Render is using an old cached node_modules. Please use 'Clear build cache & deploy' on Render.");
+  }
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
