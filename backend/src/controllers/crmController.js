@@ -104,7 +104,7 @@ exports.getPipeline = async (req, res) => {
     // Group contacts by their current stage
     leads.forEach(lead => {
       // Exclude IG users/fans who haven't shown business intent yet
-      if (lead.status === 'visitor' || lead.status === 'unqualified') return;
+      if (lead.status === 'visitor' || lead.status === 'unqualified' || lead.status === 'deleted') return;
 
       const norm = normalizeData(lead.name, lead.city);
       lead.name = norm.name;
@@ -130,6 +130,7 @@ exports.getPipeline = async (req, res) => {
       let stage = (contact.crmStage || 'new').toLowerCase();
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
+      if (stage === 'deleted') return;
 
       const norm = normalizeData(contact.name, contact.city);
       const platform = determinePlatform(contact.phone || contact.phoneNumber, contact.source);
@@ -261,34 +262,32 @@ exports.deleteContact = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const { id } = req.params;
 
-    console.log(`\n🗑️ [CRM DEBUG DELETE] Attempting to delete Contact/Lead with ID: ${id} for User: ${userId}`);
+    console.log(`\n🗑️ [CRM DEBUG DELETE] Attempting to PERMANENTLY delete Contact/Lead with ID: ${id} for User: ${userId}`);
     
-    // Try to delete from both collections since CRM shows mixed data
-    let leadResult = null;
-    let contactResult = null;
+    // 🚀 FIX: PERMANENT HARD DELETE + CLEAN MESSAGES
+    // Jisse database ekdum clean rahega aur auto-sync inko dobara nahi layega.
+    let record = null;
     try {
-      leadResult = await Lead.findOneAndDelete({ _id: id, userId });
-      if (!leadResult) contactResult = await Contact.findOneAndDelete({ _id: id, userId });
+      record = await Lead.findOneAndDelete({ _id: id, userId });
+      if (!record) record = await Contact.findOneAndDelete({ _id: id, userId });
     } catch (e) {
-      // Fallback if ID is a phone number or IG string (Mongoose CastError)
-      console.log(`⚠️ [CRM DEBUG DELETE] Mongoose CastError. ID is likely a Phone/IG Number. Falling back to Phone search...`);
-      leadResult = await Lead.findOneAndDelete({ phoneNumber: id, userId });
-      if (!leadResult) contactResult = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
+      record = await Lead.findOneAndDelete({ phoneNumber: id, userId });
+      if (!record) record = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
     }
     
-    if (!leadResult && !contactResult) {
+    if (!record) {
       console.log(`❌ [CRM DEBUG DELETE] Failed: No record found for ID/Phone: ${id}. It may already be deleted.`);
       return res.status(404).json({ success: false, message: 'Record not found or already deleted' });
     }
 
-    console.log(`🗑️ [CRM DEBUG DELETE] Success: Record deleted from Database.`);
-    
-    // 🚀 FIX: Delete associated messages so Auto-Sync doesn't resurrect them like Zombies!
-    const phoneToClear = leadResult ? (leadResult.phoneNumber || leadResult.phone) : (contactResult?.phone || contactResult?.phoneNumber);
-    if (phoneToClear) {
-      const msgDeleteResult = await Message.deleteMany({ customerPhone: phoneToClear, userId });
-      console.log(`🧹 [CRM DEBUG DELETE] Cleared ${msgDeleteResult.deletedCount} old messages for phone: ${phoneToClear} to prevent Auto-Sync zombie resurrection.`);
+    // Wipe message history to guarantee a clean DB
+    const phoneToClean = record.phoneNumber || record.phone;
+    if (phoneToClean) {
+      await Message.deleteMany({ customerPhone: phoneToClean, userId });
+      console.log(`🧹 [CRM DEBUG DELETE] Wiped all chat history for ${phoneToClean} to keep Database CLEAN.`);
     }
+
+    console.log(`🗑️ [CRM DEBUG DELETE] Success: Record and history PERMANENTLY deleted.`);
     
     res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {

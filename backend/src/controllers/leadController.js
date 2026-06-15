@@ -103,52 +103,45 @@ exports.deleteLead = async (req, res) => {
     const { id } = req.params;
     let deletedRecord = null;
 
-    console.log(`\n🗑️ [DEBUG DELETE] Attempting to delete Lead/Contact with ID: ${id} for User: ${userId}`);
+    console.log(`\n🗑️ [DEBUG DELETE] Attempting to PERMANENTLY Delete Lead with ID: ${id} for User: ${userId}`);
 
-    // 1. Check and Delete from New Lead model
+    // 🚀 FIX: HARD DELETE
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
         deletedRecord = await Lead.findOneAndDelete({ _id: id, userId });
-        if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Lead Model via ObjectId`);
       }
     } catch (e) {
       console.log(`⚠️ [DEBUG DELETE] Error querying Lead by ObjectId:`, e.message);
     }
 
-    // 2. Check and Delete from Old Contact model (Manual Data)
     if (!deletedRecord) {
       try {
         if (mongoose.Types.ObjectId.isValid(id)) {
           deletedRecord = await Contact.findOneAndDelete({ _id: id, userId });
-          if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Contact Model via ObjectId`);
         }
       } catch (e) {
         console.log(`⚠️ [DEBUG DELETE] Error querying Contact by ObjectId:`, e.message);
       }
     }
 
-    // 3. Fallback to phone number deletion (just in case)
     if (!deletedRecord) {
       deletedRecord = await Lead.findOneAndDelete({ phoneNumber: id, userId });
-      if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Lead Model via Phone Number`);
     }
     if (!deletedRecord) {
       deletedRecord = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
-      if (deletedRecord) console.log(`🗑️ [DEBUG DELETE] Success: Found and deleted from Contact Model via Phone Number`);
     }
     
     if (!deletedRecord) {
       console.log(`❌ [DEBUG DELETE] Failed: No record found for ID/Phone: ${id}`);
       return res.status(404).json({ message: 'Lead or Contact not found' });
     }
-
-    // 🚀 FIX: Delete associated messages so Auto-Sync doesn't resurrect them like Zombies!
-    const phoneToClear = deletedRecord.phoneNumber || deletedRecord.phone;
-    if (phoneToClear) {
-      const msgDeleteResult = await Message.deleteMany({ customerPhone: phoneToClear, userId });
-      console.log(`🧹 [DEBUG DELETE] Cleared ${msgDeleteResult.deletedCount} old messages for phone: ${phoneToClear} to prevent Auto-Sync zombie resurrection.`);
-    }
     
+    const phoneToClean = deletedRecord.phoneNumber || deletedRecord.phone;
+    if (phoneToClean) {
+      await Message.deleteMany({ customerPhone: phoneToClean, userId });
+      console.log(`🧹 [DEBUG DELETE] Wiped all messages for ${phoneToClean} to keep Database CLEAN.`);
+    }
+
     res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
     console.error(`🚨 [DEBUG DELETE] Critical Error:`, error);
@@ -242,35 +235,10 @@ exports.getLeadAnalytics = async (req, res) => {
     console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}, workspace: ${workspaceId}`);
     const userIdObj = new mongoose.Types.ObjectId(userId);
 
-    // 🚀 NEW: AUTO-SYNC OLD CHATS BEFORE FETCHING ANALYTICS (Ensures Dashboard is always accurate)
-    try {
-      const distinctPhones = await Message.distinct('customerPhone', { userId: userIdObj });
-      for (const phone of distinctPhones) {
-        if (!phone) continue;
-        try {
-          const leadExists = await Lead.findOne({ phoneNumber: phone, userId });
-          const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
-          
-          if (!leadExists && !contactExists) {
-            const leadCount = await Lead.countDocuments({ userId });
-            const seqId = String(leadCount + 1).padStart(4, '0');
-            await Lead.create({
-              userId,
-              createdBy: userId,
-              phoneNumber: phone,
-              name: `User #${seqId}`,
-              source: 'WhatsApp (Old Chat)',
-              status: 'new'
-            });
-          }
-        } catch (innerErr) { }
-      }
-    } catch (syncErr) { }
-
-    // 🔥 DYNAMIC WORKSPACE FILTER LOGIC
-    // 🚀 FIX: 'visitor' aur 'unqualified' ko Analytics ki counting se hamesha bahar rakhein
-    const leadQuery = { userId, status: { $nin: ['visitor', 'unqualified'] } };
-    const aggLeadQuery = { userId: userIdObj, status: { $nin: ['visitor', 'unqualified'] } };
+    //  DYNAMIC WORKSPACE FILTER LOGIC
+    // 🚀 FIX: Ignore visitor, unqualified, AND 'deleted' statuses
+    const leadQuery = { userId, status: { $nin: ['visitor', 'unqualified', 'deleted'] } };
+    const aggLeadQuery = { userId: userIdObj, status: { $nin: ['visitor', 'unqualified', 'deleted'] } };
     
     if (workspaceId && workspaceId !== 'main_business' && workspaceId !== 'main' && workspaceId !== 'all') {
       leadQuery.lastSelectedWorkspaceId = workspaceId;

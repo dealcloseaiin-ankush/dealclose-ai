@@ -9,6 +9,11 @@ module.exports = function (ws) {
   let conversationHistory = [];
   
   // 1. Initialize APIs
+  console.log(`\n================== [AI CALLING DEBUG] ==================`);
+  console.log(`🔑 DEEPGRAM_API_KEY Check:`, process.env.DEEPGRAM_API_KEY ? `LOADED (Length: ${process.env.DEEPGRAM_API_KEY.length})` : `MISSING!`);
+  console.log(`🔑 OPENAI_API_KEY Check:`, process.env.OPENAI_API_KEY ? `LOADED` : `MISSING!`);
+  console.log(`========================================================\n`);
+
   if (!process.env.DEEPGRAM_API_KEY) {
     console.error("❌ DEEPGRAM_API_KEY is missing in Env! Closing WebSocket.");
     if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'error', data: 'DEEPGRAM_API_KEY missing on server' }));
@@ -16,7 +21,7 @@ module.exports = function (ws) {
   }
 
   const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
+  const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
   console.log(`📱 [Mobile Stream] New connection from Android App! Call ID: ${callSid}`);
@@ -31,6 +36,7 @@ module.exports = function (ws) {
       encoding: 'linear16',
       sample_rate: 16000,
     });
+    console.log(`✅ [Deepgram STT] Live connection initiated successfully.`);
   } catch (err) {
     console.error("❌ Deepgram Initialization Error:", err.message);
     if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'error', data: 'Failed to connect to AI Ears' }));
@@ -47,25 +53,47 @@ module.exports = function (ws) {
       await processAIResponse();
     }
   });
+  
+  deepgramLive.on('Error', (err) => {
+    console.error(`❌ [Deepgram STT Error]:`, err);
+  });
 
   async function processAIResponse() {
     try {
       console.log(`🧠 [AI Soch Raha Hai...]`);
       let aiText = "";
 
-      const systemPrompt = { 
-        role: "system", 
-        content: "You are a DealClose AI calling assistant working through a mobile app. Keep answers short (1 sentence). Speak in Hinglish." 
-      };
+      const systemPromptText = "You are a friendly DealClose AI calling assistant working through a mobile app. Keep answers short (1 sentence). Speak in Hinglish.";
 
-      const chatCompletion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [systemPrompt, ...conversationHistory],
-      });
+      let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
 
-      const responseMessage = chatCompletion.choices[0].message;
-      conversationHistory.push(responseMessage);
-      aiText = responseMessage.content;
+      // 1. Try Gemini First
+      if (useGemini && genAI) {
+         console.log(`🧠 [AI] Using Gemini 2.5 Flash...`);
+         try {
+             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+             let promptStr = systemPromptText + "\n\nConversation History:\n";
+             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
+             promptStr += "AI:";
+             
+             const result = await model.generateContent(promptStr);
+             aiText = result.response.text();
+         } catch (geminiErr) {
+             console.error(`⚠️ [AI] Gemini Error: ${geminiErr.message}. Falling back to OpenAI...`);
+             useGemini = false; 
+         }
+      }
+
+      // 2. Fallback to OpenAI
+      if (!useGemini) {
+          if (!openai) throw new Error("OpenAI API Key is missing and Gemini failed.");
+          console.log(`🧠 [AI] Using OpenAI GPT-4o-mini...`);
+          const chatCompletion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "system", content: systemPromptText }, ...conversationHistory] });
+          aiText = chatCompletion.choices[0].message.content;
+      }
+
+      aiText = aiText.replace(/\*/g, '').trim();
+      conversationHistory.push({ role: "assistant", content: aiText });
 
       console.log(`🤖 [AI Agent]: ${aiText}`);
       rawTranscript.push({ speaker: 'AI', text: aiText, time: new Date() });
@@ -76,6 +104,8 @@ module.exports = function (ws) {
         { text: aiText },
         { model: 'aura-asteria-en', encoding: 'linear16', sample_rate: 16000, container: 'none' } 
       );
+      
+      console.log(`✅ [TTS] Audio stream received from Deepgram.`);
 
       const stream = await ttsResponse.getStream();
       const reader = stream.getReader();

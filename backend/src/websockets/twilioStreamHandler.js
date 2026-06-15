@@ -15,7 +15,7 @@ module.exports = function (ws) {
   
   // 1. Initialize API Clients (STT/TTS via Deepgram, Brain via Gemini/OpenAI)
   const deepgram = createClient(process.env.DEEPGRAM_API_KEY || 'dummy');
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
+  const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
   // 2. Setup Deepgram Live Transcription (Kaano ke liye - STT)
@@ -48,66 +48,56 @@ module.exports = function (ws) {
       console.log(`🧠 [AI Soch Raha Hai...]`);
       let aiText = "";
 
-      // 🚀 SYSTEM PROMPT (AI ki Personality aur Tools ki jaankari)
-      const systemPrompt = { 
-        role: "system", 
-        content: "You are a friendly DealClose AI sales agent. Keep your answers extremely short (1-2 sentences). Speak in Hinglish. You can take orders and save notes using tools." 
-      };
+      const systemPromptText = "You are a friendly DealClose AI sales agent. Keep your answers extremely short (1-2 sentences). Speak in Hinglish.";
+      let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
 
-      // OpenAI API Call with Tools (Order Taking & Notes)
-      const chatCompletion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // Aap Gemini Flash me bhi similar logic laga sakte hain
-        messages: [systemPrompt, ...conversationHistory],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "create_sales_order",
-              description: "Use this to punch an order when the customer confirms they want to buy something.",
-              parameters: {
-                type: "object",
-                properties: { itemName: { type: "string" }, quantity: { type: "number" }, deliveryCity: { type: "string" } },
-                required: ["itemName", "quantity"]
-              }
-            }
-          },
-          {
-            type: "function",
-            function: {
-              name: "add_call_notes",
-              description: "Use this to save important CRM notes about the lead's budget, intent, or questions.",
-              parameters: {
-                type: "object",
-                properties: { noteSummary: { type: "string" } },
-                required: ["noteSummary"]
-              }
-            }
-          }
-        ]
-      });
-
-      const responseMessage = chatCompletion.choices[0].message;
-      conversationHistory.push(responseMessage); // Save AI's response to history
-
-      // 🚀 TOOL EXECUTION LOGIC (Agar AI ne order lene ka socha)
-      if (responseMessage.tool_calls) {
-        for (const toolCall of responseMessage.tool_calls) {
-          const args = JSON.parse(toolCall.function.arguments);
-          
-          if (toolCall.function.name === "create_sales_order") {
-            console.log(`🛍️ [AI SALES TOOL] Taking Order: ${args.quantity}x ${args.itemName}`);
-            // Real DB Logic: await Order.create({ ... })
-            aiText = `Done! Maine aapka ${args.quantity} ${args.itemName} ka order punch kar diya hai. Kuch aur help karu?`;
-          } 
-          else if (toolCall.function.name === "add_call_notes") {
-            console.log(`📝 [AI CRM TOOL] Saving Note: ${args.noteSummary}`);
-            // Real DB Logic: await Lead.findOneAndUpdate(...)
-            aiText = "Maine aapki requirement note kar li hai. Hamari team aapse jaldi connect karegi.";
-          }
-        }
-      } else {
-        aiText = responseMessage.content;
+      if (useGemini && genAI) {
+         console.log(`🧠 [AI] Using Gemini 2.5 Flash...`);
+         try {
+             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+             let promptStr = systemPromptText + "\n\nConversation History:\n";
+             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
+             promptStr += "AI:";
+             
+             const result = await model.generateContent(promptStr);
+             aiText = result.response.text();
+         } catch (geminiErr) {
+             console.error(`⚠️ [AI] Gemini Error: ${geminiErr.message}. Falling back to OpenAI...`);
+             useGemini = false; 
+         }
       }
+
+      if (!useGemini) {
+          if (!openai) throw new Error("OpenAI API Key is missing and Gemini failed.");
+          console.log(`🧠 [AI] Using OpenAI GPT-4o-mini...`);
+          const chatCompletion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "system", content: systemPromptText }, ...conversationHistory],
+            tools: [
+              { type: "function", function: { name: "create_sales_order", description: "Punch an order.", parameters: { type: "object", properties: { itemName: { type: "string" }, quantity: { type: "number" }, deliveryCity: { type: "string" } }, required: ["itemName", "quantity"] } } },
+              { type: "function", function: { name: "add_call_notes", description: "Save notes.", parameters: { type: "object", properties: { noteSummary: { type: "string" } }, required: ["noteSummary"] } } }
+            ]
+          });
+          
+          const responseMessage = chatCompletion.choices[0].message;
+          if (responseMessage.tool_calls) {
+            for (const toolCall of responseMessage.tool_calls) {
+              const args = JSON.parse(toolCall.function.arguments);
+              if (toolCall.function.name === "create_sales_order") {
+                console.log(`🛍️ [AI SALES TOOL] Taking Order: ${args.quantity}x ${args.itemName}`);
+                aiText = `Done! Maine aapka ${args.quantity} ${args.itemName} ka order punch kar diya hai. Kuch aur help karu?`;
+              } else if (toolCall.function.name === "add_call_notes") {
+                console.log(`📝 [AI CRM TOOL] Saving Note: ${args.noteSummary}`);
+                aiText = "Maine aapki requirement note kar li hai. Hamari team aapse jaldi connect karegi.";
+              }
+            }
+          } else {
+            aiText = responseMessage.content;
+          }
+      }
+
+      aiText = aiText.replace(/\*/g, '').trim();
+      conversationHistory.push({ role: "assistant", content: aiText });
 
       console.log(`🤖 [AI Agent]: ${aiText}`);
       
@@ -179,15 +169,16 @@ module.exports = function (ws) {
         if (conversationHistory.length > 0) {
            console.log("🧠 [Post-Call Analysis] Generating AI Summary...");
            const summaryPrompt = "Analyze this call transcript and provide a short summary (2-3 lines). Identify the customer's intent, whether an order was placed, or if a follow-up is needed. Format: \nIntent: ... \nOutcome: ...";
+           const transcriptText = JSON.stringify(rawTranscript.map(t => `${t.speaker}: ${t.text}`));
            
-           const summaryResponse = await openai.chat.completions.create({
-             model: "gpt-4o-mini",
-             messages: [
-               { role: "system", content: summaryPrompt },
-               { role: "user", content: JSON.stringify(rawTranscript.map(t => `${t.speaker}: ${t.text}`)) }
-             ]
-           });
-           callSummary = summaryResponse.choices[0].message.content;
+           if (genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy') {
+               const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+               const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+               callSummary = result.response.text();
+           } else if (openai) {
+               const summaryResponse = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "system", content: summaryPrompt }, { role: "user", content: transcriptText }] });
+               callSummary = summaryResponse.choices[0].message.content;
+           }
            console.log(`✅ [Post-Call Analysis] Summary:\n${callSummary}`);
         }
         await Call.findOneAndUpdate({ sid: callSid }, { $set: { transcript: rawTranscript, summary: callSummary } });

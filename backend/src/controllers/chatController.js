@@ -45,13 +45,17 @@ exports.getChats = async (req, res) => {
 
     leads.forEach(lead => {
       const norm = normalizeData(lead.name, lead.city);
-      leadDataMap[lead.phoneNumber] = {
-        name: norm.name,
-        city: norm.city,
-        workspaceId: lead.lastSelectedWorkspaceId || 'main',
-        isAiPaused: lead.isAiPaused || false,
-        aiPausedUntil: lead.aiPausedUntil || null
-      };
+      // 🚀 FIX: Exact mapping for both regular phones and IG IDs to show real names
+      const identifier = String(lead.phoneNumber || lead.phone || '').trim();
+      if (identifier) {
+        leadDataMap[identifier] = {
+          name: norm.name,
+          city: norm.city,
+          workspaceId: lead.lastSelectedWorkspaceId || 'main',
+          isAiPaused: lead.isAiPaused || false,
+          aiPausedUntil: lead.aiPausedUntil || null
+        };
+      }
     });
 
     let enrichedMessages = messages.map(msg => {
@@ -67,7 +71,7 @@ exports.getChats = async (req, res) => {
       return {
         ...msg,
         platform, // Added Platform Tag for Frontend Filters
-        customerName: leadDataMap[msg.customerPhone]?.name || (platform !== 'whatsapp' ? msg.customerPhone.replace('IG_', '@') : 'Unknown'),
+        customerName: leadDataMap[msg.customerPhone]?.name || (platform !== 'whatsapp' ? String(msg.customerPhone).replace('IG_', '@') : 'Unknown'),
         customerCity: leadDataMap[msg.customerPhone]?.city || '',
         workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main',
         isAiPaused: leadDataMap[msg.customerPhone]?.isAiPaused || false,
