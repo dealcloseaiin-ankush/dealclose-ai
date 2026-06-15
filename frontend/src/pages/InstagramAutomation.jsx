@@ -328,7 +328,7 @@ export default function InstagramAutomation() {
       )}
       
       {activeTab === 'posts' && (
-        <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-lg p-6">
+        <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-lg p-6 animate-fade-in">
           <div className="mb-6 flex justify-between items-end">
             <div>
               <h2 className="text-xl font-bold text-white mb-2">Per-Post Bot Configuration</h2>
@@ -425,7 +425,7 @@ export default function InstagramAutomation() {
       )}
 
       {activeTab === 'smart-groups' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-in">
           <div className="bg-[#111111] border border-gray-800 p-6 rounded-2xl shadow-lg mb-6">
              <h2 className="text-xl font-bold text-white mb-2">Unanswered Comments (AI Clustered)</h2>
              <p className="text-gray-400 text-sm">30 comments were not understood by basic bots. AI has grouped them by intent so you can bulk-reply.</p>

@@ -777,15 +777,22 @@ exports.handleInstagramWebhook = async (req, res) => {
           let matchedRule = null;
           let isPostSpecific = false;
           
-          // Pehle check karo ki kya is specific reel/post ke liye koi rule bana hai?
-          if (mediaId && user.postAutomations) {
-             matchedRule = user.postAutomations.find(rule => rule.postId === mediaId && commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
-             if (matchedRule) isPostSpecific = true;
+          if (user.postAutomations && user.postAutomations.length > 0) {
+            // First, try to find a rule for this specific post ID
+            if (mediaId) {
+              matchedRule = user.postAutomations.find(rule => rule.postId === mediaId && commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+              if (matchedRule) isPostSpecific = true;
+            }
+            
+            // If no specific rule, find a global rule (where postId is empty)
+            if (!matchedRule) {
+              matchedRule = user.postAutomations.find(rule => !rule.postId && commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+            }
           }
 
-          // Agar post-specific rule nahi mila, toh Global rule (autoReplies) check karo
+          // Fallback to old autoReplies if still no match (for backward compatibility)
           if (!matchedRule) {
-             matchedRule = autoReplies.find(rule => commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+             matchedRule = (user.autoReplies || []).find(rule => commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
           }
 
           if (matchedRule) {
