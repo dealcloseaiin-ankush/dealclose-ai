@@ -50,12 +50,17 @@ wssMobile.on('connection', (ws) => {
 
 server.on('upgrade', (request, socket, head) => {
   // Safely parse URL to ignore query parameters that might break routing
-  const pathname = request.url.split('?')[0];
+  let pathname = request.url.split('?')[0];
+  if (pathname.endsWith('/') && pathname.length > 1) pathname = pathname.slice(0, -1);
+
+  console.log(`🔌 [WebSocket] Upgrade request received for: ${pathname}`);
+
   if (pathname === '/api/webhooks/twilio/stream') {
     wssTwilio.handleUpgrade(request, socket, head, (ws) => wssTwilio.emit('connection', ws, request));
   } else if (pathname === '/api/webhooks/mobile/stream') {
     wssMobile.handleUpgrade(request, socket, head, (ws) => wssMobile.emit('connection', ws, request));
   } else {
+    console.log(`❌ [WebSocket] Route not found, destroying socket: ${pathname}`);
     socket.destroy();
   }
 });

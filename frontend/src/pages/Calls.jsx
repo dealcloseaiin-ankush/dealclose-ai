@@ -21,10 +21,11 @@ export default function Calls() {
       setStatus("Connecting to AI...");
       addLog("Initializing Audio & WebSocket...");
       
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // 🚀 FIX: Redirect WebSocket directly to the Backend (Render) instead of the Frontend host
+      const backendBase = import.meta.env.VITE_API_URL || 'https://dealclose-ai.onrender.com/api';
       const wsUrl = import.meta.env.MODE === 'development' 
         ? 'ws://localhost:5000/api/webhooks/mobile/stream' 
-        : `${protocol}//${window.location.host}/api/webhooks/mobile/stream`;
+        : backendBase.replace('http', 'ws').replace('/api', '') + '/api/webhooks/mobile/stream';
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
