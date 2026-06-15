@@ -38,7 +38,13 @@ export default function Calls() {
         ws.send(JSON.stringify({ event: 'start' }));
 
         // 🎤 1. GET MICROPHONE ACCESS
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            autoGainControl: true,    // 🚀 Dheere aawaz ko automatically loud karega
+            echoCancellation: true,   // 🚀 Echo (goonj) ko kam karega
+            noiseSuppression: true    // 🚀 Background shor ko hatayega
+          } 
+        });
         streamRef.current = stream;
         addLog("Mic access granted! Streaming audio...");
         
@@ -137,7 +143,7 @@ export default function Calls() {
       <div className="flex flex-col md:flex-row gap-8">
         <div className="bg-[#111] border border-gray-800 p-8 rounded-3xl shadow-2xl flex flex-col items-center justify-center flex-1">
           <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 transition-all duration-500 ${isCalling ? 'bg-green-500/20 border-4 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse' : 'bg-gray-800 border-4 border-gray-700'}`}>
-            {isCalling ? <Activity size={50} className="text-green-500" /> : <Mic size={50} className="text-gray-500" />}
+            {isCalling ? <Mic size={50} className="text-green-500 animate-pulse" /> : <Mic size={50} className="text-gray-500" />}
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">{status}</h2>
           <p className="text-sm text-gray-400 text-center mb-8 max-w-xs">Make sure you have added your Deepgram API Key and Gemini API Key in the backend `.env` file.</p>

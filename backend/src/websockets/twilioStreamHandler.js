@@ -1,9 +1,9 @@
-const { createClient } = require('@deepgram/sdk');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
 const Order = require('../models/orderModel');
 const Lead = require('../models/leadModel');
+const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 
 module.exports = function (ws) {
   let streamSid = null;
@@ -14,34 +14,35 @@ module.exports = function (ws) {
   let conversationHistory = [];
   
   // 1. Initialize API Clients (STT/TTS via Deepgram, Brain via Gemini/OpenAI)
-  const apiKey = process.env.DEEPGRAM_API_KEY || 'dummy';
-  const deepgram = createClient(apiKey);
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
-  // 2. Setup Deepgram Live Transcription (Kaano ke liye - STT)
-  const deepgramLive = deepgram.listen.live({
-    model: 'nova-2',
-    language: 'en-IN', // Supports Indian English/Hinglish
-    smart_format: true,
-    encoding: 'mulaw',
-    sample_rate: 8000,
-  });
+  // 2. 🚀 Setup Bulletproof Raw STT Connection
+  let deepgramLive;
+  try {
+    deepgramLive = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2&language=en-IN&smart_format=true&encoding=mulaw&sample_rate=8000', {
+      headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}` }
+    });
 
-  // 3. Handle Text coming from Deepgram
-  deepgramLive.on('Results', async (data) => {
-    const transcript = data.channel.alternatives[0].transcript;
-    if (transcript && data.is_final) {
-      console.log(`👤 [Customer]: ${transcript}`);
-      
-      // Save Customer's raw text
-      rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
-      conversationHistory.push({ role: "user", content: transcript });
-
-      // Jab customer bolna band kare, dimaag (OpenAI) ko sochna shuru karne bolo
-      await processAIResponse();
-    }
-  });
+    deepgramLive.on('message', async (data) => {
+      const response = JSON.parse(data);
+      if (response.channel && response.channel.alternatives[0]) {
+        const transcript = response.channel.alternatives[0].transcript;
+        if (transcript && response.is_final) {
+          console.log(`👤 [Customer]: ${transcript}`);
+          rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
+          conversationHistory.push({ role: "user", content: transcript });
+          await processAIResponse();
+        }
+      }
+    });
+    
+    deepgramLive.on('error', (err) => {
+      console.error(`❌ [Deepgram STT Error]:`, err.message);
+    });
+  } catch (err) {
+    console.error("❌ Deepgram Initialization Error:", err.message);
+  }
 
   // 4. The Brain (LLM) -> Text to Speech (TTS) -> Send to Twilio
   async function processAIResponse() {
@@ -49,7 +50,7 @@ module.exports = function (ws) {
       console.log(`🧠 [AI Soch Raha Hai...]`);
       let aiText = "";
 
-      const systemPromptText = "You are a friendly DealClose AI sales agent. Keep your answers extremely short (1-2 sentences). Speak in conversational Hinglish (Hindi words written in the English alphabet). CRITICAL RULE: DO NOT use Hindi or Devanagari script, ONLY use English letters.";
+      const systemPromptText = "You are a friendly DealClose AI sales agent. Keep answers extremely short. Speak in conversational Hinglish. CRITICAL RULE: Use simple words so an American AI voice can pronounce them. DO NOT use Devanagari script.";
       let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
 
       if (useGemini && genAI) {
@@ -105,24 +106,18 @@ module.exports = function (ws) {
       // Save AI's raw text for Dashboard
       rawTranscript.push({ speaker: 'AI', text: aiText, time: new Date() });
 
-      // Convert AI Text to Audio (Deepgram Aura TTS - Sasta aur Fast)
-      console.log(`🔊 [TTS] Converting text to speech via Deepgram...`);
-      const ttsResponse = await deepgram.speak.request(
-        { text: aiText },
-        { model: 'aura-asteria-en', encoding: 'mulaw', sample_rate: 8000, container: 'none' } // Twilio format
-      );
+      // 🚀 RAW TTS API CALL
+      console.log(`🔊 [TTS] Converting text to speech via Raw API...`);
+      const ttsResponse = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=mulaw&sample_rate=8000', {
+        method: 'POST',
+        headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: aiText })
+      });
 
-      const stream = await ttsResponse.getStream();
-      const reader = stream.getReader();
-      const chunks = [];
+      if (!ttsResponse.ok) return;
       
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      
-      const audioBuffer = Buffer.concat(chunks);
+      const arrayBuffer = await ttsResponse.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
       const base64Audio = audioBuffer.toString('base64');
       
       // Send audio back to Phone Call

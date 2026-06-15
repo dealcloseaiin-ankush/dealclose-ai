@@ -1,12 +1,13 @@
-const { createClient } = require('@deepgram/sdk');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
+const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 
 module.exports = function (ws) {
   let callSid = 'MOBILE_' + Date.now(); 
   let rawTranscript = []; 
   let conversationHistory = [];
+  let audioChunkCount = 0;
   
   // 1. Initialize APIs
   console.log(`\n================== [AI CALLING DEBUG] ==================`);
@@ -20,50 +21,51 @@ module.exports = function (ws) {
     return ws.close();
   }
 
-  const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
   const openai = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'dummy' ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
   const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
   console.log(`📱 [Mobile Stream] New connection from Android App! Call ID: ${callSid}`);
 
-  // 2. Setup Deepgram Live Transcription
+  // 2. 🚀 Setup Bulletproof Raw STT Connection (Bypasses SDK Bugs)
   let deepgramLive;
   try {
-    deepgramLive = deepgram.listen.live({
-      model: 'nova-2',
-      language: 'en-IN',
-      smart_format: true,
-      encoding: 'linear16',
-      sample_rate: 16000,
+    deepgramLive = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2&language=en-IN&smart_format=true&encoding=linear16&sample_rate=16000', {
+      headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}` }
     });
-    console.log(`✅ [Deepgram STT] Live connection initiated successfully.`);
+    
+    deepgramLive.on('open', () => {
+      console.log(`✅ [Deepgram STT] Live Ears opened successfully.`);
+    });
+
+    deepgramLive.on('message', async (data) => {
+      const response = JSON.parse(data);
+      if (response.channel && response.channel.alternatives[0]) {
+        const transcript = response.channel.alternatives[0].transcript;
+        if (transcript && response.is_final) {
+          console.log(`👤 [Customer on Mobile]: ${transcript}`);
+          rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
+          conversationHistory.push({ role: "user", content: transcript });
+          await processAIResponse();
+        }
+      }
+    });
+    
+    deepgramLive.on('error', (err) => {
+      console.error(`❌ [Deepgram STT Error]:`, err.message);
+    });
+
   } catch (err) {
     console.error("❌ Deepgram Initialization Error:", err.message);
-    if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'error', data: 'Failed to connect to AI Ears' }));
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ event: 'error', data: 'Failed to connect to AI Ears' }));
     return ws.close();
   }
-
-  deepgramLive.on('Results', async (data) => {
-    const transcript = data.channel.alternatives[0].transcript;
-    if (transcript && data.is_final) {
-      console.log(`👤 [Customer on Mobile]: ${transcript}`);
-      rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
-      conversationHistory.push({ role: "user", content: transcript });
-
-      await processAIResponse();
-    }
-  });
-  
-  deepgramLive.on('Error', (err) => {
-    console.error(`❌ [Deepgram STT Error]:`, err);
-  });
 
   async function processAIResponse() {
     try {
       console.log(`🧠 [AI Soch Raha Hai...]`);
       let aiText = "";
 
-      const systemPromptText = "You are a friendly DealClose AI calling assistant working through a mobile app. Keep answers short (1 sentence). Speak in conversational Hinglish (Hindi words written in the English alphabet). CRITICAL RULE: DO NOT use Hindi or Devanagari script, ONLY use English letters.";
+      const systemPromptText = "You are a friendly DealClose AI calling assistant. Keep answers short (1 sentence). Speak in conversational Hinglish. CRITICAL RULE: DO NOT use complex Hindi words. Use simple words so an American AI voice can pronounce them naturally. Do NOT use Devanagari script.";
 
       let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
 
@@ -98,30 +100,27 @@ module.exports = function (ws) {
       console.log(`🤖 [AI Agent]: ${aiText}`);
       rawTranscript.push({ speaker: 'AI', text: aiText, time: new Date() });
 
-      // Convert AI Text to Audio (Deepgram Aura TTS)
-      console.log(`🔊 [TTS] Converting text to speech...`);
-      const ttsResponse = await deepgram.speak.request(
-        { text: aiText },
-        { model: 'aura-asteria-en', encoding: 'linear16', sample_rate: 16000, container: 'none' } 
-      );
+      // 🚀 RAW TTS API CALL (Bulletproof Fix)
+      console.log(`🔊 [TTS] Converting text to speech via Raw API...`);
+      const ttsResponse = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=linear16&sample_rate=16000', {
+        method: 'POST',
+        headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: aiText })
+      });
       
+      if (!ttsResponse.ok) {
+         console.error(`❌ [TTS Error] Code: ${ttsResponse.status}`);
+         return;
+      }
+
       console.log(`✅ [TTS] Audio stream received from Deepgram.`);
 
-      const stream = await ttsResponse.getStream();
-      const reader = stream.getReader();
-      const chunks = [];
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      
-      const audioBuffer = Buffer.concat(chunks);
+      const arrayBuffer = await ttsResponse.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
       const base64Audio = audioBuffer.toString('base64');
       
       // Send audio back to Android App
-      if (ws.readyState === 1) {
+      if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ event: 'audio', data: base64Audio }));
       }
     } catch (error) {
@@ -139,19 +138,24 @@ module.exports = function (ws) {
         processAIResponse(); // Initiate first greeting
 
       } else if (msg.event === 'audio') {
+        audioChunkCount++;
+        if (audioChunkCount % 50 === 0) {
+           console.log(`🎤 [Audio Debug] Receiving voice data from mic... (Chunks: ${audioChunkCount})`);
+        }
+        
         // Receive raw mic audio from Android
         const audioBuffer = Buffer.from(msg.data, 'base64');
-        if (deepgramLive.getReadyState() === 1) {
+        if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) {
           deepgramLive.send(audioBuffer);
         }
         
       } else if (msg.event === 'stop') {
         console.log(`🛑 [Mobile Stream] Android App stopped call.`);
-        deepgramLive.finish();
+        if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) deepgramLive.close();
       }
     } catch(e) {
        // If sending raw binary instead of JSON
-       if (deepgramLive.getReadyState() === 1) {
+       if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) {
           deepgramLive.send(message);
        }
     }
@@ -159,7 +163,7 @@ module.exports = function (ws) {
 
   ws.on('close', async () => {
     console.log('🔌 [WebSocket] Mobile App Connection Closed');
-    if (deepgramLive.getReadyState() === 1) deepgramLive.finish();
+    if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) deepgramLive.close();
     
     // Save Call Transcript to DB
     if (rawTranscript.length > 0) {
