@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line, AreaChart, Area } from 'recharts';
-import { useAuth } from '../hooks/useAuth';
 import DashboardAIAssistant from '../components/DashboardAIAssistant'; // Import the AI Chat Assistant
 
 function StatCard({ title, value, trend, trendUp, icon, color, linkTo, subtitle }) {
@@ -34,9 +33,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']; // Blue, Green, Amber, Red
-  const { user } = useAuth() || {};
-  // 🚀 FIX: Super Admin access is strictly for superadmin or specific developer email
-  const isSuperAdmin = user?.role === 'superadmin' || user?.email === 'ankush.bani@gmail.com';
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const [clients, setClients] = useState([]);
   const [adminStats, setAdminStats] = useState(null);
@@ -55,16 +52,22 @@ export default function Dashboard() {
           setMessageStats(response.data.messageStats);
         }
         
-        if (isSuperAdmin) {
-           const adminRes = await api.get('/admin/stats').catch(() => ({ data: { stats: {}, users: [] } }));
-           setAdminStats(adminRes.data?.stats);
-           setClients(adminRes.data?.users || []);
-        }
-
         // Fetch Real WhatsApp Message Stats from User Profile
         const userRes = await api.get('/users/profile').catch(() => null);
         const userData = userRes?.data?.user || userRes?.data;
+        
+        let adminCheck = false; // Define local variable to avoid useEffect dependency warnings
         if (userData) {
+          // 🚀 REAL-TIME ADMIN CHECK: Check from the actual Database object instead of local cache
+          adminCheck = userData.role === 'superadmin' || userData.email === 'ankush.bani@gmail.com';
+          setIsSuperAdmin(adminCheck);
+
+          if (adminCheck) {
+             const adminRes = await api.get('/admin/stats').catch(() => ({ data: { stats: {}, users: [] } }));
+             setAdminStats(adminRes.data?.stats);
+             setClients(adminRes.data?.users || []);
+          }
+
           // Set the dropdown options
         const mainBusiness = { _id: 'main', name: userData.businessName || 'Main Business' };
           const otherWorkspaces = userData.workspaces || [];
@@ -72,7 +75,7 @@ export default function Dashboard() {
         }
         
         // Check if AI is active but missing training data
-        const hasCredits = userData?.aiCredits > 0 || isSuperAdmin;
+        const hasCredits = userData?.aiCredits > 0 || adminCheck;
         const hasNoTraining = !userData?.businessDescription || userData.businessDescription.trim().length < 10;
         console.log(`🔍 [Dashboard Popup Logic] hasCredits: ${hasCredits}, hasNoTraining: ${hasNoTraining}, AI_Prompt_Length: ${userData?.businessDescription?.length || 0}`);
         console.log(`📊 [Dashboard Graph Data from API] => `, response.data.graphData);
@@ -83,7 +86,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, [isSuperAdmin, activeBusinessId, platformFilter]);
+  }, [activeBusinessId, platformFilter]);
 
   if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
 

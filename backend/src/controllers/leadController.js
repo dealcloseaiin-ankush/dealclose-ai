@@ -259,6 +259,39 @@ exports.getLeadAnalytics = async (req, res) => {
     console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}, workspace: ${workspaceId}, platform: ${platform}`);
     const userIdObj = new mongoose.Types.ObjectId(userId);
 
+    // 🚀 AUTO-SYNC: Ensure leads exist for all past conversations before calculating stats
+    try {
+      const distinctPhones = await Message.distinct('customerPhone', { userId: userIdObj });
+      if (distinctPhones && distinctPhones.length > 0) {
+        const existingLeads = await Lead.find({ userId: userIdObj, phoneNumber: { $in: distinctPhones } }).select('phoneNumber').lean();
+        const existingPhones = new Set(existingLeads.map(l => l.phoneNumber));
+        
+        const newLeadsToCreate = [];
+        let leadCount = await Lead.countDocuments({ userId: userIdObj });
+
+        for (const phone of distinctPhones) {
+          if (phone && !existingPhones.has(phone)) {
+            leadCount++;
+            const seqId = String(leadCount).padStart(4, '0');
+            newLeadsToCreate.push({
+              userId: userIdObj,
+              createdBy: userIdObj,
+              phoneNumber: phone,
+              name: `User #${seqId}`,
+              source: phone.startsWith('IG_') ? 'Instagram (Old Chat)' : 'WhatsApp (Old Chat)',
+              status: 'new'
+            });
+          }
+        }
+        if (newLeadsToCreate.length > 0) {
+          await Lead.insertMany(newLeadsToCreate);
+          console.log(`✅ [Dashboard Sync] Auto-created ${newLeadsToCreate.length} missing leads.`);
+        }
+      }
+    } catch (syncErr) {
+      console.error("Dashboard lead sync error:", syncErr.message);
+    }
+
     //  DYNAMIC WORKSPACE FILTER LOGIC
     // 🚀 FIX: Ignore visitor, unqualified, AND 'deleted' statuses
     const leadQuery = { userId, status: { $nin: ['visitor', 'unqualified', 'deleted'] } };
@@ -328,18 +361,26 @@ exports.getLeadAnalytics = async (req, res) => {
     // Calculations
     const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : 0;
     
-    // 🚀 BULLETPROOF FIX: Calculate REAL Message Stats directly from DB in case Meta Webhooks fail/delay
-    const actualSent = await Message.countDocuments({ userId: userIdObj, direction: 'outgoing' });
-    const actualDelivered = await Message.countDocuments({ userId: userIdObj, direction: 'outgoing', status: { $in: ['delivered', 'read'] } });
-    const actualRead = await Message.countDocuments({ userId: userIdObj, direction: 'outgoing', status: 'read' });
-    
-    const user = await User.findById(userIdObj).lean();
-    const webhookStats = user?.messageStats || { sent: 0, delivered: 0, read: 0 };
+    // 🚀 BULLETPROOF FIX: Calculate REAL Message Stats directly from DB, filtered by workspace.
+    // STRICTLY for WhatsApp API Delivery Report (Excluded Instagram 'IG_' numbers)
+    const leadsForMessageStats = await Lead.find(leadQuery).select('phoneNumber').lean();
+    const phoneNumbersForStats = leadsForMessageStats
+      .map(l => l.phoneNumber)
+      .filter(phone => phone && !phone.toUpperCase().startsWith('IG_'));
+
+    const messageQuery = { 
+      userId: userIdObj, 
+      customerPhone: { $in: phoneNumbersForStats } 
+    };
+
+    const actualSent = await Message.countDocuments({ ...messageQuery, direction: 'outgoing' });
+    const actualDelivered = await Message.countDocuments({ ...messageQuery, direction: 'outgoing', status: { $in: ['delivered', 'read'] } });
+    const actualRead = await Message.countDocuments({ ...messageQuery, direction: 'outgoing', status: 'read' });
     
     const messageStats = {
-      sent: Math.max(actualSent, webhookStats.sent),
-      delivered: Math.max(actualDelivered, webhookStats.delivered),
-      read: Math.max(actualRead, webhookStats.read)
+      sent: actualSent,
+      delivered: actualDelivered,
+      read: actualRead
     };
 
     // 🚀 LIVE: Total Investment calculated based on WhatsApp messages sent (₹0.80 per msg approx)
