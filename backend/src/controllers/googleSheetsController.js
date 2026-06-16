@@ -4,7 +4,13 @@ const User = require('../models/userModel');
 const getOAuth2Client = (req = null) => {
   // 🚀 MEGA DEBUG & FIX: Automatically generate correct Redirect URL to prevent Google 400 Error
   let redirectUri = process.env.GOOGLE_REDIRECT_URI;
-  if (!redirectUri || redirectUri === 'postmessage' || redirectUri === '') {
+  
+  // 🚀 BULLETPROOF FIX: Use Explicit URI directly from Frontend Payload to avoid Browser CORS drops
+  const explicitUri = req?.body?.redirectUri || req?.query?.redirectUri;
+  
+  if (explicitUri) {
+    redirectUri = explicitUri;
+  } else if (!redirectUri || redirectUri === 'postmessage' || redirectUri === '') {
     // Bulletproof Origin Extraction using standard URL API
     let origin = req?.headers?.origin || req?.headers?.referer;
     if (origin) {

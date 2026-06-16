@@ -79,10 +79,14 @@ export default function Settings() {
     const code = urlParams.get('code');
     if (code) {
       setIsLoading(true);
-      api.post('/settings/google/connect', { code })
+      
+      // 🚀 CRITICAL FIX: Clean URL instantly to prevent React StrictMode from sending the code twice (causes 400 Error)
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      const currentUri = `${window.location.origin}/settings`;
+      api.post('/settings/google/connect', { code, redirectUri: currentUri })
         .then(() => {
           alert('🎉 Google Sheets Connected Successfully! Auto-sync is now ACTIVE.');
-          window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
           fetchSettings();
         })
         .catch(err => {
@@ -91,7 +95,6 @@ export default function Settings() {
             : (err.response?.data?.message || err.message);
             
           alert(`❌ Google Connection Failed: ${errMsg}`);
-          window.history.replaceState({}, document.title, window.location.pathname);
           setIsLoading(false);
         });
     }
@@ -99,7 +102,8 @@ export default function Settings() {
 
   const handleGoogleAuth = async () => {
     try {
-      const res = await api.get('/settings/google/auth-url');
+      const currentUri = `${window.location.origin}/settings`;
+      const res = await api.get(`/settings/google/auth-url?redirectUri=${encodeURIComponent(currentUri)}`);
       if (res.data.success) window.location.href = res.data.url; // Redirect to Google Login
     } catch (err) { alert(err.response?.data?.message || 'Error generating Auth URL.'); }
   };

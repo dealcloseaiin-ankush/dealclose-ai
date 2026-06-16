@@ -184,11 +184,13 @@ export default function Dashboard() {
 
       {/* Real-time WhatsApp Delivery Stats */}
       {platformFilter !== 'instagram' && (
-      <div className="mb-10 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-xl">
-        <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-          <span className="text-green-500">📱</span> WhatsApp API Delivery Report
+      <Link to="/chats" className="block mb-10 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-xl hover:border-gray-700 transition-all duration-300 group cursor-pointer relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between relative z-10">
+          <span className="flex items-center gap-2"><span className="text-green-500">📱</span> WhatsApp API Delivery Report</span>
+          <span className="text-sm text-blue-400 group-hover:text-blue-300 font-semibold transition-colors">View Chat Logs →</span>
         </h3>
-        <div className="grid grid-cols-3 gap-4 text-center divide-x divide-gray-800">
+        <div className="grid grid-cols-3 gap-4 text-center divide-x divide-gray-800 relative z-10">
           <div>
             <p className="text-3xl font-bold text-blue-400">{messageStats.sent}</p>
             <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-bold">Total Sent</p>
@@ -202,7 +204,7 @@ export default function Dashboard() {
             <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-bold">Read (Blue Tick)</p>
           </div>
         </div>
-      </div>
+      </Link>
       )}
 
       {/* Main Content Grid */}
