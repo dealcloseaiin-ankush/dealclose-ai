@@ -43,6 +43,7 @@ export default function Settings() {
   const [devApiKey, setDevApiKey] = useState('');
   const [igConnected, setIgConnected] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
+abhi   const [googleConnectedEmail, setGoogleConnectedEmail] = useState(''); // 🚀 NEW STATE
   const [userId, setUserId] = useState('demo-business'); // Used for QR code link
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showExternalToken, setShowExternalToken] = useState(false);
@@ -156,6 +157,7 @@ export default function Settings() {
         if (savedData._id) setDevApiKey(savedData._id);
         setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
+        setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); // 🚀 Extract email
       }
     } catch (error) {
       console.error('Failed to load settings. It might be empty currently.', error);
@@ -459,7 +461,10 @@ export default function Settings() {
                        <span>Connect Google Sheets</span>
                     </button>
                   ) : (
-                    <p className="text-sm font-semibold text-emerald-500 relative z-10">✅ Your leads are automatically syncing to your Drive.</p>
+                    <div className="relative z-10">
+                      <p className="text-sm font-semibold text-emerald-500 mb-1">✅ Connected to: <span className="text-white font-bold">{googleConnectedEmail || 'Your Google Account'}</span></p>
+                      <p className="text-xs text-emerald-600 font-medium">Your leads are automatically syncing to this Drive.</p>
+                    </div>
                   )}
                 </div>
 

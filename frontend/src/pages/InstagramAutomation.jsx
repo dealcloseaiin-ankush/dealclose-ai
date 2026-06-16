@@ -37,14 +37,69 @@ export default function InstagramAutomation() {
   const [iceBreakers, setIceBreakers] = useState('');
   
   // 🚀 NEW: Post Automation Form State
-  const [newAuto, setNewAuto] = useState({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩' });
+  const [newAuto, setNewAuto] = useState({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploadingPdf(true);
+    const toastId = toast.loading("Uploading file securely...");
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const uploadedUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+      setNewAuto(prev => ({ ...prev, fileUrl: uploadedUrl }));
+      toast.success("File uploaded successfully!", { id: toastId });
+    } catch (err) {
+      console.error("Upload Error:", err);
+      toast.error("Failed to upload file. Check connection.", { id: toastId });
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
+
   const handleAddPostAuto = async (e) => {
     e.preventDefault();
     try {
        await api.put('/users/profile', { postAutomations: [...(user?.postAutomations || []), newAuto] });
        toast.success("Post Automation Rule Added!");
-       setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩' });
+       setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
     } catch { toast.error("Failed to add rule."); }
+  };
+
+  // 🚀 NEW: Specific Post Auto-DM State & Function
+  const [selectedPostForAuto, setSelectedPostForAuto] = useState(null);
+  const handleSavePostSpecificAuto = async (e) => {
+    e.preventDefault();
+    try {
+       const updatedAutomations = [...(user?.postAutomations || []).filter(r => r.postId !== selectedPostForAuto.id), { ...newAuto, postId: selectedPostForAuto.id }];
+       await api.put('/users/profile', { postAutomations: updatedAutomations });
+       toast.success("Post Automation Saved Successfully!");
+       setSelectedPostForAuto(null);
+       setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
+    } catch { toast.error("Failed to save post automation."); }
+  };
+
+  // 🚀 NEW: Fetch real posts & reels from Meta API
+  const handleSyncPosts = async () => {
+    const toastId = toast.loading("Syncing recent posts from Instagram...");
+    try {
+      // Ye aapke backend route par request bhejega jo Instagram Graph API se data layega
+      const res = await api.get('/instagram/sync-posts', { params: { workspaceId: activeWorkspace } });
+      if (res.data && res.data.recentPosts) {
+        setRecentPosts(res.data.recentPosts);
+        toast.success("Posts synced successfully! 🎉", { id: toastId });
+      } else {
+        toast.success("Sync successful, but no new posts found.", { id: toastId });
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast.error("Failed to sync posts. Please check if Instagram is connected in Settings.", { id: toastId });
+    }
   };
 
   useEffect(() => {
@@ -320,7 +375,25 @@ export default function InstagramAutomation() {
             </div>
             <div><label className="block text-xs font-bold text-gray-400 mb-1">Public Comment Reply <span className="text-rose-500">*</span></label><input type="text" required value={newAuto.publicReply} onChange={e=>setNewAuto({...newAuto, publicReply: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="Hey! I've sent you a DM 📩" /></div>
             <div><label className="block text-xs font-bold text-gray-400 mb-1">DM Message <span className="text-rose-500">*</span></label><textarea required value={newAuto.replyMessage} onChange={e=>setNewAuto({...newAuto, replyMessage: e.target.value})} rows="2" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="Here is the link you asked for!"></textarea></div>
-            <div><label className="block text-xs font-bold text-gray-400 mb-1">File / Website Link <span className="text-rose-500">*</span></label><input type="url" required value={newAuto.fileUrl} onChange={e=>setNewAuto({...newAuto, fileUrl: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="https://..." /></div>
+            
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-1">File / Website Link <span className="text-rose-500">*</span></label>
+              <div className="flex gap-2">
+                <input type="url" required value={newAuto.fileUrl} onChange={e=>setNewAuto({...newAuto, fileUrl: e.target.value})} className="flex-1 w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="https://..." />
+                <label className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 px-4 rounded-lg cursor-pointer transition-colors text-xs flex items-center justify-center whitespace-nowrap border border-gray-700 shadow-sm">
+                  {isUploadingPdf ? '⏳ Uploading...' : '📎 Upload PDF'}
+                  <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handlePdfUpload} disabled={isUploadingPdf} />
+                </label>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-1">Delivery Method <span className="text-rose-500">*</span></label>
+              <select value={newAuto.deliveryMode || 'direct'} onChange={e=>setNewAuto({...newAuto, deliveryMode: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none">
+                <option value="direct">Direct Link (Send immediately)</option>
+                <option value="button">Quick Reply Button (User taps to get link)</option>
+              </select>
+            </div>
             <button type="submit" className="bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg w-full md:w-auto">Add Automation Rule</button>
           </form>
         </div>
@@ -334,22 +407,42 @@ export default function InstagramAutomation() {
               <h2 className="text-xl font-bold text-white mb-2">Per-Post Bot Configuration</h2>
               <p className="text-gray-400 text-sm">First, the Chat Bot replies to exact keywords. Then, the AI Smart Chat Bot handles all remaining/complex comments!</p>
             </div>
-            <button className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors">🔄 Sync Recent Posts</button>
+            <button onClick={handleSyncPosts} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors shadow-lg hover:shadow-gray-700/50">
+              🔄 Sync Recent Posts
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {recentPosts.map(post => (
               <div key={post.id} className={`border ${post.botMode === 'hybrid' ? 'border-purple-500/50 bg-[#1a1525]' : post.botMode === 'chatbot' ? 'border-blue-500/50 bg-[#151a25]' : 'border-gray-800 bg-[#0a0a0a]'} rounded-xl p-5 relative transition-all`}>
                 <div className="flex items-start gap-4 mb-4">
-                  <div className="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center text-3xl shadow-inner">{post.image}</div>
-                  <div>
+                  <div className="w-20 h-20 bg-gray-800 rounded-lg flex items-center justify-center text-3xl shadow-inner overflow-hidden border border-gray-700">
+                    {post.mediaUrl ? <img src={post.mediaUrl} alt="post" className="w-full h-full object-cover"/> : post.image}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
                     <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">{post.type}</span>
+                      {/* 🚀 Show if Auto-DM Rule exists for this post */}
+                      {user?.postAutomations?.find(r => r.postId === post.id) && (
+                        <span className="bg-pink-500/20 text-pink-400 border border-pink-500/30 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🎁 Auto-DM Active
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-300 line-clamp-2 mt-1 font-medium">{post.caption}</p>
                     
+                    {/* 🚀 NEW: Visual Enterprise Stats (Views, Comments, DMs) */}
+                    <div className="flex items-center gap-4 mt-3 border-t border-gray-800 pt-2">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-blue-400">👁️</span> {post.stats?.views || '1.2k'}</div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-green-400">💬</span> {post.stats?.totalComments || 0}</div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-pink-400">📩</span> {
+                        user?.postAutomations?.find(r => r.postId === post.id)?.stats?.sentCount || post.stats?.dmsSent || 0
+                      }</div>
+                    </div>
+
                     {/* Performance Stats highlighting AI Value */}
-                    <div className="mt-2 text-xs font-bold space-y-1">
+                    <div className="mt-3 text-[10px] font-bold space-y-1">
                       <div className="flex gap-2">
-                        <span className="text-gray-400 bg-gray-800 px-2 py-1 rounded">Total: {post.stats.totalComments}</span>
                         <span className="text-blue-400 bg-blue-400/10 px-2 py-1 rounded">Chat Bot: {post.stats.chatBotReplied}</span>
                       </div>
                       
@@ -418,6 +511,13 @@ export default function InstagramAutomation() {
                     </div>
                   )}
                 </div>
+
+                {/* 🚀 NEW: Specific Lead Magnet Button */}
+                <div className="mt-4 pt-4 border-t border-gray-800 flex justify-end">
+                  <button onClick={() => { setNewAuto(user?.postAutomations?.find(r => r.postId === post.id) || { postId: post.id, triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' }); setSelectedPostForAuto(post); }} className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2">
+                    🎁 Set Auto-DM Link Rule
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -471,6 +571,52 @@ export default function InstagramAutomation() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 NEW: Per-Post Lead Magnet Modal */}
+      {selectedPostForAuto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111] border border-pink-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setSelectedPostForAuto(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white">✕</button>
+            <h2 className="text-xl font-bold text-white mb-2">🎁 Reel / Post Automation</h2>
+            <p className="text-xs text-gray-400 mb-6">Create a specific keyword rule for this selected post.</p>
+            
+            <form onSubmit={handleSavePostSpecificAuto} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Trigger Keyword <span className="text-rose-500">*</span></label>
+                <input type="text" required value={newAuto.triggerWord} onChange={e=>setNewAuto({...newAuto, triggerWord: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="e.g. PDF, COURSE, LINK" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Public Comment Reply <span className="text-rose-500">*</span></label>
+                <input type="text" required value={newAuto.publicReply} onChange={e=>setNewAuto({...newAuto, publicReply: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="I've sent the PDF to your DM! 📩" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">DM Message <span className="text-rose-500">*</span></label>
+                <textarea required value={newAuto.replyMessage} onChange={e=>setNewAuto({...newAuto, replyMessage: e.target.value})} rows="2" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="Here is your requested file..."></textarea>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">File / Website Link <span className="text-rose-500">*</span></label>
+                <div className="flex gap-2">
+                  <input type="url" required value={newAuto.fileUrl} onChange={e=>setNewAuto({...newAuto, fileUrl: e.target.value})} className="flex-1 w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none" placeholder="https://..." />
+                  <label className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 px-4 rounded-lg cursor-pointer transition-colors text-xs flex items-center justify-center whitespace-nowrap border border-gray-700 shadow-sm">
+                    {isUploadingPdf ? '⏳ Uploading...' : '📎 Upload PDF'}
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handlePdfUpload} disabled={isUploadingPdf} />
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Delivery Method <span className="text-rose-500">*</span></label>
+                <select value={newAuto.deliveryMode || 'direct'} onChange={e=>setNewAuto({...newAuto, deliveryMode: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-pink-500 outline-none">
+                  <option value="direct">Direct Link (Send immediately)</option>
+                  <option value="button">Quick Reply Button (User taps to get link)</option>
+                </select>
+              </div>
+              <button type="submit" className="bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg w-full mt-2">
+                Save Reel Automation
+              </button>
+            </form>
           </div>
         </div>
       )}

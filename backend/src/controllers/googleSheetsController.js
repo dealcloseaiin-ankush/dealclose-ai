@@ -3,8 +3,7 @@ const User = require('../models/userModel');
 
 const getOAuth2Client = (req = null) => {
   // 🚀 MEGA DEBUG & FIX: Automatically generate correct Redirect URL to prevent Google 400 Error
-  let redirectUri = process.env.GOOGLE_REDIRECT_URI;
-  
+  let redirectUri = process.env.GOOGLE_REDIRECT_URI;  
   // 🚀 BULLETPROOF FIX: Use Explicit URI directly from Frontend Payload to avoid Browser CORS drops
   const explicitUri = req?.body?.redirectUri || req?.query?.redirectUri;
   
@@ -57,7 +56,8 @@ exports.getAuthUrl = async (req, res) => {
       access_type: 'offline', // Important for getting refresh_token
       scope: [
         'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file'
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/userinfo.email' // 🚀 NEW: Fetch Email Scope
       ],
       prompt: 'consent' // Forces Google to send refresh token every time
     });
@@ -86,6 +86,16 @@ exports.connectGoogleAccount = async (req, res) => {
     oauth2Client.setCredentials(tokens);
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
+    // 🚀 NEW: Extract connected Google Email
+    let connectedEmail = '';
+    try {
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const userInfo = await oauth2.userinfo.get();
+      connectedEmail = userInfo.data.email;
+    } catch (e) {
+      console.log('Could not fetch google email', e.message);
+    }
+
     // Create a new Spreadsheet automatically for the user
     const spreadsheet = await sheets.spreadsheets.create({
       resource: {
@@ -110,7 +120,8 @@ exports.connectGoogleAccount = async (req, res) => {
         googleSheetsConfig: {
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
-          spreadsheetId: spreadsheet.data.spreadsheetId
+          spreadsheetId: spreadsheet.data.spreadsheetId,
+          connectedEmail: connectedEmail // 🚀 NEW: Saved to DB
         }
       }
     });
