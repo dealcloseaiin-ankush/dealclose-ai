@@ -19,6 +19,7 @@ export default function CrmPage() {
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
   const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'whatsapp', 'instagram'
+  const [statusFilter, setStatusFilter] = useState('all'); // Smart CRM Status filter
   
   const [isGoogleSynced, setIsGoogleSynced] = useState(false);
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
@@ -147,11 +148,12 @@ export default function CrmPage() {
         const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
         const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
         const matchPlatform = platformFilter === 'all' || lead.platform === platformFilter;
-        return matchWs && matchSearch && matchLeadFilter && matchPlatform;
+        const matchStatus = statusFilter === 'all' || lead.status === statusFilter;
+        return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus;
       });
     });
     return filtered;
-  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter]);
+  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter]);
 
   const filteredFlatContacts = flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
@@ -166,7 +168,8 @@ export default function CrmPage() {
     const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
     const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
     const matchPlatform = platformFilter === 'all' || lead.platform === platformFilter;
-    return matchWs && matchSearch && matchLeadFilter && matchPlatform;
+    const matchStatus = statusFilter === 'all' || lead.status === statusFilter;
+    return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus;
   });
 
   // Logic for the Expiry Warning Banner
@@ -217,6 +220,20 @@ export default function CrmPage() {
               <option value="all">🌐 All Platforms</option>
               <option value="whatsapp">🟩 WhatsApp</option>
               <option value="instagram">🟪 Instagram</option>
+            </select>
+
+            {/* 🚀 NEW: Smart Status Dropdown Filter */}
+            <select 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-amber-500 cursor-pointer shadow-sm"
+            >
+              <option value="all">📊 All Stages</option>
+              <option value="hot">🔥 Hot Leads</option>
+              <option value="warm">🌟 Warm Leads</option>
+              <option value="cold">❄️ Cold Leads</option>
+              <option value="existing">💼 Existing</option>
+              <option value="vip">👑 VIP</option>
             </select>
 
             {/* Team vs My Leads Filter (Only for Owners/Managers) */}

@@ -328,9 +328,19 @@ exports.getLeadAnalytics = async (req, res) => {
     // Calculations
     const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : 0;
     
-    // 🚀 NEW: Fetch User Message Stats first to calculate LIVE costs
+    // 🚀 BULLETPROOF FIX: Calculate REAL Message Stats directly from DB in case Meta Webhooks fail/delay
+    const actualSent = await Message.countDocuments({ userId: userIdObj, direction: 'outgoing' });
+    const actualDelivered = await Message.countDocuments({ userId: userIdObj, direction: 'outgoing', status: { $in: ['delivered', 'read'] } });
+    const actualRead = await Message.countDocuments({ userId: userIdObj, direction: 'outgoing', status: 'read' });
+    
     const user = await User.findById(userIdObj).lean();
-    const messageStats = user?.messageStats || { sent: 0, delivered: 0, read: 0 };
+    const webhookStats = user?.messageStats || { sent: 0, delivered: 0, read: 0 };
+    
+    const messageStats = {
+      sent: Math.max(actualSent, webhookStats.sent),
+      delivered: Math.max(actualDelivered, webhookStats.delivered),
+      read: Math.max(actualRead, webhookStats.read)
+    };
 
     // 🚀 LIVE: Total Investment calculated based on WhatsApp messages sent (₹0.80 per msg approx)
     const totalInvestment = messageStats.sent * 0.80; 

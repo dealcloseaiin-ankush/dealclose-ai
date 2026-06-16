@@ -35,9 +35,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']; // Blue, Green, Amber, Red
   const { user } = useAuth() || {};
-  const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'owner';
+  // 🚀 FIX: Super Admin access is strictly for superadmin or specific developer email
+  const isSuperAdmin = user?.role === 'superadmin' || user?.email === 'ankush.bani@gmail.com';
 
   const [clients, setClients] = useState([]);
+  const [adminStats, setAdminStats] = useState(null);
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
   const [workspaces, setWorkspaces] = useState([]);
   const [activeBusinessId, setActiveBusinessId] = useState('main');
@@ -49,20 +51,20 @@ export default function Dashboard() {
       try {
         const response = await api.get('/leads/analytics', { params: { workspaceId: activeBusinessId, platform: platformFilter } });
         setData(response.data);
+        if (response.data.messageStats) {
+          setMessageStats(response.data.messageStats);
+        }
         
         if (isSuperAdmin) {
-           const clientsRes = await api.get('/users/clients').catch(() => ({ data: [] }));
-           setClients(Array.isArray(clientsRes.data) ? clientsRes.data : []);
+           const adminRes = await api.get('/admin/stats').catch(() => ({ data: { stats: {}, users: [] } }));
+           setAdminStats(adminRes.data?.stats);
+           setClients(adminRes.data?.users || []);
         }
 
         // Fetch Real WhatsApp Message Stats from User Profile
         const userRes = await api.get('/users/profile').catch(() => null);
         const userData = userRes?.data?.user || userRes?.data;
-        console.log("🔍 [Dashboard Debug] Fetched User Data from DB:", userData);
         if (userData) {
-          if (userData.messageStats) {
-            setMessageStats(userData.messageStats);
-          }
           // Set the dropdown options
         const mainBusiness = { _id: 'main', name: userData.businessName || 'Main Business' };
           const otherWorkspaces = userData.workspaces || [];
@@ -313,28 +315,28 @@ export default function Dashboard() {
               <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
                 <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total Users Onboarded</p>
                 <div className="flex items-end gap-2">
-                  <p className="text-2xl font-black text-white">128</p>
-                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded font-bold">+12 this week</span>
+                  <p className="text-2xl font-black text-white">{adminStats?.totalUsers || 0}</p>
+                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded font-bold">Real-time</span>
                 </div>
               </div>
               <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total MRR</p>
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total Leads Processed</p>
                 <div className="flex items-end gap-2">
-                  <p className="text-2xl font-black text-blue-400">₹45,290</p>
-                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded font-bold">+15% vs last week</span>
+                  <p className="text-2xl font-black text-blue-400">{adminStats?.totalLeads || 0}</p>
+                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded font-bold">Across all accounts</span>
                 </div>
               </div>
               <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total AI API Cost</p>
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total API Messages</p>
                 <div className="flex items-end gap-2">
-                  <p className="text-2xl font-black text-rose-400">₹2,140</p>
-                  <span className="text-xs text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-bold">~4.7% of MRR</span>
+                  <p className="text-2xl font-black text-rose-400">{adminStats?.totalMessages || 0}</p>
+                  <span className="text-xs text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-bold">In & Out</span>
                 </div>
               </div>
               <div className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Avg AI Cost / User</p>
-                <p className="text-2xl font-black text-purple-400">₹16.70</p>
-                <p className="text-[10px] text-gray-500 mt-1">Highly profitable</p>
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Avg Messages / User</p>
+                <p className="text-2xl font-black text-purple-400">{adminStats?.totalUsers ? Math.round(adminStats.totalMessages / adminStats.totalUsers) : 0}</p>
+                <p className="text-[10px] text-gray-500 mt-1">Calculated Average</p>
               </div>
             </div>
 
@@ -401,21 +403,20 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-800 text-sm">
                   {clients.map(client => (
-                    <tr key={client.id} className="hover:bg-gray-900/50 transition-colors">
-                      <td className="p-4 font-bold text-gray-200">{client.name} <br/><span className="text-xs text-gray-500 font-normal">{client.platforms || 'B2B Retail'}</span></td>
-                      <td className="p-4 text-blue-400 font-semibold">{client.plan} <br/><span className="text-xs text-gray-500">₹{client.mrr}/mo</span></td>
+                    <tr key={client._id} className="hover:bg-gray-900/50 transition-colors">
+                      <td className="p-4 font-bold text-gray-200">{client.businessName || client.fullName || 'No Name'} <br/><span className="text-xs text-gray-500 font-normal">{client.email}</span></td>
+                      <td className="p-4 text-blue-400 font-semibold">{client.isPremium ? 'Premium' : 'Free Trial'} <br/><span className="text-xs text-gray-500 uppercase">{client.role}</span></td>
                       <td className="p-4 text-gray-300 text-xs">
                         <div className="flex gap-1 flex-wrap w-32">
-                          <span className="bg-gray-800 px-2 py-0.5 rounded">WA</span>
-                          <span className="bg-gray-800 px-2 py-0.5 rounded">IG</span>
+                          <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">Account Active</span>
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className="text-purple-400 font-bold">{client.aiLeft || '850'} credits left</span> <br/>
-                        <span className="text-xs text-rose-400">Real Cost: ₹{client.aiCost || '12.40'}</span>
+                        <span className="text-purple-400 font-bold">{client.aiCredits || 0} credits left</span> <br/>
+                        <span className="text-xs text-gray-500">AI Tokens</span>
                       </td>
                       <td className="p-4">
-                        {client.status === 'Active' ? (
+                        {client.aiCredits > 0 ? (
                           <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1 rounded-md text-xs font-bold">Healthy ✅</span>
                         ) : (
                           <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-md text-xs font-bold">Limit Reached ⚠️</span>
