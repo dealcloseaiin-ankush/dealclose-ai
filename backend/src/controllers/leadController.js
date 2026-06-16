@@ -31,6 +31,18 @@ exports.createLead = async (req, res) => {
       return res.status(400).json({ message: 'Name and Phone Number are required' });
     }
 
+    // 🚀 CRM UPGRADE: Old Customer Detection
+    // Agar number daalte hi pata karna hai ki purana customer hai ya nahi
+    let formattedPhone = phoneNumber.replace(/\D/g, '');
+    const existingLead = await Lead.findOne({ phoneNumber: { $regex: new RegExp(formattedPhone.slice(-10) + '$') }, userId });
+    
+    if (existingLead) {
+      const lastContactDate = existingLead.updatedAt ? new Date(existingLead.updatedAt).toLocaleDateString('en-IN') : 'N/A';
+      return res.status(400).json({ 
+        message: `Customer already exists in CRM! \nStatus: ${existingLead.status.toUpperCase()} \nLast Contacted: ${lastContactDate}` 
+      });
+    }
+
     const lead = await Lead.create({
       userId,
       name,
@@ -38,7 +50,8 @@ exports.createLead = async (req, res) => {
       email,
       status,
       source,
-      createdBy: userId 
+      createdBy: userId,
+      timeline: [{ eventType: 'Lead Created', description: 'Lead manually created in CRM', timestamp: new Date() }]
     });
 
     res.status(201).json(lead);
@@ -59,7 +72,10 @@ exports.updateLeadStatus = async (req, res) => {
 
     const updatedLead = await Lead.findOneAndUpdate(
       { _id: id, userId },
-      { $set: { status } },
+      { 
+        $set: { status },
+        $push: { timeline: { eventType: 'Status Changed', description: `Status manually updated to ${status}`, timestamp: new Date() } }
+      },
       { new: true }
     );
 
@@ -186,13 +202,21 @@ exports.exportLeads = async (req, res) => {
 exports.shareLeadsToWhatsApp = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { targetPhoneNumber } = req.body;
+    let { targetPhoneNumber } = req.body;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    if (!targetPhoneNumber) return res.status(400).json({ message: 'Target phone number is required.' });
 
     const user = await User.findById(userId).lean();
     if (!user || !user.whatsappConfig || !user.whatsappConfig.accessToken) {
       return res.status(400).json({ message: 'WhatsApp configuration missing.' });
+    }
+
+    // 🚀 SMART UPGRADE: Auto fallback to ownerPhone
+    if (!targetPhoneNumber) {
+      if (user.ownerPhone) {
+        targetPhoneNumber = user.ownerPhone;
+      } else {
+        return res.status(400).json({ message: 'Owner phone missing. Please set it in Settings.' });
+      }
     }
 
     // Get the latest 50 CRM leads
@@ -231,8 +255,8 @@ exports.getLeadAnalytics = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: "Not authorized" });
 
-    const { workspaceId } = req.query;
-    console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}, workspace: ${workspaceId}`);
+    const { workspaceId, platform } = req.query;
+    console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}, workspace: ${workspaceId}, platform: ${platform}`);
     const userIdObj = new mongoose.Types.ObjectId(userId);
 
     //  DYNAMIC WORKSPACE FILTER LOGIC
@@ -259,12 +283,45 @@ exports.getLeadAnalytics = async (req, res) => {
       Object.assign(aggLeadQuery, mainFilter);
     }
 
+    // 🚀 NEW: Platform Filter Logic (WhatsApp / Instagram)
+    if (platform === 'instagram') {
+      const igFilter = {
+        $or: [
+          { phoneNumber: { $regex: /^IG_/i } },
+          { source: { $regex: /instagram/i } }
+        ]
+      };
+      Object.assign(leadQuery, igFilter);
+      Object.assign(aggLeadQuery, igFilter);
+    } else if (platform === 'whatsapp') {
+      const waFilter = {
+        $and: [
+          { phoneNumber: { $not: /^IG_/i } },
+          { source: { $not: /instagram/i } }
+        ]
+      };
+      Object.assign(leadQuery, waFilter);
+      Object.assign(aggLeadQuery, waFilter);
+    }
+
     const totalLeads = await Lead.countDocuments(leadQuery);
     const converted = await Lead.countDocuments({ ...leadQuery, status: 'converted' });
     const interested = await Lead.countDocuments({ ...leadQuery, status: 'interested' });
     const ignored = await Lead.countDocuments({ ...leadQuery, status: 'ignored' });
     const newLeads = await Lead.countDocuments({ ...leadQuery, status: 'new' });
     const lost = await Lead.countDocuments({ ...leadQuery, status: 'lost' });
+
+    // 🚀 CRM UPGRADE: Smart Categories
+    const hot = await Lead.countDocuments({ ...leadQuery, status: { $in: ['hot', 'negotiating'] } });
+    const warm = await Lead.countDocuments({ ...leadQuery, status: { $in: ['warm', 'interested'] } });
+    const cold = await Lead.countDocuments({ ...leadQuery, status: 'cold' });
+    const existing = await Lead.countDocuments({ ...leadQuery, status: 'existing' });
+    const vip = await Lead.countDocuments({ ...leadQuery, status: 'vip' });
+
+    // Follow-ups due today
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+    const followUpsToday = await Lead.countDocuments({ ...leadQuery, nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } });
     
     console.log(`📊 [Lead Analytics Debug] Found -> New: ${newLeads}, Interested: ${interested}, Converted: ${converted}, Lost/Ignored: ${lost + ignored}`);
     
@@ -285,6 +342,10 @@ exports.getLeadAnalytics = async (req, res) => {
       { name: 'Converted', value: converted },
       { name: 'Lost/Ignored', value: ignored + lost }
     ];
+
+    const smartCrmData = {
+      hot, warm, cold, existing, vip, followUpsToday, new: newLeads, lost
+    };
 
     // 🚀 NEW: Lead Source Breakdown (Bar Chart)
     const leadsBySource = await Lead.aggregate([
@@ -357,6 +418,7 @@ exports.getLeadAnalytics = async (req, res) => {
       messageStats,
       recentActivity,
       advancedStats,
+      smartCrmData,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -67,6 +67,11 @@ const leadSchema = new Schema({
     type: Map,
     of: String,
   },
+  timeline: [{
+    eventType: { type: String },
+    description: { type: String },
+    timestamp: { type: Date, default: Date.now }
+  }],
   expiresAt: {
     type: Date
   },

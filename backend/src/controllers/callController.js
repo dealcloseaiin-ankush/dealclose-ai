@@ -59,6 +59,10 @@ exports.initiateCall = async (req, res) => {
         leadId: leadId,
         provider: 'twilio_custom'
       });
+      
+      if (leadId) {
+        await Lead.findByIdAndUpdate(leadId, { $push: { timeline: { eventType: 'Call Made', description: `Outbound call initiated to ${phoneNumber} via Twilio`, timestamp: new Date() } } });
+      }
     } 
     // 🚀 OPTION 2: PLATFORM'S MASTER EXOTEL NUMBER (Default System)
     else {
@@ -75,6 +79,10 @@ exports.initiateCall = async (req, res) => {
         leadId: leadId,
         provider: 'exotel_master'
       });
+      
+      if (leadId) {
+        await Lead.findByIdAndUpdate(leadId, { $push: { timeline: { eventType: 'Call Made', description: `Outbound call initiated to ${phoneNumber} via Exotel`, timestamp: new Date() } } });
+      }
     }
 
     res.status(200).json({ success: true, message: 'Call initiated', call: newCall });

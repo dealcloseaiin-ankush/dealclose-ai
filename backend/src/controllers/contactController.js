@@ -36,3 +36,20 @@ exports.addContact = async (req, res) => {
     res.status(500).json({ success: false, message: error.code === 11000 ? 'Contact already exists' : 'Server Error' });
   }
 };
+
+// @desc    Get AI Smart Segments (Mock for UI)
+// @route   GET /api/contacts/segments
+exports.getSegments = async (req, res) => {
+  try {
+    // This resolves the 404 error and shows smart data in the Contacts UI
+    const dummySegments = [
+      { id: 1, name: "Hot Prospects", count: 12, reason: "Recent active negotiation / high intent" },
+      { id: 2, name: "Needs Follow-up", count: 8, reason: "No response in 7 days" },
+      { id: 3, name: "VIP Customers", count: 4, reason: "Repeated purchases" }
+    ];
+    res.status(200).json(dummySegments);
+  } catch (error) {
+    console.error('Segments Error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};

@@ -5,7 +5,14 @@ const getOAuth2Client = (req = null) => {
   // 🚀 MEGA DEBUG & FIX: Automatically generate correct Redirect URL to prevent Google 400 Error
   let redirectUri = process.env.GOOGLE_REDIRECT_URI;
   if (!redirectUri || redirectUri === 'postmessage' || redirectUri === '') {
-    redirectUri = req && req.headers.origin ? `${req.headers.origin}/settings` : 'https://dealclose-ai.onrender.com/settings';
+    // Bulletproof Origin Extraction using standard URL API
+    let origin = req?.headers?.origin || req?.headers?.referer;
+    if (origin) {
+      const urlObj = new URL(origin);
+      redirectUri = `${urlObj.origin}/settings`; // Automatically handles http/https and exact domain
+    } else {
+      redirectUri = 'https://dealclose-ai.onrender.com/settings';
+    }
   }
   
   console.log(`\n================== [MEGA DEBUG: GOOGLE AUTH] ==================`);

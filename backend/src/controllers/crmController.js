@@ -94,10 +94,12 @@ exports.getPipeline = async (req, res) => {
     // Default pipeline structure
     const pipeline = {
       new: [],
-      contacted: [],
-      interested: [],
-      negotiating: [],
-      converted: [],
+      hot: [],
+      warm: [],
+      cold: [],
+      existing: [],
+      vip: [],
+      converted: [], // For backwards compatibility
       lost: []
     };
 
@@ -115,6 +117,10 @@ exports.getPipeline = async (req, res) => {
       let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); // Map AI status to pipeline
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
+      if (stage === 'interested') stage = 'warm'; // Legacy Mapping
+      if (stage === 'negotiating') stage = 'hot'; // Legacy Mapping
+      
+      if (!pipeline[stage]) stage = 'new'; // Safe Fallback
       lead.status = stage; // Ensure lowercase for Kanban board strict match
       lead.id = lead._id ? lead._id.toString() : String(lead.phoneNumber); // Ensure 'id' is strictly a string
 
@@ -217,6 +223,15 @@ exports.updateStage = async (req, res) => {
         changedBy: req.user?.fullName || 'system',
         reason: reason || 'Manual update via CRM Panel'
       });
+
+      // 🚀 CRM UPGRADE: Lead Timeline
+      if (!record.timeline) record.timeline = [];
+      record.timeline.push({ eventType: 'Status Changed', description: `Stage moved from ${oldStage} to ${targetStage.toLowerCase()}`, timestamp: new Date() });
+      if (['won', 'converted', 'completed'].includes(targetStage.toLowerCase())) {
+        record.timeline.push({ eventType: 'Lead Won', description: 'Deal successfully closed', timestamp: new Date() });
+      } else if (targetStage.toLowerCase() === 'lost') {
+        record.timeline.push({ eventType: 'Lead Lost', description: 'Deal lost', timestamp: new Date() });
+      }
     }
 
     // 🚀 NEW: Save Deal Value and Notes
@@ -227,6 +242,10 @@ exports.updateStage = async (req, res) => {
       // Ensure notes is an array and push the new log
       if (Array.isArray(record.notes)) record.notes.push(humanLog);
       else record.notes = record.notes ? [record.notes, humanLog] : [humanLog];
+
+      // 🚀 CRM UPGRADE: Lead Timeline
+      if (!record.timeline) record.timeline = [];
+      record.timeline.push({ eventType: 'Follow-up Completed', description: `Note added: ${notes}`, timestamp: new Date() });
     }
 
     await record.save();

@@ -204,6 +204,45 @@ const automationWorker = new Worker('automationQueue', async job => {
       }
     }
   }
+
+  // ==========================================
+  // 6. DAILY CRM AI SUMMARY & FOLLOW-UPS ALERTS
+  // ==========================================
+  if (job.name === 'daily_crm_summary') {
+    console.log(`⏳ [Worker Started] Generating Daily AI CRM Summary...`);
+    const users = await User.find({ "whatsappConfig.accessToken": { $exists: true } });
+    
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+
+    for (const user of users) {
+      if (!user.ownerPhone) continue;
+
+      const hotLeads = await Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating'] } });
+      const warmLeads = await Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested'] } });
+      const coldLeads = await Lead.countDocuments({ userId: user._id, status: 'cold' });
+      const existingCustomers = await Lead.countDocuments({ userId: user._id, status: 'existing' });
+      const followUpsToday = await Lead.find({ userId: user._id, nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } });
+
+      let msg = `🤖 *DealClose AI: Daily CRM Summary*\nGood Morning! Here is your lead status update:\n\n`;
+      msg += `🔥 *${hotLeads}* Hot Leads\n`;
+      msg += `🌟 *${warmLeads}* Warm Leads\n`;
+      msg += `❄️ *${coldLeads}* Cold Leads\n`;
+      msg += `💼 *${existingCustomers}* Existing Customers\n\n`;
+
+      if (followUpsToday.length > 0) {
+        msg += `📅 *Today's Follow-ups (${followUpsToday.length}):*\n`;
+        followUpsToday.slice(0, 5).forEach(l => { msg += `- ${l.name} (${l.phoneNumber})\n`; });
+        if (followUpsToday.length > 5) msg += `+ ${followUpsToday.length - 5} more... Please check your CRM dashboard.`;
+      } else {
+        msg += `📅 No follow-ups scheduled for today.`;
+      }
+
+      let formattedPhone = user.ownerPhone.replace(/\D/g, ''); 
+      if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;
+      await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, formattedPhone, msg).catch(() => {});
+    }
+  }
 }, { 
   connection,
   // 🔴 TRICK: Stop the "Tick-Tick" polling!
@@ -234,6 +273,13 @@ automationQueue.add('daily_token_refresh', {}, {
     pattern: '0 2 * * *' // Cron syntax for 02:00 AM daily
   },
   jobId: 'system_token_refresh'
+});
+
+// 🚀 NEW: Start the Daily Cron Job for CRM Summary & Follow-ups
+// Runs every day at 09:00 AM automatically
+automationQueue.add('daily_crm_summary', {}, {
+  repeat: { pattern: '0 9 * * *' }, // Cron syntax for 09:00 AM daily
+  jobId: 'daily_crm_summary_job'
 });
 
 module.exports = { automationQueue, automationWorker };

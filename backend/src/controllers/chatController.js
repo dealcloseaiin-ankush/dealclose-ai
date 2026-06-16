@@ -10,7 +10,7 @@ exports.getChats = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized. Please login again.' });
     
-    const { search } = req.query; // Search query from frontend
+    const { search, platform } = req.query; // Search query and platform filter from frontend
 
     const messages = await Message.find({ userId }).lean().sort({ timestamp: 1 });
 
@@ -87,6 +87,17 @@ exports.getChats = async (req, res) => {
       enrichedMessages.forEach(msg => {
         if ((msg.customerName && msg.customerName.toLowerCase().includes(searchTerm)) ||
             (msg.customerCity && msg.customerCity.toLowerCase().includes(searchTerm))) {
+          matchingPhones.add(msg.customerPhone);
+        }
+      });
+      enrichedMessages = enrichedMessages.filter(msg => matchingPhones.has(msg.customerPhone));
+    }
+
+    // If there's a platform filter (e.g., 'whatsapp', 'instagram'), filter the results
+    if (platform && platform !== 'all') {
+      const matchingPhones = new Set();
+      enrichedMessages.forEach(msg => {
+        if (msg.platform === platform || (platform === 'instagram' && msg.platform.startsWith('instagram'))) {
           matchingPhones.add(msg.customerPhone);
         }
       });

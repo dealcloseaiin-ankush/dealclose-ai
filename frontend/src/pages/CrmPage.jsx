@@ -7,6 +7,7 @@ import ContactDrawer from '../components/crm/ContactDrawer';
 import CrmList from '../components/crm/CrmList';
 import CrmAnalytics from '../components/crm/CrmAnalytics';
 import { useAuth } from '../hooks/useAuth';
+import InfluencerCRM from './InfluencerCRM';
 
 export default function CrmPage() {
   const [pipelineData, setPipelineData] = useState(null);
@@ -73,14 +74,20 @@ export default function CrmPage() {
 
   // Function to Share Backup directly to WhatsApp
   const handleShareWhatsApp = async () => {
-    const ownerPhone = prompt("Enter the WhatsApp number where you want to receive the backup (e.g., 919876543210):");
-    if (!ownerPhone) return;
+    // 🚀 SMART UPGRADE: No manual typing. Auto-detect from settings!
+    if (!user?.ownerPhone) {
+      toast.error("⚠️ Please add your 'Owner Phone' in Settings to receive backups automatically!");
+      return;
+    }
+    
+    const toastId = toast.loading('Sending backup to your WhatsApp...');
     try {
-      const res = await api.post('/leads/share-whatsapp', { targetPhoneNumber: ownerPhone });
+      const res = await api.post('/leads/share-whatsapp', {});
       if (res.data.success) {
-        toast.success('✅ Backup successfully sent to your WhatsApp!');
+        toast.success('✅ Backup successfully sent to your WhatsApp!', { id: toastId });
       }
     } catch (err) {
+      toast.dismiss(toastId);
       toast.error('❌ Failed to share: ' + (err.response?.data?.message || err.message));
     }
   };
@@ -175,6 +182,11 @@ export default function CrmPage() {
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-sky-500"></div>
       </div>
     );
+  }
+
+  // 🚀 SMART ROUTING: Agar user ek Influencer/Creator hai (Settings se ON kiya hai)
+  if (user?.acceptCollabs) {
+    return <InfluencerCRM />;
   }
 
   return (

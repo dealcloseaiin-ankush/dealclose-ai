@@ -9,6 +9,13 @@ const IvrCampaign = require('../models/ivrCampaignModel');
 exports.handleTwilioVoice = (req, res) => {
   const twiml = new VoiceResponse();
   
+  const fromPhone = req.body.From;
+  if (fromPhone) {
+    const Lead = require('../models/leadModel');
+    // Find lead async and push event
+    Lead.findOneAndUpdate({ phoneNumber: { $regex: new RegExp(fromPhone.replace(/\D/g, '').slice(-10) + '$') } }, { $push: { timeline: { eventType: 'Call Received', description: `Inbound call from ${fromPhone}`, timestamp: new Date() } } }).exec().catch(()=>{});
+  }
+
   // WebSocket URL automatically banayega (http -> ws)
   const host = req.headers.host || (process.env.BASE_URL ? process.env.BASE_URL.replace(/^https?:\/\//, '') : '');
   const wsUrl = `wss://${host}/api/webhooks/twilio/stream`;

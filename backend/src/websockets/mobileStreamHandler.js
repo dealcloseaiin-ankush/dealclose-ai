@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Call = require('../models/callModel');
 const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
+const Lead = require('../models/leadModel');
 
 // 🚀 GLOBAL CACHE: Taki Fallback Audio ka kharcha baar baar na aaye
 let cachedMobileFallbackAudio = null;
@@ -11,6 +12,8 @@ module.exports = function (ws) {
   let rawTranscript = []; 
   let conversationHistory = [];
   let audioChunkCount = 0;
+  let activeLeadId = null;
+  let activePhone = null;
   
   // 1. Initialize APIs
   console.log(`\n================== [AI CALLING DEBUG] ==================`);
@@ -165,6 +168,20 @@ module.exports = function (ws) {
 
       if (msg.event === 'start') {
         console.log(`📞 [Mobile Stream] Android App started recording.`);
+        
+        // 🚀 NEW: Extract Lead ID or Phone to track Timeline
+        if (msg.leadId) activeLeadId = msg.leadId;
+        if (msg.phone) activePhone = msg.phone;
+        
+        if (activeLeadId || activePhone) {
+          try {
+            const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
+            await Lead.findOneAndUpdate(query, {
+              $push: { timeline: { eventType: 'Call Received', description: 'Voice Call session started via Mobile/Web App.', timestamp: new Date() } }
+            }).exec().catch(() => {});
+          } catch(e) {}
+        }
+        
         processAIResponse(); // Initiate first greeting
 
       } else if (msg.event === 'audio') {
@@ -210,6 +227,14 @@ module.exports = function (ws) {
             summary: 'Call handled via Mobile App' 
         });
         console.log("💾 [DB] Mobile Call Transcript saved successfully.");
+        
+        // 🚀 NEW: Record Call Completion in Timeline
+        if (activeLeadId || activePhone) {
+           const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
+           await Lead.findOneAndUpdate(query, {
+              $push: { timeline: { eventType: 'Follow-up Completed', description: 'Voice Call session ended. Transcript saved.', timestamp: new Date() } }
+           }).exec().catch(() => {});
+        }
       } catch (e) {
         console.log("❌ DB Save Error:", e.message);
       }

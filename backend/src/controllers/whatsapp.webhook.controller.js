@@ -117,8 +117,12 @@ exports.handleWhatsApp = async (req, res) => {
               const seqId = String(leadCount + 1).padStart(4, '0');
               savedLead = await Lead.create({
                 userId: user._id, phoneNumber: fromNumber, name: `User #${seqId}`,
-                source: 'WhatsApp Inbound', status: 'new', createdBy: user._id, // 🐛 FIXED: Added missing comma
-                ...(getExpiry('junk') && { expiresAt: getExpiry('junk') }) // Only add if not null
+                source: 'WhatsApp Inbound', status: 'new', createdBy: user._id,
+                timeline: [
+                  { eventType: 'Lead Created', description: 'Lead auto-captured from WhatsApp Inbound', timestamp: new Date() },
+                  { eventType: 'WhatsApp Conversation Started', description: 'Customer initiated a new WhatsApp chat', timestamp: new Date() }
+                ],
+                ...(getExpiry('junk') && { expiresAt: getExpiry('junk') })
               });
             }
             
@@ -812,9 +816,14 @@ exports.handleWhatsApp = async (req, res) => {
                         userId: user._id, 
                         createdBy: user._id,
                         source: leadData.category || 'WhatsApp AI', 
-                        status: "interested", 
+                        status: leadData.status ? leadData.status.toLowerCase() : "warm", 
                         notes: `Interested in: ${leadData.itemName} | Budget: ${leadData.budget}` 
                       };
+                      
+                      if (leadData.leadScore !== undefined) updateFields.leadScore = leadData.leadScore;
+                      if (leadData.nextFollowUpDate) updateFields.nextFollowUpDate = new Date(leadData.nextFollowUpDate);
+                      if (leadData.budget) updateFields.budget = leadData.budget;
+                      if (leadData.customerType) updateFields.customerType = leadData.customerType;
                       
                       const updatedLead = await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { $set: updateFields }, { returnDocument: 'after', upsert: true });
                       
@@ -836,6 +845,10 @@ exports.handleWhatsApp = async (req, res) => {
                       if (items.length > 0) {
                         const catalogList = items.map(item => `*${item.name}* - ₹${item.price}\n${item.description || ''}`).join('\n\n');
                         responseMessage = `Here are the options I found for you:\n\n${catalogList}\n\nWould you like to know more about any of these or place an order?`;
+                        await Lead.findOneAndUpdate(
+                          { phoneNumber: fromNumber, userId: user._id },
+                          { $push: { timeline: { eventType: 'Quotation Sent', description: `Shared catalog options for "${searchData.searchQuery}"`, timestamp: new Date() } } }
+                        );
                       } else {
                         responseMessage = `I checked our catalog, but I couldn't find an exact match for "${searchData.searchQuery}". Please let me know if you are looking for something else.`;
                       }
@@ -856,6 +869,10 @@ exports.handleWhatsApp = async (req, res) => {
                           if (products.length > 0) {
                             const productList = products.slice(0, 3).map((p, i) => `*${i+1}. ${p.name || p.title}*\n💰 ₹${p.price}\n🔗 ${p.url || p.link || 'Link not available'}`).join('\n\n');
                             responseMessage = `Here are the top options from our website:\n\n${productList}\n\nWould you like to know more or add them to your cart?`;
+                            await Lead.findOneAndUpdate(
+                              { phoneNumber: fromNumber, userId: user._id },
+                              { $push: { timeline: { eventType: 'Quotation Sent', description: `Shared external catalog for "${searchData.searchQuery}"`, timestamp: new Date() } } }
+                            );
                           } else {
                             responseMessage = `I checked our store, but couldn't find an exact match for "${searchData.searchQuery}".`;
                           }
@@ -901,6 +918,13 @@ exports.handleWhatsApp = async (req, res) => {
                       if (profileData.email) updateFields.email = profileData.email;
                       if (profileData.city) updateFields.city = profileData.city;
                       if (profileData.businessType) updateFields.businessType = profileData.businessType;
+                      
+                      // CRM Extra Fields Extracted by AI
+                      if (profileData.status) updateFields.status = profileData.status.toLowerCase();
+                      if (profileData.leadScore !== undefined) updateFields.leadScore = profileData.leadScore;
+                      if (profileData.nextFollowUpDate) updateFields.nextFollowUpDate = new Date(profileData.nextFollowUpDate);
+                      if (profileData.budget) updateFields.budget = profileData.budget;
+                      if (profileData.customerType) updateFields.customerType = profileData.customerType;
                       
                       const aiLog = `[AI Assistant] Updated Profile - Name: ${profileData.fullName || 'N/A'}${profileData.city ? ', City: ' + profileData.city : ''}${profileData.email ? ', Email: ' + profileData.email : ''}`;
 

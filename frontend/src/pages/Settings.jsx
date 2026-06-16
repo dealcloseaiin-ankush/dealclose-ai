@@ -86,7 +86,11 @@ export default function Settings() {
           fetchSettings();
         })
         .catch(err => {
-          alert(err.response?.data?.message || 'Failed to connect Google Sheets.');
+          const errMsg = err.response?.status === 404 
+            ? 'Backend API Route Not Found (404). Please ensure /api/settings/google/connect is properly mapped in your server routes.' 
+            : (err.response?.data?.message || err.message);
+            
+          alert(`❌ Google Connection Failed: ${errMsg}`);
           window.history.replaceState({}, document.title, window.location.pathname);
           setIsLoading(false);
         });

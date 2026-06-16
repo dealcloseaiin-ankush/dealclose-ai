@@ -41,12 +41,13 @@ export default function Dashboard() {
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
   const [workspaces, setWorkspaces] = useState([]);
   const [activeBusinessId, setActiveBusinessId] = useState('main');
+  const [platformFilter, setPlatformFilter] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await api.get('/leads/analytics', { params: { workspaceId: activeBusinessId } });
+        const response = await api.get('/leads/analytics', { params: { workspaceId: activeBusinessId, platform: platformFilter } });
         setData(response.data);
         
         if (isSuperAdmin) {
@@ -80,7 +81,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, [isSuperAdmin, activeBusinessId]);
+  }, [isSuperAdmin, activeBusinessId, platformFilter]);
 
   if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
 
@@ -100,6 +101,11 @@ export default function Dashboard() {
               {workspaces.map(ws => (
                 <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
               ))}
+            </select>
+            <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
+              <option value="all">🌍 All Platforms</option>
+              <option value="whatsapp">🟩 WhatsApp</option>
+              <option value="instagram">🟪 Instagram</option>
             </select>
           </div>
           <p className="text-gray-400 text-lg">Welcome back. Here is how your AI Agent is performing today.</p>
@@ -134,7 +140,45 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Smart CRM Classification Panel */}
+      <div className="mb-10 bg-gradient-to-r from-[#111111] to-[#1a1a1a] border border-gray-800 rounded-2xl p-6 shadow-xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <span className="text-yellow-500">🧠</span> Smart AI Lead Classification
+          </h3>
+          <Link to="/crm" className="text-sm text-blue-400 hover:text-blue-300 font-semibold">View CRM Board →</Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 text-center">
+          <div className="bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
+            <p className="text-2xl font-black text-blue-400">{data.smartCrmData?.new || 0}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">New Leads</p>
+          </div>
+          <div className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+            <p className="text-2xl font-black text-red-500">{data.smartCrmData?.hot || 0}</p><p className="text-[10px] text-red-400 font-bold uppercase tracking-wide mt-1">Hot 🔥</p>
+          </div>
+          <div className="bg-orange-500/10 p-4 rounded-xl border border-orange-500/20 hover:bg-orange-500/20 transition">
+            <p className="text-2xl font-black text-orange-400">{data.smartCrmData?.warm || 0}</p><p className="text-[10px] text-orange-400 font-bold uppercase tracking-wide mt-1">Warm 🌟</p>
+          </div>
+          <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition">
+            <p className="text-2xl font-black text-blue-300">{data.smartCrmData?.cold || 0}</p><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wide mt-1">Cold ❄️</p>
+          </div>
+          <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20 hover:bg-green-500/20 transition">
+            <p className="text-2xl font-black text-green-400">{data.smartCrmData?.existing || 0}</p><p className="text-[10px] text-green-400 font-bold uppercase tracking-wide mt-1">Existing 💼</p>
+          </div>
+          <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 hover:bg-purple-500/20 transition">
+            <p className="text-2xl font-black text-purple-400">{data.smartCrmData?.vip || 0}</p><p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide mt-1">VIP 👑</p>
+          </div>
+          <div className="bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
+            <p className="text-2xl font-black text-gray-400">{data.smartCrmData?.lost || 0}</p><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide mt-1">Lost 💔</p>
+          </div>
+          <div className="bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/20 transition relative">
+            {data.smartCrmData?.followUpsToday > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{data.smartCrmData.followUpsToday} Due</span>}
+            <p className="text-2xl font-black text-yellow-400">{data.smartCrmData?.followUpsToday || 0}</p><p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wide mt-1">Follow-ups</p>
+          </div>
+        </div>
+      </div>
+
       {/* Real-time WhatsApp Delivery Stats */}
+      {platformFilter !== 'instagram' && (
       <div className="mb-10 bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-xl">
         <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
           <span className="text-green-500">📱</span> WhatsApp API Delivery Report
@@ -154,6 +198,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
