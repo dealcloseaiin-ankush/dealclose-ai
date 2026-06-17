@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import toast from 'react-hot-toast';
 
 export default function AvatarProductAds() {
   const { user } = useAuth();
@@ -9,20 +10,44 @@ export default function AvatarProductAds() {
   const [videoUrl, setVideoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Helper function for polling job status from the backend
+  const pollJobStatus = (jobId) => {
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/video/job-status/${jobId}`);
+        
+        if (data.status === 'completed') {
+          clearInterval(interval);
+          setVideoUrl(data.result.url);
+          toast.success("Avatar Lip-Sync successful!", { id: 'lipsync-toast' });
+          setLoading(false);
+        } else if (data.status === 'failed') {
+          clearInterval(interval);
+          toast.error(data.error || "Failed to generate lip-sync video.", { id: 'lipsync-toast' });
+          setLoading(false);
+        }
+      } catch (error) {
+        clearInterval(interval);
+        console.error("Polling Error:", error);
+        toast.error("Error checking video status.", { id: 'lipsync-toast' });
+        setLoading(false);
+      }
+    }, 5000); // Poll every 5 seconds for video
+  };
+
   const handleGenerateLipSync = async () => {
-    if (!script) return alert("Please enter a script.");
+    if (!script) return toast.error("Please enter a script.");
     setLoading(true);
+    setVideoUrl(null);
+    toast.loading("Sending script to AI Avatar...", { id: 'lipsync-toast' });
+
     try {
-      const { data } = await api.post('/video/generate-lipsync', {
-        avatarImageUrl: "sample-avatar.png",
-        script: script,
-        userId: user?._id
-      });
-      setVideoUrl(data.url);
-      alert("Avatar Lip-Sync successful! This is saved privately to your account.");
+      const { data } = await api.post('/video/generate-lipsync', { avatarImageUrl: "sample-avatar.png", script: script, userId: user?._id });
+      toast.loading("AI is generating your avatar video... This can take 2-5 minutes.", { id: 'lipsync-toast' });
+      pollJobStatus(data.jobId);
     } catch (error) {
       console.error(error);
-    } finally {
+      toast.error(error.response?.data?.message || "Failed to start lip-sync generation.", { id: 'lipsync-toast' });
       setLoading(false);
     }
   };

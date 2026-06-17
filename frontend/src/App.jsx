@@ -41,6 +41,7 @@ import AIVideoDashboard from './pages/AIVideoDashboard';
 import WhatsAppRules from './pages/WhatsAppRules';
 import SuperAdmin from './pages/SuperAdmin';
 import SolutionRecommender from './pages/SolutionRecommender';
+import AutoMarketerDashboard from './pages/AutoMarketerDashboard'; // 🚀 NEW
 import { useAuth } from './hooks/useAuth';
 
 // Placeholder component for Change Password until we build the real one
@@ -209,6 +210,7 @@ export default function App() {
             <Route path="whatsapp-rules" element={<WhatsAppRules />} />
             <Route path="scaniq" element={<ScanIQ />} />
             <Route path="super-admin" element={<SuperAdmin />} />
+            <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
           </Route>
         </Route>
       </Routes>

@@ -1,6 +1,7 @@
 const { Worker, Queue } = require('bullmq');
 const IORedis = require('ioredis');
 const User = require('../models/userModel');
+const GeneratedPost = require('../models/generatedPostModel'); // 🚀 NEW
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/aiService');
@@ -243,6 +244,86 @@ const automationWorker = new Worker('automationQueue', async job => {
       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, formattedPhone, msg).catch(() => {});
     }
   }
+
+  // ==========================================
+  // 7. AUTO-PILOT SOCIAL MEDIA MARKETER (DAILY POST GENERATION)
+  // ==========================================
+  if (job.name === 'generate_social_post') {
+    console.log(`⏳ [Worker Started] Generating Daily Social Media Post for all users...`);
+    
+    // Find users who have Instagram connected and ownerPhone set
+    const users = await User.find({ 
+      "igConfig.accessToken": { $exists: true }, 
+      ownerPhone: { $exists: true, $ne: "" } 
+    });
+
+    for (const user of users) {
+      try {
+        const bizName = user.businessName || "our business";
+        const bizDesc = user.businessDescription || "a great company";
+        
+        const prompt = `Act as an expert Instagram Social Media Manager for a business named "${bizName}". 
+        Business details: ${bizDesc}.
+        Write a highly engaging, viral Instagram caption for a new post today. Include emojis, a strong hook, and 5-10 relevant hashtags. Do not include any placeholder brackets.`;
+
+        // Generate Caption using AI
+        const generatedCaption = await aiService.generateAIResponse("Create a viral Instagram post", prompt);
+
+        // 🚀 NEW: Generate Real AI Image using Replicate API (SDXL Lightning)
+        let generatedImageUrl = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=2070&auto=format&fit=crop'; // Fallback
+        if (process.env.REPLICATE_API_TOKEN) {
+          try {
+            const Replicate = require('replicate');
+            const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+            
+            // Create a smart prompt for the image based on the caption
+            const imgPrompt = `A high quality, professional promotional image for an Instagram post about: ${bizName}. Concept: ${generatedCaption.substring(0, 100).replace(/[^a-zA-Z0-9 ]/g, '')}, highly detailed, cinematic lighting, 8k, modern photography`;
+            
+            const output = await replicate.run(
+              "bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637",
+              { input: { prompt: imgPrompt } }
+            );
+            
+            if (output && (Array.isArray(output) ? output[0] : output)) {
+              generatedImageUrl = Array.isArray(output) ? output[0] : output;
+            }
+          } catch (imgErr) {
+            console.error(`❌ [Worker Error] Replicate Image Gen Failed for ${user._id}:`, imgErr.message);
+          }
+        }
+
+        // 🚀 NEW: Save the generated post to the database with 'pending_approval' status
+        const newPost = new GeneratedPost({
+          userId: user._id,
+          caption: generatedCaption,
+          imageUrl: generatedImageUrl
+        });
+        await newPost.save();
+
+        // Send WhatsApp Approval Message to the Business Owner
+        let formattedPhone = user.ownerPhone.replace(/\D/g, ''); 
+        if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;
+
+        const waMessage = `🚀 *DealClose Auto-Marketer*\n\nHere is your AI-generated Instagram Post for today:\n\n🖼️ *Image:* ${generatedImageUrl}\n\n💬 *Caption:*\n${generatedCaption}\n\n👉 Reply with "APPROVE ${newPost._id.toString().slice(-6).toUpperCase()}" to publish this.`;
+        
+        // 🚀 SMART ROUTING: Use User's WA API if available, ELSE use DealClose AI's System WA API
+        const waToken = user.whatsappConfig?.accessToken || process.env.SYSTEM_META_TOKEN;
+        const waPhoneId = user.whatsappConfig?.phoneNumberId || process.env.SYSTEM_PHONE_ID;
+
+        if (waToken && waPhoneId) {
+          await whatsappService.sendTextMessage(waToken, waPhoneId, formattedPhone, waMessage);
+          const sentVia = user.whatsappConfig?.accessToken ? 'User API' : 'DealClose System API';
+          console.log(`✅ [Worker Success] Sent Auto-Post approval to ${user.businessName} via ${sentVia}`);
+        } else {
+          // Both are missing (Very rare if SYSTEM_META_TOKEN is set in .env)
+          console.log(`⚠️ [Worker Info] Could not send WA approval to ${user.businessName}. Post is saved in Dashboard.`);
+        }
+
+      } catch (err) {
+        console.error(`❌ [Worker Failed] Error generating post for user ${user._id}:`, err.message);
+      }
+    }
+  }
 }, { 
   connection,
   // 🔴 TRICK: Stop the "Tick-Tick" polling!
@@ -280,6 +361,13 @@ automationQueue.add('daily_token_refresh', {}, {
 automationQueue.add('daily_crm_summary', {}, {
   repeat: { pattern: '0 9 * * *' }, // Cron syntax for 09:00 AM daily
   jobId: 'daily_crm_summary_job'
+});
+
+// 🚀 NEW: Start the Daily Cron Job for Auto-Pilot Marketer (Social Media)
+// Runs every day at 10:00 AM automatically
+automationQueue.add('generate_social_post', {}, {
+  repeat: { pattern: '0 10 * * *' }, // Cron syntax for 10:00 AM daily
+  jobId: 'generate_social_post_job'
 });
 
 module.exports = { automationQueue, automationWorker };

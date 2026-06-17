@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Image, Video, Music, LayoutTemplate, Play, Download, Loader2, Home, User } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Image, Video, Music, LayoutTemplate, Play, Download, Loader2, Home, User, ImageIcon } from 'lucide-react';
+import toast from 'react-hot-toast'; // Make sure this is installed
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // Import Auth to show user info
 
@@ -22,6 +22,31 @@ export default function AIVideoDashboard() {
     { image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30', prompt: 'Sleek white smartwatch hovering over a minimalist concrete podium, soft sunlight, highly detailed product photography' },
     { image: 'https://images.unsplash.com/photo-1596462502278-27bf85033e5a', prompt: 'Luxury perfume bottle splashing into crystal clear water, slow motion, macro photography' }
   ];
+
+  // Helper function for polling job status from the backend
+  const pollJobStatus = (jobId, assetType) => {
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/video/job-status/${jobId}`);
+        
+        if (data.status === 'completed') {
+          clearInterval(interval);
+          setGeneratedAsset({ type: assetType, url: data.result.url });
+          toast.success(`${assetType.charAt(0).toUpperCase() + assetType.slice(1)} generated successfully!`, { id: 'anim-toast' });
+          setLoading(false);
+        } else if (data.status === 'failed') {
+          clearInterval(interval);
+          toast.error(data.error || `Failed to generate ${assetType}.`, { id: 'anim-toast' });
+          setLoading(false);
+        }
+      } catch (error) {
+        clearInterval(interval);
+        console.error("Polling Error:", error);
+        toast.error(`Error checking ${assetType} status.`, { id: 'anim-toast' });
+        setLoading(false);
+      }
+    }, 5000); // Poll every 5 seconds
+  };
 
   // Real API Call for Image Generation (Replicate API)
   const handleGenerateImage = async (e) => {
@@ -62,18 +87,25 @@ export default function AIVideoDashboard() {
     }
     
     setLoading(true);
+    // Keep the image visible while video is loading in the background
+    toast.loading("Sending image to animation engine...", { id: 'anim-toast' });
+
     try {
-      const res = await api.post('/video/animate-image', { imageUrl: generatedAsset.url, prompt });
-      setGeneratedAsset({ type: 'video', url: res.data.url });
-      if (res.data.isMock) {
-        toast.error("Replicate API Limit Reached! Showing a sample video instead.", { duration: 5000 });
+      // Backend returns a jobId
+      const { data } = await api.post('/video/animate-image', { imageUrl: generatedAsset.url, prompt });
+      
+      if (data.jobId) {
+        toast.loading("AI is animating your video... This can take 2-3 minutes.", { id: 'anim-toast' });
+        pollJobStatus(data.jobId, 'video');
       } else {
-        toast.success("Video animated successfully!");
+        // Fallback for old API behavior
+        setGeneratedAsset({ type: 'video', url: data.url });
+        toast.success("Video animated successfully!", { id: 'anim-toast' });
+        setLoading(false);
       }
     } catch (error) {
       console.error("Video Animation Error:", error);
-      toast.error(error.response?.data?.message || "Failed to animate video.");
-    } finally {
+      toast.error(error.response?.data?.message || "Failed to start video animation.", { id: 'anim-toast' });
       setLoading(false);
     }
   };
@@ -237,37 +269,33 @@ export default function AIVideoDashboard() {
             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Output / Preview</h3>
             
             <div className="w-full aspect-video bg-[#050505] rounded-2xl border border-gray-800 flex items-center justify-center relative overflow-hidden group">
-              {!generatedAsset && !loading && (
+              {!generatedAsset && !loading && ( // Initial state
                 <div className="text-center text-gray-600">
-                  <Play size={48} className="mx-auto mb-2 opacity-20" />
+                  <ImageIcon size={48} className="mx-auto mb-2 opacity-20" />
                   <p>Your creation will appear here</p>
                 </div>
               )}
               
-              {loading && (
-                <div className="text-center text-pink-500">
+              {generatedAsset && generatedAsset.type === 'image' && ( // Image is ready
+                <img src={generatedAsset.url} alt="AI Generated" className="w-full h-full object-cover" />
+              )}
+
+              {generatedAsset && generatedAsset.type === 'video' && ( // Video is ready
+                <video src={generatedAsset.url} autoPlay loop muted controls className="w-full h-full object-cover" />
+              )}
+
+              {loading && ( // Loading overlay
+                <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-center text-pink-500">
                   <Loader2 size={48} className="animate-spin mx-auto mb-4" />
                   <p className="font-bold animate-pulse">AI is rendering magic...</p>
-                  <p className="text-xs text-gray-500 mt-2">This usually takes 15-30 seconds</p>
+                  <p className="text-xs text-gray-500 mt-2">This can take a few minutes</p>
                 </div>
               )}
 
-              {generatedAsset && !loading && generatedAsset.type === 'image' && (
-                <>
-                  <img src={generatedAsset.url} alt="AI Generated" className="w-full h-full object-cover" />
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <button onClick={() => handleDownload(generatedAsset.url, 'image')} className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white transition-all hover:scale-110" title="Download"><Download size={18}/></button>
-                  </div>
-                </>
-              )}
-
-              {generatedAsset && !loading && generatedAsset.type === 'video' && (
-                <>
-                  <video src={generatedAsset.url} autoPlay loop muted controls className="w-full h-full object-cover" />
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <button onClick={() => handleDownload(generatedAsset.url, 'video')} className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white transition-all hover:scale-110" title="Download"><Download size={18}/></button>
-                  </div>
-                </>
+              {generatedAsset && !loading && ( // Download button when not loading
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                  <button onClick={() => handleDownload(generatedAsset.url, generatedAsset.type)} className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white transition-all hover:scale-110" title="Download"><Download size={18}/></button>
+                </div>
               )}
             </div>
           </div>

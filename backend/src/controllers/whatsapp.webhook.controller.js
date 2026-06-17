@@ -9,6 +9,8 @@ const billing = require('../utils/billing');
 const metaAdsService = require('../services/metaAdsService');
 const Flow = require('../models/flowModel');
 const googleSheetsController = require('./googleSheetsController');
+const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 NEW: Auto-Marketer DB
+const instagramService = require('../services/instagramService'); // 🚀 NEW: IG Publisher
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
@@ -246,6 +248,50 @@ exports.handleWhatsApp = async (req, res) => {
             let repliedBy = 'ai';
 
             const isOwnerOrStaff = (user.ownerPhone && user.ownerPhone.replace(/\D/g,'') === fromNumber) || (user.staff && user.staff.some(s => s.phone.replace(/\D/g,'') === fromNumber));
+            
+            // ==========================================================
+            // 🚀 NEW: AUTO-MARKETER APPROVAL LOGIC (For Business Owner)
+            // ==========================================================
+            const incomingTextUpper = incomingText.toUpperCase();
+            if (isOwnerOrStaff && incomingTextUpper.startsWith('APPROVE ')) {
+              const postIdShort = incomingTextUpper.split(' ')[1];
+              
+              if (postIdShort && postIdShort.length === 6) {
+                const postToApprove = await GeneratedPost.findOne({ 
+                  _id: { $regex: `${postIdShort}$`, $options: 'i' },
+                  status: 'pending_approval'
+                });
+
+                if (postToApprove) {
+                  try {
+                    // Handle Model naming variations (instagramConfig vs igConfig)
+                    const igSettings = user.instagramConfig || user.igConfig || {};
+                    const igAccountId = igSettings.instagramAccountId || igSettings.accountId;
+                    
+                    if (!igAccountId || !igSettings.accessToken) {
+                      await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `❌ Instagram account is not connected properly. Please reconnect from your Dashboard Settings.`);
+                      continue;
+                    }
+
+                    await instagramService.publishInstagramPost(igAccountId, igSettings.accessToken, postToApprove.imageUrl, postToApprove.caption);
+
+                    postToApprove.status = 'posted';
+                    postToApprove.postedAt = new Date();
+                    await postToApprove.save();
+
+                    await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `✅ Success! Your AI-generated post has been published to your Instagram feed.`);
+                    continue; // 🚀 Stop execution here!
+                  } catch (publishError) {
+                    postToApprove.status = 'failed';
+                    postToApprove.feedback = publishError.message;
+                    await postToApprove.save();
+                    await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `❌ Oops! Error publishing to Instagram: ${publishError.message}`);
+                    continue; // 🚀 Stop execution here!
+                  }
+                }
+              }
+            }
+
             if (isOwnerOrStaff) {
               const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
