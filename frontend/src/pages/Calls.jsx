@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { Phone, PhoneOff, Mic, Activity } from 'lucide-react';
+import { Phone, PhoneOff, Mic, Settings, PlayCircle, History, Bot, Volume2 } from 'lucide-react';
 
 export default function Calls() {
   const [isCalling, setIsCalling] = useState(false);
@@ -13,12 +13,16 @@ export default function Calls() {
   const streamRef = useRef(null);
 
   const addLog = (msg) => {
-    setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: msg }]);
+    setLogs(prev => [...prev, { 
+      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}), 
+      text: msg 
+    }]);
   };
 
   const startCall = async () => {
     try {
       setStatus("Connecting to AI...");
+      setLogs([]); // Clear previous logs
       addLog("Initializing Audio & WebSocket...");
       
       // 🚀 FIX: Redirect WebSocket directly to the Backend (Render) instead of the Frontend host
@@ -136,29 +140,94 @@ export default function Calls() {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-[#050505] text-gray-200">
-      <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mb-2">Web AI Calling (Test Mode)</h1>
-      <p className="text-gray-400 mb-8">Test your AI Voice Assistant directly from your browser before launching the Android App.</p>
+    <div className="min-h-[calc(100vh-4rem)] p-6 md:p-10 bg-[#050505] text-gray-200 font-sans">
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mb-2">
+          AI Voice Studio
+        </h1>
+        <p className="text-gray-400">Configure and test your AI Voice Assistant before deploying it to real customers.</p>
+      </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        <div className="bg-[#111] border border-gray-800 p-8 rounded-3xl shadow-2xl flex flex-col items-center justify-center flex-1">
-          <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 transition-all duration-500 ${isCalling ? 'bg-green-500/20 border-4 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse' : 'bg-gray-800 border-4 border-gray-700'}`}>
-            {isCalling ? <Mic size={50} className="text-green-500 animate-pulse" /> : <Mic size={50} className="text-gray-500" />}
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">{status}</h2>
-          <p className="text-sm text-gray-400 text-center mb-8 max-w-xs">Make sure you have added your Deepgram API Key and Gemini API Key in the backend `.env` file.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        
+        {/* COLUMN 1: Agent Configuration */}
+        <div className="bg-[#111] border border-gray-800 p-6 rounded-3xl shadow-xl flex flex-col gap-6">
+          <h3 className="font-bold text-white flex items-center gap-2 text-lg border-b border-gray-800 pb-4">
+            <Settings size={20} className="text-blue-400"/> Agent Configuration
+          </h3>
           
-          {!isCalling ? (
-            <button onClick={startCall} className="flex items-center gap-3 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-green-600/30"><Phone size={24} /> Start Test Call</button>
-          ) : (
-            <button onClick={() => endCall()} className="flex items-center gap-3 bg-rose-600 hover:bg-rose-500 text-white px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-rose-600/30"><PhoneOff size={24} /> End Call</button>
-          )}
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Agent Persona</label>
+            <select className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none cursor-pointer">
+              <option>Sales Representative (Energetic)</option>
+              <option>Customer Support (Calm & Empathetic)</option>
+              <option>Appointment Setter (Professional)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">AI Voice Model</label>
+            <select className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none cursor-pointer">
+              <option>Aura Asteria (Female - US English)</option>
+              <option>Aura Orion (Male - US English)</option>
+              <option>Aura Luna (Female - Soft Accent)</option>
+            </select>
+          </div>
+
+          <div className="flex-1">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">System Instructions (Prompt)</label>
+            <textarea 
+              className="w-full h-32 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none resize-none text-sm"
+              defaultValue="You are the AI assistant for DealClose. Your goal is to answer questions politely and try to capture the user's email address."
+            ></textarea>
+          </div>
         </div>
 
-        <div className="bg-[#0a0a0a] border border-gray-800 p-6 rounded-3xl flex-1 flex flex-col">
-          <h3 className="font-bold text-gray-300 mb-4 uppercase tracking-wider text-sm">System Logs</h3>
-          <div className="flex-1 bg-black rounded-xl p-4 overflow-y-auto font-mono text-xs text-green-400 space-y-2 border border-gray-900 min-h-[300px]">
-            {logs.map((log, i) => <div key={i}><span className="text-gray-600">[{log.time}]</span> {log.text}</div>)}
+        {/* COLUMN 2: Live Dialer Console */}
+        <div className="bg-[#111] border border-gray-800 rounded-3xl shadow-xl flex flex-col items-center justify-center relative overflow-hidden h-[500px] lg:h-auto border-t-4 border-t-green-500">
+          <div className="absolute top-0 w-full h-full bg-gradient-to-b from-green-500/5 to-transparent pointer-events-none"></div>
+          
+          <div className="text-center z-10">
+            <h2 className={`text-xl font-bold mb-8 transition-colors ${isCalling ? 'text-green-400' : 'text-white'}`}>{status}</h2>
+            
+            <div className={`mx-auto w-40 h-40 rounded-full flex items-center justify-center mb-10 transition-all duration-500 ${isCalling ? 'bg-green-500/20 border-4 border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.4)]' : 'bg-[#1a1a1a] border-4 border-gray-700 shadow-xl'}`}>
+              <div className={`w-28 h-28 rounded-full flex items-center justify-center ${isCalling ? 'bg-green-500 animate-pulse' : 'bg-gray-800'}`}>
+                {isCalling ? <Volume2 size={40} className="text-white" /> : <Bot size={40} className="text-gray-400" />}
+              </div>
+            </div>
+            
+            {!isCalling ? (
+              <button onClick={startCall} className="mx-auto flex items-center justify-center gap-3 bg-green-600 hover:bg-green-500 text-white px-10 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-green-600/30">
+                <Phone size={24} /> Connect to AI
+              </button>
+            ) : (
+              <button onClick={() => endCall()} className="mx-auto flex items-center justify-center gap-3 bg-rose-600 hover:bg-rose-500 text-white px-10 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-rose-600/30">
+                <PhoneOff size={24} /> End Session
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* COLUMN 3: Live Transcripts & Logs */}
+        <div className="bg-[#0a0a0a] border border-gray-800 p-6 rounded-3xl flex flex-col">
+          <h3 className="font-bold text-white flex items-center gap-2 text-lg border-b border-gray-800 pb-4 mb-4">
+            <History size={20} className="text-purple-400"/> Live Call Transcripts
+          </h3>
+          
+          <div className="flex-1 bg-[#111] rounded-xl p-4 overflow-y-auto font-mono text-sm space-y-3 border border-gray-800 min-h-[300px]">
+            {logs.length === 0 ? (
+               <div className="text-center text-gray-600 flex flex-col items-center justify-center h-full">
+                 <Activity size={32} className="mb-2 opacity-20" />
+                 <p>Call logs will appear here</p>
+               </div>
+            ) : (
+              logs.map((log, i) => (
+                <div key={i} className="flex flex-col gap-1 border-b border-gray-800/50 pb-2 last:border-0 animate-fade-in">
+                  <span className="text-[10px] text-gray-500">{log.time}</span> 
+                  <span className="text-green-400 leading-snug">{log.text}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

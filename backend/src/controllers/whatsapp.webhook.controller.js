@@ -71,6 +71,14 @@ exports.handleWhatsApp = async (req, res) => {
           console.log(`✅ [Webhook] User found: ${user.email} for Phone ID: ${phoneNumberId}`);
         }
 
+        // 🚀 PRIVACY FIX: Check if the message is for the page itself, not a personal DM forwarded by Meta
+        const recipientId = entry.id; // This is the ID of the page that received the event
+        const pageIgId = user.igConfig?.accountId;
+        if (changes.field === 'messages' && pageIgId && recipientId !== pageIgId) {
+          console.log(`🚫 [Privacy Guard] Ignored a personal DM forwarded to webhook. Page ID: ${pageIgId}, Recipient ID: ${recipientId}`);
+          continue; // Stop processing this message
+        }
+
         // 1. CHECK FOR STATUS UPDATES
         if (value.statuses && value.statuses.length > 0) {
           console.log(`➡️ [Webhook] Status update received: ${value.statuses[0].status} for message ID: ${value.statuses[0].id}`);

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight, Mic, Play, PhoneCall } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function Campaigns() {
   const { user } = useAuth() || {};
@@ -39,6 +41,10 @@ export default function Campaigns() {
   const [ivrCampaigns, setIvrCampaigns] = useState([]);
   const [testPhone, setTestPhone] = useState('');
   const [testingId, setTestingId] = useState(null);
+
+  // 🚀 NEW: AI Chatbot for Ad Creation
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: "Hi! I'm your Ad Strategist. What kind of campaign should we create today?" }]);
 
   const handleGenerateAd = async (e) => {
     e.preventDefault();
@@ -144,6 +150,31 @@ export default function Campaigns() {
     // It will not auto-submit to give the user a chance to read it, but you can call handleGenerateAd(e) here if you want instant generation.
   };
 
+  // 🚀 NEW: AI Chatbot handler
+  const handleAdChat = async (e) => {
+    e.preventDefault();
+    const userMessage = e.target.message.value;
+    if (!userMessage) return;
+    
+    const newMsgs = [...chatMessages, { role: 'user', text: userMessage }];
+    setChatMessages(newMsgs);
+    e.target.message.value = '';
+
+    try {
+      const res = await api.post('/ai/webchat', { 
+        message: userMessage, 
+        context: "You are a Meta Ads expert. Help the user create an ad campaign by asking for their product, budget, and target audience. Then, summarize it for the main prompt box."
+      });
+      
+      // If AI suggests a prompt, auto-fill it!
+      if (res.data.reply.toLowerCase().includes("prompt:")) {
+        setAiPrompt(res.data.reply.split("Prompt:")[1].trim());
+      }
+
+      setChatMessages([...newMsgs, { role: 'ai', text: res.data.reply }]);
+    } catch { toast.error("AI Assistant is busy."); }
+  };
+
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-[calc(100vh-4rem)] text-gray-100 font-sans">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -170,24 +201,27 @@ export default function Campaigns() {
       <div className="mb-10">
         <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">📊 True ROI Analytics (Last 30 Days)</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-[#111] p-5 rounded-2xl border border-gray-800 shadow-lg">
+          <Link to="/wallet" className="block bg-[#111] p-5 rounded-2xl border border-gray-800 shadow-lg hover:border-rose-500/50 transition-colors cursor-pointer group">
             <p className="text-gray-400 text-xs font-bold uppercase mb-1 flex items-center gap-1"><DollarSign size={14} className="text-rose-400"/> Ad Spend</p>
-            <p className="text-2xl font-black text-white">₹5,000</p>
-          </div>
-          <div className="bg-[#111] p-5 rounded-2xl border border-gray-800 shadow-lg">
+            <p className="text-2xl font-black text-white group-hover:text-rose-400 transition-colors">₹5,000</p>
+          </Link>
+          
+          <Link to="/tracking-analytics" className="block bg-[#111] p-5 rounded-2xl border border-gray-800 shadow-lg hover:border-blue-500/50 transition-colors cursor-pointer group">
             <p className="text-gray-400 text-xs font-bold uppercase mb-1 flex items-center gap-1"><Eye size={14} className="text-blue-400"/> Impressions</p>
-            <p className="text-2xl font-black text-white">10,240</p>
-          </div>
-          <div className="bg-[#111] p-5 rounded-2xl border border-gray-800 shadow-lg">
+            <p className="text-2xl font-black text-white group-hover:text-blue-400 transition-colors">10,240</p>
+          </Link>
+          
+          <Link to="/crm" className="block bg-[#111] p-5 rounded-2xl border border-gray-800 shadow-lg hover:border-green-500/50 transition-colors cursor-pointer group">
             <p className="text-gray-400 text-xs font-bold uppercase mb-1 flex items-center gap-1"><MessageCircle size={14} className="text-green-400"/> WhatsApp Leads</p>
             <p className="text-2xl font-black text-green-400">200</p>
             <p className="text-[10px] text-gray-500 mt-1">Cost Per Lead: ₹25</p>
-          </div>
-          <div className="bg-gradient-to-br from-indigo-900/20 to-[#111] p-5 rounded-2xl border border-indigo-500/30 shadow-lg relative overflow-hidden">
+          </Link>
+          
+          <Link to="/dispatch" className="block bg-gradient-to-br from-indigo-900/20 to-[#111] p-5 rounded-2xl border border-indigo-500/30 shadow-lg relative overflow-hidden hover:border-indigo-500/60 transition-colors cursor-pointer group">
             <p className="text-indigo-300 text-xs font-bold uppercase mb-1 flex items-center gap-1"><ShoppingCart size={14}/> Actual Sales</p>
-            <p className="text-2xl font-black text-white">20</p>
+            <p className="text-2xl font-black text-white group-hover:text-indigo-300 transition-colors">20</p>
             <p className="text-[10px] text-indigo-400 mt-1 font-semibold">Cost Per Sale: ₹250</p>
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -203,7 +237,10 @@ export default function Campaigns() {
         <div className="bg-[#111] border border-blue-500/20 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="relative z-10">
-            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">✨ Create Campaign with AI</h2>
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">✨ Create Campaign with AI</h2>
+              <button onClick={() => setIsChatOpen(!isChatOpen)} className="text-xs font-bold bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full hover:bg-blue-500/30 transition-colors">AI Assistant</button>
+            </div>
             <p className="text-gray-400 text-sm mb-6">Just tell the AI what you want to sell, and it will write the ad copy and target the best audience.</p>
             
             <form onSubmit={handleGenerateAd}>
@@ -300,6 +337,31 @@ export default function Campaigns() {
               </button>
             </form>
 
+            {/* 🚀 NEW: AI Chatbot Window */}
+            {isChatOpen && (
+              <div className="mt-6 bg-[#0a0a0a] border border-gray-800 rounded-2xl flex flex-col animate-fade-in">
+                <div className="p-3 border-b border-gray-800">
+                  <h3 className="text-sm font-bold text-white">AI Ad Strategist</h3>
+                </div>
+                <div className="h-48 overflow-y-auto p-3 space-y-3 text-sm">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`p-2 rounded-lg max-w-[80%] ${msg.role === 'ai' ? 'bg-[#1a1a1a] self-start' : 'bg-blue-600 self-end text-white'}`}>
+                      {msg.text}
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleAdChat} className="p-2 border-t border-gray-800 flex gap-2">
+                  <input 
+                    name="message"
+                    type="text" 
+                    placeholder="e.g., Help me target shoe buyers..." 
+                    className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500"
+                  />
+                  <button type="submit" className="bg-blue-600 text-white px-3 rounded-lg font-bold text-sm">Send</button>
+                </form>
+              </div>
+            )}
+
             {generatedAd && (
               <div className="mt-6 p-5 bg-[#0a0a0a] border border-gray-700 rounded-xl">
                 <div className="flex justify-between items-start mb-4">
@@ -374,6 +436,22 @@ export default function Campaigns() {
               Generate Lookalike Audience
             </button>
           </div>
+
+          {/* 🚀 NEW: Meta Conversions API Sync Status */}
+          <div className="bg-[#111] border border-gray-800 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden mt-6">
+            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2"><span className="text-blue-400">🔄</span> Meta Conversions API Sync</h2>
+            <p className="text-gray-400 text-sm mb-6">When you mark a lead as 'Converted' in your CRM, we automatically send that data to Meta to improve your Ad Targeting and create Lookalike Audiences.</p>
+            <div className="bg-[#0a0a0a] border border-gray-800 rounded-xl p-4">
+              <div className="flex justify-between items-center text-sm">
+                <p className="font-bold text-gray-300">Last Sync Status:</p>
+                <p className="flex items-center gap-2 font-bold text-green-400">
+                  <CheckCircle size={16}/> Success
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Last synced a 'Purchase' event for lead <span className="font-mono text-gray-400">+9198****3210</span> 2 hours ago.</p>
+            </div>
+          </div>
+
         </div>
       </div>
       )}

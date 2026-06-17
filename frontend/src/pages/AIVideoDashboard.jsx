@@ -54,18 +54,29 @@ export default function AIVideoDashboard() {
     if (!prompt) return toast.error("Please enter a prompt!");
     
     setLoading(true);
+    setGeneratedAsset(null); // Clear previous asset
+    toast.loading("Sending prompt to AI...", { id: 'gen-toast' });
+
     try {
-      const res = await api.post('/video/generate-image', { prompt });
-      setGeneratedAsset({ type: 'image', url: res.data.url });
-      if (res.data.isMock) {
-        toast.error("Replicate API Limit Reached! Showing a sample image instead.", { duration: 5000 });
+      // The backend now returns a jobId immediately
+      const { data } = await api.post('/video/generate-image', { prompt });
+      
+      if (data.jobId) {
+        toast.loading("AI is generating your image... This may take up to a minute.", { id: 'gen-toast' });
+        pollJobStatus(data.jobId, 'image');
       } else {
-        toast.success("Image generated successfully!");
+        // Fallback for old API behavior or immediate mock response
+        setGeneratedAsset({ type: 'image', url: data.url });
+        if (data.isMock) {
+          toast.error("Replicate API Limit Reached! Showing a sample image instead.", { id: 'gen-toast', duration: 5000 });
+        } else {
+          toast.success("Image generated successfully!", { id: 'gen-toast' });
+        }
+        setLoading(false);
       }
     } catch (error) {
       console.error("Image Generation Error:", error);
-      toast.error(error.response?.data?.message || "Failed to generate image.");
-    } finally {
+      toast.error(error.response?.data?.message || "Failed to start image generation.", { id: 'gen-toast' });
       setLoading(false);
     }
   };

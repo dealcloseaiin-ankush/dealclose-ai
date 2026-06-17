@@ -140,8 +140,8 @@ export default function Dashboard() {
           title="Cost Per Lead" 
           value={`₹${data.stats.costPerLead}`} 
           trend="+8.2%" trendUp={true} icon="🔥" color="from-purple-500/20 to-purple-500/5" 
-          linkTo="/analytics"
-          subtitle="Calculated: ₹0.80 per WA message sent"
+          linkTo="/whatsapp-rules"
+          subtitle="Est. based on outgoing templates. Click to see pricing."
         />
       </div>
 
@@ -154,31 +154,31 @@ export default function Dashboard() {
           <Link to="/crm" className="text-sm text-blue-400 hover:text-blue-300 font-semibold">View CRM Board →</Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 text-center">
-          <div className="bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
+          <Link to="/crm" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
             <p className="text-2xl font-black text-blue-400">{data.smartCrmData?.new || 0}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">New Leads</p>
-          </div>
-          <div className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+          </Link>
+          <Link to="/crm" className="block bg-red-500/10 p-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition shadow-[0_0_15px_rgba(239,68,68,0.1)]">
             <p className="text-2xl font-black text-red-500">{data.smartCrmData?.hot || 0}</p><p className="text-[10px] text-red-400 font-bold uppercase tracking-wide mt-1">Hot 🔥</p>
-          </div>
-          <div className="bg-orange-500/10 p-4 rounded-xl border border-orange-500/20 hover:bg-orange-500/20 transition">
+          </Link>
+          <Link to="/crm" className="block bg-orange-500/10 p-4 rounded-xl border border-orange-500/20 hover:bg-orange-500/20 transition">
             <p className="text-2xl font-black text-orange-400">{data.smartCrmData?.warm || 0}</p><p className="text-[10px] text-orange-400 font-bold uppercase tracking-wide mt-1">Warm 🌟</p>
-          </div>
-          <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition">
+          </Link>
+          <Link to="/crm" className="block bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition">
             <p className="text-2xl font-black text-blue-300">{data.smartCrmData?.cold || 0}</p><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wide mt-1">Cold ❄️</p>
-          </div>
-          <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20 hover:bg-green-500/20 transition">
+          </Link>
+          <Link to="/crm" className="block bg-green-500/10 p-4 rounded-xl border border-green-500/20 hover:bg-green-500/20 transition">
             <p className="text-2xl font-black text-green-400">{data.smartCrmData?.existing || 0}</p><p className="text-[10px] text-green-400 font-bold uppercase tracking-wide mt-1">Existing 💼</p>
-          </div>
-          <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 hover:bg-purple-500/20 transition">
+          </Link>
+          <Link to="/crm" className="block bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 hover:bg-purple-500/20 transition">
             <p className="text-2xl font-black text-purple-400">{data.smartCrmData?.vip || 0}</p><p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide mt-1">VIP 👑</p>
-          </div>
-          <div className="bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
+          </Link>
+          <Link to="/crm" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
             <p className="text-2xl font-black text-gray-400">{data.smartCrmData?.lost || 0}</p><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide mt-1">Lost 💔</p>
-          </div>
-          <div className="bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/20 transition relative">
+          </Link>
+          <Link to="/crm" className="block bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/20 transition relative">
             {data.smartCrmData?.followUpsToday > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{data.smartCrmData.followUpsToday} Due</span>}
             <p className="text-2xl font-black text-yellow-400">{data.smartCrmData?.followUpsToday || 0}</p><p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wide mt-1">Follow-ups</p>
-          </div>
+          </Link>
         </div>
       </div>
 

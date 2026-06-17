@@ -456,7 +456,7 @@ export default function Chats() {
                     )}
                     <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`p-4 max-w-sm rounded-2xl ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
-                        <p className="whitespace-pre-wrap">{msg.messageText}</p>
+                        <p className="whitespace-pre-wrap">{msg.messageText || "📎 [Attachment / Shared Post]"}</p>
                         <div className="flex justify-between items-center gap-4 mt-2">
                           <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
                           <span className="text-[10px] opacity-70">{formatTime(msg.timestamp || msg.createdAt)}</span>

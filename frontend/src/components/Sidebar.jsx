@@ -45,7 +45,8 @@ export default function Sidebar() {
       items: [
         { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
         { name: 'Automations', path: '/automations', icon: '🔁' },
-        { name: 'Instagram', path: '/instagram-automation', icon: '📸' }
+        { name: 'Instagram', path: '/instagram-automation', icon: '📸' },
+        { name: 'Auto-Marketer', path: '/auto-marketer', icon: '🚀' }
       ]
     },
     {

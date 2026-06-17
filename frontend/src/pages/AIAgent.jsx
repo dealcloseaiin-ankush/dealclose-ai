@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 
 export default function AIAgent() {
   const [queries, setQueries] = useState([]);
@@ -216,17 +217,17 @@ export default function AIAgent() {
       <div>
         <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">📊 Performance Insights</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#111] p-6 rounded-2xl border border-orange-500/30 shadow-lg">
+          <Link to="/chats" className="block bg-[#111] p-6 rounded-2xl border border-orange-500/30 shadow-lg hover:border-orange-500 transition-colors cursor-pointer group">
             <h3 className="text-orange-400 font-bold mb-2 flex items-center gap-2">🔥 Trending Query</h3>
-            <p className="text-white font-medium mb-4">"75% of users asked about 'Cash on Delivery' today."</p>
+            <p className="text-white font-medium mb-4 group-hover:text-orange-200 transition-colors">"75% of users asked about 'Cash on Delivery' today."</p>
             <p className="text-sm text-gray-400">AI Advice: Consider adding a clear COD policy message to your welcome menu.</p>
-          </div>
+          </Link>
 
-          <div className="bg-[#111] p-6 rounded-2xl border border-green-500/30 shadow-lg">
+          <Link to="/crm" className="block bg-[#111] p-6 rounded-2xl border border-green-500/30 shadow-lg hover:border-green-500 transition-colors cursor-pointer group">
             <h3 className="text-green-400 font-bold mb-2 flex items-center gap-2">📈 High Intent Lead</h3>
-            <p className="text-white font-medium mb-4">"The product 'Summer Collection Tshirt' is getting high attention."</p>
+            <p className="text-white font-medium mb-4 group-hover:text-green-200 transition-colors">"The product 'Summer Collection Tshirt' is getting high attention."</p>
             <p className="text-sm text-gray-400">AI Advice: Run a promotional WhatsApp campaign for this item to close pending leads.</p>
-          </div>
+          </Link>
           
           <div className="bg-gradient-to-br from-[#1a1120] to-[#111] p-6 rounded-2xl border border-pink-500/30 shadow-lg">
             <h3 className="text-pink-400 font-bold mb-2 flex items-center gap-2">📸 IG Growth Audit</h3>

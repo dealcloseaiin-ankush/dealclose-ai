@@ -89,7 +89,7 @@ export default function InstagramAutomation() {
     const toastId = toast.loading("Syncing recent posts from Instagram...");
     try {
       // Ye aapke backend route par request bhejega jo Instagram Graph API se data layega
-      const res = await api.get('/instagram/sync-posts', { params: { workspaceId: activeWorkspace } });
+      const res = await api.get('/instagram/sync-posts', { params: { workspaceId: activeWorkspace, fetchAll: true } });
       if (res.data && res.data.recentPosts) {
         setRecentPosts(res.data.recentPosts);
         toast.success("Posts synced successfully! 🎉", { id: toastId });

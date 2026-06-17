@@ -105,6 +105,9 @@ exports.getPipeline = async (req, res) => {
 
     // Group contacts by their current stage
     leads.forEach(lead => {
+      // 🚀 FIX: Prevent crash if a null/corrupted record exists in the DB
+      if (!lead) return;
+
       // Exclude IG users/fans who haven't shown business intent yet
       if (lead.status === 'visitor' || lead.status === 'unqualified' || lead.status === 'deleted') return;
 
@@ -133,6 +136,9 @@ exports.getPipeline = async (req, res) => {
     
     // Group old contacts into the pipeline too
     contacts.forEach(contact => {
+      // 🚀 FIX: Prevent crash if a null/corrupted record exists in the DB
+      if (!contact) return;
+
       let stage = (contact.crmStage || 'new').toLowerCase();
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';

@@ -5,7 +5,7 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../hooks/useAuth';
-import { Search, Share2 } from 'lucide-react';
+import { Search, Share2, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Contacts() {
@@ -20,6 +20,7 @@ export default function Contacts() {
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
   const [searchTerm, setSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,8 +57,24 @@ export default function Contacts() {
     const term = searchTerm.toLowerCase();
     const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString().toLowerCase() : '';
     const matchesSearch = searchTerm === '' || (c.name || '').toLowerCase().includes(term) || (c.phoneNumber || c.phone || '').includes(term) || (c.city || '').toLowerCase().includes(term) || dateStr.includes(term);
-    return matchesWs && matchesSearch;
+    const matchPlatform = platformFilter === 'all' || c.platform === platformFilter || (!c.platform && platformFilter === 'whatsapp');
+    return matchesWs && matchesSearch && matchPlatform;
   });
+
+  // 🚀 NEW: Bulk Export Functionality
+  const handleBulkExport = () => {
+    if (filteredContacts.length === 0) return toast.error("No contacts to export");
+    const csvContent = "Name,Phone,City,Status,Source\n" + 
+      filteredContacts.map(c => `"${c.name || 'Unknown'}","${c.phoneNumber || c.phone || ''}","${c.city || ''}","${c.status || ''}","${c.source || ''}"`).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "DealClose_Contacts_Backup.csv");
+    document.body.appendChild(link);
+    link.click();
+    toast.success("Contacts Exported Successfully! 🎉");
+  };
 
   // Mobile/PC Native Share API for Enterprise Feel
   const handleNativeShare = async (row) => {
@@ -118,6 +135,15 @@ export default function Contacts() {
                 <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
               ))}
             </select>
+            <select 
+              value={platformFilter} 
+              onChange={(e) => setPlatformFilter(e.target.value)} 
+              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+            >
+              <option value="all">🌐 All Platforms</option>
+              <option value="whatsapp">🟩 WhatsApp</option>
+              <option value="instagram">🟪 Instagram</option>
+            </select>
           </div>
           <p className="text-gray-400">Manage your address book and AI smart segments.</p>
         </div>
@@ -126,6 +152,9 @@ export default function Contacts() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
             <input type="text" placeholder="Search contacts..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#111] border border-gray-800 text-white text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-blue-500 shadow-sm" />
           </div>
+          <Button onClick={handleBulkExport} variant="secondary" className="whitespace-nowrap flex items-center gap-2">
+            <Download size={16} /> Backup All
+          </Button>
           <Button onClick={() => setIsModalOpen(true)} variant="primary" className="whitespace-nowrap">+ Add Contact</Button>
         </div>
       </div>

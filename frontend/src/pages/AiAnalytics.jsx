@@ -1,20 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import api from '../services/api';
 
 export default function AiAnalytics() {
   const [profile, setProfile] = useState({ aiCredits: 0 });
   const [leads, setLeads] = useState([]);
 
-  // Mock Fetch (Aap inko apni actual API calls se replace karein)
   useEffect(() => {
-    // Fetch Profile for Credits
-    fetch('/api/users/profile', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
-      .then(res => res.json())
-      .then(data => setProfile(data.user || {}));
+    // 🚀 FIX: Fetching real data using configured Axios instance
+    api.get('/users/profile')
+      .then(res => setProfile(res.data.user || res.data || {}))
+      .catch(console.error);
 
-    // Fetch Leads for AI Chat history
-    fetch('/api/leads', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
-      .then(res => res.json())
-      .then(data => setLeads(data || []));
+    // Fetch real leads from CRM pipeline
+    api.get('/crm/pipeline')
+      .then(res => {
+        const allContacts = [];
+        if (res.data && res.data.data) {
+          Object.values(res.data.data).forEach(arr => {
+            if (Array.isArray(arr)) allContacts.push(...arr);
+          });
+        }
+        setLeads(allContacts);
+      })
+      .catch(console.error);
   }, []);
 
   return (
