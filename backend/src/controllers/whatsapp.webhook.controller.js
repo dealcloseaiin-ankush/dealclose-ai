@@ -11,6 +11,7 @@ const Flow = require('../models/flowModel');
 const googleSheetsController = require('./googleSheetsController');
 const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 NEW: Auto-Marketer DB
 const instagramService = require('../services/instagramService'); // 🚀 NEW: IG Publisher
+const { automationQueue } = require('../workers/automationWorker'); // 🚀 FIX: Import Queue to prevent ReferenceError crash
 
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp

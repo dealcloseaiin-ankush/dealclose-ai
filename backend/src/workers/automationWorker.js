@@ -1,7 +1,11 @@
 const { Worker, Queue } = require('bullmq');
 const IORedis = require('ioredis');
+
+// 🚀 FIX: Disable BullMQ Eviction Warning (Prevents console spam & memory warnings)
+process.env.BULLMQ_DISABLE_REDIS_EVICTION_WARNING = '1';
+
 const User = require('../models/userModel');
-const GeneratedPost = require('../models/generatedPostModel'); // 🚀 NEW
+const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 FIX: Case-sensitive path for Linux/Render
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/aiService');

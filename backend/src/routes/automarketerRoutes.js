@@ -1,4 +1,4 @@
---- /dev/null
+// Routes for Auto-Marketer Dashboard
 const express = require('express');
 const router = express.Router();
 const automarketerController = require('../controllers/automarketerController');

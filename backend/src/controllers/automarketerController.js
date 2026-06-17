@@ -1,4 +1,4 @@
---- /dev/null
+// Controller for Auto-Marketer System
 const GeneratedPost = require('../models/GeneratedPostModel');
 const User = require('../models/userModel');
 const instagramService = require('../services/instagramService');
