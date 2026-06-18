@@ -43,7 +43,7 @@ export default function Settings() {
   const [devApiKey, setDevApiKey] = useState('');
   const [igConnected, setIgConnected] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
-abhi   const [googleConnectedEmail, setGoogleConnectedEmail] = useState(''); // 🚀 NEW STATE
+  const [googleConnectedEmail, setGoogleConnectedEmail] = useState(''); // 🚀 FIXED STATE
   const [userId, setUserId] = useState('demo-business'); // Used for QR code link
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showExternalToken, setShowExternalToken] = useState(false);
