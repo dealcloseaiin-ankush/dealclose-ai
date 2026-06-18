@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import KanbanBoard from '../components/crm/KanbanBoard';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { Search, Plus, FileDown, Printer, KanbanSquare, List, BarChart3, Share2, AlertTriangle, CloudLightning } from 'lucide-react';
+import { Search, Plus, FileDown, Printer, KanbanSquare, List, BarChart3, Share2, AlertTriangle, CloudLightning, Wand2, UserCheck, Combine, FileSignature, PhoneCall } from 'lucide-react';
 import ContactDrawer from '../components/crm/ContactDrawer';
 import CrmList from '../components/crm/CrmList';
 import CrmAnalytics from '../components/crm/CrmAnalytics';
@@ -20,6 +20,7 @@ export default function CrmPage() {
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
   const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'whatsapp', 'instagram'
   const [statusFilter, setStatusFilter] = useState('all'); // Smart CRM Status filter
+  const [showAITools, setShowAITools] = useState(false); // Enterprise Tools Dropdown
   
   const [isGoogleSynced, setIsGoogleSynced] = useState(false);
   const { user } = useAuth() || { user: { role: 'owner' } }; // Fallback
@@ -155,7 +156,9 @@ export default function CrmPage() {
     return filtered;
   }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter]);
 
-  const filteredFlatContacts = flatContacts.filter(lead => {
+  // 🚀 PERFORMANCE FIX: Memoized the flat contacts array to prevent lagging when typing in Search with 10k+ leads
+  const filteredFlatContacts = React.useMemo(() => {
+    return flatContacts.filter(lead => {
     const ws = lead.lastSelectedWorkspaceId || 'main';
     const matchWs = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
     
@@ -171,6 +174,7 @@ export default function CrmPage() {
     const matchStatus = statusFilter === 'all' || lead.status === statusFilter;
     return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus;
   });
+  }, [flatContacts, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter]);
 
   // Logic for the Expiry Warning Banner
   const expiringLeadsCount = flatContacts.filter(l => {
@@ -290,6 +294,32 @@ export default function CrmPage() {
             <Plus size={16} /> 
             <span className="text-sm font-medium">Add Lead</span>
           </button>
+
+          {/* 🚀 NEW: Enterprise AI Tools Dropdown */}
+          <div className="relative">
+            <button onClick={() => setShowAITools(!showAITools)} className="bg-purple-600/20 text-purple-400 border border-purple-500/30 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-md flex items-center gap-2 shadow-lg transition-colors" title="Enterprise AI Tools">
+              <Wand2 size={16} /> <span className="hidden sm:inline text-sm font-bold">AI Tools</span>
+            </button>
+            {showAITools && (
+              <div className="absolute right-0 mt-2 w-64 bg-[#111] border border-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden text-sm animate-fade-in">
+                <div className="p-3 border-b border-gray-800 bg-[#1a1a1a]">
+                  <h4 className="font-bold text-gray-300 text-[10px] uppercase tracking-wider">Enterprise Features</h4>
+                </div>
+                <button className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800 transition-colors text-gray-200">
+                  <UserCheck size={16} className="text-sky-400"/> <span>Assign Leads to Staff</span>
+                </button>
+                <button className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800 transition-colors text-gray-200">
+                  <Combine size={16} className="text-emerald-400"/> <span>Smart Merge (WA + IG)</span>
+                </button>
+                <button className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800 transition-colors text-gray-200">
+                  <FileSignature size={16} className="text-orange-400"/> <span>Create Quotation / PDF</span>
+                </button>
+                <button className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800 transition-colors text-gray-200">
+                  <PhoneCall size={16} className="text-pink-400"/> <span>View AI Call Transcripts</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       

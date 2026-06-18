@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
-import { Search, Camera, MessageSquare, MessageCircle } from 'lucide-react';
+import { Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function Chats() {
@@ -23,6 +23,7 @@ export default function Chats() {
   const [newChatSource, setNewChatSource] = useState('Manual Entry');
   const [sendAutoOffer, setSendAutoOffer] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     let isFirstLoad = true;
@@ -167,9 +168,17 @@ export default function Chats() {
     }
   }, [customerDetails, activeCustomer]);
 
+  // 🚀 FIX #3: CHAT SORTING ASCENDING
   const activeChatMessages = useMemo(() => {
-    return filteredMessages.filter(m => m.customerPhone === activeCustomer);
+    return filteredMessages
+      .filter(m => m.customerPhone === activeCustomer)
+      .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
   }, [filteredMessages, activeCustomer]);
+
+  // 🚀 FIX #4: AUTO SCROLL ON NEW MESSAGE
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeChatMessages]);
 
   // Start a manual chat by entering a new number
   const handleStartChatSubmit = (e) => {
@@ -256,6 +265,17 @@ export default function Chats() {
     if (sentBy === 'system') return '⚙️ System';
     if (direction === 'incoming') return '👤 Customer';
     return sentBy || 'Unknown';
+  };
+  
+  // 🚀 NEW: WHATSAPP STYLE MESSAGE STATUS
+  const getMessageStatusIcon = (status) => {
+    switch(status) {
+      case 'sent': return <Check size={12} className="text-gray-400" />;
+      case 'delivered': return <CheckCheck size={12} className="text-gray-400" />;
+      case 'read': return <CheckCheck size={12} className="text-blue-400" />;
+      case 'failed': return <span className="text-red-400 text-[10px]">⚠️</span>;
+      default: return <span className="text-gray-500 text-[10px]">🕒</span>;
+    }
   };
 
   // 🚀 CLEAN CODE: Moving logic out of JSX to prevent Vercel/Rollup Build Crashes
@@ -461,13 +481,17 @@ export default function Chats() {
                         <p className="whitespace-pre-wrap">{msg.messageText || "📎 [Attachment / Shared Post]"}</p>
                         <div className="flex justify-between items-center gap-4 mt-2">
                           <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
-                          <span className="text-[10px] opacity-70">{formatTime(msg.timestamp || msg.createdAt)}</span>
+                          <span className="text-[10px] opacity-70 flex items-center gap-1">
+                            {formatTime(msg.timestamp || msg.createdAt)}
+                            {msg.direction === 'outgoing' && getMessageStatusIcon(msg.status)}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 );
               })}
+              <div ref={messagesEndRef} />
             </div>
             
             {/* Active Customer Status Warning */}
@@ -477,36 +501,38 @@ export default function Chats() {
                </div>
             )}
 
-            <div className="p-4 bg-[#111] border-t border-gray-800 rounded-br-2xl flex items-center gap-3">
-              <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Send Approved Template">
-                📄
-              </button>
-              <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Attach Image or Document">
-                📎
-              </button>
-              <button 
-                onClick={() => setReplyText("Thank you for your visit! 🙏\n\n⭐ Please leave us a 5-star review: [Review Link]\n📸 Follow us on Instagram: [Instagram Link]\n▶️ Subscribe on YouTube: [YouTube Link]\n\n🎁 *Special Offer:* Use code *WELCOME10* on your next visit within 30 days to get 10% OFF!")}
-                disabled={!activeCustomer} 
-                className="p-3 text-yellow-500 hover:text-yellow-400 bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" 
-                title="Load Rating & Discount Offer"
-              >
-                ⭐
-              </button>
-          <textarea 
-            rows="1"
-            value={replyText} 
-            onChange={e => setReplyText(e.target.value)} 
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendReply();
-              }
-            }}
-            placeholder="Type a message or paste a link (Shift+Enter for new line)..." 
-            className="flex-1 p-3 bg-[#0a0a0a] border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none resize-none" 
-            disabled={!activeCustomer}
-          />
-              <button onClick={sendReply} disabled={!activeCustomer || !replyText.trim()} className="px-4 md:px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0">Send 🚀</button>
+            <div className="p-4 bg-[#111] border-t border-gray-800 rounded-br-2xl flex flex-col gap-3">
+              
+              {/* 🚀 AI SUGGESTED / QUICK REPLIES */}
+              <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                 {['Here is our catalog 📦', 'Please share your location 📍', 'I will call you shortly 📞', 'Let me check and revert ⏳'].map((qr, idx) => (
+                    <button key={idx} onClick={() => setReplyText(prev => prev ? prev + " " + qr : qr)} disabled={!activeCustomer} className="text-[10px] font-bold whitespace-nowrap bg-[#1a1a1a] hover:bg-gray-800 text-gray-400 px-3 py-1.5 rounded-full border border-gray-700 transition-colors shrink-0 disabled:opacity-50">
+                       {qr}
+                    </button>
+                 ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Send Approved Template">📄</button>
+                <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Attach Image or Document">📎</button>
+                <button onClick={() => setReplyText("Thank you for your visit! 🙏\n\n⭐ Please leave us a 5-star review: [Review Link]\n📸 Follow us on Instagram: [Instagram Link]\n\n🎁 *Special Offer:* Use code *WELCOME10* on your next visit to get 10% OFF!")} disabled={!activeCustomer} className="p-3 text-yellow-500 hover:text-yellow-400 bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Load Rating & Discount Offer">⭐</button>
+                
+                <textarea 
+                  rows="1"
+                  value={replyText} 
+                  onChange={e => setReplyText(e.target.value)} 
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                  placeholder="Type a message or paste a link (Shift+Enter for new line)..." 
+                  className="flex-1 p-3 bg-[#0a0a0a] border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none resize-none" 
+                  disabled={!activeCustomer}
+                />
+                <button onClick={sendReply} disabled={!activeCustomer || !replyText.trim()} className="px-4 md:px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0">Send 🚀</button>
+              </div>
             </div>
           </>
         )}
