@@ -113,22 +113,19 @@ exports.handleInstagramWebhook = async (req, res) => {
               }).lean(); // 🚀 FIX: .lean() is REQUIRED to expose 'igConfig' which is not in the strict schema!
               
               if (!user) {
-                 console.log(`⚠️ [IG Webhook] Exact IG Account match not found for ${igAccountId}. Using fallback owner...`);
-                 // 🚀 SMART FALLBACK: Find the most recently active user who actually connected an IG Token!
-                 user = await User.findOne({ 
-                   $or: [
-                     { "igConfig.accessToken": { $exists: true, $ne: "" } },
-                     { "workspaces.igConfig.accessToken": { $exists: true, $ne: "" } }
-                   ]
-                 }).sort({ updatedAt: -1 }).lean(); // 🚀 FIX: Added .lean()
-                 
-                 if (!user) {
-                   user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 }).lean(); // 🚀 FIX: Added .lean()
-                 }
+                 console.log(`❌ [IG Webhook - DMs] No matching Instagram account found in DB for Webhook IG ID: ${igAccountId}`);
+                 continue;
               }
-              if (!user) continue;
 
-              // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents TypeError on undefined)
+              // 🚀 DEBUG: Strict Match Success
+              console.log(`\n✅ [IG Webhook - DMs] STRICT MATCH SUCCESS!`);
+              console.log(`- Webhook IG ID:`, igAccountId);
+              console.log(`- Matched Account:`, user?.igConfig?.accountId);
+              console.log(`- Matched Page:`, user?.igConfig?.pageId);
+              console.log(`- Matched User Email:`, user?.email);
+              console.log(`------------------------------------------------\n`);
+
+              // �️ BULLETPROOF TOKEN EXTRACTION (Prevents TypeError on undefined)
               let igToken = null;
               let incomingWorkspaceId = 'main';
               let activeWorkspace = null;
@@ -723,17 +720,21 @@ exports.handleInstagramWebhook = async (req, res) => {
           let user = await User.findOne({ 
              $or: [
                { "igConfig.accountId": igAccountId },
-               { "igConfig.pageId": igAccountId }
+               { "igConfig.pageId": igAccountId },
+               { "workspaces.igConfig.accountId": igAccountId },
+               { "workspaces.igConfig.pageId": igAccountId }
              ]
           });
           if (!user) {
-             // 🚀 SMART FALLBACK for Comments too
-             user = await User.findOne({ "igConfig.accessToken": { $exists: true, $ne: "" } }).sort({ updatedAt: -1 });
-             if (!user) {
-               user = await User.findOne({ role: 'owner' }).sort({ createdAt: -1 });
-             }
+             console.log(`❌ [IG Webhook - Comments] No matching Instagram account found in DB for Webhook IG ID: ${igAccountId}`);
+             continue;
           }
-          if (!user) continue;
+          
+          console.log(`\n✅ [IG Webhook - Comments] STRICT MATCH SUCCESS!`);
+          console.log(`- Webhook IG ID:`, igAccountId);
+          console.log(`- Matched Account:`, user?.igConfig?.accountId);
+          console.log(`- Matched User Email:`, user?.email);
+          console.log(`------------------------------------------------\n`);
           
           // Safely extract IG Token for Comments
           let igToken = user.igConfig?.accessToken;

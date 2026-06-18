@@ -49,7 +49,9 @@ export default function Chats() {
         setAllMessages(prev => {
           // 🚀 PLAY SOUND IF NEW INCOMING MESSAGE DETECTED
           if (!isFirstLoad && prev.length > 0 && messages.length > prev.length) {
-             const newMsgs = messages.slice(prev.length);
+             // 🚀 FIX: Safer comparison using message IDs instead of array slice
+             const existingIds = new Set(prev.map(p => p._id));
+             const newMsgs = messages.filter(m => !existingIds.has(m._id));
              if (newMsgs.some(m => m.direction === 'incoming')) {
                 playNotificationSound();
              }
@@ -257,7 +259,7 @@ export default function Chats() {
   };
 
   // 🚀 CLEAN CODE: Moving logic out of JSX to prevent Vercel/Rollup Build Crashes
-  const activeCustomerData = customerDetails.find(c => c.phone === activeCustomer);
+  const activeCustomerData = customerDetails?.find(c => c.phone === activeCustomer) || null;
   const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
 
   return (
@@ -490,13 +492,18 @@ export default function Chats() {
               >
                 ⭐
               </button>
-          <input 
-            type="text" 
+          <textarea 
+            rows="1"
             value={replyText} 
             onChange={e => setReplyText(e.target.value)} 
-            onKeyDown={e => e.key === 'Enter' && sendReply()}
-                placeholder="Type a message or paste a link..." 
-            className="flex-1 p-3 bg-[#0a0a0a] border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none" 
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendReply();
+              }
+            }}
+            placeholder="Type a message or paste a link (Shift+Enter for new line)..." 
+            className="flex-1 p-3 bg-[#0a0a0a] border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none resize-none" 
             disabled={!activeCustomer}
           />
               <button onClick={sendReply} disabled={!activeCustomer || !replyText.trim()} className="px-4 md:px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0">Send 🚀</button>
