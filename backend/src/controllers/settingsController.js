@@ -7,7 +7,7 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
         // Check if a default flow already exists to prevent duplicates
         const existingFlow = await Flow.findOne({ userId: userId, name: { $regex: /Instagram Collab Flow|Lead Generation Auto|Real Estate Lead Capture/i } });
         if (existingFlow) {
-            console.log(`[Magic Onboarding] Default flow already exists for user ${userId}. Skipping creation.`);
+            console.log(`[Magic Onboarding] Default flow already exists for user . Skipping creation.`);
             return;
         }
 
@@ -54,10 +54,10 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
         }
 
         await Flow.create({ userId, workspaceId: 'main', name: flowName, flowData });
-        console.log(`✅ [Magic Onboarding] Automatically created '${flowName}' for user ${userId}.`);
+        console.log(`✅ [Magic Onboarding] Automatically created '' for user .`);
 
     } catch (error) {
-        console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user ${userId}:`, error.message);
+        console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user :`, error.message);
     }
 };
 
@@ -222,13 +222,34 @@ exports.connectMetaAccount = async (req, res) => {
       { new: true }
     ).lean();
 
-    // Optional: Send a welcome message via WhatsApp using the new credentials
-    // await whatsappService.sendTextMessage(accessToken, phoneNumberId, updatedUser.ownerPhone, "🎉 Your WhatsApp API is now connected to DealClose AI!");
-
-    console.log(`✅ [Meta Onboarding] Account connected successfully for User: ${userId}`);
+    console.log(`✅ [Meta Onboarding] Account connected successfully for User: `);
     res.status(200).json({ success: true, message: 'WhatsApp API connected successfully!', user: updatedUser });
   } catch (error) {
     console.error('Meta Connect Error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Current User Profile
+// @route   GET /api/users/profile
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    
+    // Use .lean() here to ensure the full, raw document is returned, including potentially newly added fields
+    const user = await User.findById(userId).select('-password').lean();
+
+    if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
+    
+    // YAHI WOH LINE THI JO TERMINAL MEIN KACHRA BHAR RAHI THI, ISEY BAND KAR DIYA GAYA HAI
+    // console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
+    // - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
+    // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
+    // - IG Connected Token Exist?: ${user.igConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
+
+    if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching profile' });
   }
 };
