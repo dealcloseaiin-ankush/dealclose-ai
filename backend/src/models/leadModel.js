@@ -78,7 +78,13 @@ const leadSchema = new Schema({
   // --- Retention & Cold Storage (For 120-Day Rule) ---
   isArchived: { type: Boolean, default: false }, // Hides from UI but stays in DB
   archivedAt: { type: Date },
-  archiveUrl: { type: String } // AWS S3 / Cloud Link if moved to cold storage
+  archiveUrl: { type: String }, // AWS S3 / Cloud Link if moved to cold storage
+
+  // --- Call AI Tracking ---
+  lastCallSummary: { type: String },
+  lastCallActionTaken: { type: String },
+  lastCallDate: { type: Date },
+  callConfidenceStatus: { type: String, enum: ['High', 'Medium', 'Low'] }
 });
 
 // TTL Index: MongoDB will automatically delete the document when current time > expiresAt

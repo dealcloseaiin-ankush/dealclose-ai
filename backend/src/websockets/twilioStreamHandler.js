@@ -200,8 +200,18 @@ module.exports = function (ws) {
            }
            console.log(`✅ [Post-Call Analysis] Summary:\n${callSummary}`);
         }
-        await Call.findOneAndUpdate({ sid: callSid }, { $set: { transcript: rawTranscript, summary: callSummary } });
+        
+        const callDoc = await Call.findOneAndUpdate({ sid: callSid }, { $set: { transcript: rawTranscript, summary: callSummary } }, { new: true });
         console.log("💾 [DB] Raw Transcript & Summary saved successfully.");
+        
+        // 🚀 NEW: Update CRM Lead with Call Summary
+        if (callDoc && (callDoc.leadId || callDoc.to)) {
+           const query = callDoc.leadId ? { _id: callDoc.leadId } : { phoneNumber: { $regex: new RegExp(callDoc.to.replace(/\D/g, '').slice(-10) + '$') } };
+           await Lead.findOneAndUpdate(query, {
+              $set: { lastCallSummary: callSummary, lastCallDate: new Date() },
+              $push: { timeline: { eventType: 'Call Completed', description: `Voice session ended. Summary: ${callSummary}`, timestamp: new Date() } }
+           }).exec().catch(() => {});
+        }
       } catch (e) {
         console.log("❌ DB/Summary Save Error:", e.message);
       }

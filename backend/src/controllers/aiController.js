@@ -434,6 +434,11 @@ exports.generateFlow = async (req, res) => {
     - 'menu': { "id": "node_m", "type": "menu", "position": {"x":250,"y":250}, "data": { "message": "Choose option:", "opt1": "Collab", "opt2": "Ads", "opt3": "Fan" } }
     - 'delay': { "id": "node_4", "type": "delay", "position": {"x":250,"y":350}, "data": { "delay": "15", "unit": "Minutes" } }
     - 'condition': { "id": "node_5", "type": "condition", "position": {"x":250,"y":450}, "data": { "condition": "If User Replied" } }
+    - 'tag_lead': { "id": "node_6", "type": "tag_lead", "position": {"x":250,"y":550}, "data": { "tag": "Hot Lead" } }
+    - 'crm_update': { "id": "node_7", "type": "crm_update", "position": {"x":250,"y":650}, "data": { "status": "hot", "leadScore": "80" } }
+    - 'human_handover': { "id": "node_8", "type": "human_handover", "position": {"x":250,"y":750}, "data": { "message": "Assigning to staff..." } }
+    - 'google_sheet': { "id": "node_9", "type": "google_sheet", "position": {"x":250,"y":850}, "data": { "action": "sync" } }
+    - 'ai_agent': { "id": "node_10", "type": "ai_agent", "position": {"x":250,"y":950}, "data": { "message": "Connecting to AI..." } }
     
     CRITICAL RULES:
     0. If asked to "hand over to AI", just end the flow with a 'message' node. Do NOT invent new node types.

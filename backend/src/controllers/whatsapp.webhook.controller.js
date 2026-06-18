@@ -119,22 +119,59 @@ exports.handleWhatsApp = async (req, res) => {
           console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
           console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
           
+          // 🚀 NEW: Meta Ad Click Tracking (Attribution)
+          let adReferral = null;
+          if (msg.referral) {
+            adReferral = msg.referral;
+            console.log(`🎯 [Ad Tracking] Customer came from Meta Ad! Source ID: ${adReferral.source_id}`);
+          }
+
           // 🚀 NEW: AUTO-ADD EVERY SENDER TO CRM (So it shows on your board immediately)
           try {
             console.log(`[Webhook Debug] Attempting to save Lead ${fromNumber} for user ${user._id}`);
+            
+            // 🚀 FIX: Prevented ReferenceError Crash for getExpiry
+            const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
+            const getExpiry = (type) => {
+              if (type === 'lead') return isPremium ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+              return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+            };
+            
             let savedLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
             if (!savedLead) {
               const leadCount = await Lead.countDocuments({ userId: user._id });
               const seqId = String(leadCount + 1).padStart(4, '0');
+              
+              // 🚀 SMART LEAD SOURCE: Attach Ad Name if they came from Meta Ads
+              const leadSource = adReferral ? `Meta Ad (${adReferral.headline || 'Click-to-WA'})` : 'WhatsApp Inbound';
+              
               savedLead = await Lead.create({
                 userId: user._id, phoneNumber: fromNumber, name: `User #${seqId}`,
-                source: 'WhatsApp Inbound', status: 'new', createdBy: user._id,
+                source: leadSource, status: 'new', createdBy: user._id,
+                customFields: adReferral ? {
+                  adId: String(adReferral.source_id || ''),
+                  adHeadline: String(adReferral.headline || ''),
+                  sourceUrl: String(adReferral.source_url || '')
+                } : {},
                 timeline: [
                   { eventType: 'Lead Created', description: 'Lead auto-captured from WhatsApp Inbound', timestamp: new Date() },
-                  { eventType: 'WhatsApp Conversation Started', description: 'Customer initiated a new WhatsApp chat', timestamp: new Date() }
+                  { eventType: 'WhatsApp Conversation Started', description: 'Customer initiated a new WhatsApp chat', timestamp: new Date() },
+                  ...(adReferral ? [{ eventType: 'Ad Click Tracking', description: `Customer clicked Meta Ad: ${adReferral.headline}`, timestamp: new Date() }] : [])
                 ],
                 ...(getExpiry('junk') && { expiresAt: getExpiry('junk') })
               });
+            } else if (adReferral) {
+               // 🚀 UPDATE EXISTING LEAD: If old customer clicks a new Ad!
+               const newSource = `Meta Ad (${adReferral.headline || 'Click-to-WA'})`;
+               await Lead.updateOne({ _id: savedLead._id }, { 
+                 $set: { 
+                   source: newSource,
+                   "customFields.adId": String(adReferral.source_id || ''),
+                   "customFields.adHeadline": String(adReferral.headline || ''),
+                   "customFields.sourceUrl": String(adReferral.source_url || '')
+                 },
+                 $push: { timeline: { eventType: 'Ad Click Tracking', description: `Customer re-engaged via Meta Ad: ${adReferral.headline}`, timestamp: new Date() } }
+               });
             }
             
             // 🚀 NEW: Auto-Sync New WhatsApp Leads to Google Sheets
@@ -480,48 +517,61 @@ exports.handleWhatsApp = async (req, res) => {
                 const edges = activeFlow.flowData.edges || [];
                 const questionNode = nodes.find(n => n.id === currentLeadCheck.activeFlowState.nodeId);
 
-                if (questionNode && questionNode.type === 'askQuestion') {
+                if (questionNode) {
                    let chosenEdge = null;
                    
-                   if (questionNode.data.replyType === 'open') {
-                     // 🚀 SYSTEM ZERO-COST PARSER: Extract Name/City without AI!
-                     const existingNotes = currentLeadCheck.notes || "";
-                     const newNote = `Flow Answer (${questionNode.data.question}): ${incomingText}`;
-                     let setPayload = { notes: existingNotes ? `${existingNotes}\n${newNote}` : newNote };
-                     const qText = (questionNode.data.question || '').toLowerCase();
-                     
-                     if (qText.includes('name') && qText.includes('city')) {
-                         const parts = incomingText.split(/[\s,]+/);
-                         const idMatch = currentLeadCheck.name ? currentLeadCheck.name.match(/(?:#|ID: )\d+/) : null;
-                         const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
-                         if (parts.length >= 2) {
-                             setPayload.name = `${parts[0]} (${seqId})`;
-                             setPayload.city = parts.slice(1).join(' ');
-                         } else {
+                   if (questionNode.type === 'askQuestion') {
+                       if (questionNode.data.replyType === 'open') {
+                         // 🚀 SYSTEM ZERO-COST PARSER: Extract Name/City without AI!
+                         const existingNotes = currentLeadCheck.notes || "";
+                         const newNote = `Flow Answer (${questionNode.data.question}): ${incomingText}`;
+                         let setPayload = { notes: existingNotes ? `${existingNotes}\n${newNote}` : newNote };
+                         const qText = (questionNode.data.question || '').toLowerCase();
+                         
+                         if (qText.includes('name') && qText.includes('city')) {
+                             const parts = incomingText.split(/[\s,]+/);
+                             const idMatch = currentLeadCheck.name ? currentLeadCheck.name.match(/(?:#|ID: )\d+/) : null;
+                             const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
+                             if (parts.length >= 2) {
+                                 setPayload.name = `${parts[0]} (${seqId})`;
+                                 setPayload.city = parts.slice(1).join(' ');
+                             } else {
+                                 setPayload.name = `${incomingText.trim()} (${seqId})`;
+                             }
+                         } else if (qText.includes('name') && incomingText.length < 50) {
+                             const idMatch = currentLeadCheck.name ? currentLeadCheck.name.match(/(?:#|ID: )\d+/) : null;
+                             const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
                              setPayload.name = `${incomingText.trim()} (${seqId})`;
+                         } else if ((qText.includes('city') || qText.includes('location')) && incomingText.length < 50) {
+                             setPayload.city = incomingText.trim();
                          }
-                     } else if (qText.includes('name') && incomingText.length < 50) {
-                         const idMatch = currentLeadCheck.name ? currentLeadCheck.name.match(/(?:#|ID: )\d+/) : null;
-                         const seqId = idMatch ? idMatch[0].replace('ID: ', '#') : `#${fromNumber.slice(-4)}`;
-                         setPayload.name = `${incomingText.trim()} (${seqId})`;
-                     } else if ((qText.includes('city') || qText.includes('location')) && incomingText.length < 50) {
-                         setPayload.city = incomingText.trim();
-                     }
-                     if (qText.includes('email') && incomingText.includes('@')) {
-                         setPayload.email = incomingText.trim();
-                     }
-                     
-                     await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: setPayload }, { strict: false });
-                     chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'replied');
-                   } else {
-                     // Yes / No Choice Evaluator
-                     if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
-                       chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'yes');
-                     } else if (['no', 'n', 'na', 'nahi', 'nahin'].includes(incomingTextLower)) {
-                       chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'no');
-                     } else {
-                       chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'other');
-                     }
+                         if (qText.includes('email') && incomingText.includes('@')) {
+                             setPayload.email = incomingText.trim();
+                         }
+                         
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: setPayload }, { strict: false });
+                         chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'replied');
+                       } else {
+                         // Yes / No Choice Evaluator
+                         if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
+                           chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'yes');
+                         } else if (['no', 'n', 'na', 'nahi', 'nahin'].includes(incomingTextLower)) {
+                           chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'no');
+                         } else {
+                           chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'other');
+                         }
+                       }
+                   } else if (questionNode.type === 'menu') {
+                       const incLower = incomingText.toLowerCase();
+                       if (questionNode.data.opt1 && incLower === questionNode.data.opt1.toLowerCase()) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_0');
+                       else if (questionNode.data.opt2 && incLower === questionNode.data.opt2.toLowerCase()) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_1');
+                       else if (questionNode.data.opt3 && incLower === questionNode.data.opt3.toLowerCase()) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_2');
+                       else {
+                           const num = parseInt(incomingText.trim());
+                           if (num === 1) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_0');
+                           else if (num === 2) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_1');
+                           else if (num === 3) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_2');
+                       }
                    }
 
                    // Clear the waiting state since user has replied
@@ -532,6 +582,8 @@ exports.handleWhatsApp = async (req, res) => {
                    while (currNodeId) {
                      const nextNode = nodes.find(n => n.id === currNodeId);
                      if (!nextNode) break;
+                     
+                     const currentFlowId = activeFlow._id.toString();
 
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
@@ -545,8 +597,7 @@ exports.handleWhatsApp = async (req, res) => {
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
                        await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
-                       // Put user back into waiting state for this new question
-                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
                      } else if (nextNode.type === 'menu') {
                        const msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -560,9 +611,38 @@ exports.handleWhatsApp = async (req, res) => {
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
                          await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
-                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: activeFlow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
+                     } else if (nextNode.type === 'add_tag' || nextNode.type === 'tag_lead') {
+                       if (nextNode.data.tag) await Lead.updateOne({ _id: currentLeadCheck._id }, { $addToSet: { tags: nextNode.data.tag } }, { strict: false });
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'crm_update') {
+                       const updateFields = {};
+                       if (nextNode.data.status) updateFields.status = nextNode.data.status;
+                       if (nextNode.data.leadScore) updateFields.leadScore = parseInt(nextNode.data.leadScore);
+                       if (nextNode.data.budget) updateFields.budget = nextNode.data.budget;
+                       if (Object.keys(updateFields).length > 0) await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updateFields }, { strict: false });
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'human_handover' || nextNode.type === 'assign_staff') {
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }, { strict: false });
+                       if (user.ownerPhone) await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, `🚨 *Human Handover Request*\nCustomer ${fromNumber} requested staff assistance from the automated flow.`);
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'google_sheet') {
+                       const freshLead = await Lead.findById(currentLeadCheck._id);
+                       googleSheetsController.appendLeadToSheet(user._id, freshLead).catch(e => console.log('Sheets flow sync error:', e.message));
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'ai_agent') {
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
+                       if (nextNode.data.message) {
+                           const msgText = formatFlowMsg(nextNode.data.message);
+                           await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
+                       }
+                       currNodeId = null; // End flow, pass to AI
                      } else {
                        break;
                      }
@@ -600,6 +680,8 @@ exports.handleWhatsApp = async (req, res) => {
                   while (currNodeId) {
                      const nextNode = nodes.find(n => n.id === currNodeId);
                      if (!nextNode) break;
+                     
+                     const currentFlowId = flow._id.toString();
 
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
@@ -613,8 +695,7 @@ exports.handleWhatsApp = async (req, res) => {
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
                        await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
                        
-                       // Pause execution and wait for user's reply
-                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
                      } else if (nextNode.type === 'menu') {
                        const msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -628,9 +709,38 @@ exports.handleWhatsApp = async (req, res) => {
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
                          await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
-                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flow._id.toString(), nodeId: nextNode.id } } }, { strict: false });
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
+                     } else if (nextNode.type === 'add_tag' || nextNode.type === 'tag_lead') {
+                       if (nextNode.data.tag) await Lead.updateOne({ _id: currentLeadCheck._id }, { $addToSet: { tags: nextNode.data.tag } }, { strict: false });
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'crm_update') {
+                       const updateFields = {};
+                       if (nextNode.data.status) updateFields.status = nextNode.data.status;
+                       if (nextNode.data.leadScore) updateFields.leadScore = parseInt(nextNode.data.leadScore);
+                       if (nextNode.data.budget) updateFields.budget = nextNode.data.budget;
+                       if (Object.keys(updateFields).length > 0) await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updateFields }, { strict: false });
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'human_handover' || nextNode.type === 'assign_staff') {
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }, { strict: false });
+                       if (user.ownerPhone) await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, `🚨 *Human Handover Request*\nCustomer ${fromNumber} requested staff assistance from the automated flow.`);
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'google_sheet') {
+                       const freshLead = await Lead.findById(currentLeadCheck._id);
+                       googleSheetsController.appendLeadToSheet(user._id, freshLead).catch(e => console.log('Sheets flow sync error:', e.message));
+                       let nextE = edges.find(e => e.source === nextNode.id);
+                       currNodeId = nextE ? nextE.target : null;
+                     } else if (nextNode.type === 'ai_agent') {
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
+                       if (nextNode.data.message) {
+                           const msgText = formatFlowMsg(nextNode.data.message);
+                           await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
+                       }
+                       currNodeId = null; // AI Takes over
                      } else {
                        break;
                      }

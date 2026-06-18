@@ -301,37 +301,40 @@ exports.handleInstagramWebhook = async (req, res) => {
                   if (activeNode) {
                      let chosenEdge = null;
                      if (activeNode.type === 'askQuestion') {
-                       if (activeNode.data.replyType === 'open') {
-                         const qLower = (activeNode.data.question || '').toLowerCase();
-                         const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } };
-                         
-                         // 🔥 Convert to proper lead if they answer a business/collab related flow question
-                         if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('business') || qLower.includes('name'))) {
-                            updatePayload.$set = { status: 'new', expiresAt: getExpiry('lead') };
-                         }
-                         await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
-                         chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
-                       } else {
-                         if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
-                           chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'yes');
-                         } else if (['no', 'n', 'na', 'nahi', 'nahin'].includes(incomingTextLower)) {
-                           chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'no');
+                         if (activeNode.data.replyType === 'open') {
+                             const qLower = (activeNode.data.question || '').toLowerCase();
+                             const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } };
+                             if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('business') || qLower.includes('name'))) {
+                                 updatePayload.$set = { status: 'new', expiresAt: getExpiry('lead') };
+                             }
+                             await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
+                             chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
                          } else {
-                           chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'other');
+                             if (['yes', 'y', 'ha', 'haan', 'han'].includes(incomingTextLower)) {
+                                 chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'yes');
+                             } else if (['no', 'n', 'na', 'nahi', 'nahin'].includes(incomingTextLower)) {
+                                 chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'no');
+                             } else {
+                                 chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'other');
+                             }
                          }
-                       }
                      } else if (activeNode.type === 'menu') {
-                       const num = parseInt(incomingText.trim());
-                       if (num === 1) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0');
-                       else if (num === 2) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_1');
-                       else if (num === 3) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_2');
-                       else chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0'); // fallback
-
-                       const options = [activeNode.data.opt1, activeNode.data.opt2, activeNode.data.opt3];
-                       const selectedOpt = options[num - 1] || options[0];
-                       if (selectedOpt && currentLeadCheck.status === 'visitor' && (selectedOpt.toLowerCase().includes('brand') || selectedOpt.toLowerCase().includes('collab') || selectedOpt.toLowerCase().includes('buy') || selectedOpt.toLowerCase().includes('order'))) {
-                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { status: 'new', expiresAt: getExpiry('lead') } }, { strict: false });
-                       }
+                         const incLower = incomingText.toLowerCase();
+                         if (activeNode.data.opt1 && incLower === activeNode.data.opt1.toLowerCase()) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0');
+                         else if (activeNode.data.opt2 && incLower === activeNode.data.opt2.toLowerCase()) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_1');
+                         else if (activeNode.data.opt3 && incLower === activeNode.data.opt3.toLowerCase()) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_2');
+                         else {
+                             const num = parseInt(incomingText.trim());
+                             if (num === 1) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0');
+                             else if (num === 2) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_1');
+                             else if (num === 3) chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_2');
+                             else chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'opt_0'); // fallback
+                         }
+                         const options = [activeNode.data.opt1, activeNode.data.opt2, activeNode.data.opt3];
+                         const selectedOpt = options[parseInt(incomingText.trim()) - 1] || options[0];
+                         if (selectedOpt && currentLeadCheck.status === 'visitor' && (selectedOpt.toLowerCase().includes('brand') || selectedOpt.toLowerCase().includes('collab') || selectedOpt.toLowerCase().includes('buy') || selectedOpt.toLowerCase().includes('order'))) {
+                             await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { status: 'new', expiresAt: getExpiry('lead') } }, { strict: false });
+                         }
                      }
 
                      await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
@@ -340,6 +343,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                      while (currNodeId) {
                        const nextNode = nodes.find(n => n.id === currNodeId);
                        if (!nextNode) break;
+                       const currentFlowId = activeFlow._id.toString();
+                       
                        if (nextNode.type === 'message') {
                          const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                          await sendIGFlowMessage(msgText);
@@ -347,7 +352,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
                          const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         await sendIGFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
+                         await sendIGFlowMessage(msgText, nextNode.id, currentFlowId);
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -356,9 +361,35 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           await sendIGFlowMessage(msgText, nextNode.id, activeFlow._id.toString());
+                           await sendIGFlowMessage(msgText, nextNode.id, currentFlowId);
                          }
                          currNodeId = null; 
+                       } else if (nextNode.type === 'add_tag' || nextNode.type === 'tag_lead') {
+                         if (nextNode.data.tag) await Lead.updateOne({ _id: currentLeadCheck._id }, { $addToSet: { tags: nextNode.data.tag } }, { strict: false });
+                         let nextE = edges.find(e => e.source === nextNode.id);
+                         currNodeId = nextE ? nextE.target : null;
+                       } else if (nextNode.type === 'crm_update') {
+                         const updateFields = {};
+                         if (nextNode.data.status) updateFields.status = nextNode.data.status;
+                         if (nextNode.data.leadScore) updateFields.leadScore = parseInt(nextNode.data.leadScore);
+                         if (nextNode.data.budget) updateFields.budget = nextNode.data.budget;
+                         if (Object.keys(updateFields).length > 0) await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: updateFields }, { strict: false });
+                         let nextE = edges.find(e => e.source === nextNode.id);
+                         currNodeId = nextE ? nextE.target : null;
+                       } else if (nextNode.type === 'human_handover' || nextNode.type === 'assign_staff') {
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }, { strict: false });
+                         if (user.ownerPhone && user.whatsappConfig?.accessToken) await metaAdsService.sendInstagramDM(user.whatsappConfig.accessToken, user.ownerPhone, `🚨 *Human Handover Request*\nIG User ${senderId} requested staff assistance from the automated flow.`).catch(() => {});
+                         let nextE = edges.find(e => e.source === nextNode.id);
+                         currNodeId = nextE ? nextE.target : null;
+                       } else if (nextNode.type === 'google_sheet') {
+                         const freshLead = await Lead.findById(currentLeadCheck._id);
+                         googleSheetsController.appendLeadToSheet(user._id, freshLead).catch(e => console.log('Sheets flow sync error:', e.message));
+                         let nextE = edges.find(e => e.source === nextNode.id);
+                         currNodeId = nextE ? nextE.target : null;
+                       } else if (nextNode.type === 'ai_agent') {
+                         await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
+                         if (nextNode.data.message) await sendIGFlowMessage(formatFlowMsg(nextNode.data.message));
+                         currNodeId = null; // AI Takes over
                        } else { break; }
                      }
                      flowReplyHandled = true;

@@ -14,6 +14,9 @@ module.exports = function (ws) {
   let audioChunkCount = 0;
   let activeLeadId = null;
   let activePhone = null;
+  let activeUserId = null;
+  let activeWorkspaceId = 'main';
+  let activeCallGoal = null;
   
   // 1. Initialize APIs
   console.log(`\n================== [AI CALLING DEBUG] ==================`);
@@ -172,6 +175,9 @@ module.exports = function (ws) {
         // 🚀 NEW: Extract Lead ID or Phone to track Timeline
         if (msg.leadId) activeLeadId = msg.leadId;
         if (msg.phone) activePhone = msg.phone;
+        if (msg.userId) activeUserId = msg.userId;
+        if (msg.workspaceId) activeWorkspaceId = msg.workspaceId;
+        if (msg.callGoal) activeCallGoal = msg.callGoal;
         
         if (activeLeadId || activePhone) {
           try {
@@ -215,16 +221,36 @@ module.exports = function (ws) {
     // Save Call Transcript to DB
     if (rawTranscript.length > 0) {
       try {
+        let callSummary = "No summary generated.";
+        if (conversationHistory.length > 0) {
+           console.log("🧠 [Post-Call Analysis] Generating AI Summary...");
+           const summaryPrompt = "Analyze this call transcript and provide a short summary (2-3 lines). Identify the customer's intent, whether an order was placed, or if a follow-up is needed. Format: \nIntent: ... \nOutcome: ...";
+           const transcriptText = JSON.stringify(rawTranscript.map(t => `${t.speaker}: ${t.text}`));
+           
+           if (genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy') {
+               const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+               const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+               callSummary = result.response.text();
+           } else if (openai) {
+               const summaryResponse = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "system", content: summaryPrompt }, { role: "user", content: transcriptText }] });
+               callSummary = summaryResponse.choices[0].message.content;
+           }
+        }
+
         // 🚀 FIX: Map 'AI' to 'Agent' and add missing 'to' field to satisfy MongoDB Schema
         const formattedTranscript = rawTranscript.map(t => ({ ...t, speaker: t.speaker === 'AI' ? 'Agent' : t.speaker }));
         await Call.create({ 
+            userId: activeUserId,
+            workspaceId: activeWorkspaceId,
             sid: callSid, 
             to: 'Mobile App',
             from: 'Customer',
+            callType: 'web',
             status: 'completed', 
             provider: 'android_app',
             transcript: formattedTranscript,
-            summary: 'Call handled via Mobile App' 
+            summary: callSummary,
+            callGoal: activeCallGoal
         });
         console.log("💾 [DB] Mobile Call Transcript saved successfully.");
         
@@ -232,6 +258,7 @@ module.exports = function (ws) {
         if (activeLeadId || activePhone) {
            const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
            await Lead.findOneAndUpdate(query, {
+              $set: { lastCallSummary: callSummary, lastCallDate: new Date() },
               $push: { timeline: { eventType: 'Follow-up Completed', description: 'Voice Call session ended. Transcript saved.', timestamp: new Date() } }
            }).exec().catch(() => {});
         }

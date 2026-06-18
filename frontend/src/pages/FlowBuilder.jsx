@@ -260,15 +260,14 @@ const initialNodes = [
   },
 ];
 
-let id = 0;
-const getId = () => `dndnode_${id++}`;
+const getId = () => `dndnode_${crypto.randomUUID()}`;
 
 // 🚀 NEW: LocalStorage Logic for Chat History (12 hours limit & Max 5 recent chats)
 const CHAT_STORAGE_KEY = 'dealclose_ai_chat_history';
 const CHAT_EXPIRY_HOURS = 12;
 
 const loadChatHistory = () => {
-  const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+  const saved = sessionStorage.getItem(CHAT_STORAGE_KEY);
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -276,7 +275,7 @@ const loadChatHistory = () => {
       if (now - parsed.timestamp < CHAT_EXPIRY_HOURS * 60 * 60 * 1000) {
         return parsed.messages;
       } else {
-        localStorage.removeItem(CHAT_STORAGE_KEY);
+        sessionStorage.removeItem(CHAT_STORAGE_KEY);
       }
     } catch (error) {
       console.error('Failed to parse chat history:', error);
@@ -322,7 +321,7 @@ export default function FlowBuilder() {
       setAiMessages([aiMessages[0], ...aiMessages.slice(-5)]);
       return;
     }
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
+    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
       timestamp: new Date().getTime(),
       messages: aiMessages
     }));
