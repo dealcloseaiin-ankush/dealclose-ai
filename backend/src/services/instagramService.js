@@ -80,3 +80,23 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
     throw new Error(errorMessage);
   }
 };
+
+// 🚀 NEW: Fetches existing posts/reels from Meta to display in templates dropdown
+exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
+  try {
+    const response = await axios.get(
+      `https://graph.facebook.com/v19.0/${igAccountId}/media`,
+      {
+        params: {
+          fields: 'id,caption,media_type,media_url,thumbnail_url,timestamp,comments_count,like_count',
+          limit: limit,
+          access_token: accessToken
+        }
+      }
+    );
+    return response.data.data || [];
+  } catch (error) {
+    console.error("❌ Meta Graph API Posts Fetch Error:", error.response?.data?.error?.message || error.message);
+    throw error;
+  }
+};

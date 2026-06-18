@@ -434,18 +434,6 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   ))}
-                  {clients.length === 0 && (
-                    <tr className="opacity-40 grayscale pointer-events-none">
-                      <td className="p-4 text-gray-200">
-                        Demo User Store <span className="ml-2 bg-gray-800 text-[10px] px-2 py-0.5 rounded text-gray-400">Sample Data</span>
-                      </td>
-                      <td className="p-4 text-blue-400 font-semibold">Pro AI <br/><span className="text-xs text-gray-500">₹499/mo (Demo)</span></td>
-                      <td className="p-4 text-gray-300 text-xs"><span className="bg-gray-800 px-2 py-0.5 rounded">WA</span></td>
-                      <td className="p-4"><span className="text-blue-400 font-bold">145 Replies</span> <br/><span className="text-xs text-gray-500">Auto Chat</span></td>
-                      <td className="p-4"><span className="text-purple-400 font-bold">950 Tokens</span> <br/><span className="text-xs text-rose-400">Real Cost: ₹1.25</span></td>
-                      <td className="p-4"><span className="bg-gray-500/10 text-gray-400 border border-gray-500/20 px-3 py-1 rounded-md text-xs font-bold">Demo Mode</span></td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>

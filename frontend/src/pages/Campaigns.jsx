@@ -35,8 +35,8 @@ export default function Campaigns() {
       })
       .catch(err => {
          console.error("Analytics fetch error", err);
-         // Fallback dummy data if endpoint doesn't exist yet
-         setAnalytics({ adSpend: 5430, impressions: 12450, leads: 245, sales: 24, costPerLead: 22.1, costPerSale: 226, campaigns: [{ id: 1, name: 'Diwali Offer', spend: 2000, leads: 95, sales: 12, roi: '+140%' }, { id: 2, name: 'Retargeting Cold Leads', spend: 1000, leads: 30, sales: 2, roi: '-10%' }] });
+         // Clean zero-state fallback instead of dummy data
+         setAnalytics({ adSpend: 0, impressions: 0, leads: 0, sales: 0, costPerLead: 0, costPerSale: 0, campaigns: [] });
       })
       .finally(() => setAnalyticsLoading(false));
   }, [activeWorkspace]);

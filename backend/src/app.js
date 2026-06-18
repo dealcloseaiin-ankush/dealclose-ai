@@ -14,7 +14,6 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const whatsappTemplateRoutes = require('./routes/whatsappTemplateRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
-const templateRoutes = require('./routes/templateRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const contactRoutes = require('./routes/contactRoutes');
@@ -28,7 +27,6 @@ const trackingRoutes = require('./routes/trackingRoutes');
 const trackingController = require('./controllers/trackingController');
 const authRoutes = require('./routes/authRoutes');
 const scraperRoutes = require('./routes/scraperRoutes');
-const trackerRoutes = require('./routes/trackerRoutes');
 const instagramRoutes = require('./routes/instagramRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const inboundWebhookRoutes = require('./routes/inboundWebhookRoutes');
@@ -78,10 +76,8 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
-app.use('/api/templates', templateRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/scraper', scraperRoutes);
-app.use('/api/tracker', trackerRoutes);
 app.use('/api/instagram', instagramRoutes);
 app.use('/api/admin', adminRoutes); // Super Admin Routes
 app.use('/api/webhooks/inbound', inboundWebhookRoutes); // Developer API

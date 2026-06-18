@@ -15,6 +15,24 @@ exports.getGeneratedPosts = async (req, res) => {
   }
 };
 
+// @desc    Generate a custom post via Prompt
+// @route   POST /api/automarketer/generate
+exports.generatePost = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    // Placeholder logic for AI Image & Caption Generation (To be replaced with actual Replicate/Gemini API calls)
+    const newPost = await GeneratedPost.create({
+      userId: req.user._id,
+      caption: `[AI Draft for]: ${prompt}\n\n✨ Tap the link in bio to shop!\n#Automarketer #DealCloseAI`,
+      imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80", // Placeholder until linked to Replicate Image Generator
+      status: 'pending_approval'
+    });
+    res.status(200).json({ success: true, post: newPost });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Approve post and send to Instagram
 // @route   POST /api/automarketer/posts/:id/approve
 exports.approvePost = async (req, res) => {

@@ -383,8 +383,10 @@ exports.getLeadAnalytics = async (req, res) => {
       read: actualRead
     };
 
-    // 🚀 LIVE: Total Investment calculated based on WhatsApp messages sent (₹0.80 per msg approx)
-    const totalInvestment = messageStats.sent * 0.80; 
+    // 🚀 LIVE: Total Investment Fix (Meta charges per 24h conversation, NOT per message)
+    // Assuming ~4 messages equal 1 conversation session. Incoming/free window replies don't cost ₹0.80 each.
+    const estimatedConversations = Math.ceil(messageStats.sent / 4);
+    const totalInvestment = estimatedConversations * 0.80; 
     const costPerLead = totalLeads > 0 ? (totalInvestment / totalLeads).toFixed(2) : 0;
 
     const graphData = [

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Image, CheckCircle, XCircle, RefreshCw, Send, Loader2 } from 'lucide-react';
+import { Image, CheckCircle, XCircle, RefreshCw, Send, Loader2, Sparkles } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function AutoMarketerDashboard() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [publishingId, setPublishingId] = useState(null);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -34,6 +37,22 @@ export default function AutoMarketerDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 🚀 NEW: Generate custom post via AI
+  const handleGeneratePost = async (e) => {
+    e.preventDefault();
+    if (!aiPrompt) return;
+    setIsGenerating(true);
+    toast.loading("AI is generating image and caption...", { id: 'genPost' });
+    try {
+      const { data } = await api.post('/automarketer/generate', { prompt: aiPrompt });
+      toast.success("Post generated successfully!", { id: 'genPost' });
+      setPosts([data.post, ...posts]);
+      setAiPrompt('');
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to generate post", { id: 'genPost' });
+    } finally { setIsGenerating(false); }
   };
 
   const handleApprove = async (postId) => {
@@ -71,6 +90,16 @@ export default function AutoMarketerDashboard() {
         <p className="text-gray-400">
           AI generates daily posts for you. Review, approve, and auto-publish them to Instagram & Facebook instantly.
         </p>
+      </div>
+
+      {/* 🚀 NEW: Prompt Box to create posts on-demand */}
+      <div className="bg-[#111] border border-pink-500/30 p-6 rounded-3xl shadow-xl mb-8">
+        <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2"><Sparkles className="text-pink-500" size={20}/> Draft a Custom Post</h2>
+        <p className="text-gray-400 text-sm mb-4">Want to post about a special offer today? Tell the AI what to make.</p>
+        <form onSubmit={handleGeneratePost} className="flex flex-col sm:flex-row gap-3">
+          <input type="text" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="e.g. A Diwali discount post offering 20% off on all sneakers..." className="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm" disabled={isGenerating} />
+          <button type="submit" disabled={isGenerating || !aiPrompt.trim()} className="bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg disabled:opacity-50 whitespace-nowrap">{isGenerating ? 'Generating...' : 'Generate Post'}</button>
+        </form>
       </div>
 
       {loading ? (
@@ -147,6 +176,9 @@ export default function AutoMarketerDashboard() {
           ))}
         </div>
       )}
+      
+      {/* AI Assistant Chatbot */}
+      <DashboardAIAssistant />
     </div>
   );
 }

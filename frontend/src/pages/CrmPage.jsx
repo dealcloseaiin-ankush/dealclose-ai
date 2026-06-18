@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import KanbanBoard from '../components/crm/KanbanBoard';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -10,6 +11,8 @@ import { useAuth } from '../hooks/useAuth';
 import InfluencerCRM from './InfluencerCRM';
 
 export default function CrmPage() {
+  const location = useLocation();
+  
   const [pipelineData, setPipelineData] = useState(null);
   const [flatContacts, setFlatContacts] = useState([]); // For list view
   const [loading, setLoading] = useState(true);
@@ -19,7 +22,10 @@ export default function CrmPage() {
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
   const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'whatsapp', 'instagram'
-  const [statusFilter, setStatusFilter] = useState('all'); // Smart CRM Status filter
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('status') || 'all';
+  }); // Smart CRM Status filter
   const [showAITools, setShowAITools] = useState(false); // Enterprise Tools Dropdown
   
   const [isGoogleSynced, setIsGoogleSynced] = useState(false);
@@ -28,6 +34,15 @@ export default function CrmPage() {
   
   // Get workspaces list from user object
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
+
+  // 🚀 SMART ROUTING FIX: Update filter instantly if URL changes (e.g. coming from Dashboard)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status');
+    if (statusParam) {
+      setStatusFilter(statusParam);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     fetchPipeline();

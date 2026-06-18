@@ -139,7 +139,8 @@ export default function Chats() {
            }
         }
       }
-      return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' };
+      // 🚀 FIX: Will not ask for 'needsReply' (blue blink) if 24-hour window has expired
+      return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' && windowOpen };
     }).sort((a, b) => {
        // SAFE NUMERIC SORTING (Ignores NaNs)
        const dateA = new Date(a.lastMessage.timestamp || a.lastMessage.createdAt || 0).getTime();
@@ -459,6 +460,15 @@ export default function Chats() {
               <h3 className="font-bold text-white truncate">
                 {activeCustomerData?.name || activeCustomer} <span className="text-xs text-gray-400 font-normal">({activeCustomer})</span>
               </h3>
+              
+              {/* 🚀 NEW: Share Contact Button */}
+              <button onClick={() => {
+                const text = `Name: ${activeCustomerData?.name || 'Unknown'}\nPhone: ${activeCustomer}\nCity: ${activeCustomerData?.city || 'N/A'}`;
+                if (navigator.share) navigator.share({ title: 'Shared Contact', text }).catch(()=>{});
+                else { navigator.clipboard.writeText(text); toast.success("Contact Details Copied!"); }
+              }} className="ml-auto text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors font-bold flex items-center gap-1.5 shadow-sm">
+                🔗 Share 
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
