@@ -139,8 +139,8 @@ export default function Chats() {
            }
         }
       }
-      // 🚀 FIX: Will not ask for 'needsReply' (blue blink) if 24-hour window has expired
-      return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' && windowOpen };
+      // 🚀 FIX: Show blue dot for all unreplied messages permanently, regardless of 24h window
+      return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' };
     }).sort((a, b) => {
        // SAFE NUMERIC SORTING (Ignores NaNs)
        const dateA = new Date(a.lastMessage.timestamp || a.lastMessage.createdAt || 0).getTime();

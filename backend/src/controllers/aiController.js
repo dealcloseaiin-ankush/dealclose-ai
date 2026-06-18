@@ -451,7 +451,8 @@ exports.generateFlow = async (req, res) => {
        - For 'menu' node, sourceHandle MUST be "opt_0" (for opt1), "opt_1" (for opt2), or "opt_2" (for opt3).
        Example Edge: { "id": "e1-2", "source": "node_1", "target": "node_2", "sourceHandle": "yes" }
     4. EVEN IF YOU ARE JUST CHATTING, YOU MUST RETURN JSON! Do NOT output plain text outside the JSON. Format: {"reply": "...", "nodes": [], "edges": []}
-    5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting, trailing commas, or unescaped newlines in strings. If you need a newline in a message, use \\n.`;
+    5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting, trailing commas, or unescaped newlines in strings. If you need a newline in a message, use \\n.
+    6. FALLBACK MESSAGE RULE: Always ensure your flow has a fallback or ending 'message' node that says something like: "🙏 Hum abhi available nahi hain, network milte hi hum aapse contact karenge." This ensures the user is never ignored.`;
 
     let rawResponse = "";
     const result = await model.generateContent([systemPrompt, prompt]);

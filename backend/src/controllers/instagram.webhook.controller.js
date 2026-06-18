@@ -251,6 +251,17 @@ exports.handleInstagramWebhook = async (req, res) => {
                  continue; // Stop further processing, go to next message
               }
 
+              // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
+              // Ye check karega ki agar aapne manually reply kiya hai, toh AI shant rahega
+              const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
+              
+              if (isCurrentlyPaused) {
+                console.log(`⏸️ [IG Webhook] Human has taken over chat for ${senderId}. AI is paused. Skipping.`);
+                continue; // Stop further AI/Flow processing!
+              } else if (currentLeadCheck && currentLeadCheck.isAiPaused) {
+                await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: false, aiPausedUntil: null } });
+              }
+
               // 🛑 STAGE 1: GATEKEEPER / SPAM FILTER BOT (0 Cost - Saves AI Limits)
               const incomingTextLower = incomingText.toLowerCase();
               
@@ -729,6 +740,21 @@ exports.handleInstagramWebhook = async (req, res) => {
 
                 } catch (aiErr) {
                   console.error("❌ [Instagram AI Error]:", aiErr.message);
+                  
+                  // 🚀 SYSTEM ALERT VISIBILITY: Drop an error alert directly into the Dashboard Chat!
+                  await Message.create({
+                    userId: user._id,
+                    customerPhone: `IG_${senderId}`,
+                    messageText: `[⚠️ AI System Alert: Failed to generate reply. Reason: ${aiErr.message || 'API Timeout'}]`,
+                    direction: 'outgoing',
+                    status: 'failed',
+                    sentBy: 'system',
+                    timestamp: new Date()
+                  });
+
+                  // Send a friendly fallback to the customer on Instagram so they aren't ignored
+                  const fallbackMsg = "🙏 Maafi chahenge, abhi humara AI system thoda busy hai ya network issue hai. Hum jald hi aapse contact karenge!";
+                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, fallbackMsg).catch(()=>{});
                 }
               }
             }

@@ -1282,7 +1282,7 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               } catch (aiError) {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
-                responseMessage = "Thank you for reaching out! We are currently experiencing high message volumes. Our team will get back to you shortly! 🙏";
+                responseMessage = "🙏 Maafi chahenge, abhi humara AI system thoda busy hai ya network issue hai. Hum jald hi aapse contact karenge!";
                 repliedBy = 'system';
               }
               } 

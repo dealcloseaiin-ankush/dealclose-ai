@@ -85,6 +85,10 @@ const GlobalNotification = () => {
           });
         }
         if (!lastMsgId || latest._id !== lastMsgId) setLastMsgId(latest._id);
+        
+        // 🚀 GLOBAL BLUE DOT EVENT: Broadcasts unread status so your Sidebar can catch it globally
+        const hasUnread = messages.some(m => m.direction === 'incoming');
+        window.dispatchEvent(new CustomEvent('update_unread_badge', { detail: { hasUnread } }));
       } catch(error) {
         console.debug('Background chat check skipped.', error.message);
       }

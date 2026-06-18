@@ -52,21 +52,53 @@ exports.getDashboardData = async (req, res) => {
 // @desc    Fetch Recent Instagram Posts/Reels for Post-Specific Automation
 // @route   GET /api/instagram/posts
 exports.getRecentPosts = async (req, res) => {
+  console.log(`\n================== [IG POSTS DEBUG] ==================`);
   try {
     const userId = req.user?._id || req.user?.id;
+    console.log(`🔍 1. Fetching posts for User ID: ${userId}`);
     const user = await User.findById(userId).lean();
 
-    const accessToken = user?.igConfig?.accessToken;
-    const accountId = user?.igConfig?.accountId;
+    if (!user) {
+      console.log(`❌ 2. User not found in DB!`);
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    let accessToken = user?.igConfig?.accessToken;
+    let accountId = user?.igConfig?.accountId;
+    let source = 'Main Config';
+
+    // 🚀 FIX: Also check if Instagram was connected inside a Workspace!
+    if (!accessToken && user?.workspaces) {
+      const ws = user.workspaces.find(w => w.igConfig && w.igConfig.accessToken);
+      if (ws) {
+        accessToken = ws.igConfig.accessToken;
+        accountId = ws.igConfig.accountId;
+        source = `Workspace: ${ws.name}`;
+      }
+    }
+
+    console.log(`🔍 2. Checking IG Credentials...`);
+    console.log(`   - Account ID: ${accountId ? accountId : 'MISSING ❌'}`);
+    console.log(`   - Access Token: ${accessToken ? 'PRESENT ✅' : 'MISSING ❌'}`);
+    console.log(`   - Found In: ${source}`);
 
     if (!accessToken || !accountId) {
+      console.log(`❌ 3. Failed: Instagram is not properly connected.`);
+      console.log(`======================================================\n`);
       return res.status(400).json({ success: false, message: 'Instagram is not properly connected. Please reconnect in Settings.' });
     }
 
+    console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     // Fetch latest 15 media items from Meta Graph API
     const url = `https://graph.facebook.com/v19.0/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=15&access_token=${accessToken}`;
     const response = await axios.get(url);
     
+    if (!response.data || !response.data.data) {
+      console.log(`⚠️ 4. Meta API responded but 'data' array is empty or missing!`);
+    } else {
+      console.log(`✅ 4. Meta API Success! Found ${response.data.data.length} posts.`);
+    }
+
     const posts = response.data.data.map(post => ({
       id: post.id,
       caption: post.caption || '',
@@ -77,10 +109,22 @@ exports.getRecentPosts = async (req, res) => {
       timestamp: post.timestamp
     }));
 
+    console.log(`======================================================\n`);
     res.status(200).json({ success: true, posts });
   } catch (error) {
-    console.error("IG Fetch Posts Error:", error.response?.data || error.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch Instagram posts.' });
+    console.error("❌ IG Fetch Posts Error:");
+    if (error.response) {
+        console.error(`   - Status: ${error.response.status}`);
+        console.error(`   - Meta Error Msg: ${error.response.data?.error?.message}`);
+        console.error(`   - Meta Error Type: ${error.response.data?.error?.type}`);
+        console.error(`   - Meta Error Code: ${error.response.data?.error?.code}`);
+        console.error(`   - Meta Subcode: ${error.response.data?.error?.error_subcode}`);
+    } else {
+        console.error(`   - Message: ${error.message}`);
+    }
+    console.log(`======================================================\n`);
+    // 🚀 FIX: Send the exact Meta error to the frontend so you know WHY it failed
+    res.status(500).json({ success: false, message: `Failed to fetch posts: ${error.response?.data?.error?.message || error.message}` });
   }
 };
 
