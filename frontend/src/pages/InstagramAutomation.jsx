@@ -88,10 +88,10 @@ export default function InstagramAutomation() {
   const handleSyncPosts = async () => {
     const toastId = toast.loading("Syncing recent posts from Instagram...");
     try {
-      // Ye aapke backend route par request bhejega jo Instagram Graph API se data layega
-      const res = await api.get('/instagram/sync-posts', { params: { workspaceId: activeWorkspace, fetchAll: true } });
-      if (res.data && res.data.recentPosts) {
-        setRecentPosts(res.data.recentPosts);
+      // 🚀 FIX: Calling the exact matching backend route /instagram/posts
+      const res = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace } });
+      if (res.data && res.data.posts) {
+        setRecentPosts(res.data.posts);
         toast.success("Posts synced successfully! 🎉", { id: toastId });
       } else {
         toast.success("Sync successful, but no new posts found.", { id: toastId });
@@ -113,8 +113,11 @@ export default function InstagramAutomation() {
         if (data.stats) setStats(data.stats);
         if (data.config) setConfig(data.config);
         if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
-        if (data.recentPosts) setRecentPosts(Array.isArray(data.recentPosts) ? data.recentPosts : []);
         if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
+
+        // 🚀 FIX: Start hote hi directly posts wale route ko call karke load karega!
+        const postsRes = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: { posts: [] } }));
+        if (postsRes.data && postsRes.data.posts) setRecentPosts(postsRes.data.posts);
       } catch (error) {
         console.error("Failed to fetch IG data", error);
       }
@@ -215,6 +218,9 @@ export default function InstagramAutomation() {
           </div>
           <p className="text-gray-400">Manage your Instagram automations and see how AI is converting comments into WhatsApp leads.</p>
         </div>
+        <button onClick={handleSyncPosts} className="px-5 py-2.5 bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 hover:border-pink-500 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center gap-2">
+          🔄 Sync IG Posts
+        </button>
       </div>
 
       {/* 1. Analytics Section (The "Value" Prover) */}
@@ -402,14 +408,9 @@ export default function InstagramAutomation() {
       
       {activeTab === 'posts' && (
         <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-lg p-6 animate-fade-in">
-          <div className="mb-6 flex justify-between items-end">
-            <div>
-              <h2 className="text-xl font-bold text-white mb-2">Per-Post Bot Configuration</h2>
-              <p className="text-gray-400 text-sm">First, the Chat Bot replies to exact keywords. Then, the AI Smart Chat Bot handles all remaining/complex comments!</p>
-            </div>
-            <button onClick={handleSyncPosts} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors shadow-lg hover:shadow-gray-700/50">
-              🔄 Sync Recent Posts
-            </button>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-white mb-2">Per-Post Bot Configuration</h2>
+            <p className="text-gray-400 text-sm">First, the Chat Bot replies to exact keywords. Then, the AI Smart Chat Bot handles all remaining/complex comments!</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -40,9 +40,11 @@ export default function Chats() {
     const fetchChats = async () => {
       if (isFirstLoad) setLoading(true);
       try {
-        const profileRes = await api.get('/users/profile').catch(() => null);
-        const u = profileRes?.data?.user || profileRes?.data;
-        if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+        if (isFirstLoad) {
+          const profileRes = await api.get('/users/profile').catch(() => null);
+          const u = profileRes?.data?.user || profileRes?.data;
+          if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+        }
 
         const { data } = await api.get('/chats');
         const messages = Array.isArray(data) ? data : data.data || [];

@@ -606,10 +606,10 @@ exports.getProfile = async (req, res) => {
 
     if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
     
-    console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
-    - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
-    - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
-    - IG Connected Token Exist?: ${user.igConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
+    // console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
+    // - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
+    // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
+    // - IG Connected Token Exist?: ${user.igConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
     if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
     res.status(200).json({ success: true, user });
