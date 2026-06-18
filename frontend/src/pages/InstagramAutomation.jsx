@@ -94,7 +94,7 @@ export default function InstagramAutomation() {
         // 🚀 CRITICAL FIX: Add default stats object to prevent React crash when rendering!
         const safePosts = res.data.posts.map(p => ({
           ...p,
-          stats: p.stats || { views: '1.2k', totalComments: 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0 },
+          stats: p.stats || { views: p.likes ? `${p.likes} Likes` : '0 Likes', totalComments: p.comments || 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0 },
           botMode: p.botMode || 'off'
         }));
         setRecentPosts(safePosts);
@@ -126,7 +126,7 @@ export default function InstagramAutomation() {
         if (postsRes.data && postsRes.data.posts) {
            const safePosts = postsRes.data.posts.map(p => ({
              ...p,
-             stats: p.stats || { views: '1.2k', totalComments: 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0 },
+             stats: p.stats || { views: p.likes ? `${p.likes} Likes` : '0 Likes', totalComments: p.comments || 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0 },
              botMode: p.botMode || 'off'
            }));
            setRecentPosts(safePosts);
@@ -447,7 +447,7 @@ export default function InstagramAutomation() {
                     
                     {/* 🚀 NEW: Visual Enterprise Stats (Views, Comments, DMs) */}
                     <div className="flex items-center gap-4 mt-3 border-t border-gray-800 pt-2">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-blue-400">👁️</span> {post.stats?.views || '1.2k'}</div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-red-400">❤️</span> {post.stats?.views || '0 Likes'}</div>
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-green-400">💬</span> {post.stats?.totalComments || 0}</div>
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-pink-400">📩</span> {
                         user?.postAutomations?.find(r => r.postId === post.id)?.stats?.sentCount || post.stats?.dmsSent || 0

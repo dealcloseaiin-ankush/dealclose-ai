@@ -90,7 +90,7 @@ exports.getRecentPosts = async (req, res) => {
 
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     // Fetch latest 15 media items from Meta Graph API
-    const url = `https://graph.facebook.com/v19.0/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=15&access_token=${accessToken}`;
+    const url = `https://graph.facebook.com/v19.0/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&limit=15&access_token=${accessToken}`;
     const response = await axios.get(url);
     
     if (!response.data || !response.data.data) {
@@ -106,7 +106,9 @@ exports.getRecentPosts = async (req, res) => {
       mediaUrl: post.media_url,
       thumbnailUrl: post.thumbnail_url || post.media_url, // Videos have thumbnail_url, Images have media_url
       permalink: post.permalink,
-      timestamp: post.timestamp
+      timestamp: post.timestamp,
+      likes: post.like_count || 0,
+      comments: post.comments_count || 0
     }));
 
     console.log(`======================================================\n`);
