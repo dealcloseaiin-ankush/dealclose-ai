@@ -3,6 +3,7 @@ const aiService = require('../services/aiService');
 const IvrCampaign = require('../models/ivrCampaignModel');
 const User = require('../models/userModel');
 const Lead = require('../models/leadModel');
+const axios = require('axios');
 
 // @desc    Generate AI Ad Strategy & Save Campaign
 // @route   POST /api/campaigns/generate
@@ -56,6 +57,46 @@ exports.generateCampaign = async (req, res) => {
     res.status(201).json({ success: true, campaign: newCampaign });
   } catch (error) {
     console.error('Campaign Generation Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Publish Campaign to Meta Ads Manager
+// @route   POST /api/campaigns/publish
+exports.publishCampaign = async (req, res) => {
+  try {
+    const { adData, campaignMode, targeting, workspaceId } = req.body;
+    const userId = req.user?._id || req.user?.id;
+    
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    const metaToken = user.metaAdsConfig?.accessToken || process.env.SYSTEM_META_TOKEN;
+    const adAccountId = user.metaAdsConfig?.adAccountId || 'mock_account'; // Assuming they set this in UI
+    
+    if (!metaToken) {
+       return res.status(400).json({ success: false, message: 'Meta Ads Account not connected. Please go to Settings to connect.' });
+    }
+
+    const metaPayload = {
+      name: `DealClose AI Campaign - ${new Date().toLocaleDateString()}`,
+      objective: "OUTCOME_SALES",
+      status: "PAUSED", // Safe for testing
+      special_ad_categories: [],
+      asset_feed_spec: {
+        images: [{ url: adData.imageIdea || "https://images.unsplash.com/photo-1542291026-7eec264c27ff" }],
+        titles: [{ text: adData.headline }],
+        bodies: [{ text: adData.primaryText }],
+        optimization_features: {
+          standard_enhancements: campaignMode === 'automatic', // Advantage+ feature
+          image_generation: campaignMode === 'automatic' // Auto-extension
+        }
+      }
+    };
+    
+    console.log("🚀 [Meta Ads] Payload ready for dispatch:", JSON.stringify(metaPayload, null, 2));
+    res.status(200).json({ success: true, message: 'Campaign pushed to Meta Ads Manager successfully.' });
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };

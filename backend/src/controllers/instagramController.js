@@ -2,6 +2,7 @@ const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel');
 const axios = require('axios');
+const instagramService = require('../services/instagramService');
 
 // @desc    Get Instagram Dashboard Analytics
 // @route   GET /api/instagram/dashboard
@@ -92,6 +93,30 @@ exports.getPostAutomations = async (req, res) => {
     res.status(200).json({ success: true, automations: user.postAutomations || [] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Publish Media (Image/Reel) to Instagram
+// @route   POST /api/instagram/publish-media
+exports.publishMedia = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { mediaUrl, mediaType, caption, workspaceId } = req.body;
+    
+    const user = await User.findById(userId).lean();
+    
+    const igSettings = workspaceId && workspaceId !== 'main' ? user.workspaces?.find(w => w._id.toString() === workspaceId)?.igConfig : user.igConfig;
+    const igToken = igSettings?.accessToken;
+    const igAccountId = igSettings?.accountId;
+
+    if (!igToken || !igAccountId) {
+       return res.status(400).json({ success: false, message: 'Instagram not connected. Please go to Settings to connect your account.' });
+    }
+
+    const result = await instagramService.publishInstagramMedia(igAccountId, igToken, mediaUrl, mediaType, caption);
+    res.status(200).json(result);
+  } catch (error) {
+     res.status(500).json({ success: false, message: error.message });
   }
 };
 

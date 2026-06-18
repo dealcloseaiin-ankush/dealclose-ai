@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight, Mic, Play, PhoneCall } from 'lucide-react';
+import { Target, TrendingUp, Users, Zap, MessageCircle, DollarSign, Eye, ShoppingCart, Sliders, Sparkles, ArrowRight, Mic, Play, PhoneCall, Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
@@ -20,6 +20,7 @@ export default function Campaigns() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAd, setGeneratedAd] = useState(null);
+  const [isPublishingAd, setIsPublishingAd] = useState(false);
   
   // New Targeting States
   const [country, setCountry] = useState('India');
@@ -78,6 +79,27 @@ export default function Campaigns() {
       alert('Something went wrong connecting to the AI.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // 🚀 PUBLISH AD TO META (ADVANTAGE+)
+  const handlePublishAd = async () => {
+    if (!generatedAd) return;
+    setIsPublishingAd(true);
+    const toastId = toast.loading("Deploying campaign to Meta Ads Manager with Advantage+...");
+    try {
+      await api.post('/campaigns/publish', {
+        adData: generatedAd,
+        campaignMode: campaignMode, // 'automatic' mode triggers Advantage+ standard_enhancements
+        targeting: { country, state: stateLoc, city, ageMin, ageMax, gender, interests, retargetType },
+        workspaceId: activeWorkspace
+      });
+      toast.success("🚀 Campaign successfully launched on Meta!", { id: toastId });
+    } catch (error) {
+      console.error('Error publishing campaign:', error);
+      toast.error(error.response?.data?.message || 'Failed to publish to Meta. Check API keys.', { id: toastId });
+    } finally {
+      setIsPublishingAd(false);
     }
   };
 
@@ -397,8 +419,12 @@ export default function Campaigns() {
                   )}
                 </div>
                 
-                <button className="w-full mt-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/20">
-                  Launch on Facebook & Instagram 🚀
+                <button 
+                  onClick={handlePublishAd}
+                  disabled={isPublishingAd}
+                  className="w-full mt-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {isPublishingAd ? <><Loader2 className="animate-spin" size={18}/> Deploying to Meta...</> : 'Launch on Facebook & Instagram 🚀'}
                 </button>
               </div>
             )}

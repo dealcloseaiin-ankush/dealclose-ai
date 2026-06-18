@@ -154,28 +154,28 @@ export default function Dashboard() {
           <Link to="/crm" className="text-sm text-blue-400 hover:text-blue-300 font-semibold">View CRM Board →</Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 text-center">
-          <Link to="/crm" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
+          <Link to="/crm?status=new" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
             <p className="text-2xl font-black text-blue-400">{data.smartCrmData?.new || 0}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">New Leads</p>
           </Link>
-          <Link to="/crm" className="block bg-red-500/10 p-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+          <Link to="/crm?status=hot" className="block bg-red-500/10 p-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition shadow-[0_0_15px_rgba(239,68,68,0.1)]">
             <p className="text-2xl font-black text-red-500">{data.smartCrmData?.hot || 0}</p><p className="text-[10px] text-red-400 font-bold uppercase tracking-wide mt-1">Hot 🔥</p>
           </Link>
-          <Link to="/crm" className="block bg-orange-500/10 p-4 rounded-xl border border-orange-500/20 hover:bg-orange-500/20 transition">
+          <Link to="/crm?status=warm" className="block bg-orange-500/10 p-4 rounded-xl border border-orange-500/20 hover:bg-orange-500/20 transition">
             <p className="text-2xl font-black text-orange-400">{data.smartCrmData?.warm || 0}</p><p className="text-[10px] text-orange-400 font-bold uppercase tracking-wide mt-1">Warm 🌟</p>
           </Link>
-          <Link to="/crm" className="block bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition">
+          <Link to="/crm?status=cold" className="block bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition">
             <p className="text-2xl font-black text-blue-300">{data.smartCrmData?.cold || 0}</p><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wide mt-1">Cold ❄️</p>
           </Link>
-          <Link to="/crm" className="block bg-green-500/10 p-4 rounded-xl border border-green-500/20 hover:bg-green-500/20 transition">
+          <Link to="/crm?status=existing" className="block bg-green-500/10 p-4 rounded-xl border border-green-500/20 hover:bg-green-500/20 transition">
             <p className="text-2xl font-black text-green-400">{data.smartCrmData?.existing || 0}</p><p className="text-[10px] text-green-400 font-bold uppercase tracking-wide mt-1">Existing 💼</p>
           </Link>
-          <Link to="/crm" className="block bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 hover:bg-purple-500/20 transition">
+          <Link to="/crm?status=vip" className="block bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 hover:bg-purple-500/20 transition">
             <p className="text-2xl font-black text-purple-400">{data.smartCrmData?.vip || 0}</p><p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide mt-1">VIP 👑</p>
           </Link>
-          <Link to="/crm" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
+          <Link to="/crm?status=lost" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
             <p className="text-2xl font-black text-gray-400">{data.smartCrmData?.lost || 0}</p><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide mt-1">Lost 💔</p>
           </Link>
-          <Link to="/crm" className="block bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/20 transition relative">
+          <Link to="/crm?status=followup" className="block bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/20 transition relative">
             {data.smartCrmData?.followUpsToday > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{data.smartCrmData.followUpsToday} Due</span>}
             <p className="text-2xl font-black text-yellow-400">{data.smartCrmData?.followUpsToday || 0}</p><p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wide mt-1">Follow-ups</p>
           </Link>
@@ -402,7 +402,8 @@ export default function Dashboard() {
                     <th className="p-4 font-semibold">Client Name</th>
                     <th className="p-4 font-semibold">Plan & MRR</th>
                     <th className="p-4 font-semibold">Active Features</th>
-                    <th className="p-4 font-semibold">AI Usage (Tokens/Cost)</th>
+                    <th className="p-4 font-semibold">Chat Responses</th>
+                    <th className="p-4 font-semibold">Platform Tokens</th>
                     <th className="p-4 font-semibold">Status / Issues</th>
                   </tr>
                 </thead>
@@ -417,8 +418,12 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className="text-purple-400 font-bold">{client.aiCredits || 0} credits left</span> <br/>
-                        <span className="text-xs text-gray-500">AI Tokens</span>
+                        <span className="text-blue-400 font-bold">{client.messageStats?.sent || 0} Replies</span> <br/>
+                        <span className="text-xs text-gray-500">Auto Chat</span>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-purple-400 font-bold">{client.aiCredits || 0} Tokens</span> <br/>
+                        <span className="text-xs text-gray-500">Flows/Ads/Scripts</span>
                       </td>
                       <td className="p-4">
                         {client.aiCredits > 0 ? (
@@ -436,7 +441,8 @@ export default function Dashboard() {
                       </td>
                       <td className="p-4 text-blue-400 font-semibold">Pro AI <br/><span className="text-xs text-gray-500">₹499/mo (Demo)</span></td>
                       <td className="p-4 text-gray-300 text-xs"><span className="bg-gray-800 px-2 py-0.5 rounded">WA</span></td>
-                      <td className="p-4"><span className="text-purple-400 font-bold">950 credits left</span> <br/><span className="text-xs text-rose-400">Real Cost: ₹1.25</span></td>
+                      <td className="p-4"><span className="text-blue-400 font-bold">145 Replies</span> <br/><span className="text-xs text-gray-500">Auto Chat</span></td>
+                      <td className="p-4"><span className="text-purple-400 font-bold">950 Tokens</span> <br/><span className="text-xs text-rose-400">Real Cost: ₹1.25</span></td>
                       <td className="p-4"><span className="bg-gray-500/10 text-gray-400 border border-gray-500/20 px-3 py-1 rounded-md text-xs font-bold">Demo Mode</span></td>
                     </tr>
                   )}

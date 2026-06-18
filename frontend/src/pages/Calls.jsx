@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { Phone, PhoneOff, Mic, Settings, PlayCircle, History, Bot, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, Settings, PlayCircle, History, Bot, Volume2, Activity } from 'lucide-react';
 
 export default function Calls() {
   const [isCalling, setIsCalling] = useState(false);

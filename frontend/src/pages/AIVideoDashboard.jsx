@@ -142,6 +142,19 @@ export default function AIVideoDashboard() {
     }
   };
 
+  // 🚀 PUBLISH REEL/IMAGE TO INSTAGRAM DIRECTLY
+  const handlePublishToIG = async (url, type) => {
+    toast.loading(`Publishing ${type} to Instagram...`, { id: 'ig-publish' });
+    try {
+      // Hits your backend route which calls Meta Graph API to post a REEL or IMAGE
+      await api.post('/instagram/publish-media', { mediaUrl: url, mediaType: type, caption: prompt });
+      toast.success("🚀 Successfully published to Instagram!", { id: 'ig-publish' });
+    } catch (err) {
+      console.error("IG Publish Error:", err);
+      toast.error(err.response?.data?.message || "Failed to publish. Ensure IG is connected in Settings.", { id: 'ig-publish' });
+    }
+  };
+
   // Handle Trending Prompt Click
   const handleUseTrending = (item) => {
     setPrompt(item.prompt);
@@ -305,6 +318,9 @@ export default function AIVideoDashboard() {
 
               {generatedAsset && !loading && ( // Download button when not loading
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                  <button onClick={() => handlePublishToIG(generatedAsset.url, generatedAsset.type)} className="bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 px-3 py-2 rounded-lg border border-pink-500/50 text-white transition-all text-xs font-bold shadow-lg flex items-center gap-1" title="Publish to Instagram">
+                    🚀 Post to IG
+                  </button>
                   <button onClick={() => handleDownload(generatedAsset.url, generatedAsset.type)} className="bg-black/80 hover:bg-black p-2 rounded-lg border border-gray-700 text-white transition-all hover:scale-110" title="Download"><Download size={18}/></button>
                 </div>
               )}

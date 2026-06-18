@@ -6,6 +6,7 @@ const campaignController = require('../controllers/campaignController');
 const { protect } = require('../middleware/authMiddleware'); 
 
 router.post('/generate', protect, campaignController.generateCampaign);
+router.post('/publish', protect, campaignController.publishCampaign);
 router.get('/', protect, campaignController.getCampaigns);
 router.get('/ivr', protect, campaignController.getIvrCampaigns);
 router.post('/ivr/:id/test', protect, campaignController.testIvrCampaign);

@@ -11,5 +11,6 @@ router.post('/automations', protect, instagramController.savePostAutomation);
 router.delete('/automations/:postId', protect, instagramController.deletePostAutomation);
 router.post('/icebreakers', protect, instagramController.setIceBreakers);
 router.post('/broadcast', protect, instagramController.sendBroadcast);
+router.post('/publish-media', protect, instagramController.publishMedia);
 
 module.exports = router;
