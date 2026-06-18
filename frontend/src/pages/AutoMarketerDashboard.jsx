@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Image, CheckCircle, XCircle, RefreshCw, Send, Loader2, Sparkles } from 'lucide-react';
+import { Image, CheckCircle, XCircle, RefreshCw, Send, Loader2, Sparkles, Heart, MessageCircle, Bookmark, MoreHorizontal } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
+import { useAuth } from '../hooks/useAuth';
 
 export default function AutoMarketerDashboard() {
+  const { user } = useAuth() || {};
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [publishingId, setPublishingId] = useState(null);
@@ -122,20 +124,34 @@ export default function AutoMarketerDashboard() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {posts.map((post) => (
-            <div key={post._id} className="bg-[#111] border border-gray-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col group">
-              {/* Image Header */}
-              <div className="w-full aspect-square relative bg-black overflow-hidden border-b border-gray-800">
+            <div key={post._id} className="bg-black border border-gray-800 rounded-[30px] overflow-hidden shadow-2xl flex flex-col group max-w-sm mx-auto w-full relative">
+              
+              {/* 🚀 IG MOCKUP HEADER */}
+              <div className="flex items-center justify-between p-3 border-b border-gray-900 bg-black">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 p-[2px]">
+                    <div className="w-full h-full bg-black rounded-full border border-black overflow-hidden flex items-center justify-center text-[10px] font-bold">
+                      {user?.businessName ? user.businessName.substring(0,2).toUpperCase() : 'IG'}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white leading-tight">{user?.businessName?.replace(/\s/g,'').toLowerCase() || 'yourbrand'}</p>
+                    <p className="text-[10px] text-gray-400 leading-tight">Sponsored</p>
+                  </div>
+                </div>
+                <MoreHorizontal size={16} className="text-gray-500" />
+              </div>
+
+              {/* Image Content */}
+              <div className="w-full aspect-square relative bg-[#111] overflow-hidden">
                 <img 
                   src={post.imageUrl} 
                   alt="AI Generated" 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold border border-gray-700 uppercase tracking-wider">
-                  {new Date(post.createdAt).toLocaleDateString()}
-                </div>
                 
                 {post.status === 'posted' && (
-                  <div className="absolute inset-0 bg-green-900/40 flex items-center justify-center backdrop-blur-sm">
+                  <div className="absolute inset-0 bg-green-900/40 flex items-center justify-center backdrop-blur-sm z-20">
                     <div className="bg-green-500 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-xl shadow-green-500/30">
                       <CheckCircle size={20} /> Published to Meta
                     </div>
@@ -143,30 +159,45 @@ export default function AutoMarketerDashboard() {
                 )}
               </div>
 
-              {/* Content Area */}
-              <div className="p-6 flex-1 flex flex-col">
+              {/* 🚀 IG MOCKUP ACTIONS */}
+              <div className="p-3 pb-1 bg-black flex justify-between items-center">
+                <div className="flex gap-4">
+                  <Heart size={24} className="text-white hover:text-gray-400 cursor-pointer transition-colors" />
+                  <MessageCircle size={24} className="text-white hover:text-gray-400 cursor-pointer transition-colors" />
+                  <Send size={24} className="text-white hover:text-gray-400 cursor-pointer transition-colors" />
+                </div>
+                <Bookmark size={24} className="text-white hover:text-gray-400 cursor-pointer transition-colors" />
+              </div>
+
+              {/* Content Area / IG MOCKUP CAPTION */}
+              <div className="px-3 pb-4 bg-black flex-1 flex flex-col">
+                <p className="text-sm font-bold text-white mb-1">1,245 likes</p>
                 <div className="flex-1">
-                  <p className="text-gray-300 whitespace-pre-wrap text-sm leading-relaxed mb-4">
+                  <p className="text-gray-200 text-sm leading-relaxed mb-1 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
+                    <span className="font-bold text-white mr-2">{user?.businessName?.replace(/\s/g,'').toLowerCase() || 'yourbrand'}</span>
                     {post.caption}
+                  </p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-2">
+                    {new Date(post.createdAt).toLocaleDateString()}
                   </p>
                 </div>
 
                 {/* Action Buttons */}
                 {post.status === 'pending_approval' && (
-                  <div className="flex gap-3 mt-4 pt-4 border-t border-gray-800">
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-900">
                     <button 
                       onClick={() => handleReject(post._id)}
-                      className="flex-1 py-3 bg-[#1a1a1a] hover:bg-gray-800 text-gray-400 font-bold rounded-xl transition-colors border border-gray-700 flex items-center justify-center gap-2"
+                      className="flex-1 py-2.5 bg-[#1a1a1a] hover:bg-gray-800 text-gray-400 font-bold rounded-lg transition-colors border border-gray-800 flex items-center justify-center gap-2 text-sm"
                     >
-                      <XCircle size={18} /> Reject
+                      <XCircle size={16} /> Reject
                     </button>
                     
                     <button 
                       onClick={() => handleApprove(post._id)}
                       disabled={publishingId === post._id}
-                      className="flex-[2] py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-pink-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-[2] py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-lg transition-all shadow-lg shadow-pink-600/20 flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                     >
-                      {publishingId === post._id ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                      {publishingId === post._id ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
                       {publishingId === post._id ? 'Publishing...' : 'Approve & Publish'}
                     </button>
                   </div>
