@@ -303,13 +303,13 @@ exports.instagramConnect = async (req, res) => {
 
     // 🔥 FIX: Prevent Branch from stealing Main's IG Account
     const userDb = await User.findById(userId);
-    const usedIgAccountIds = []; // Array to store IDs already in use by other workspaces
+    const usedIgAccountIds = [];
     if (userDb.instagramConfig && userDb.instagramConfig.instagramAccountId && workspaceId !== 'main') {
       usedIgAccountIds.push(userDb.instagramConfig.instagramAccountId);
     }
     if (userDb.workspaces) {
       userDb.workspaces.forEach(w => {
-        if (w._id.toString() !== workspaceId && w.igConfig && w.igConfig.instagramAccountId) {
+        if (w._id.toString() !== workspaceId && w.igConfig?.instagramAccountId) {
           usedIgAccountIds.push(w.igConfig.instagramAccountId);
         }
       });
@@ -343,17 +343,21 @@ exports.instagramConnect = async (req, res) => {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
     }
 
-    // 🚀 CRITICAL FIX: Find the correct account to connect
-    // This was the main bug. It was always looking at the old main config.
+    // 🚀 CRITICAL FIX: Find the correct account to connect. This was the main bug.
     let requestedAccountId = null;
     if (workspaceId && workspaceId !== 'main') {
-      const ws = userDb.workspaces.find(w => w._id.toString() === workspaceId);
-      if (ws && ws.igConfig) requestedAccountId = ws.igConfig.instagramAccountId;
-    } else {
-      if (userDb.instagramConfig) requestedAccountId = userDb.instagramConfig.instagramAccountId;
+        const ws = userDb.workspaces.find(w => w._id.toString() === workspaceId);
+        if (ws && ws.igConfig) requestedAccountId = ws.igConfig.instagramAccountId;
+    } else if (userDb.instagramConfig) {
+        requestedAccountId = userDb.instagramConfig.instagramAccountId;
     }
 
     let targetAccount = null;
+
+    // If an account was already configured for this workspace, try to find it again.
+    if (requestedAccountId) {
+        targetAccount = availableAccounts.find(acc => acc.accountId === requestedAccountId);
+    }
 
     // If no specific account is requested (first time connect for this workspace), find the first available one.
     if (!targetAccount) {
@@ -370,10 +374,12 @@ exports.instagramConnect = async (req, res) => {
     // Meta will not send real DMs/Comments to our webhook unless the page is explicitly subscribed.
     try {
         console.log(`📡 5. Subscribing App to Facebook Page Webhooks for Page ID: ${targetAccount.pageId}...`);
+        // 🚀 FIX: 'comments' is invalid for Page webhooks. The correct field is 'feed'.
+        const subscribedFields = 'messages,messaging_postbacks,feed';
+        console.log(`   - Subscribing to fields: [${subscribedFields}]`);
         await axios.post(`https://graph.facebook.com/v19.0/${targetAccount.pageId}/subscribed_apps`, null, {
             params: {
-                // 🚀 FIX: Added 'messages' and 'messaging_postbacks' to fix the permission error
-                subscribed_fields: 'messages,messaging_postbacks,comments',
+                subscribed_fields: subscribedFields,
                 access_token: targetAccount.pageToken
             }
         });
