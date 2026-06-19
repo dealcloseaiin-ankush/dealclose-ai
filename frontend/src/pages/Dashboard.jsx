@@ -130,18 +130,18 @@ export default function Dashboard() {
           subtitle="Click to view all leads in CRM"
         />
         <StatCard 
-          title="Conversion Rate" 
+          title="Lead Conversion Rate" 
           value={`${data.stats.conversionRate}%`} 
           trend="+22.4%" trendUp={true} icon="📞" color="from-green-500/20 to-green-500/5" 
           linkTo="/crm"
           subtitle="Linked to Kanban 'Converted' stage"
         />
         <StatCard 
-          title="Cost Per Lead" 
+          title="Est. Cost / Lead" 
           value={`₹${data.stats.costPerLead}`} 
-          trend="+8.2%" trendUp={true} icon="🔥" color="from-purple-500/20 to-purple-500/5" 
+          trend="+8.2%" trendUp={false} icon="🔥" color="from-purple-500/20 to-purple-500/5" 
           linkTo="/whatsapp-rules"
-          subtitle="Est. based on outgoing templates. Click to see pricing."
+          subtitle="⚠️ Est. based on outgoing templates. Does not include 24-hr free replies."
         />
       </div>
 

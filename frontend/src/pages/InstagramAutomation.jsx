@@ -122,14 +122,19 @@ export default function InstagramAutomation() {
         if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
 
         // 🚀 FIX: Start hote hi directly posts wale route ko call karke load karega!
-        const postsRes = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: { posts: [] } }));
-        if (postsRes.data && postsRes.data.posts) {
-           const safePosts = postsRes.data.posts.map(p => ({
-             ...p,
-             stats: p.stats || { views: p.likes ? `${p.likes} Likes` : '0 Likes', totalComments: p.comments || 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0 },
-             botMode: p.botMode || 'off'
-           }));
-           setRecentPosts(safePosts);
+        try {
+          const postsRes = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace } });
+          if (postsRes.data && postsRes.data.posts) {
+             const safePosts = postsRes.data.posts.map(p => ({
+               ...p,
+               stats: p.stats || { views: p.likes ? `${p.likes} Likes` : '0 Likes', totalComments: p.comments || 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0 },
+               botMode: p.botMode || 'off'
+             }));
+             setRecentPosts(safePosts);
+          }
+        } catch (postErr) {
+          console.error("Failed to fetch posts from backend:", postErr);
+          toast.error(`Backend Error Loading Posts: ${postErr.response?.data?.message || postErr.message}`);
         }
       } catch (error) {
         console.error("Failed to fetch IG data", error);
@@ -219,7 +224,7 @@ export default function InstagramAutomation() {
             <h1 className="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">
               Instagram AI Funnel
             </h1>
-            <select 
+            <select
               value={activeWorkspace} 
               onChange={(e) => setActiveWorkspace(e.target.value)} 
               className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
@@ -231,10 +236,41 @@ export default function InstagramAutomation() {
           </div>
           <p className="text-gray-400">Manage your Instagram automations and see how AI is converting comments into WhatsApp leads.</p>
         </div>
-        <button onClick={handleSyncPosts} className="px-5 py-2.5 bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 hover:border-pink-500 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center gap-2">
-          🔄 Sync IG Posts
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => alert(JSON.stringify(recentPosts, null, 2))} className="px-3 py-2.5 bg-[#111] hover:bg-gray-800 border border-gray-800 text-gray-400 text-xs font-bold rounded-xl transition-colors">
+            🐛 Debug
+          </button>
+          <button onClick={handleSyncPosts} className="px-5 py-2.5 bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 hover:border-pink-500 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center gap-2">
+            🔄 Sync IG Posts
+          </button>
+        </div>
       </div>
+
+      {/* 🔴 SYSTEM DIAGNOSTIC BANNER (To help user understand what is happening) */}
+      <div className="bg-gray-900 border border-gray-700 p-4 rounded-xl mb-6">
+        <h3 className="text-gray-400 font-bold mb-2">🔍 System Diagnostic</h3>
+        <p className="text-sm text-gray-300">Total Posts Loaded in Memory: <strong className="text-white">{recentPosts.length}</strong></p>
+        <p className="text-sm text-gray-300">Current Active Tab: <strong className="text-white">{activeTab}</strong></p>
+        {recentPosts.length > 0 && activeTab !== 'posts' && (
+           <p className="text-rose-400 text-sm font-bold mt-2">👉 Posts are loaded successfully! Click the "Per-Post Customization" tab below to view them.</p>
+        )}
+        {recentPosts.length === 0 && (
+           <p className="text-yellow-400 text-sm font-bold mt-2">⚠️ No posts loaded yet. Please click "Sync IG Posts" button.</p>
+        )}
+      </div>
+
+      {/* 🚀 FIX: Visually alert the user if posts are loaded but they are on the wrong tab */}
+      {recentPosts.length > 0 && activeTab !== 'posts' && (
+         <div className="bg-pink-500/10 border border-pink-500/30 p-4 rounded-xl mb-6 flex justify-between items-center animate-pulse">
+            <div>
+               <p className="text-pink-400 font-bold">🎉 We found {recentPosts.length} posts from your Instagram!</p>
+               <p className="text-sm text-gray-400">Click the "Per-Post Customization" tab below to view them and set up Auto-DMs.</p>
+            </div>
+            <button onClick={() => setActiveTab('posts')} className="bg-pink-600 hover:bg-pink-500 text-white px-5 py-2 rounded-lg font-bold shadow-lg text-sm transition-colors">
+               View Posts ↗
+            </button>
+         </div>
+      )}
 
       {/* 1. Analytics Section (The "Value" Prover) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
@@ -268,7 +304,7 @@ export default function InstagramAutomation() {
           General Rules & Live Activity
         </button>
         <button onClick={() => setActiveTab('posts')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'posts' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
-          Per-Post Customization (E-commerce)
+          Per-Post Customization {recentPosts.length > 0 && <span className="ml-1 bg-pink-500 text-white text-[10px] px-2 py-0.5 rounded-full">{recentPosts.length}</span>}
         </button>
         <button onClick={() => setActiveTab('smart-groups')} className={`pb-3 px-2 font-semibold transition-all duration-300 ${activeTab === 'smart-groups' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500 hover:text-gray-300'}`}>
           Smart Comment Grouping
@@ -430,27 +466,31 @@ export default function InstagramAutomation() {
             {recentPosts.map(post => (
               <div key={post.id} className={`border ${post.botMode === 'hybrid' ? 'border-purple-500/50 bg-[#1a1525]' : post.botMode === 'chatbot' ? 'border-blue-500/50 bg-[#151a25]' : 'border-gray-800 bg-[#0a0a0a]'} rounded-xl p-5 relative transition-all`}>
                 <div className="flex items-start gap-4 mb-4">
-                  <div className="w-20 h-20 bg-gray-800 rounded-lg flex items-center justify-center text-3xl shadow-inner overflow-hidden border border-gray-700">
-                    {post.mediaUrl ? <img src={post.mediaUrl} alt="post" className="w-full h-full object-cover"/> : post.image}
-                  </div>
+                  <a href={post.permalink} target="_blank" rel="noopener noreferrer" className="block w-20 h-20 bg-gray-800 rounded-lg flex-shrink-0 items-center justify-center text-3xl shadow-inner overflow-hidden border border-gray-700 group/img">
+                    {post.media_url ? <img src={post.media_url} alt="post" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-300"/> : <span className="text-[10px] text-gray-500">No Image</span>}
+                  </a>
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
-                    <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">{post.type}</span>
+                      <div>
+                        <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">{post.media_type}</span>
+                        <p className="text-[10px] text-gray-600 font-semibold">{new Date(post.timestamp).toLocaleDateString()}</p>
+                      </div>
                       {/* 🚀 Show if Auto-DM Rule exists for this post */}
-                      {user?.postAutomations?.find(r => r.postId === post.id) && (
+                      {user?.postAutomations?.find(r => r?.postId === post.id) && (
                         <span className="bg-pink-500/20 text-pink-400 border border-pink-500/30 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                           🎁 Auto-DM Active
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-300 line-clamp-2 mt-1 font-medium">{post.caption}</p>
+                    <p className="text-sm text-gray-300 line-clamp-2 mt-1 font-medium">{post.caption || "No caption for this media."}</p>
                     
                     {/* 🚀 NEW: Visual Enterprise Stats (Views, Comments, DMs) */}
-                    <div className="flex items-center gap-4 mt-3 border-t border-gray-800 pt-2">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-red-400">❤️</span> {post.stats?.views || '0 Likes'}</div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-green-400">💬</span> {post.stats?.totalComments || 0}</div>
+                    <div className="flex items-center gap-4 mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400 font-bold">
+                      <div className="flex items-center gap-1.5" title="Impressions / Views"><span className="text-blue-400">👁️</span> {post.impressions || 0}</div>
+                      <div className="flex items-center gap-1.5" title="Likes"><span className="text-red-400">❤️</span> {post.like_count || 0}</div>
+                      <div className="flex items-center gap-1.5" title="Comments"><span className="text-green-400">💬</span> {post.comments_count || 0}</div>
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold"><span className="text-pink-400">📩</span> {
-                        user?.postAutomations?.find(r => r.postId === post.id)?.stats?.sentCount || post.stats?.dmsSent || 0
+                        (user?.postAutomations || []).find(r => r?.postId === post.id)?.stats?.sentCount || post.stats?.dmsSent || 0
                       }</div>
                     </div>
 
@@ -528,7 +568,7 @@ export default function InstagramAutomation() {
 
                 {/* 🚀 NEW: Specific Lead Magnet Button */}
                 <div className="mt-4 pt-4 border-t border-gray-800 flex justify-end">
-                  <button onClick={() => { setNewAuto(user?.postAutomations?.find(r => r.postId === post.id) || { postId: post.id, triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' }); setSelectedPostForAuto(post); }} className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2">
+                  <button onClick={() => { setNewAuto((user?.postAutomations || []).find(r => r?.postId === post.id) || { postId: post.id, triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' }); setSelectedPostForAuto(post); }} className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2">
                     🎁 Set Auto-DM Link Rule
                   </button>
                 </div>

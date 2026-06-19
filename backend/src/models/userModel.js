@@ -74,14 +74,24 @@ const userSchema = new Schema({
     name: { type: String }, 
     description: { type: String }, // E.g., "Real Estate", "Electronics" for Cross-Selling
     email: { type: String }, // Branch Email ID
+    // --- Separate Connections for each Workspace ---
+    whatsappConfig: {
+      accessToken: { type: String },
+      phoneNumberId: { type: String },
+      wabaId: { type: String }
+    },
+    igConfig: {
+      accessToken: { type: String },
+      instagramAccountId: { type: String },
+      facebookPageId: { type: String }
+    },
     // --- Separate AI Brain for each Workspace ---
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
     // --- Social links for each specific workspace ---
     instagram: { type: String },
     facebook: { type: String },
-    website: { type: String },
-    googleReview: { type: String }
+    website: { type: String }
   }],
   savedMedia: [{
     mediaId: { type: String },

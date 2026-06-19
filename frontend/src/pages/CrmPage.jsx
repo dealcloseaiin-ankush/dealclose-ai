@@ -220,7 +220,7 @@ export default function CrmPage() {
             <h1 className="text-2xl font-bold text-white">CRM Pipeline</h1>
             
             {/* Workspace / Business Dropdown */}
-            <select 
+            <select
               value={activeWorkspace} 
               onChange={(e) => setActiveWorkspace(e.target.value)} 
               className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-sky-500 cursor-pointer shadow-sm"

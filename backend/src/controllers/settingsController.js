@@ -200,29 +200,42 @@ exports.connectMetaAccount = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
 
-    // Frontend SDK will send these details after the Meta popup flow is completed
-    const { accessToken, wabaId, phoneNumberId } = req.body;
+    // Frontend SDK will send these details after the Meta popup flow is completed, along with workspaceId
+    const { accessToken, wabaId, phoneNumberId, platform, workspaceId } = req.body;
+    console.log(`➡️ [DEBUG Meta Connect] Received for User: ${userId}, Workspace: ${workspaceId}, Platform: ${platform}`);
 
     if (!accessToken || !phoneNumberId) {
       return res.status(400).json({ success: false, message: 'Missing Meta credentials from Embedded Signup.' });
     }
 
-    // Save the credentials securely to the user's dashboard
-    const updateData = {
-      whatsappConfig: {
-        accessToken: accessToken,
-        phoneNumberId: phoneNumberId,
-        wabaId: wabaId || ''
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // 🚀 CRITICAL FIX: Save to the correct workspace or main config
+    if (workspaceId && workspaceId !== 'main') {
+      const wsIndex = user.workspaces.findIndex(ws => ws._id.toString() === workspaceId);
+      if (wsIndex === -1) return res.status(404).json({ success: false, message: 'Workspace not found' });
+
+      if (platform === 'whatsapp') {
+        user.workspaces[wsIndex].whatsappConfig = { accessToken, phoneNumberId, wabaId: wabaId || '' };
+      } else if (platform === 'instagram') {
+        // Note: For IG, phoneNumberId is actually the IG Account ID
+        user.workspaces[wsIndex].igConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
       }
-    };
+      console.log(`✅ [DEBUG Meta Connect] SAVING to Workspace: ${user.workspaces[wsIndex].name}`);
+    } else {
+      // Save to main/root config
+      if (platform === 'whatsapp') {
+        user.whatsappConfig = { accessToken, phoneNumberId, wabaId: wabaId || '' };
+      } else if (platform === 'instagram') {
+        user.instagramConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
+      }
+      console.log(`✅ [DEBUG Meta Connect] SAVING to Main Business Config`);
+    }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updateData },
-      { new: true }
-    ).lean();
+    const updatedUser = await user.save();
 
-    console.log(`✅ [Meta Onboarding] Account connected successfully for User: `);
+    console.log(`✅ [Meta Onboarding] ${platform} account connected successfully for User: ${userId}`);
     res.status(200).json({ success: true, message: 'WhatsApp API connected successfully!', user: updatedUser });
   } catch (error) {
     console.error('Meta Connect Error:', error);

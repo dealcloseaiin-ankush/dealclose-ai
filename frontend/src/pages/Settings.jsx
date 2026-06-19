@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
-import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database } from 'lucide-react'; 
+import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database } from 'lucide-react';
 import MetaConnectButton from '../components/MetaConnectButton';
 
 export default function Settings() {
@@ -68,7 +68,7 @@ export default function Settings() {
   };
   
   const handleCustomWebhookChange = (index, field, value) => {
-    const updated = [...config.customWebhooks];
+    const updated = [...(config.customWebhooks || [])];
     updated[index][field] = value;
     setConfig({ ...config, customWebhooks: updated });
   };
@@ -84,15 +84,15 @@ export default function Settings() {
       // 🚀 CRITICAL FIX: Clean URL instantly to prevent React StrictMode from sending the code twice (causes 400 Error)
       window.history.replaceState({}, document.title, window.location.pathname);
       
-      const currentUri = `${window.location.origin}/settings`;
+      const currentUri = `${window.location.origin}${window.location.pathname}`;
       api.post('/settings/google/connect', { code, redirectUri: currentUri })
         .then(() => {
           alert('🎉 Google Sheets Connected Successfully! Auto-sync is now ACTIVE.');
           fetchSettings();
         })
         .catch(err => {
-          const errMsg = err.response?.status === 404 
-            ? 'Backend API Route Not Found (404). Please ensure /api/settings/google/connect is properly mapped in your server routes.' 
+          const errMsg = err.response?.status === 404
+            ? 'Backend API Route Not Found (404). Please ensure /api/settings/google/connect is properly mapped in your server routes.'
             : (err.response?.data?.message || err.message);
             
           alert(`❌ Google Connection Failed: ${errMsg}`);
@@ -103,7 +103,7 @@ export default function Settings() {
 
   const handleGoogleAuth = async () => {
     try {
-      const currentUri = `${window.location.origin}/settings`;
+      const currentUri = `${window.location.origin}${window.location.pathname}`;
       const res = await api.get(`/settings/google/auth-url?redirectUri=${encodeURIComponent(currentUri)}`);
       if (res.data.success) window.location.href = res.data.url; // Redirect to Google Login
     } catch (err) { alert(err.response?.data?.message || 'Error generating Auth URL.'); }
@@ -317,7 +317,7 @@ export default function Settings() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-4 mb-2">
-              <h1 className="text-4xl font-extrabold tracking-tight">
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
                   Integrations & Settings
                 </span>
@@ -333,7 +333,7 @@ export default function Settings() {
                 ))}
               </select>
             </div>
-            <p className="text-gray-400 text-lg">Manage your APIs, AI Rules, and Branches securely.</p>
+            <p className="text-gray-400 md:text-lg">Manage your APIs, AI Rules, and Branches securely.</p>
           </div>
           <button onClick={handleSave} className="w-full md:w-auto px-8 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 transition-colors shadow-lg shadow-green-600/20 flex items-center justify-center gap-2">
             <CheckCircle size={18}/> Save Settings
@@ -389,7 +389,7 @@ export default function Settings() {
                         <label className="block text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Main Business Links</label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <input type="text" name="websiteLink" value={config.websiteLink} onChange={handleChange} placeholder="🌐 Website / Catalog URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none md:col-span-2" />
-                          <div>
+                          <div className="md:col-span-2">
                             <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500">
                               <span className="px-3 py-2 text-gray-500 bg-[#111] text-sm flex items-center border-r border-gray-700">ig.com/</span>
                               <input type="text" value={getUsername(config.instagramLink, 'https://instagram.com/')} onChange={(e) => handleSocialLinkChange('instagramLink', 'https://instagram.com/', e)} placeholder="username" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
@@ -401,7 +401,7 @@ export default function Settings() {
                               <input type="text" value={getUsername(config.facebookLink, 'https://facebook.com/')} onChange={(e) => handleSocialLinkChange('facebookLink', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
                             </div>
                           </div>
-                          <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="⭐ Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none md:col-span-2" />
+                          <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="⭐ Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none" />
                         </div>
                       </div>
 
@@ -471,7 +471,7 @@ export default function Settings() {
                 {/* Branch Management Section */}
                 <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold text-blue-400 flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-semibold text-blue-400 flex items-center gap-2">
                        <Briefcase size={20}/> Managed Branches / Businesses
                     </h2>
                     <button type="button" onClick={addWorkspace} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
@@ -508,7 +508,7 @@ export default function Settings() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
+                      <div className="md:col-span-2">
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
                     <input type="password" name="igAccessToken" value={config.igAccessToken} onChange={handleChange} placeholder="IG Token (Auto-filled or Paste here)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
                       </div>
@@ -712,7 +712,7 @@ export default function Settings() {
                   <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">Branch Specific Links</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 relative z-10 bg-[#1a1a1a] p-5 rounded-xl border border-gray-800">
                      <input type="text" value={activeWs.website || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'website', e.target.value)} placeholder="🌐 Website / Catalog URL" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none md:col-span-2" />
-                     <div>
+                     <div className="md:col-span-2">
                        <div className="flex bg-[#0a0a0a] border border-gray-700 rounded-lg overflow-hidden focus-within:border-blue-500">
                          <span className="px-3 py-2 text-gray-500 bg-[#111] text-xs flex items-center border-r border-gray-700">ig.com/</span>
                          <input type="text" value={getUsername(activeWs.instagram, 'https://instagram.com/')} onChange={(e) => handleWorkspaceSocialChange(wsIndex, 'instagram', 'https://instagram.com/', e)} placeholder="username" className="w-full bg-transparent p-2 text-white text-xs outline-none" />
@@ -780,7 +780,7 @@ export default function Settings() {
                   </div>
 
               {/* Branch Independent Meta API Connect (Target Specific Accounts) */}
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">Target Meta Connections</h3>
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10 mt-8">Target Meta Connections</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
                     <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WhatsApp Phone ID</label>
@@ -801,7 +801,7 @@ export default function Settings() {
                   </div>
                   
                   <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-800 relative z-10 items-center">
-                     {activeWs._id ? (
+                     {activeWs?._id ? (
                        <>
                          <div className="w-full mb-2 flex flex-col md:flex-row gap-4">
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
@@ -814,8 +814,8 @@ export default function Settings() {
                            </div>
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
-                     <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs._id} onSuccess={fetchSettings} />
-                     <MetaConnectButton buttonText={activeWs.igConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs._id} onSuccess={fetchSettings} />
+                     <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
+                     <MetaConnectButton buttonText={activeWs.igConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

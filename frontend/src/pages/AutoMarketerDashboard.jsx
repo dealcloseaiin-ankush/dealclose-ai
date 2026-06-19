@@ -124,18 +124,18 @@ export default function AutoMarketerDashboard() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {posts.map((post) => (
-            <div key={post._id} className="bg-black border border-gray-800 rounded-[30px] overflow-hidden shadow-2xl flex flex-col group max-w-sm mx-auto w-full relative">
+            <div key={post._id} className="bg-black border border-gray-800 rounded-[24px] overflow-hidden shadow-2xl flex flex-col group max-w-sm mx-auto w-full relative">
               
               {/* 🚀 IG MOCKUP HEADER */}
               <div className="flex items-center justify-between p-3 border-b border-gray-900 bg-black">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 p-[2px]">
-                    <div className="w-full h-full bg-black rounded-full border border-black overflow-hidden flex items-center justify-center text-[10px] font-bold">
-                      {user?.businessName ? user.businessName.substring(0,2).toUpperCase() : 'IG'}
+                    <div className="w-full h-full bg-black rounded-full border-2 border-black overflow-hidden flex items-center justify-center text-[10px] font-bold">
+                      {user?.businessName ? user.businessName.substring(0, 2).toUpperCase() : 'IG'}
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white leading-tight">{user?.businessName?.replace(/\s/g,'').toLowerCase() || 'yourbrand'}</p>
+                    <p className="text-sm font-bold text-white leading-tight">{user?.businessName?.replace(/\s/g, '').toLowerCase() || 'yourbrand'}</p>
                     <p className="text-[10px] text-gray-400 leading-tight">Sponsored</p>
                   </div>
                 </div>
@@ -160,7 +160,7 @@ export default function AutoMarketerDashboard() {
               </div>
 
               {/* 🚀 IG MOCKUP ACTIONS */}
-              <div className="p-3 pb-1 bg-black flex justify-between items-center">
+              <div className="p-4 pb-1 bg-black flex justify-between items-center">
                 <div className="flex gap-4">
                   <Heart size={24} className="text-white hover:text-gray-400 cursor-pointer transition-colors" />
                   <MessageCircle size={24} className="text-white hover:text-gray-400 cursor-pointer transition-colors" />
@@ -170,11 +170,11 @@ export default function AutoMarketerDashboard() {
               </div>
 
               {/* Content Area / IG MOCKUP CAPTION */}
-              <div className="px-3 pb-4 bg-black flex-1 flex flex-col">
+              <div className="px-4 pb-4 bg-black flex-1 flex flex-col">
                 <p className="text-sm font-bold text-white mb-1">1,245 likes</p>
                 <div className="flex-1">
                   <p className="text-gray-200 text-sm leading-relaxed mb-1 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
-                    <span className="font-bold text-white mr-2">{user?.businessName?.replace(/\s/g,'').toLowerCase() || 'yourbrand'}</span>
+                    <span className="font-bold text-white mr-2">{user?.businessName?.replace(/\s/g, '').toLowerCase() || 'yourbrand'}</span>
                     {post.caption}
                   </p>
                   <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-2">
