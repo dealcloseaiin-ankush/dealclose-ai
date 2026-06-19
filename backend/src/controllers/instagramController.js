@@ -90,7 +90,8 @@ exports.getRecentPosts = async (req, res) => {
 
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     // Fetch latest 15 media items from Meta Graph API
-    const url = `https://graph.facebook.com/v19.0/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&limit=15&access_token=${accessToken}`;
+    // 🚀 FIX: Added 'impressions' to fetch real post views
+    const url = `https://graph.facebook.com/v19.0/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions)&limit=15&access_token=${accessToken}`;
     const response = await axios.get(url);
     
     if (!response.data || !response.data.data) {
@@ -99,17 +100,22 @@ exports.getRecentPosts = async (req, res) => {
       console.log(`✅ 4. Meta API Success! Found ${response.data.data.length} posts.`);
     }
 
-    const posts = response.data.data.map(post => ({
-      id: post.id,
-      caption: post.caption || '',
-      type: post.media_type,
-      mediaUrl: post.media_url,
-      thumbnailUrl: post.thumbnail_url || post.media_url, // Videos have thumbnail_url, Images have media_url
-      permalink: post.permalink,
-      timestamp: post.timestamp,
-      likes: post.like_count || 0,
-      comments: post.comments_count || 0
-    }));
+    // 🚀 FIX: Map the new 'impressions' field to 'views' for the frontend
+    const posts = response.data.data.map(post => {
+      const insightsData = post.insights?.data[0]?.values[0]?.value;
+      return {
+        id: post.id,
+        caption: post.caption || '',
+        media_type: post.media_type,
+        media_url: post.media_url,
+        thumbnail_url: post.thumbnail_url || post.media_url,
+        permalink: post.permalink,
+        timestamp: post.timestamp,
+        like_count: post.like_count || 0,
+        comments_count: post.comments_count || 0,
+        impressions: insightsData || 0, // This is the 'views' count
+      };
+    });
 
     console.log(`======================================================\n`);
     res.status(200).json({ success: true, posts });

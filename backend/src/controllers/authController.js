@@ -303,14 +303,14 @@ exports.instagramConnect = async (req, res) => {
 
     // 🔥 FIX: Prevent Branch from stealing Main's IG Account
     const userDb = await User.findById(userId);
-    const usedIgAccountIds = [];
-    if (userDb.igConfig && userDb.igConfig.accountId) {
-      if (workspaceId !== 'main') usedIgAccountIds.push(userDb.igConfig.accountId);
+    const usedIgAccountIds = []; // Array to store IDs already in use by other workspaces
+    if (userDb.instagramConfig && userDb.instagramConfig.instagramAccountId && workspaceId !== 'main') {
+      usedIgAccountIds.push(userDb.instagramConfig.instagramAccountId);
     }
     if (userDb.workspaces) {
       userDb.workspaces.forEach(w => {
-        if (w._id.toString() !== workspaceId && w.igConfig && w.igConfig.accountId) {
-          usedIgAccountIds.push(w.igConfig.accountId);
+        if (w._id.toString() !== workspaceId && w.igConfig && w.igConfig.instagramAccountId) {
+          usedIgAccountIds.push(w.igConfig.instagramAccountId);
         }
       });
     }
@@ -325,7 +325,7 @@ exports.instagramConnect = async (req, res) => {
             console.log(`🔍 2. Checking FB Page "${page.name}": IG Account Linked? ->`, igAcc ? `YES (ID: ${igAcc.id})` : 'NO');
             
             if (igAcc) {
-                availableAccounts.push({
+                availableAccounts.push({ // Storing all available accounts from Meta
                    accountId: igAcc.id,
                    pageId: page.id,
                        pageName: page.name,
@@ -343,17 +343,22 @@ exports.instagramConnect = async (req, res) => {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
     }
 
-    let requestedAccountId = workspaceId && workspaceId !== 'main' ? userDb.workspaces.find(w => w._id.toString() === workspaceId)?.igConfig?.accountId : userDb.igConfig?.accountId;
+    // 🚀 CRITICAL FIX: Find the correct account to connect
+    // This was the main bug. It was always looking at the old main config.
+    let requestedAccountId = null;
+    if (workspaceId && workspaceId !== 'main') {
+      const ws = userDb.workspaces.find(w => w._id.toString() === workspaceId);
+      if (ws && ws.igConfig) requestedAccountId = ws.igConfig.instagramAccountId;
+    } else {
+      if (userDb.instagramConfig) requestedAccountId = userDb.instagramConfig.instagramAccountId;
+    }
+
     let targetAccount = null;
 
-    if (requestedAccountId) {
-        targetAccount = availableAccounts.find(acc => acc.accountId === requestedAccountId);
-        if (!targetAccount) {
-            return res.status(400).json({ success: false, message: `Target IG Account ID (${requestedAccountId}) not found in Meta's response! You clicked 'Got it' without selecting the new page. Please Reconnect, click 'Edit Settings' in the Meta popup, and TICK the new Instagram page!` });
-        }
-    } else {
+    // If no specific account is requested (first time connect for this workspace), find the first available one.
+    if (!targetAccount) {
         targetAccount = availableAccounts.find(acc => !usedIgAccountIds.includes(acc.accountId));
-        if (!targetAccount) { 
+        if (!targetAccount) {
             return res.status(400).json({ success: false, message: `No new Instagram accounts found! The accounts Meta returned are already in use by your other branches. Please click 'Edit Settings' in the Meta popup and tick your NEW Instagram page.` });
         }
     }
@@ -364,10 +369,11 @@ exports.instagramConnect = async (req, res) => {
     // 🚀 NEW: Auto-Subscribe the Facebook Page to the Webhook!
     // Meta will not send real DMs/Comments to our webhook unless the page is explicitly subscribed.
     try {
-        console.log(`📡 5. Subscribing App to Facebook Page Webhooks...`);
+        console.log(`📡 5. Subscribing App to Facebook Page Webhooks for Page ID: ${targetAccount.pageId}...`);
         await axios.post(`https://graph.facebook.com/v19.0/${targetAccount.pageId}/subscribed_apps`, null, {
             params: {
-                subscribed_fields: 'messages',
+                // 🚀 FIX: Added 'messages' and 'messaging_postbacks' to fix the permission error
+                subscribed_fields: 'messages,messaging_postbacks,comments',
                 access_token: targetAccount.pageToken
             }
         });
@@ -380,8 +386,8 @@ exports.instagramConnect = async (req, res) => {
 
     const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
     const igConfigObj = {
-      accessToken: targetAccount.pageToken || clientAccessToken,
-      accountId: targetAccount.accountId,
+      accessToken: clientAccessToken, // Use the long-lived user token
+      instagramAccountId: targetAccount.accountId,
       pageId: targetAccount.pageId,
       tokenExpiresAt: tokenExpiresAt
     };
@@ -394,12 +400,11 @@ exports.instagramConnect = async (req, res) => {
         { strict: false }
       );
     } else {
-      await User.updateOne({ _id: userId }, { $set: { igConfig: igConfigObj } }, { strict: false });
+      await User.updateOne({ _id: userId }, { $set: { instagramConfig: igConfigObj } }, { strict: false });
     }
 
     const updatedUser = await User.findById(userId).lean();
-
-    console.log(`✅ [DEBUG Meta Connect] IG Config SAVED to Database! Token Present: ${updatedUser?.igConfig?.accessToken ? 'YES' : 'NO'}`);
+    console.log(`✅ [DEBUG Meta Connect] IG Config SAVED to Database! Token Present: ${updatedUser?.instagramConfig?.accessToken ? 'YES' : 'NO'}`);
 
     const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.igConfig : updatedUser.igConfig;
     res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: savedData });

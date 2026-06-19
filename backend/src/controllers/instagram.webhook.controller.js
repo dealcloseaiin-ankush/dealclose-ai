@@ -101,16 +101,14 @@ exports.handleInstagramWebhook = async (req, res) => {
               const incomingText = event.message.text.trim();
               
               console.log(` [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
-
-              // Find the exact User who owns this Instagram/Facebook Account
+ 
+              // 🚀 CRITICAL FIX: Find user by checking BOTH main config and workspaces array
               let user = await User.findOne({ 
                 $or: [
-                  { "igConfig.accountId": igAccountId },
-                  { "workspaces.igConfig.accountId": igAccountId },
-                  { "igConfig.pageId": igAccountId },
-                  { "workspaces.igConfig.pageId": igAccountId }
+                  { "instagramConfig.instagramAccountId": igAccountId },
+                  { "workspaces.igConfig.instagramAccountId": igAccountId }
                 ]
-              }).lean(); // 🚀 FIX: .lean() is REQUIRED to expose 'igConfig' which is not in the strict schema!
+              }).lean();
               
               if (!user) {
                  console.log(`❌ [IG Webhook - DMs] No matching Instagram account found in DB for Webhook IG ID: ${igAccountId}`);
@@ -119,9 +117,9 @@ exports.handleInstagramWebhook = async (req, res) => {
 
               // 🚀 DEBUG: Strict Match Success
               console.log(`\n✅ [IG Webhook - DMs] STRICT MATCH SUCCESS!`);
-              console.log(`- Webhook IG ID:`, igAccountId);
-              console.log(`- Matched Account:`, user?.igConfig?.accountId);
-              console.log(`- Matched Page:`, user?.igConfig?.pageId);
+              console.log(`- Webhook IG Account ID:`, igAccountId);
+              console.log(`- Matched Main Account ID:`, user?.instagramConfig?.instagramAccountId || 'N/A');
+              console.log(`- Matched Workspace Account ID:`, user?.workspaces?.find(w=>w.igConfig?.instagramAccountId === igAccountId)?.igConfig?.instagramAccountId);
               console.log(`- Matched User Email:`, user?.email);
               console.log(`------------------------------------------------\n`);
 
@@ -131,20 +129,20 @@ exports.handleInstagramWebhook = async (req, res) => {
               let activeWorkspace = null;
               
               if (user && user.workspaces && user.workspaces.length > 0) {
-                 activeWorkspace = user.workspaces.find(w => w && w.igConfig && (w.igConfig.accountId === igAccountId || w.igConfig.pageId === igAccountId));
+                 activeWorkspace = user.workspaces.find(w => w?.igConfig?.instagramAccountId === igAccountId);
                  if (activeWorkspace && activeWorkspace.igConfig && activeWorkspace.igConfig.accessToken) {
                     igToken = activeWorkspace.igConfig.accessToken;
                     incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
                  }
               }
               
-              if (!igToken && user && user.igConfig && user.igConfig.accessToken) {
-                 igToken = user.igConfig.accessToken;
+              if (!igToken && user && user.instagramConfig && user.instagramConfig.accessToken) {
+                 igToken = user.instagramConfig.accessToken;
                  incomingWorkspaceId = 'main';
               }
 
               if (!igToken && user && user.workspaces) {
-                 const fallbackWs = user.workspaces.find(w => w && w.igConfig && w.igConfig.accessToken);
+                 const fallbackWs = user.workspaces.find(w => w?.igConfig?.accessToken);
                  if (fallbackWs) {
                     igToken = fallbackWs.igConfig.accessToken;
                     incomingWorkspaceId = fallbackWs._id ? fallbackWs._id.toString() : 'main';
@@ -252,6 +250,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
+              const currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
               // Ye check karega ki agar aapne manually reply kiya hai, toh AI shant rahega
               const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
               
@@ -267,9 +266,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               
               // ==========================================================
               // 🚀 NEW: INSTAGRAM FLOW EXECUTION ENGINE
-              // ==========================================================
               let flowReplyHandled = false;
-              const currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
               
               const formatFlowMsg = (text) => {
                 if (!text) return "";
@@ -774,12 +771,10 @@ exports.handleInstagramWebhook = async (req, res) => {
           console.log(`[Meta Comment (IG/FB)] Received from ${username}: ${commentText}`);
 
           // Find the exact user based on IG or FB Account ID
-          let user = await User.findOne({ 
+          let user = await User.findOne({
              $or: [
-               { "igConfig.accountId": igAccountId },
-               { "igConfig.pageId": igAccountId },
-               { "workspaces.igConfig.accountId": igAccountId },
-               { "workspaces.igConfig.pageId": igAccountId }
+               { "instagramConfig.instagramAccountId": igAccountId },
+               { "workspaces.igConfig.instagramAccountId": igAccountId }
              ]
           });
           if (!user) {
@@ -789,14 +784,14 @@ exports.handleInstagramWebhook = async (req, res) => {
           
           console.log(`\n✅ [IG Webhook - Comments] STRICT MATCH SUCCESS!`);
           console.log(`- Webhook IG ID:`, igAccountId);
-          console.log(`- Matched Account:`, user?.igConfig?.accountId);
+          console.log(`- Matched Account:`, user?.instagramConfig?.instagramAccountId);
           console.log(`- Matched User Email:`, user?.email);
           console.log(`------------------------------------------------\n`);
           
           // Safely extract IG Token for Comments
-          let igToken = user.igConfig?.accessToken;
+          let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
           if (!igToken && user.workspaces) {
-             igToken = user.workspaces.find(w => w.igConfig?.accessToken)?.igConfig?.accessToken;
+             igToken = user.workspaces.find(w => w.igConfig?.instagramAccountId === igAccountId)?.igConfig?.accessToken;
           }
 
           // 🚀 SMART TTL: Calculate Expiry for Comments
