@@ -290,7 +290,8 @@ exports.instagramConnect = async (req, res) => {
 
     // Fetch User's Facebook Pages
     const pagesResponse = await axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
-      params: { access_token: clientAccessToken }
+      // 🚀 FIX: Explicitly request pages_messaging permission
+      params: { access_token: clientAccessToken, scope: 'pages_show_list,instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_messaging' }
     });
 
     const pages = pagesResponse.data.data;
@@ -357,6 +358,9 @@ exports.instagramConnect = async (req, res) => {
     // If an account was already configured for this workspace, try to find it again.
     if (requestedAccountId) {
         targetAccount = availableAccounts.find(acc => acc.accountId === requestedAccountId);
+        if (!targetAccount) {
+            return res.status(400).json({ success: false, message: `Target IG Account ID (${requestedAccountId}) not found in Meta's response! You might have clicked 'Got it' without selecting the correct page. Please Reconnect, click 'Edit Settings' in the Meta popup, and TICK the new Instagram page!` });
+        }
     }
 
     // If no specific account is requested (first time connect for this workspace), find the first available one.
@@ -374,13 +378,13 @@ exports.instagramConnect = async (req, res) => {
     // Meta will not send real DMs/Comments to our webhook unless the page is explicitly subscribed.
     try {
         console.log(`📡 5. Subscribing App to Facebook Page Webhooks for Page ID: ${targetAccount.pageId}...`);
-        // 🚀 FIX: 'comments' is invalid for Page webhooks. The correct field is 'feed'.
+        // 🚀 FIX: 'comments' is invalid. The correct field is 'feed'. Also include DM permissions.
         const subscribedFields = 'messages,messaging_postbacks,feed';
         console.log(`   - Subscribing to fields: [${subscribedFields}]`);
         await axios.post(`https://graph.facebook.com/v19.0/${targetAccount.pageId}/subscribed_apps`, null, {
             params: {
                 subscribed_fields: subscribedFields,
-                access_token: targetAccount.pageToken
+                access_token: targetAccount.pageToken || clientAccessToken // Use Page Token if available, else User Token
             }
         });
         console.log(`✅ Webhook Subscribed Successfully for Page!`);
