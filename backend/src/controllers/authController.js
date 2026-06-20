@@ -239,8 +239,45 @@ exports.whatsappConnect = async (req, res) => {
 // @route   POST /api/users/settings/instagram-connect-selected
 exports.instagramConnectSelected = async (req, res) => {
   try {
-    const { authCode, workspaceId, selectedAccountId, selectedPageId } = req.body;
+    const { selectedAccountId, selectedPageId } = req.body;
     const userId = req.user?._id || req.user?.id;
+
+    const user = await User.findById(userId);
+    const pending = user?.pendingInstagramConnection;
+    if (!userId || !selectedAccountId || !selectedPageId || !pending || pending.expiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
+    }
+
+    const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
+    if (!selected) {
+      return res.status(400).json({ success: false, message: 'Selected Instagram account was not returned by Meta.' });
+    }
+
+    const workspaceId = pending.workspaceId || 'main';
+    const instagramConfig = {
+      accessToken: pending.accessToken,
+      instagramAccountId: selected.accountId,
+      facebookPageId: selected.pageId,
+      tokenExpiresAt: pending.tokenExpiresAt
+    };
+    const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
+    const update = workspaceId !== 'main'
+      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig }, $unset: { 'workspaces.$.igConfig': '' } }
+      : { $set: { instagramConfig }, $unset: { igConfig: '' } };
+    await User.updateOne(filter, update);
+    await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
+
+    let webhookWarning;
+    try {
+      await axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
+        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken }
+      });
+    } catch (subscriptionError) {
+      webhookWarning = subscriptionError.response?.data?.error?.message || subscriptionError.message;
+      console.error('Webhook subscription failed after Instagram connection:', webhookWarning);
+    }
+
+    return res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: instagramConfig, webhookWarning });
 
     if (!userId || !authCode || !selectedAccountId || !selectedPageId) {
       return res.status(400).json({ success: false, message: 'Missing required parameters or unauthorized session' });
@@ -421,6 +458,30 @@ exports.instagramConnect = async (req, res) => {
     if (availableAccounts.length === 0) {
         return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
     }
+
+    // This endpoint only discovers accounts. It never auto-selects or saves one.
+    const selectableAccounts = availableAccounts.filter(account => !usedIgAccountIds.includes(account.accountId));
+    if (selectableAccounts.length === 0) {
+      return res.status(400).json({ success: false, message: 'The Instagram accounts Meta returned are already assigned to another workspace.' });
+    }
+
+    const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+    await User.updateOne({ _id: userId }, {
+      $set: {
+        pendingInstagramConnection: {
+          workspaceId: workspaceId || 'main',
+          accessToken: clientAccessToken,
+          tokenExpiresAt,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          accounts: selectableAccounts
+        }
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      availableAccounts: selectableAccounts.map(({ accountId, pageId, pageName }) => ({ accountId, pageId, pageName }))
+    });
 
     // 🚀 CRITICAL FIX: Find the correct account to connect. This was the main bug.
     let requestedAccountId = null;
@@ -635,7 +696,8 @@ exports.updateProfile = async (req, res) => {
       externalApiBlogUrl,
       externalApiVisitUrl,
       customWebhooks,
-      igConfig
+      igConfig,
+      instagramConfig
     } = req.body;
 
     // Assuming you have an auth middleware that sets req.user
@@ -668,6 +730,7 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
+    if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
     if (igConfig !== undefined) updateData.igConfig = igConfig;
     
     console.log(`➡️ [DEBUG Profile Update] Data being set in DB:`, updateData);
@@ -700,7 +763,7 @@ exports.getProfile = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     
     // Use .lean() here to ensure the full, raw document is returned, including potentially newly added fields
-    const user = await User.findById(userId).select('-password').lean();
+    const user = await User.findById(userId).select('-password -pendingInstagramConnection').lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
     

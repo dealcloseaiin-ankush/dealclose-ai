@@ -53,6 +53,8 @@ export default function Settings() {
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [expandedWebhooks, setExpandedWebhooks] = useState({});
+  const [instagramPicker, setInstagramPicker] = useState(null);
+  const [isSavingInstagramSelection, setIsSavingInstagramSelection] = useState(false);
 
   // --- Functions ---
   const addCustomWebhook = () => {
@@ -133,7 +135,10 @@ export default function Settings() {
           discountPercentage: savedData.discountConfig?.percentage || '',
           discountCode: savedData.discountConfig?.code || '',
           validityDays: savedData.discountConfig?.validityDays || '30',
-          workspaces: savedData.workspaces || [], // Fetch saved workspaces
+          workspaces: (savedData.workspaces || []).map(({ igConfig, ...workspace }) => ({
+            ...workspace,
+            instagramConfig: workspace.instagramConfig || igConfig || {}
+          })),
           aiAgentEnabled: savedData.aiAgentEnabled !== false,
           acceptCollabs: savedData.acceptCollabs || false,
           businessDescription: savedData.businessDescription || '',
@@ -149,13 +154,15 @@ export default function Settings() {
           externalApiBlogUrl: savedData.externalApiBlogUrl || '',
           externalApiVisitUrl: savedData.externalApiVisitUrl || '',
           customWebhooks: savedData.customWebhooks || [],
-          igAccessToken: savedData.igConfig?.accessToken || '',
-          igAccountId: savedData.igConfig?.accountId || '',
-          fbPageId: savedData.igConfig?.pageId || ''
+          igAccessToken: savedData.instagramConfig?.accessToken || '',
+          igAccountId: savedData.instagramConfig?.instagramAccountId || '',
+          fbPageId: savedData.instagramConfig?.facebookPageId || ''
         });
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
+        setIgConnected(!!savedData.instagramConfig?.accessToken);
         setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
+        setIgConnected(!!savedData.instagramConfig?.accessToken);
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
         setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); // 🚀 Extract email
       }
@@ -262,10 +269,10 @@ export default function Settings() {
           pixelId: config.metaPixelId,
           accessToken: config.metaAccessToken
         },
-      igConfig: {
+      instagramConfig: {
         accessToken: config.igAccessToken,
-        accountId: config.igAccountId,
-        pageId: config.fbPageId
+        instagramAccountId: config.igAccountId,
+        facebookPageId: config.fbPageId
       },
         externalApiUrl: config.externalApiUrl,
         externalApiToken: config.externalApiToken,
@@ -300,6 +307,30 @@ export default function Settings() {
       alert(error.response?.data?.message || "Failed to change password. Please check your old password.");
     } finally {
       setIsChangingPass(false);
+    }
+  };
+
+  const openInstagramPicker = (data, workspaceId = 'main') => {
+    if (!data?.availableAccounts?.length) return fetchSettings();
+    setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
+  };
+
+  const saveInstagramSelection = async (account) => {
+    setIsSavingInstagramSelection(true);
+    try {
+      const { data } = await api.post('/users/settings/instagram-connect-selected', {
+        selectedAccountId: account.accountId,
+        selectedPageId: account.pageId
+      });
+      setInstagramPicker(null);
+      await fetchSettings();
+      if (data.webhookWarning) {
+        alert(`Instagram connected, but webhook setup needs Meta permissions: ${data.webhookWarning}`);
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || 'Could not save the selected Instagram account.');
+    } finally {
+      setIsSavingInstagramSelection(false);
     }
   };
 
@@ -524,29 +555,7 @@ export default function Settings() {
                     buttonText="Connect Instagram via Meta" 
                     platform="instagram" 
                     workspaceId="main" 
-                    onSuccess={(data) => {
-                      if (data && data.availableAccounts && data.availableAccounts.length > 0) {
-                        // For simplicity, we auto-select the first one here if the modal isn't fully built yet,
-                        // or we could show a browser prompt.
-                        const selected = data.availableAccounts[0];
-                        const accountNames = data.availableAccounts.map((a, i) => `${i + 1}: ${a.pageName}`).join('\n');
-                        const choice = window.prompt(`Multiple accounts found. Enter the number to connect:\n${accountNames}`, "1");
-                        
-                        let targetAccount = selected;
-                        if (choice && !isNaN(parseInt(choice)) && data.availableAccounts[parseInt(choice)-1]) {
-                          targetAccount = data.availableAccounts[parseInt(choice)-1];
-                        }
-                        
-                        api.post('/users/settings/instagram-connect-selected', {
-                          authCode: data.authCode,
-                          workspaceId: 'main',
-                          selectedAccountId: targetAccount.accountId,
-                          selectedPageId: targetAccount.pageId
-                        }).then(() => fetchSettings()).catch(err => alert("Error saving account: " + err.message));
-                      } else {
-                        fetchSettings();
-                      }
-                    }} 
+                    onSuccess={(data) => openInstagramPicker(data, 'main')} 
                   />
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
@@ -819,11 +828,11 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
-                  <input type="password" value={activeWs.igConfig?.accessToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'igConfig', { ...activeWs.igConfig, accessToken: e.target.value })} placeholder="IG Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                  <input type="password" value={activeWs.instagramConfig?.accessToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, accessToken: e.target.value })} placeholder="IG Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
                     </div>
                     <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
-                  <input type="text" value={activeWs.igConfig?.accountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'igConfig', { ...activeWs.igConfig, accountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                  <input type="text" value={activeWs.instagramConfig?.instagramAccountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, instagramAccountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
                     </div>
                   </div>
                   
@@ -837,12 +846,12 @@ export default function Settings() {
                            </div>
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
                              <p className="text-xs text-gray-400 mb-1">Instagram Status</p>
-                             {activeWs.igConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                             {activeWs.instagramConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
                            </div>
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
                      <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                     <MetaConnectButton buttonText={activeWs.igConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
+                      <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">
@@ -884,6 +893,31 @@ export default function Settings() {
           </>
         )}
       </div>
+
+      {instagramPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-pink-500/30 bg-[#111] p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-pink-400">Choose an Instagram account</h2>
+            <p className="mt-2 text-sm text-gray-400">Select the Facebook Page and linked Instagram Business Account to connect. Nothing is saved until you choose one.</p>
+            <div className="mt-5 space-y-3">
+              {instagramPicker.accounts.map((account) => (
+                <button
+                  key={`${account.pageId}-${account.accountId}`}
+                  type="button"
+                  disabled={isSavingInstagramSelection}
+                  onClick={() => saveInstagramSelection(account)}
+                  className="w-full rounded-xl border border-gray-700 bg-[#0a0a0a] p-4 text-left transition hover:border-pink-500 disabled:opacity-50"
+                >
+                  <span className="block font-semibold text-white">{account.pageName}</span>
+                  <span className="mt-1 block text-xs text-gray-400">Page ID: {account.pageId}</span>
+                  <span className="block text-xs text-gray-400">Instagram Account ID: {account.accountId}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" disabled={isSavingInstagramSelection} onClick={() => setInstagramPicker(null)} className="mt-5 text-sm font-semibold text-gray-400 hover:text-white">Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

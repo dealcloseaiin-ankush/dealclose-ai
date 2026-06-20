@@ -63,16 +63,18 @@ exports.getRecentPosts = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    let accessToken = user?.igConfig?.accessToken;
-    let accountId = user?.igConfig?.accountId;
+    const mainInstagram = user?.instagramConfig || user?.igConfig;
+    let accessToken = mainInstagram?.accessToken;
+    let accountId = mainInstagram?.instagramAccountId || mainInstagram?.accountId;
     let source = 'Main Config';
 
     // 🚀 FIX: Also check if Instagram was connected inside a Workspace!
     if (!accessToken && user?.workspaces) {
-      const ws = user.workspaces.find(w => w.igConfig && w.igConfig.accessToken);
+      const ws = user.workspaces.find(w => (w.instagramConfig || w.igConfig)?.accessToken);
       if (ws) {
-        accessToken = ws.igConfig.accessToken;
-        accountId = ws.igConfig.accountId;
+        const workspaceInstagram = ws.instagramConfig || ws.igConfig;
+        accessToken = workspaceInstagram.accessToken;
+        accountId = workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
         source = `Workspace: ${ws.name}`;
       }
     }
@@ -157,9 +159,10 @@ exports.publishMedia = async (req, res) => {
     
     const user = await User.findById(userId).lean();
     
-    const igSettings = workspaceId && workspaceId !== 'main' ? user.workspaces?.find(w => w._id.toString() === workspaceId)?.igConfig : user.igConfig;
+    const workspace = workspaceId && workspaceId !== 'main' ? user.workspaces?.find(w => w._id.toString() === workspaceId) : null;
+    const igSettings = workspace ? (workspace.instagramConfig || workspace.igConfig) : (user.instagramConfig || user.igConfig);
     const igToken = igSettings?.accessToken;
-    const igAccountId = igSettings?.accountId;
+    const igAccountId = igSettings?.instagramAccountId || igSettings?.accountId;
 
     if (!igToken || !igAccountId) {
        return res.status(400).json({ success: false, message: 'Instagram not connected. Please go to Settings to connect your account.' });
@@ -230,15 +233,17 @@ exports.setIceBreakers = async (req, res) => {
     const { questions } = req.body; 
     const user = await User.findById(userId).lean();
     
-    if (!user?.igConfig?.accessToken || !user?.igConfig?.accountId) {
+    const instagramConfig = user?.instagramConfig || user?.igConfig;
+    if (!instagramConfig?.accessToken || !(instagramConfig.instagramAccountId || instagramConfig.accountId)) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
     }
     
     const ice_breakers = questions.map(q => ({ question: q, payload: `ICEBREAKER_${q.toUpperCase().replace(/\s+/g, '_')}` }));
     
-    await axios.post(`https://graph.facebook.com/v19.0/${user.igConfig.accountId}/messenger_profile`, {
+    const igAccountId = instagramConfig.instagramAccountId || instagramConfig.accountId;
+    await axios.post(`https://graph.facebook.com/v19.0/${igAccountId}/messenger_profile`, {
       ice_breakers
-    }, { params: { access_token: user.igConfig.accessToken } });
+    }, { params: { access_token: instagramConfig.accessToken } });
     
     res.status(200).json({ success: true, message: 'Ice Breakers updated successfully on Instagram App!' });
   } catch (error) {
@@ -253,7 +258,8 @@ exports.sendBroadcast = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const { messageText } = req.body;
     const user = await User.findById(userId).lean();
-    if (!user?.igConfig?.accessToken) return res.status(400).json({ success: false, message: 'Instagram not connected.' });
+    const instagramConfig = user?.instagramConfig || user?.igConfig;
+    if (!instagramConfig?.accessToken) return res.status(400).json({ success: false, message: 'Instagram not connected.' });
     
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentMessages = await Message.find({ userId, direction: 'incoming', timestamp: { $gte: twentyFourHoursAgo }, customerPhone: { $regex: /^IG_/ } }).distinct('customerPhone');
@@ -264,7 +270,7 @@ exports.sendBroadcast = async (req, res) => {
     for (const phone of recentMessages) {
       try {
         const igUserId = phone.replace('IG_', '');
-        await axios.post(`https://graph.facebook.com/v19.0/me/messages`, { recipient: { id: igUserId }, message: { text: messageText } }, { params: { access_token: user.igConfig.accessToken }});
+        await axios.post(`https://graph.facebook.com/v19.0/me/messages`, { recipient: { id: igUserId }, message: { text: messageText } }, { params: { access_token: instagramConfig.accessToken }});
         successCount++;
       } catch(e) {}
     }

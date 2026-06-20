@@ -145,14 +145,15 @@ exports.sendManualMessage = async (req, res) => {
       let igToken = null;
       if (user && user.workspaces && wsIdIg !== 'main') {
          const ws = user.workspaces.find(w => w && w._id && w._id.toString() === wsIdIg);
-         if (ws && ws.igConfig && ws.igConfig.accessToken) igToken = ws.igConfig.accessToken;
+          const workspaceInstagram = ws?.instagramConfig || ws?.igConfig;
+          if (workspaceInstagram?.accessToken) igToken = workspaceInstagram.accessToken;
       }
-      if (!igToken && user && user.igConfig && user.igConfig.accessToken) {
-         igToken = user.igConfig.accessToken;
+      if (!igToken && user && (user.instagramConfig || user.igConfig)?.accessToken) {
+         igToken = (user.instagramConfig || user.igConfig).accessToken;
       }
       if (!igToken && user && user.workspaces) {
-         const wsWithToken = user.workspaces.find(w => w && w.igConfig && w.igConfig.accessToken);
-         if (wsWithToken) igToken = wsWithToken.igConfig.accessToken;
+          const wsWithToken = user.workspaces.find(w => (w?.instagramConfig || w?.igConfig)?.accessToken);
+          if (wsWithToken) igToken = (wsWithToken.instagramConfig || wsWithToken.igConfig).accessToken;
       }
 
       if (!user || !igToken) {

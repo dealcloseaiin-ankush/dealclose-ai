@@ -106,6 +106,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               let user = await User.findOne({ 
                 $or: [
                   { "instagramConfig.instagramAccountId": igAccountId },
+                  { "workspaces.instagramConfig.instagramAccountId": igAccountId },
                   { "workspaces.igConfig.instagramAccountId": igAccountId }
                 ]
               }).lean();
@@ -119,7 +120,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               console.log(`\n✅ [IG Webhook - DMs] STRICT MATCH SUCCESS!`);
               console.log(`- Webhook IG Account ID:`, igAccountId);
               console.log(`- Matched Main Account ID:`, user?.instagramConfig?.instagramAccountId || 'N/A');
-              console.log(`- Matched Workspace Account ID:`, user?.workspaces?.find(w=>w.igConfig?.instagramAccountId === igAccountId)?.igConfig?.instagramAccountId);
+               console.log(`- Matched Workspace Account ID:`, user?.workspaces?.find(w => (w.instagramConfig || w.igConfig)?.instagramAccountId === igAccountId)?.instagramConfig?.instagramAccountId);
               console.log(`- Matched User Email:`, user?.email);
               console.log(`------------------------------------------------\n`);
 
@@ -129,9 +130,10 @@ exports.handleInstagramWebhook = async (req, res) => {
               let activeWorkspace = null;
               
               if (user && user.workspaces && user.workspaces.length > 0) {
-                 activeWorkspace = user.workspaces.find(w => w?.igConfig?.instagramAccountId === igAccountId);
-                 if (activeWorkspace && activeWorkspace.igConfig && activeWorkspace.igConfig.accessToken) {
-                    igToken = activeWorkspace.igConfig.accessToken;
+                  activeWorkspace = user.workspaces.find(w => (w?.instagramConfig || w?.igConfig)?.instagramAccountId === igAccountId);
+                  const workspaceInstagram = activeWorkspace?.instagramConfig || activeWorkspace?.igConfig;
+                  if (workspaceInstagram?.accessToken) {
+                     igToken = workspaceInstagram.accessToken;
                     incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
                  }
               }
@@ -142,9 +144,9 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               if (!igToken && user && user.workspaces) {
-                 const fallbackWs = user.workspaces.find(w => w?.igConfig?.accessToken);
-                 if (fallbackWs) {
-                    igToken = fallbackWs.igConfig.accessToken;
+                  const fallbackWs = user.workspaces.find(w => (w?.instagramConfig || w?.igConfig)?.accessToken);
+                  if (fallbackWs) {
+                     igToken = (fallbackWs.instagramConfig || fallbackWs.igConfig).accessToken;
                     incomingWorkspaceId = fallbackWs._id ? fallbackWs._id.toString() : 'main';
                  }
               }
@@ -773,8 +775,9 @@ exports.handleInstagramWebhook = async (req, res) => {
           // Find the exact user based on IG or FB Account ID
           let user = await User.findOne({
              $or: [
-               { "instagramConfig.instagramAccountId": igAccountId },
-               { "workspaces.igConfig.instagramAccountId": igAccountId }
+                { "instagramConfig.instagramAccountId": igAccountId },
+                { "workspaces.instagramConfig.instagramAccountId": igAccountId },
+                { "workspaces.igConfig.instagramAccountId": igAccountId }
              ]
           });
           if (!user) {
@@ -789,10 +792,11 @@ exports.handleInstagramWebhook = async (req, res) => {
           console.log(`------------------------------------------------\n`);
           
           // Safely extract IG Token for Comments
-          let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
-          if (!igToken && user.workspaces) {
-             igToken = user.workspaces.find(w => w.igConfig?.instagramAccountId === igAccountId)?.igConfig?.accessToken;
-          }
+           let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
+           if (!igToken && user.workspaces) {
+              const workspace = user.workspaces.find(w => (w.instagramConfig || w.igConfig)?.instagramAccountId === igAccountId);
+              igToken = (workspace?.instagramConfig || workspace?.igConfig)?.accessToken;
+           }
 
           // 🚀 SMART TTL: Calculate Expiry for Comments
           const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';

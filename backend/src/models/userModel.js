@@ -80,10 +80,19 @@ const userSchema = new Schema({
       phoneNumberId: { type: String },
       wabaId: { type: String }
     },
+    // Canonical Instagram connection for a workspace.
+    instagramConfig: {
+      accessToken: { type: String },
+      instagramAccountId: { type: String },
+      facebookPageId: { type: String },
+      tokenExpiresAt: { type: Date }
+    },
+    // Legacy field retained temporarily so existing workspace connections can be migrated.
     igConfig: {
       accessToken: { type: String },
       instagramAccountId: { type: String },
-      facebookPageId: { type: String }
+      facebookPageId: { type: String },
+      tokenExpiresAt: { type: Date }
     },
     // --- Separate AI Brain for each Workspace ---
     businessDescription: { type: String, default: '' }, // AI Training Data
@@ -107,7 +116,21 @@ const userSchema = new Schema({
   instagramConfig: {
     accessToken: { type: String }, // Page Access Token (igAccessToken)
     instagramAccountId: { type: String }, // Instagram Business/Creator ID
-    facebookPageId: { type: String } // Linked FB Page ID
+    facebookPageId: { type: String }, // Linked FB Page ID
+    tokenExpiresAt: { type: Date }
+  },
+  // Server-side, 10-minute state for the account picker. It is never sent in profile responses.
+  pendingInstagramConnection: {
+    workspaceId: { type: String },
+    accessToken: { type: String },
+    tokenExpiresAt: { type: Date },
+    expiresAt: { type: Date },
+    accounts: [{
+      accountId: { type: String },
+      pageId: { type: String },
+      pageName: { type: String },
+      pageToken: { type: String }
+    }]
   },
   // --- New AI-related fields ---
   businessName: { type: String, default: '' },
