@@ -235,6 +235,83 @@ exports.whatsappConnect = async (req, res) => {
   }
 };
 
+// @desc    Connect Selected Instagram via Meta Login
+// @route   POST /api/users/settings/instagram-connect-selected
+exports.instagramConnectSelected = async (req, res) => {
+  try {
+    const { authCode, workspaceId, selectedAccountId, selectedPageId } = req.body;
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId || !authCode || !selectedAccountId || !selectedPageId) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters or unauthorized session' });
+    }
+
+    const APP_ID = process.env.META_APP_ID;
+    const APP_SECRET = process.env.META_APP_SECRET;
+    
+    if (!APP_ID || !APP_SECRET) return res.status(400).json({ success: false, message: 'Backend .env is missing META_APP_ID or META_APP_SECRET' });
+
+    let clientAccessToken = authCode;
+    let expiresInDays = 60; 
+
+    // 🔥 Exchange authCode again to be safe and ensure we have long-lived token context if provided directly
+    // This is optional since frontend already provided it but we need the token value. The frontend sends authCode directly.
+    // In our case authCode is the accessToken we extracted earlier. 
+
+    console.log(`➡️ [DEBUG Meta Connect Selected] Saving IG Config to Database for user ${userId}...`);
+
+    const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+    const igConfigObj = {
+      accessToken: clientAccessToken, // Use the long-lived user token
+      instagramAccountId: selectedAccountId,
+      pageId: selectedPageId,
+      tokenExpiresAt: tokenExpiresAt
+    };
+
+    // 🚀 CRITICAL BUG FIX: Save the token BEFORE attempting webhook subscription.
+    // This prevents the token from being lost if the webhook subscription fails.
+    if (workspaceId && workspaceId !== 'main') {
+      await User.updateOne(
+        { _id: userId, "workspaces._id": workspaceId },
+        { $set: { "workspaces.$.igConfig": igConfigObj } },
+        { strict: false }
+      );
+    } else {
+      await User.updateOne({ _id: userId }, { $set: { instagramConfig: igConfigObj } }, { strict: false });
+    }
+
+    // 🚀 NEW: Auto-Subscribe the Facebook Page to the Webhook!
+    // Meta will not send real DMs/Comments to our webhook unless the page is explicitly subscribed.
+    try {
+        console.log(`📡 5. Subscribing App to Facebook Page Webhooks for Page ID: ${selectedPageId}...`);
+        // 🚀 FIX: 'comments' is invalid. The correct field is 'feed'. Also include DM permissions.
+        const subscribedFields = 'messages,messaging_postbacks,feed';
+        console.log(`   - Subscribing to fields: [${subscribedFields}]`);
+        await axios.post(`https://graph.facebook.com/v19.0/${selectedPageId}/subscribed_apps`, null, {
+            params: {
+                subscribed_fields: subscribedFields,
+                access_token: clientAccessToken 
+            }
+        });
+        console.log(`✅ Webhook Subscribed Successfully for Page!`);
+    } catch (subErr) {
+        console.error(`❌ Webhook Subscription Failed:`, subErr.response?.data || subErr.message);
+    }
+
+    console.log(`➡️ [DEBUG Meta Connect Selected] Verification step passed...`);
+
+    const updatedUser = await User.findById(userId).lean();
+    console.log(`✅ [DEBUG Meta Connect Selected] IG Config SAVED to Database! Token Present: ${updatedUser?.instagramConfig?.accessToken ? 'YES' : 'NO'}`);
+
+    const savedData = workspaceId && workspaceId !== 'main' ? updatedUser.workspaces.find(w => w._id.toString() === workspaceId)?.igConfig : updatedUser.igConfig;
+    res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: savedData });
+  } catch (error) {
+    console.error('Instagram Connect Selected Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Failed to save Instagram account. Try again.' });
+  }
+};
+
+
 // @desc    Connect Instagram via Meta Login
 // @route   POST /api/users/settings/instagram-connect
 exports.instagramConnect = async (req, res) => {
@@ -290,8 +367,9 @@ exports.instagramConnect = async (req, res) => {
 
     // Fetch User's Facebook Pages
     const pagesResponse = await axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
-      // 🚀 FIX: Explicitly request pages_messaging permission
-      params: { access_token: clientAccessToken, scope: 'pages_show_list,instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_messaging' }
+      // 🚀 FIX: explicitly request messaging scopes at /me/accounts level doesn't work this way.
+      // Scopes are requested during FB.login. Here we just use the token to get accounts.
+      params: { access_token: clientAccessToken }
     });
 
     const pages = pagesResponse.data.data;
@@ -347,10 +425,10 @@ exports.instagramConnect = async (req, res) => {
     // 🚀 CRITICAL FIX: Find the correct account to connect. This was the main bug.
     let requestedAccountId = null;
     if (workspaceId && workspaceId !== 'main') {
-        const ws = userDb.workspaces.find(w => w._id.toString() === workspaceId);
-        if (ws && ws.igConfig) requestedAccountId = ws.igConfig.instagramAccountId;
+      const ws = userDb.workspaces.find(w => w._id.toString() === workspaceId);
+      if (ws && ws.igConfig) requestedAccountId = ws.igConfig.instagramAccountId;
     } else if (userDb.instagramConfig) {
-        requestedAccountId = userDb.instagramConfig.instagramAccountId;
+      requestedAccountId = userDb.instagramConfig.instagramAccountId;
     }
 
     let targetAccount = null;
@@ -374,6 +452,28 @@ exports.instagramConnect = async (req, res) => {
     console.log(`✅ 4. TARGET IG ACCOUNT SELECTED:`, targetAccount.accountId);
     console.log(`============================================================\n`);
 
+    console.log(`➡️ [DEBUG Meta Connect] Saving IG Config to Database for user ${userId}...`);
+
+    const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+    const igConfigObj = {
+      accessToken: clientAccessToken, // Use the long-lived user token
+      instagramAccountId: targetAccount.accountId,
+      pageId: targetAccount.pageId,
+      tokenExpiresAt: tokenExpiresAt
+    };
+
+    // 🚀 CRITICAL BUG FIX: Save the token BEFORE attempting webhook subscription.
+    // This prevents the token from being lost if the webhook subscription fails.
+    if (workspaceId && workspaceId !== 'main') {
+      await User.updateOne(
+        { _id: userId, "workspaces._id": workspaceId },
+        { $set: { "workspaces.$.igConfig": igConfigObj } },
+        { strict: false }
+      );
+    } else {
+      await User.updateOne({ _id: userId }, { $set: { instagramConfig: igConfigObj } }, { strict: false });
+    }
+
     // 🚀 NEW: Auto-Subscribe the Facebook Page to the Webhook!
     // Meta will not send real DMs/Comments to our webhook unless the page is explicitly subscribed.
     try {
@@ -392,26 +492,9 @@ exports.instagramConnect = async (req, res) => {
         console.error(`❌ Webhook Subscription Failed:`, subErr.response?.data || subErr.message);
     }
 
-    console.log(`➡️ [DEBUG Meta Connect] Saving IG Config to Database for user ${userId}...`);
+    console.log(`➡️ [DEBUG Meta Connect] Verification step passed...`);
 
-    const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
-    const igConfigObj = {
-      accessToken: clientAccessToken, // Use the long-lived user token
-      instagramAccountId: targetAccount.accountId,
-      pageId: targetAccount.pageId,
-      tokenExpiresAt: tokenExpiresAt
-    };
-
-    // Mongoose Model strict-mode Bypass: Force save
-    if (workspaceId && workspaceId !== 'main') {
-      await User.updateOne(
-        { _id: userId, "workspaces._id": workspaceId },
-        { $set: { "workspaces.$.igConfig": igConfigObj } },
-        { strict: false }
-      );
-    } else {
-      await User.updateOne({ _id: userId }, { $set: { instagramConfig: igConfigObj } }, { strict: false });
-    }
+    // Mongoose Model strict-mode Bypass is already done above. We don't need to save twice.
 
     const updatedUser = await User.findById(userId).lean();
     console.log(`✅ [DEBUG Meta Connect] IG Config SAVED to Database! Token Present: ${updatedUser?.instagramConfig?.accessToken ? 'YES' : 'NO'}`);

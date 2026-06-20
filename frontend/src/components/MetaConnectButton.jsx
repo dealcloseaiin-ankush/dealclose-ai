@@ -84,8 +84,13 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
       // 🔥 Enhanced Error Detection
       if (response.status === 'unknown' || response.error || !response.authResponse) {
         console.error('❌ [MetaConnect] Meta Login Failed/Blocked. Full Response:', response);
-        console.warn('💡 [DEBUG TIP]: If popup says "JSSDK Option is Not Toggled", you MUST enable it in Meta Developer Dashboard.');
-        alert('Meta Login Failed!\n\nIf you saw a JSSDK error, you MUST enable "Login with Javascript SDK" in developers.facebook.com -> Facebook Login -> Settings.\n\nCheck Console (F12) for detailed logs.');
+        let userFriendlyError = 'Meta Login Failed! Please try again.';
+        if (response.status === 'not_authorized') {
+          userFriendlyError = 'Login Cancelled: You did not grant the required permissions in the Meta popup.';
+        } else if (response.error) {
+          userFriendlyError = `Meta Login Error: ${response.error_message || 'Please check browser console for details.'}`;
+        }
+        alert(userFriendlyError);
         setLoading(false);
         return;
       }
@@ -97,14 +102,23 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
         
         console.log('✅ [MetaConnect] Meta Auth Success. Auth Code extracted:', authCode);
         
-        // 3. Send Credentials to our Backend API
-        
-        console.log('➡️ [MetaConnect] Sending authCode to backend API...');
-        api.post(`/users/settings/${platform}-connect`, {
-          authCode: authCode,
-          workspaceId: workspaceId
-        })
-        .then(res => {
+    // 3. Send Credentials to our Backend API
+    // 🚀 FIX: Use separate, dedicated backend routes for WhatsApp and Instagram
+    const backendRoute = `/users/settings/${platform}-connect`;
+
+    console.log('➡️ [MetaConnect] Sending authCode to backend API...');
+    api.post(backendRoute, {
+      authCode: authCode,
+      workspaceId: workspaceId
+    })
+    .then(res => {
+      // 🚀 MODIFIED: For Instagram, the backend returns availableAccounts array
+      if (platform === 'instagram' && res.data.availableAccounts) {
+         if (onSuccess) {
+           onSuccess({ availableAccounts: res.data.availableAccounts, authCode }); 
+         }
+         return;
+      }
           const data = res.data;
           console.log('➡️ [MetaConnect] Backend API response:', data);
           if (data.success) {

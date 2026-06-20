@@ -520,7 +520,34 @@ export default function Settings() {
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
 
                     {!igConnected ? (
-                  <MetaConnectButton buttonText="Connect Instagram via Meta" platform="instagram" workspaceId="main" onSuccess={fetchSettings} />
+                  <MetaConnectButton 
+                    buttonText="Connect Instagram via Meta" 
+                    platform="instagram" 
+                    workspaceId="main" 
+                    onSuccess={(data) => {
+                      if (data && data.availableAccounts && data.availableAccounts.length > 0) {
+                        // For simplicity, we auto-select the first one here if the modal isn't fully built yet,
+                        // or we could show a browser prompt.
+                        const selected = data.availableAccounts[0];
+                        const accountNames = data.availableAccounts.map((a, i) => `${i + 1}: ${a.pageName}`).join('\n');
+                        const choice = window.prompt(`Multiple accounts found. Enter the number to connect:\n${accountNames}`, "1");
+                        
+                        let targetAccount = selected;
+                        if (choice && !isNaN(parseInt(choice)) && data.availableAccounts[parseInt(choice)-1]) {
+                          targetAccount = data.availableAccounts[parseInt(choice)-1];
+                        }
+                        
+                        api.post('/users/settings/instagram-connect-selected', {
+                          authCode: data.authCode,
+                          workspaceId: 'main',
+                          selectedAccountId: targetAccount.accountId,
+                          selectedPageId: targetAccount.pageId
+                        }).then(() => fetchSettings()).catch(err => alert("Error saving account: " + err.message));
+                      } else {
+                        fetchSettings();
+                      }
+                    }} 
+                  />
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
