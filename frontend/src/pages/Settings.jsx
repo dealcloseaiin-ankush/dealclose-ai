@@ -117,7 +117,8 @@ export default function Settings() {
       const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
       
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
-      console.log("➡️ [Settings Debug] IG Token status:", savedData.igConfig?.accessToken ? "Exists ✅" : "Missing ❌");
+      console.log("➡️ [Settings Debug] IG Token status (root):", savedData.igConfig?.accessToken ? "Exists ✅" : "Missing ❌");
+      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!ws.instagramConfig?.accessToken })));
       
       if (savedData) {
         setConfig({
@@ -178,8 +179,10 @@ export default function Settings() {
 
   // Debug: log active workspace mapping to detect mismatch between DB and UI
   useEffect(() => {
-    const aw = (config.workspaces || []).find(w => w._id === activeWorkspace) || null;
-    console.log('[Settings Debug] activeWorkspace id:', activeWorkspace, 'activeWorkspace config:', aw);
+    const isMain = activeWorkspace === 'main';
+    const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
+    const aw = !isMain ? config.workspaces?.[wsIndex] : null;
+    console.log('[Settings Debug] activeWorkspace id:', activeWorkspace, 'wsIndex:', wsIndex, 'activeWorkspace config found:', !!aw, aw ? `{name: ${aw.name}, _id: ${aw._id}}` : 'N/A');
   }, [config.workspaces, activeWorkspace]);
 
   const handleChange = (e) => {
