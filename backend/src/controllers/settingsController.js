@@ -220,7 +220,8 @@ exports.connectMetaAccount = async (req, res) => {
         user.workspaces[wsIndex].whatsappConfig = { accessToken, phoneNumberId, wabaId: wabaId || '' };
       } else if (platform === 'instagram') {
         // Note: For IG, phoneNumberId is actually the IG Account ID
-        user.workspaces[wsIndex].igConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
+        user.workspaces[wsIndex].instagramConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
+        user.workspaces[wsIndex].igConfig = undefined;
       }
       console.log(`✅ [DEBUG Meta Connect] SAVING to Workspace: ${user.workspaces[wsIndex].name}`);
     } else {

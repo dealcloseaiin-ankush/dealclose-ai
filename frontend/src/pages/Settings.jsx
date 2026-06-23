@@ -117,8 +117,8 @@ export default function Settings() {
       const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
       
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
-      console.log("➡️ [Settings Debug] IG Token status (root):", savedData.igConfig?.accessToken ? "Exists ✅" : "Missing ❌");
-      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!ws.instagramConfig?.accessToken })));
+      console.log("➡️ [Settings Debug] IG Token status (root):", (savedData.instagramConfig?.accessToken || savedData.igConfig?.accessToken) ? "Exists ✅" : "Missing ❌");
+      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!(ws.instagramConfig?.accessToken || ws.igConfig?.accessToken) })));
       
       if (savedData) {
         setConfig({
@@ -138,7 +138,8 @@ export default function Settings() {
           validityDays: savedData.discountConfig?.validityDays || '30',
           workspaces: (savedData.workspaces || []).map(({ igConfig, ...workspace }) => ({
             ...workspace,
-            instagramConfig: workspace.instagramConfig || igConfig || {}
+            instagramConfig: workspace.instagramConfig || igConfig || {},
+            igConfig: undefined
           })),
           aiAgentEnabled: savedData.aiAgentEnabled !== false,
           acceptCollabs: savedData.acceptCollabs || false,
@@ -155,9 +156,9 @@ export default function Settings() {
           externalApiBlogUrl: savedData.externalApiBlogUrl || '',
           externalApiVisitUrl: savedData.externalApiVisitUrl || '',
           customWebhooks: savedData.customWebhooks || [],
-          igAccessToken: savedData.instagramConfig?.accessToken || '',
-          igAccountId: savedData.instagramConfig?.instagramAccountId || '',
-          fbPageId: savedData.instagramConfig?.facebookPageId || ''
+          igAccessToken: savedData.instagramConfig?.accessToken || savedData.igConfig?.accessToken || '',
+          igAccountId: savedData.instagramConfig?.instagramAccountId || savedData.igConfig?.instagramAccountId || '',
+          fbPageId: savedData.instagramConfig?.facebookPageId || savedData.igConfig?.facebookPageId || ''
         });
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
@@ -348,7 +349,7 @@ export default function Settings() {
   const isMain = activeWorkspace === 'main';
   const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
   const activeWs = !isMain ? config.workspaces[wsIndex] : null;
-  const mainIgConnected = !!(config.instagramConfig?.accessToken || config.igConfig?.accessToken);
+  const mainIgConnected = !!(config.igAccessToken && config.igAccountId);
   const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
 
   return (

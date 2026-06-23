@@ -5,19 +5,6 @@ const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
-// Meta debugging deliberately never prints OAuth codes, access tokens, or secrets.
-const createMetaTrace = () => `meta_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-const logMetaTrace = (traceId, event, details = {}) => {
-  console.log(`[Meta Connect][${traceId}] ${event}`, details);
-};
-const getMetaError = (error) => ({
-  status: error.response?.status,
-  code: error.response?.data?.error?.code,
-  subcode: error.response?.data?.error?.error_subcode,
-  type: error.response?.data?.error?.type,
-  message: error.response?.data?.error?.message || error.message
-});
-
 // 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
     try {
@@ -254,14 +241,20 @@ exports.instagramConnectSelected = async (req, res) => {
   try {
     const { selectedAccountId, selectedPageId } = req.body;
     const userId = req.user?._id || req.user?.id;
+    console.log('[Instagram Connect Selected] request body:', req.body, 'userId:', userId);
 
     const user = await User.findById(userId);
     const pending = user?.pendingInstagramConnection;
+    console.log('[Instagram Connect Selected] pending session:', pending ? {
+      workspaceId: pending.workspaceId,
+      expiresAt: pending.expiresAt,
+      accountsCount: pending.accounts?.length
+    } : null);
     if (!userId || !selectedAccountId || !selectedPageId || !pending || pending.expiresAt < new Date()) {
       return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
     }
 
-    const selected = pending.accounts.find(account => String(account.accountId) === String(selectedAccountId) && String(account.pageId) === String(selectedPageId));
+    const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
     if (!selected) {
       return res.status(400).json({ success: false, message: 'Selected Instagram account was not returned by Meta.' });
     }
@@ -279,11 +272,11 @@ exports.instagramConnectSelected = async (req, res) => {
       : { $set: { instagramConfig }, $unset: { igConfig: '' } };
     await User.updateOne(filter, update);
     await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
+    console.log('[Instagram Connect Selected] saved instagramConfig for', workspaceId, 'selectedAccountId:', selectedAccountId, 'selectedPageId:', selectedPageId);
 
     let webhookWarning;
     try {
-      const graphVersion = process.env.META_GRAPH_API_VERSION || 'v25.0';
-      await axios.post(`https://graph.facebook.com/${graphVersion}/${selected.pageId}/subscribed_apps`, null, {
+      await axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
         params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken }
       });
     } catch (subscriptionError) {
@@ -292,7 +285,16 @@ exports.instagramConnectSelected = async (req, res) => {
     }
 
     return res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: instagramConfig, webhookWarning });
-    /* Legacy discovery implementation retained below temporarily; it was unreachable because it was accidentally placed after this return.
+  } catch (error) {
+    console.error('Instagram Connect Selected Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Failed to finalize Instagram account selection. Try again.' });
+  }
+};
+
+// @desc    Connect Instagram via Meta Login
+// @route   POST /api/users/settings/instagram-connect
+exports.instagramConnect = async (req, res) => {
+  try {
     const { authCode, workspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
 
@@ -360,13 +362,17 @@ exports.instagramConnectSelected = async (req, res) => {
     // 🔥 FIX: Prevent Branch from stealing Main's IG Account
     const userDb = await User.findById(userId);
     const usedIgAccountIds = [];
-    if (userDb.instagramConfig && userDb.instagramConfig.instagramAccountId && workspaceId !== 'main') {
-      usedIgAccountIds.push(userDb.instagramConfig.instagramAccountId);
+    if (userDb.instagramConfig?.instagramAccountId || userDb.igConfig?.instagramAccountId) {
+      const rootIgAccountId = userDb.instagramConfig?.instagramAccountId || userDb.igConfig?.instagramAccountId;
+      if (workspaceId !== 'main') usedIgAccountIds.push(rootIgAccountId);
     }
     if (userDb.workspaces) {
       userDb.workspaces.forEach(w => {
-        if (w._id.toString() !== workspaceId && w.igConfig?.instagramAccountId) {
-          usedIgAccountIds.push(w.igConfig.instagramAccountId);
+        if (w._id.toString() !== workspaceId) {
+          const workspaceIgAccountId = w.instagramConfig?.instagramAccountId || w.igConfig?.instagramAccountId;
+          if (workspaceIgAccountId) {
+            usedIgAccountIds.push(workspaceIgAccountId);
+          }
         }
       });
     }
@@ -423,92 +429,12 @@ exports.instagramConnectSelected = async (req, res) => {
       availableAccounts: selectableAccounts.map(({ accountId, pageId, pageName }) => ({ accountId, pageId, pageName }))
     });
 
-  */
+  
+    
+   
   } catch (error) {
     console.error('Instagram Connect Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: 'Failed to connect Instagram account. Try again.' });
-  }
-};
-
-// @desc    Discover Instagram professional accounts before the user picks one.
-// @route   POST /api/users/settings/instagram-connect
-exports.instagramConnect = async (req, res) => {
-  try {
-    const { authCode, workspaceId = 'main' } = req.body;
-    const userId = req.user?._id || req.user?.id;
-    const APP_ID = process.env.META_APP_ID;
-    const APP_SECRET = process.env.META_APP_SECRET;
-    const graphVersion = process.env.META_GRAPH_API_VERSION || 'v25.0';
-
-    if (!userId || !authCode) return res.status(400).json({ success: false, message: 'Missing Meta authorization or unauthorized session.' });
-    if (!APP_ID || !APP_SECRET) return res.status(500).json({ success: false, message: 'META_APP_ID or META_APP_SECRET is missing on the server.' });
-
-    const user = await User.findById(userId);
-    if (!user || (workspaceId !== 'main' && !user.workspaces.id(workspaceId))) {
-      return res.status(404).json({ success: false, message: 'Business not found. Save the business before connecting Instagram.' });
-    }
-
-    let accessToken = authCode;
-    if (!authCode.startsWith('EA')) {
-      const { data } = await axios.get(`https://graph.facebook.com/${graphVersion}/oauth/access_token`, {
-        params: { client_id: APP_ID, client_secret: APP_SECRET, code: authCode }
-      });
-      accessToken = data.access_token;
-    }
-
-    let expiresIn = 60 * 24 * 60 * 60;
-    try {
-      const { data } = await axios.get(`https://graph.facebook.com/${graphVersion}/oauth/access_token`, {
-        params: { grant_type: 'fb_exchange_token', client_id: APP_ID, client_secret: APP_SECRET, fb_exchange_token: accessToken }
-      });
-      accessToken = data.access_token || accessToken;
-      expiresIn = data.expires_in || expiresIn;
-    } catch (error) {
-      console.warn('Meta long-lived token exchange failed:', error.response?.data?.error?.message || error.message);
-    }
-
-    const { data: pagesData } = await axios.get(`https://graph.facebook.com/${graphVersion}/me/accounts`, {
-      params: { fields: 'id,name,access_token', access_token: accessToken }
-    });
-    const pages = pagesData.data || [];
-    if (!pages.length) return res.status(400).json({ success: false, message: 'Meta returned no Facebook Pages for this login.' });
-
-    const usedIds = new Set();
-    if (workspaceId !== 'main' && user.instagramConfig?.instagramAccountId) usedIds.add(String(user.instagramConfig.instagramAccountId));
-    for (const workspace of user.workspaces || []) {
-      if (String(workspace._id) === String(workspaceId)) continue;
-      const connection = workspace.instagramConfig || workspace.igConfig;
-      if (connection?.instagramAccountId) usedIds.add(String(connection.instagramAccountId));
-    }
-
-    const accountResults = await Promise.all(pages.map(async (page) => {
-      try {
-        const { data } = await axios.get(`https://graph.facebook.com/${graphVersion}/${page.id}`, {
-          params: { fields: 'instagram_business_account', access_token: page.access_token || accessToken }
-        });
-        const accountId = data.instagram_business_account?.id;
-        console.log(`[Meta Instagram] ${page.name}: ${accountId ? `IG ${accountId}` : 'no linked professional IG account'}`);
-        return accountId ? { accountId: String(accountId), pageId: String(page.id), pageName: page.name, pageToken: page.access_token || accessToken } : null;
-      } catch (error) {
-        console.warn(`[Meta Instagram] Page ${page.id} skipped:`, error.response?.data?.error?.message || error.message);
-        return null;
-      }
-    }));
-
-    const selectableAccounts = accountResults.filter(Boolean).filter((account) => !usedIds.has(account.accountId));
-    if (!selectableAccounts.length) {
-      return res.status(400).json({ success: false, message: 'No unused Instagram professional account was found. Each Facebook Page must be linked to a professional Instagram account.' });
-    }
-
-    await User.updateOne({ _id: userId }, { $set: { pendingInstagramConnection: {
-      workspaceId, accessToken, tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), accounts: selectableAccounts
-    } } });
-
-    return res.json({ success: true, availableAccounts: selectableAccounts.map(({ accountId, pageId, pageName }) => ({ accountId, pageId, pageName })) });
-  } catch (error) {
-    console.error('Instagram account discovery failed:', error.response?.data || error.message);
-    return res.status(500).json({ success: false, message: 'Failed to fetch Instagram accounts from Meta.' });
   }
 };
 
@@ -640,7 +566,6 @@ exports.updateProfile = async (req, res) => {
       externalApiBlogUrl,
       externalApiVisitUrl,
       customWebhooks,
-      postAutomations,
       igConfig,
       instagramConfig
     } = req.body;
@@ -675,7 +600,6 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
-    if (postAutomations !== undefined) updateData.postAutomations = postAutomations;
     if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
     if (igConfig !== undefined) updateData.igConfig = igConfig;
     
