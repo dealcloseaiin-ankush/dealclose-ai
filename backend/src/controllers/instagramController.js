@@ -63,13 +63,19 @@ exports.getRecentPosts = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    const mainInstagram = user?.instagramConfig || user?.igConfig;
-    let accessToken = mainInstagram?.accessToken;
-    let accountId = mainInstagram?.instagramAccountId || mainInstagram?.accountId;
-    let source = 'Main Config';
+    const workspaceId = req.query.workspaceId || 'main';
+    const selectedWorkspace = workspaceId !== 'main'
+      ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
+      : null;
+    const selectedInstagram = selectedWorkspace
+      ? (selectedWorkspace.instagramConfig || selectedWorkspace.igConfig)
+      : (user.instagramConfig || user.igConfig);
+    let accessToken = selectedInstagram?.accessToken;
+    let accountId = selectedInstagram?.instagramAccountId || selectedInstagram?.accountId;
+    let source = selectedWorkspace ? `Workspace: ${selectedWorkspace.name}` : 'Main Config';
 
     // 🚀 FIX: Also check if Instagram was connected inside a Workspace!
-    if (!accessToken && user?.workspaces) {
+    if (workspaceId === 'main' && !accessToken && user?.workspaces) {
       const ws = user.workspaces.find(w => (w.instagramConfig || w.igConfig)?.accessToken);
       if (ws) {
         const workspaceInstagram = ws.instagramConfig || ws.igConfig;
@@ -93,7 +99,8 @@ exports.getRecentPosts = async (req, res) => {
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     // Fetch latest 15 media items from Meta Graph API
     // 🚀 FIX: Added 'impressions' to fetch real post views
-    const url = `https://graph.facebook.com/v19.0/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions)&limit=15&access_token=${accessToken}`;
+    const graphVersion = process.env.META_GRAPH_API_VERSION || 'v25.0';
+    const url = `https://graph.facebook.com/${graphVersion}/${accountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions)&limit=15&access_token=${accessToken}`;
     const response = await axios.get(url);
     
     if (!response.data || !response.data.data) {

@@ -98,7 +98,12 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
       if (response.status === 'connected' && response.authResponse) {
         // Tech Provider (Embedded Signup) me Meta 'code' bhejta hai, 'accessToken' nahi.
         // Is code ko backend secure tarike se Meta Graph API ko bhej kar System User Access Token nikalta hai.
-        const authCode = response.authResponse.code || response.authResponse.accessToken; 
+        const authCode = response.authResponse.code || response.authResponse.accessToken;
+        if (!authCode) {
+          alert('Meta did not return an authorization code. Please try again and approve every requested permission.');
+          setLoading(false);
+          return;
+        }
         
         console.log('✅ [MetaConnect] Meta Auth Success. Auth Code extracted:', authCode);
         
@@ -143,7 +148,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     const fbLoginConfig = {
       scopes: platform === 'whatsapp' 
         ? 'whatsapp_business_management,whatsapp_business_messaging' 
-        : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_manage_metadata,pages_messaging,instagram_manage_messages',
+        : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging',
       return_scopes: true,
       response_type: 'code',
       auth_type: 'rerequest',

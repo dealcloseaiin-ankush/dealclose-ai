@@ -154,15 +154,17 @@ export default function Settings() {
           externalApiBlogUrl: savedData.externalApiBlogUrl || '',
           externalApiVisitUrl: savedData.externalApiVisitUrl || '',
           customWebhooks: savedData.customWebhooks || [],
-          igAccessToken: savedData.instagramConfig?.accessToken || '',
-          igAccountId: savedData.instagramConfig?.instagramAccountId || '',
-          fbPageId: savedData.instagramConfig?.facebookPageId || ''
+          igAccessToken: savedData.instagramConfig?.accessToken || savedData.igConfig?.accessToken || '',
+          igAccountId: savedData.instagramConfig?.instagramAccountId || savedData.igConfig?.instagramAccountId || '',
+          fbPageId: savedData.instagramConfig?.facebookPageId || savedData.igConfig?.facebookPageId || ''
         });
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
         setIgConnected(!!savedData.instagramConfig?.accessToken);
         setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
         setIgConnected(!!savedData.instagramConfig?.accessToken);
+        // Prefer the canonical field, but keep existing legacy connections visible until migrated.
+        setIgConnected(Boolean(savedData.instagramConfig?.accessToken || savedData.igConfig?.accessToken));
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
         setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); // 🚀 Extract email
       }
@@ -550,19 +552,13 @@ export default function Settings() {
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
 
-                    {!igConnected ? (
-                  <MetaConnectButton 
-                    buttonText="Connect Instagram via Meta" 
-                    platform="instagram" 
-                    workspaceId="main" 
-                    onSuccess={(data) => openInstagramPicker(data, 'main')} 
-                  />
-                    ) : (
-                      <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                         <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
-                         <button type="button" onClick={() => setIgConnected(false)} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
-                      </div>
-                    )}
+                    <MetaConnectButton
+                      buttonText={igConnected ? 'Reconnect / Change Instagram' : 'Connect Instagram via Meta'}
+                      platform="instagram"
+                      workspaceId="main"
+                      onSuccess={(data) => openInstagramPicker(data, 'main')}
+                    />
+                    {igConnected && <p className="mt-3 text-sm text-green-400 font-semibold">Instagram is actively monitored by AI. Reconnect to replace this business's linked account.</p>}
                   </div>
 
                   {/* Meta Ads Conversions API */}

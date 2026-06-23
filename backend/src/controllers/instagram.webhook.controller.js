@@ -218,8 +218,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                   $setOnInsert: Object.assign({ 
                     source: 'Instagram DM', 
                     status: 'visitor', // CHANGED FROM 'new' to avoid CRM clutter for normal fans
-                    createdBy: user._id,
-                    timeline: [{ eventType: 'Lead Created', description: 'Lead auto-captured from Instagram DM', timestamp: new Date() }]
+                    createdBy: user._id
                   }, getExpiry('junk') ? { expiresAt: getExpiry('junk') } : {}),
                   $push: { timeline: { eventType: 'Instagram DM Received', description: 'Customer sent an Instagram DM', timestamp: new Date() } }
                 },
@@ -830,7 +829,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                    status: 'new',
                    notes: `Left number in comment: "${commentText}"`
                  },
-                 $setOnInsert: { expiresAt: getExpiry('lead'), timeline: [{ eventType: 'Lead Created', description: 'Lead captured from Instagram Comment', timestamp: new Date() }] },
+                 $setOnInsert: { expiresAt: getExpiry('lead') },
                  $push: { timeline: { eventType: 'Instagram Comment Received', description: `Comment: "${commentText.substring(0,30)}..."`, timestamp: new Date() } }
                },
                { upsert: true, new: true }
