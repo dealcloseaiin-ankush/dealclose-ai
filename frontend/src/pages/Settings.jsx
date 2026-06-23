@@ -41,7 +41,7 @@ export default function Settings() {
   });
   
   const [devApiKey, setDevApiKey] = useState('');
-  const [igConnected, setIgConnected] = useState(false);
+  
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleConnectedEmail, setGoogleConnectedEmail] = useState(''); // 🚀 FIXED STATE
   const [userId, setUserId] = useState('demo-business'); // Used for QR code link
@@ -160,9 +160,7 @@ export default function Settings() {
         });
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
-        setIgConnected(!!savedData.instagramConfig?.accessToken);
-        setIgConnected(!!(savedData.igConfig && savedData.igConfig.accessToken)); // ✨ Show actual IG connected status from DB
-        setIgConnected(!!savedData.instagramConfig?.accessToken);
+        // Derive IG connected state from saved config when rendering instead of relying on multiple setState calls
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
         setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); // 🚀 Extract email
       }
@@ -347,6 +345,7 @@ export default function Settings() {
   const isMain = activeWorkspace === 'main';
   const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
   const activeWs = !isMain ? config.workspaces[wsIndex] : null;
+  const mainIgConnected = !!(config.instagramConfig?.accessToken || config.igConfig?.accessToken);
   const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
 
   return (
@@ -544,7 +543,7 @@ export default function Settings() {
                   <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold text-pink-400">Instagram Automation</h2>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${igConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{igConnected ? 'Connected ✅' : 'Not Connected'}</span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${mainIgConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{mainIgConnected ? 'Connected ✅' : 'Not Connected'}</span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -559,7 +558,7 @@ export default function Settings() {
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
 
-                    {!igConnected ? (
+                    {!mainIgConnected ? (
                   <MetaConnectButton 
                     buttonText="Connect Instagram via Meta" 
                     platform="instagram" 
@@ -569,7 +568,7 @@ export default function Settings() {
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
-                         <button type="button" onClick={() => setIgConnected(false)} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
+                         <button type="button" onClick={() => { /* Graceful disconnect UI - user can clear token manually */ alert('Disconnect via Settings: paste blank IG token and save.'); }} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
                       </div>
                     )}
                   </div>
