@@ -178,6 +178,12 @@ export default function Settings() {
     fetchSettings();
   }, []);
 
+  // Debug: log active workspace mapping to detect mismatch between DB and UI
+  useEffect(() => {
+    const aw = (config.workspaces || []).find(w => w._id === activeWorkspace) || null;
+    console.log('[Settings Debug] activeWorkspace id:', activeWorkspace, 'activeWorkspace config:', aw);
+  }, [config.workspaces, activeWorkspace]);
+
   const handleChange = (e) => {
     setConfig({ ...config, [e.target.name]: e.target.value });
   };
@@ -854,7 +860,7 @@ export default function Settings() {
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
                      <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                      <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                      <MetaConnectButton buttonText={(activeWs.instagramConfig?.accessToken || activeWs.igConfig?.accessToken) ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">
