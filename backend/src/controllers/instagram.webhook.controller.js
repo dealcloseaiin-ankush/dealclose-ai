@@ -771,14 +771,15 @@ exports.handleInstagramWebhook = async (req, res) => {
 
           console.log(`[Meta Comment (IG/FB)] Received from ${username}: ${commentText}`);
 
-          // Find the exact user based on IG or FB Account ID
-          let user = await User.findOne({
+           // Find the exact user based on IG or FB Account ID (handle legacy igConfig too)
+           let user = await User.findOne({
              $or: [
-                { "instagramConfig.instagramAccountId": igAccountId },
-                { "workspaces.instagramConfig.instagramAccountId": igAccountId },
-                { "workspaces.igConfig.instagramAccountId": igAccountId }
+               { "instagramConfig.instagramAccountId": igAccountId },
+               { "igConfig.instagramAccountId": igAccountId },
+               { "workspaces.instagramConfig.instagramAccountId": igAccountId },
+               { "workspaces.igConfig.instagramAccountId": igAccountId }
              ]
-          });
+           });
           if (!user) {
              console.log(`❌ [IG Webhook - Comments] No matching Instagram account found in DB for Webhook IG ID: ${igAccountId}`);
              continue;
@@ -790,11 +791,11 @@ exports.handleInstagramWebhook = async (req, res) => {
           console.log(`- Matched User Email:`, user?.email);
           console.log(`------------------------------------------------\n`);
           
-          // Safely extract IG Token for Comments
-           let igToken = user.instagramConfig?.accessToken || user.instagramConfig?.accessToken;
+           // Safely extract IG Token for Comments (prefer canonical field, fall back to legacy)
+           let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
            if (!igToken && user.workspaces) {
-              const workspace = user.workspaces.find(w => (w.instagramConfig || w.)?.instagramAccountId === igAccountId);
-              igToken = (workspace?.instagramConfig || workspace?.igConfig)?.accessToken;
+             const workspace = user.workspaces.find(w => (w.instagramConfig || w.igConfig)?.instagramAccountId === igAccountId);
+             igToken = workspace?.instagramConfig?.accessToken || workspace?.igConfig?.accessToken;
            }
 
           // 🚀 SMART TTL: Calculate Expiry for Comments
