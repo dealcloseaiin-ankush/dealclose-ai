@@ -637,7 +637,6 @@ exports.updateProfile = async (req, res) => {
       externalApiVisitUrl,
       customWebhooks,
       instagramConfig,
-      instagramConfig
     } = req.body;
 
     // Assuming you have an auth middleware that sets req.user
@@ -670,7 +669,6 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
-    if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
     if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
     
     console.log(`➡️ [DEBUG Profile Update] Data being set in DB:`, updateData);
