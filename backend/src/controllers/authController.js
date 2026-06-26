@@ -266,13 +266,31 @@ exports.instagramConnectSelected = async (req, res) => {
       facebookPageId: selected.pageId,
       tokenExpiresAt: pending.tokenExpiresAt
     };
+
+    console.log('[Instagram Connect Selected] 🔍 instagramConfig object being saved:', JSON.stringify(instagramConfig, null, 2));
+    console.log('[Instagram Connect Selected] 🔍 workspaceId:', workspaceId);
+
     const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
     const update = workspaceId !== 'main'
-      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig }, $unset: { 'workspaces.$.igConfig': '' } }
-      : { $set: { instagramConfig }, $unset: { igConfig: '' } };
-    await User.updateOne(filter, update);
+      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig } }
+      : { $set: { instagramConfig } };
+
+    console.log('[Instagram Connect Selected] 🔍 Update query:', JSON.stringify(update, null, 2));
+
+    const updateResult = await User.updateOne(filter, update);
+    console.log('[Instagram Connect Selected] ✅ Update result:', updateResult);
+
     await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
     console.log('[Instagram Connect Selected] saved instagramConfig for', workspaceId, 'selectedAccountId:', selectedAccountId, 'selectedPageId:', selectedPageId);
+
+    // 🔥 VERIFY: Check if data was actually saved
+    const verifyUser = await User.findById(userId);
+    if (workspaceId !== 'main') {
+      const savedWs = verifyUser.workspaces.find(w => w._id.toString() === workspaceId);
+      console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved workspace instagramConfig:', JSON.stringify(savedWs?.instagramConfig, null, 2));
+    } else {
+      console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved root instagramConfig:', JSON.stringify(verifyUser.instagramConfig, null, 2));
+    }
 
     let webhookWarning;
     try {
@@ -362,14 +380,14 @@ exports.instagramConnect = async (req, res) => {
     // 🔥 FIX: Prevent Branch from stealing Main's IG Account
     const userDb = await User.findById(userId);
     const usedIgAccountIds = [];
-    if (userDb.instagramConfig?.instagramAccountId || userDb.igConfig?.instagramAccountId) {
-      const rootIgAccountId = userDb.instagramConfig?.instagramAccountId || userDb.igConfig?.instagramAccountId;
+    if (userDb.instagramConfig?.instagramAccountId || userDb.instagramConfig?.instagramAccountId) {
+      const rootIgAccountId = userDb.instagramConfig?.instagramAccountId || userDb.instagramConfig?.instagramAccountId;
       if (workspaceId !== 'main') usedIgAccountIds.push(rootIgAccountId);
     }
     if (userDb.workspaces) {
       userDb.workspaces.forEach(w => {
         if (w._id.toString() !== workspaceId) {
-          const workspaceIgAccountId = w.instagramConfig?.instagramAccountId || w.igConfig?.instagramAccountId;
+          const workspaceIgAccountId = w.instagramConfig?.instagramAccountId || w.instagramConfig?.instagramAccountId;
           if (workspaceIgAccountId) {
             usedIgAccountIds.push(workspaceIgAccountId);
           }
@@ -566,7 +584,7 @@ exports.updateProfile = async (req, res) => {
       externalApiBlogUrl,
       externalApiVisitUrl,
       customWebhooks,
-      igConfig,
+      instagramConfig,
       instagramConfig
     } = req.body;
 
@@ -601,7 +619,7 @@ exports.updateProfile = async (req, res) => {
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
     if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
-    if (igConfig !== undefined) updateData.igConfig = igConfig;
+    if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
     
     console.log(`➡️ [DEBUG Profile Update] Data being set in DB:`, updateData);
 
@@ -640,7 +658,7 @@ exports.getProfile = async (req, res) => {
     // console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
     // - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
     // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
-    // - IG Connected Token Exist?: ${user.igConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
+    // - IG Connected Token Exist?: ${user.instagramConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
     if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
     res.status(200).json({ success: true, user });

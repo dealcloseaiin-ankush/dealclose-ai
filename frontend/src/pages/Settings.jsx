@@ -117,8 +117,18 @@ export default function Settings() {
       const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
       
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
-      console.log("➡️ [Settings Debug] IG Token status (root):", (savedData.instagramConfig?.accessToken || savedData.igConfig?.accessToken) ? "Exists ✅" : "Missing ❌");
-      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!(ws.instagramConfig?.accessToken || ws.igConfig?.accessToken) })));
+      console.log("➡️ [Settings Debug] IG Token status (root):", (savedData.instagramConfig?.accessToken || savedData.instagramConfig?.accessToken) ? "Exists ✅" : "Missing ❌");
+      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!(ws.instagramConfig?.accessToken || ws.instagramConfig?.accessToken) })));
+      
+      // 🔥 DETAILED DEBUG LOGS
+      console.log("🔍 WORKSPACES FULL DATA:", JSON.stringify(savedData.workspaces, null, 2));
+      (savedData.workspaces || []).forEach((ws, i) => {
+        console.log(`🔍 WS ${i}: name="${ws.name}", _id="${ws._id}"`);
+        console.log(`    📦 instagramConfig:`, ws.instagramConfig);
+        console.log(`    ✅ Has accessToken: ${!!(ws.instagramConfig?.accessToken)}`);
+        console.log(`    ✅ Has instagramAccountId: ${!!(ws.instagramConfig?.instagramAccountId)}`);
+        console.log(`    ✅ Has facebookPageId: ${!!(ws.instagramConfig?.facebookPageId)}`);
+      });
       
       if (savedData) {
         setConfig({
@@ -136,10 +146,9 @@ export default function Settings() {
           discountPercentage: savedData.discountConfig?.percentage || '',
           discountCode: savedData.discountConfig?.code || '',
           validityDays: savedData.discountConfig?.validityDays || '30',
-          workspaces: (savedData.workspaces || []).map(({ igConfig, ...workspace }) => ({
-            ...workspace,
-            instagramConfig: workspace.instagramConfig || igConfig || {},
-            igConfig: undefined
+          workspaces: (savedData.workspaces || []).map((ws) => ({
+            ...ws,
+            instagramConfig: ws.instagramConfig || {},
           })),
           aiAgentEnabled: savedData.aiAgentEnabled !== false,
           acceptCollabs: savedData.acceptCollabs || false,
@@ -156,9 +165,9 @@ export default function Settings() {
           externalApiBlogUrl: savedData.externalApiBlogUrl || '',
           externalApiVisitUrl: savedData.externalApiVisitUrl || '',
           customWebhooks: savedData.customWebhooks || [],
-          igAccessToken: savedData.instagramConfig?.accessToken || savedData.igConfig?.accessToken || '',
-          igAccountId: savedData.instagramConfig?.instagramAccountId || savedData.igConfig?.instagramAccountId || '',
-          fbPageId: savedData.instagramConfig?.facebookPageId || savedData.igConfig?.facebookPageId || ''
+          igAccessToken: savedData.instagramConfig?.accessToken || '',
+          igAccountId: savedData.instagramConfig?.instagramAccountId || '',
+          fbPageId: savedData.instagramConfig?.facebookPageId || ''
         });
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
@@ -351,6 +360,23 @@ export default function Settings() {
   const activeWs = !isMain ? config.workspaces[wsIndex] : null;
   const mainIgConnected = !!(config.igAccessToken && config.igAccountId);
   const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
+
+  // 🔥 WORKSPACE DEBUG LOGS
+  if (!isMain) {
+    console.log(`🔍 [Settings] Active Workspace:
+      - activeWorkspace id: ${activeWorkspace}
+      - wsIndex: ${wsIndex}
+      - activeWs object:`, activeWs);
+    if (activeWs?.instagramConfig) {
+      console.log(`🔍 [Settings] Workspace instagramConfig:
+        - accessToken: ${activeWs.instagramConfig.accessToken ? '✅ Present' : '❌ Missing'}
+        - instagramAccountId: ${activeWs.instagramConfig.instagramAccountId}
+        - facebookPageId: ${activeWs.instagramConfig.facebookPageId}
+        - Full Config:`, JSON.stringify(activeWs.instagramConfig, null, 2));
+    } else {
+      console.log(`🔍 [Settings] NO instagramConfig found in activeWs!`);
+    }
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
@@ -863,7 +889,7 @@ export default function Settings() {
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
                      <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                      <MetaConnectButton buttonText={(activeWs.instagramConfig?.accessToken || activeWs.igConfig?.accessToken) ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                      <MetaConnectButton buttonText={(activeWs.instagramConfig?.accessToken || activeWs.intagramConfig?.accessToken) ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

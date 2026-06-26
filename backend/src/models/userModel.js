@@ -87,13 +87,6 @@ const userSchema = new Schema({
       facebookPageId: { type: String },
       tokenExpiresAt: { type: Date }
     },
-    // Legacy field retained temporarily so existing workspace connections can be migrated.
-    igConfig: {
-      accessToken: { type: String },
-      instagramAccountId: { type: String },
-      facebookPageId: { type: String },
-      tokenExpiresAt: { type: Date }
-    },
     // --- Separate AI Brain for each Workspace ---
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
