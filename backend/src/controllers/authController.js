@@ -283,23 +283,40 @@ exports.instagramConnectSelected = async (req, res) => {
     await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
     console.log('[Instagram Connect Selected] saved instagramConfig for', workspaceId, 'selectedAccountId:', selectedAccountId, 'selectedPageId:', selectedPageId);
 
-    // 🔥 VERIFY: Check if data was actually saved
-    const verifyUser = await User.findById(userId);
-    if (workspaceId !== 'main') {
-      const savedWs = verifyUser.workspaces.find(w => w._id.toString() === workspaceId);
-      console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved workspace instagramConfig:', JSON.stringify(savedWs?.instagramConfig, null, 2));
-    } else {
-      console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved root instagramConfig:', JSON.stringify(verifyUser.instagramConfig, null, 2));
+    // 🔥 VERIFY: Check if data was actually saved (with timeout protection)
+    try {
+      const verifyUser = await Promise.race([
+        User.findById(userId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Verification timeout')), 5000))
+      ]);
+      
+      if (workspaceId !== 'main') {
+        const savedWs = verifyUser.workspaces.find(w => w._id.toString() === workspaceId);
+        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved workspace instagramConfig:', JSON.stringify(savedWs?.instagramConfig, null, 2));
+      } else {
+        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved root instagramConfig:', JSON.stringify(verifyUser.instagramConfig, null, 2));
+      }
+    } catch (verifyError) {
+      console.error('[Instagram Connect Selected] ⚠️ Verification failed:', verifyError.message);
     }
 
+    // 🔥 Webhook subscription - don't let it hang the entire response
     let webhookWarning;
     try {
-      await axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
-        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken }
+      const webhookPromise = axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
+        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken },
+        timeout: 5000 // 5 second timeout
       });
+      
+      await Promise.race([
+        webhookPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Webhook subscription timeout')), 6000))
+      ]);
+      
+      console.log('[Instagram Connect Selected] ✅ Webhook subscription successful');
     } catch (subscriptionError) {
       webhookWarning = subscriptionError.response?.data?.error?.message || subscriptionError.message;
-      console.error('Webhook subscription failed after Instagram connection:', webhookWarning);
+      console.warn('⚠️ Webhook subscription warning after Instagram connection:', webhookWarning);
     }
 
     return res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: instagramConfig, webhookWarning });
@@ -329,28 +346,41 @@ exports.instagramConnect = async (req, res) => {
 
     // Exchange code for token if it's a short-lived code
     if (!authCode.startsWith('EAA') && !authCode.startsWith('EA')) {
-      const tokenResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
-        params: {
-          client_id: APP_ID,
-          client_secret: APP_SECRET,
-          code: authCode,
-          redirect_uri: '' 
-        }
-      });
-      clientAccessToken = tokenResponse.data.access_token;
+      try {
+        const tokenResponse = await Promise.race([
+          axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
+            params: {
+              client_id: APP_ID,
+              client_secret: APP_SECRET,
+              code: authCode,
+              redirect_uri: '' 
+            },
+            timeout: 10000 // 10 second timeout
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Token exchange timeout')), 12000))
+        ]);
+        clientAccessToken = tokenResponse.data.access_token;
+      } catch (err) {
+        console.error('Failed to exchange auth code for token:', err.message);
+        return res.status(400).json({ success: false, message: 'Failed to authenticate with Meta' });
+      }
     }
 
     // 🔥 FIX: Automatically exchange Short-Lived Token for a Long-Lived Token (Valid for 60 Days)
     let expiresInDays = 60; // Default Meta long-lived token
     try {
-      const longLivedResponse = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
-        params: {
-          grant_type: 'fb_exchange_token',
-          client_id: APP_ID,
-          client_secret: APP_SECRET,
-          fb_exchange_token: clientAccessToken
-        }
-      });
+      const longLivedResponse = await Promise.race([
+        axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
+          params: {
+            grant_type: 'fb_exchange_token',
+            client_id: APP_ID,
+            client_secret: APP_SECRET,
+            fb_exchange_token: clientAccessToken
+          },
+          timeout: 10000
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Long-lived token exchange timeout')), 12000))
+      ]);
       
       if (longLivedResponse.data && longLivedResponse.data.access_token) {
         clientAccessToken = longLivedResponse.data.access_token;
@@ -363,11 +393,19 @@ exports.instagramConnect = async (req, res) => {
     }
 
     // Fetch User's Facebook Pages
-    const pagesResponse = await axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
-      // 🚀 FIX: explicitly request messaging scopes at /me/accounts level doesn't work this way.
-      // Scopes are requested during FB.login. Here we just use the token to get accounts.
-      params: { access_token: clientAccessToken }
-    });
+    let pagesResponse;
+    try {
+      pagesResponse = await Promise.race([
+        axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
+          params: { access_token: clientAccessToken },
+          timeout: 10000
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Pages fetch timeout')), 12000))
+      ]);
+    } catch (pagesErr) {
+      console.error('Failed to fetch Facebook pages:', pagesErr.message);
+      return res.status(400).json({ success: false, message: 'Failed to fetch Facebook pages. Check your token.' });
+    }
 
     const pages = pagesResponse.data.data;
     console.log(`\n================== [META INSTAGRAM DEBUG] ==================`);
@@ -400,7 +438,12 @@ exports.instagramConnect = async (req, res) => {
     // Find all connected Instagram accounts
     for (const page of pages) {
         try {
-            const igResponse = await axios.get(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${clientAccessToken}`);
+            const igResponse = await Promise.race([
+              axios.get(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${clientAccessToken}`, {
+                timeout: 8000
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('IG account fetch timeout')), 10000))
+            ]);
             const igAcc = igResponse.data.instagram_business_account;
             console.log(`🔍 2. Checking FB Page "${page.name}": IG Account Linked? ->`, igAcc ? `YES (ID: ${igAcc.id})` : 'NO');
             
@@ -413,7 +456,7 @@ exports.instagramConnect = async (req, res) => {
                 });
             }
         } catch (err) {
-            console.log('Skipping page, no IG connected:', err.message);
+            console.log('Skipping page, no IG connected or timeout:', err.message);
         }
     }
     
@@ -430,17 +473,26 @@ exports.instagramConnect = async (req, res) => {
     }
 
     const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
-    await User.updateOne({ _id: userId }, {
-      $set: {
-        pendingInstagramConnection: {
-          workspaceId: workspaceId || 'main',
-          accessToken: clientAccessToken,
-          tokenExpiresAt,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-          accounts: selectableAccounts
-        }
-      }
-    });
+    
+    try {
+      await Promise.race([
+        User.updateOne({ _id: userId }, {
+          $set: {
+            pendingInstagramConnection: {
+              workspaceId: workspaceId || 'main',
+              accessToken: clientAccessToken,
+              tokenExpiresAt,
+              expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+              accounts: selectableAccounts
+            }
+          }
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB update timeout')), 5000))
+      ]);
+    } catch (err) {
+      console.error('Failed to save pending Instagram connection:', err.message);
+      return res.status(500).json({ success: false, message: 'Failed to save connection state. Try again.' });
+    }
 
     return res.status(200).json({
       success: true,
