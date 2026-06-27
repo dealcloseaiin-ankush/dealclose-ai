@@ -117,8 +117,8 @@ export default function Settings() {
       const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
       
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
-      console.log("➡️ [Settings Debug] IG Token status (root):", (savedData.instagramConfig?.accessToken || savedData.instagramConfig?.accessToken) ? "Exists ✅" : "Missing ❌");
-      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!(ws.instagramConfig?.accessToken || ws.instagramConfig?.accessToken) })));
+      console.log("➡️ [Settings Debug] IG Token status (root):", savedData.instagramConfig?.accessToken ? "Exists ✅" : "Missing ❌");
+      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!ws.instagramConfig?.accessToken })));
       
       // 🔥 DETAILED DEBUG LOGS
       console.log("🔍 WORKSPACES FULL DATA:", JSON.stringify(savedData.workspaces, null, 2));
@@ -338,7 +338,8 @@ export default function Settings() {
     try {
       const { data } = await api.post('/users/settings/instagram-connect-selected', {
         selectedAccountId: account.accountId,
-        selectedPageId: account.pageId
+        selectedPageId: account.pageId,
+        workspaceId: instagramPicker?.workspaceId || 'main'
       });
       console.log('[Instagram Picker] backend response for selection:', data);
       setInstagramPicker(null);
@@ -359,6 +360,7 @@ export default function Settings() {
   const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
   const activeWs = !isMain ? config.workspaces[wsIndex] : null;
   const mainIgConnected = !!(config.igAccessToken && config.igAccountId);
+  const workspaceIgConnected = !!(activeWs?.instagramConfig?.accessToken && activeWs?.instagramConfig?.instagramAccountId);
   const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
 
   // 🔥 WORKSPACE DEBUG LOGS
@@ -884,12 +886,12 @@ export default function Settings() {
                            </div>
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
                              <p className="text-xs text-gray-400 mb-1">Instagram Status</p>
-                             {activeWs.instagramConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                             {workspaceIgConnected ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
                            </div>
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
                      <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                      <MetaConnectButton buttonText={(activeWs.instagramConfig?.accessToken || activeWs.intagramConfig?.accessToken) ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                      <MetaConnectButton buttonText={workspaceIgConnected ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

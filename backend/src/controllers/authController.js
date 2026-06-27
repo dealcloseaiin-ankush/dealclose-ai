@@ -239,7 +239,7 @@ exports.whatsappConnect = async (req, res) => {
 // @route   POST /api/users/settings/instagram-connect-selected
 exports.instagramConnectSelected = async (req, res) => {
   try {
-    const { selectedAccountId, selectedPageId } = req.body;
+    const { selectedAccountId, selectedPageId, workspaceId: requestedWorkspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
     console.log('[Instagram Connect Selected] request body:', req.body, 'userId:', userId);
 
@@ -252,6 +252,10 @@ exports.instagramConnectSelected = async (req, res) => {
     } : null);
     if (!userId || !selectedAccountId || !selectedPageId || !pending || pending.expiresAt < new Date()) {
       return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
+    }
+
+    if (requestedWorkspaceId && requestedWorkspaceId !== (pending.workspaceId || 'main')) {
+      return res.status(400).json({ success: false, message: 'Instagram selection workspace mismatch. Please connect Instagram again for this workspace.' });
     }
 
     const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
