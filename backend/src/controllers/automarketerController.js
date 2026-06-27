@@ -47,7 +47,7 @@ exports.approvePost = async (req, res) => {
     }
 
     const user = await User.findById(req.user._id);
-    const igSettings = user.instagramConfig || user.igConfig || {};
+    const igSettings = user.instagramConfig || user.instagramConfig || {};
     const igAccountId = igSettings.instagramAccountId || igSettings.accountId;
 
     if (!igAccountId || !igSettings.accessToken) {
