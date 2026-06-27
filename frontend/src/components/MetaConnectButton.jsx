@@ -81,29 +81,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     setLoading(true);
     console.log("➡️ [MetaConnect] Triggering FB.login popup...");
 
-    // Trigger Meta Oauth Popup
-    const handleLoginResponse = (response) => {
-      if (loginTimeoutRef.current) {
-        clearTimeout(loginTimeoutRef.current);
-        loginTimeoutRef.current = null;
-      }
-      console.log("➡️ [MetaConnect] FB.login response received:", response);
-      
-      // 🔥 Enhanced Error Detection
-      if (response.status === 'unknown' || response.error || !response.authResponse) {
-        console.error('❌ [MetaConnect] Meta Login Failed/Blocked. Full Response:', response);
-        let userFriendlyError = 'Meta Login Failed! Please try again.';
-        if (response.status === 'not_authorized') {
-          userFriendlyError = 'Login Cancelled: You did not grant the required permissions in the Meta popup.';
-        } else if (response.error) {
-          userFriendlyError = `Meta Login Error: ${response.error_message || 'Please check browser console for details.'}`;
-        }
-        alert(userFriendlyError);
-        setLoading(false);
-        return;
-      }
-      
-      if (response.status === 'connected' && response.authResponse) {
+    const completeMetaConnection = (response) => {
         // Tech Provider (Embedded Signup) me Meta 'code' bhejta hai, 'accessToken' nahi.
         // Is code ko backend secure tarike se Meta Graph API ko bhej kar System User Access Token nikalta hai.
         const authCode = response.authResponse.code || response.authResponse.accessToken;
@@ -150,13 +128,55 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
           alert('Error: ' + (err.response?.data?.message || 'Failed to connect. Please try again.'));
         })
         .finally(() => setLoading(false));
-      }
     };
 
+    // Trigger Meta Oauth Popup
+    const handleLoginResponse = (response) => {
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+        loginTimeoutRef.current = null;
+      }
+      console.log("➡️ [MetaConnect] FB.login response received:", response);
+      
+      if (response.status === 'connected' && response.authResponse) {
+        completeMetaConnection(response);
+        return;
+      }
+
+      // Meta can return "unknown" when browser privacy settings or the popup flow
+      // does not attach authResponse. Check login status once before failing.
+      if (response.status === 'unknown' && window.FB?.getLoginStatus) {
+        console.warn('⚠️ [MetaConnect] FB.login returned unknown. Retrying with FB.getLoginStatus...');
+        window.FB.getLoginStatus((statusResponse) => {
+          console.log('➡️ [MetaConnect] FB.getLoginStatus response:', statusResponse);
+          if (statusResponse.status === 'connected' && statusResponse.authResponse) {
+            completeMetaConnection(statusResponse);
+            return;
+          }
+          alert('Meta login was cancelled or blocked. Please allow Facebook/Meta popup and try again.');
+          setLoading(false);
+        }, true);
+        return;
+      }
+
+      console.error('❌ [MetaConnect] Meta Login Failed/Blocked. Full Response:', response);
+      let userFriendlyError = 'Meta Login Failed! Please try again.';
+      if (response.status === 'not_authorized') {
+        userFriendlyError = 'Login Cancelled: You did not grant the required permissions in the Meta popup.';
+      } else if (response.error) {
+        userFriendlyError = `Meta Login Error: ${response.error_message || 'Please check browser console for details.'}`;
+      }
+      alert(userFriendlyError);
+      setLoading(false);
+    };
+
+    const requestedScopes = platform === 'whatsapp' 
+      ? 'whatsapp_business_management,whatsapp_business_messaging' 
+      : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging';
+
     const fbLoginConfig = {
-      scope: platform === 'whatsapp' 
-        ? 'whatsapp_business_management,whatsapp_business_messaging' 
-        : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging',
+      scope: requestedScopes,
+      scopes: requestedScopes,
       return_scopes: true,
       response_type: 'code',
       auth_type: 'rerequest',
