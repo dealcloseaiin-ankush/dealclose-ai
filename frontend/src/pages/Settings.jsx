@@ -361,7 +361,12 @@ export default function Settings() {
   const activeWs = !isMain ? config.workspaces[wsIndex] : null;
   const mainIgConnected = !!(config.igAccessToken && config.igAccountId);
   const workspaceIgConnected = !!(activeWs?.instagramConfig?.accessToken && activeWs?.instagramConfig?.instagramAccountId);
+  const isInstagramConnected = isMain ? mainIgConnected : workspaceIgConnected;
   const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
+
+  console.log('ACTIVE WORKSPACE', activeWs);
+  console.log('WORKSPACE IG CONFIG', activeWs?.instagramConfig);
+  console.log('CONNECTED STATUS', isInstagramConnected);
 
   // 🔥 WORKSPACE DEBUG LOGS
   if (!isMain) {
@@ -575,7 +580,7 @@ export default function Settings() {
                   <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold text-pink-400">Instagram Automation</h2>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${mainIgConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{mainIgConnected ? 'Connected ✅' : 'Not Connected'}</span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${isInstagramConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{isInstagramConnected ? 'Connected ✅' : 'Not Connected'}</span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -590,12 +595,12 @@ export default function Settings() {
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
 
-                    {!mainIgConnected ? (
+                    {!isInstagramConnected ? (
                   <MetaConnectButton 
                     buttonText="Connect Instagram via Meta" 
                     platform="instagram" 
-                    workspaceId="main" 
-                    onSuccess={(data) => openInstagramPicker(data, 'main')} 
+                    workspaceId={isMain ? 'main' : activeWs?._id}
+                    onSuccess={(data) => openInstagramPicker(data, isMain ? 'main' : activeWs?._id)}
                   />
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
@@ -886,12 +891,12 @@ export default function Settings() {
                            </div>
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
                              <p className="text-xs text-gray-400 mb-1">Instagram Status</p>
-                             {workspaceIgConnected ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                             {isInstagramConnected ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
                            </div>
                          </div>
                          <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
                      <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                      <MetaConnectButton buttonText={workspaceIgConnected ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                      <MetaConnectButton buttonText={isInstagramConnected ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={isMain ? 'main' : activeWs?._id} onSuccess={(data) => openInstagramPicker(data, isMain ? 'main' : activeWs?._id)} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

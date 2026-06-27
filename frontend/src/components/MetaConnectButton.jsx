@@ -111,7 +111,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     // 🚀 FIX: Use separate, dedicated backend routes for WhatsApp and Instagram
     const backendRoute = `/users/settings/${platform}-connect`;
 
-    console.log('➡️ [MetaConnect] Sending authCode to backend API...');
+    console.log('➡️ [MetaConnect] Sending authCode to backend API...', { platform, workspaceId });
     api.post(backendRoute, {
       authCode: authCode,
       workspaceId: workspaceId
