@@ -43,8 +43,8 @@ export default function Settings() {
   const [devApiKey, setDevApiKey] = useState('');
   
   const [googleConnected, setGoogleConnected] = useState(false);
-  const [googleConnectedEmail, setGoogleConnectedEmail] = useState(''); // 🚀 FIXED STATE
-  const [userId, setUserId] = useState('demo-business'); // Used for QR code link
+  const [googleConnectedEmail, setGoogleConnectedEmail] = useState(''); 
+  const [userId, setUserId] = useState('demo-business'); 
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showExternalToken, setShowExternalToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,13 +77,10 @@ export default function Settings() {
 
   // --- Google Sheets OAuth Handlers ---
   useEffect(() => {
-    // Catch Google OAuth Redirect Code from URL
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     if (code) {
       setIsLoading(true);
-      
-      // 🚀 CRITICAL FIX: Clean URL instantly to prevent React StrictMode from sending the code twice (causes 400 Error)
       window.history.replaceState({}, document.title, window.location.pathname);
       
       const currentUri = `${window.location.origin}${window.location.pathname}`;
@@ -94,7 +91,7 @@ export default function Settings() {
         })
         .catch(err => {
           const errMsg = err.response?.status === 404
-            ? 'Backend API Route Not Found (404). Please ensure /api/settings/google/connect is properly mapped in your server routes.'
+            ? 'Backend API Route Not Found (404).'
             : (err.response?.data?.message || err.message);
             
           alert(`❌ Google Connection Failed: ${errMsg}`);
@@ -107,14 +104,14 @@ export default function Settings() {
     try {
       const currentUri = `${window.location.origin}${window.location.pathname}`;
       const res = await api.get(`/settings/google/auth-url?redirectUri=${encodeURIComponent(currentUri)}`);
-      if (res.data.success) window.location.href = res.data.url; // Redirect to Google Login
+      if (res.data.success) window.location.href = res.data.url; 
     } catch (err) { alert(err.response?.data?.message || 'Error generating Auth URL.'); }
   };
 
   const fetchSettings = async () => {
     try {
       const { data } = await api.get('/users/profile');
-      const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
+      const savedData = data.user || data.data || data; 
       
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
       
@@ -160,16 +157,15 @@ export default function Settings() {
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
-        setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); // 🚀 Extract email
+        setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); 
       }
     } catch (error) {
-      console.error('Failed to load settings. It might be empty currently.', error);
+      console.error('Failed to load settings.', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch saved settings on page load
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -178,7 +174,6 @@ export default function Settings() {
     setConfig({ ...config, [e.target.name]: e.target.value });
   };
 
-  // Workspace Management Functions
   const handleWorkspaceChange = (index, field, value) => {
     const updatedWorkspaces = [...config.workspaces];
     updatedWorkspaces[index][field] = value;
@@ -198,7 +193,6 @@ export default function Settings() {
     setConfig({ ...config, workspaces: updatedWorkspaces });
   };
 
-  // --- Smart Social Links Helpers ---
   const getUsername = (url, prefix) => {
     if (!url) return '';
     let val = url.trim();
@@ -308,7 +302,6 @@ export default function Settings() {
     setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
   };
 
-  // 🚀 CRITICAL RE-REGRESSION FIX: Dynamically passes the selection context and forces raw DB pull
   const saveInstagramSelection = async (account) => {
     console.log('[Instagram Picker] selected account:', account);
     setIsSavingInstagramSelection(true);
@@ -316,12 +309,12 @@ export default function Settings() {
       const { data } = await api.post('/users/settings/instagram-connect-selected', {
         selectedAccountId: account.accountId,
         selectedPageId: account.pageId,
-        workspaceId: instagramPicker.workspaceId // ✅ DYNAMIC VALUE TRANSMISSION SECURED
+        workspaceId: instagramPicker.workspaceId 
       });
       console.log('[Instagram Picker] backend response for selection:', data);
       
       setInstagramPicker(null);
-      await fetchSettings(); // ✅ STATE SYNC FORCED
+      await fetchSettings(); 
       
       if (data.webhookWarning) {
         alert(`Instagram connected, but webhook setup needs Meta permissions: ${data.webhookWarning}`);
@@ -347,8 +340,8 @@ export default function Settings() {
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
       <div className="max-w-4xl mx-auto">
         
-        {/* TOP BAR & WORKSPACE SWITCHER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        {/* 🚀 FIXED TOP BAR: Cleaned background layout and spacing to remove whitespace strips */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 pt-2">
           <div>
             <div className="flex flex-wrap items-center gap-4 mb-2">
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
@@ -708,6 +701,7 @@ export default function Settings() {
                 </div>
               </form>
             )}
+
             {/* VIEW 2: SUB-BUSINESS (BRANCH SETTINGS) */}
             {!isMain && activeWs && (
               <form onSubmit={handleSave} className="space-y-8 animate-fade-in">
@@ -853,7 +847,7 @@ export default function Settings() {
                             <button type="button"
                               onClick={() => {
                                 handleWorkspaceChange(wsIndex, 'whatsappConfig', { accessToken: '', phoneNumberId: '', wabaId: '' });
-                                alert('WhatsApp state altered. Please click top-right "Save Settings" to write changes to DB.');
+                                alert('WhatsApp status changed. Please click top-right "Save Settings" to write changes to DB.');
                               }}
                               className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
                             >
@@ -868,7 +862,7 @@ export default function Settings() {
                             <button type="button"
                               onClick={() => {
                                 handleWorkspaceChange(wsIndex, 'instagramConfig', { accessToken: '', instagramAccountId: '', facebookPageId: '' });
-                                alert('Instagram state altered. Please click top-right "Save Settings" to write changes to DB.');
+                                alert('Instagram status changed. Please click top-right "Save Settings" to write changes to DB.');
                               }}
                               className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
                             >
