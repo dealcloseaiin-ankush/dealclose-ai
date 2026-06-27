@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../services/api';
 
 const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsapp', workspaceId = 'main', onSuccess }) => {
   const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
   const [loading, setLoading] = useState(false);
+  const loginTimeoutRef = useRef(null);
 
   // 🔥 IMPORTANT: Sirf .env se hi aapki actual Meta App ID aani chahiye!
   const APP_ID = import.meta.env.VITE_META_APP_ID; 
@@ -45,7 +46,10 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
       document.body.appendChild(script);
     }
 
-    return () => clearInterval(checkInterval);
+    return () => {
+      clearInterval(checkInterval);
+      if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+    };
   }, [APP_ID]);
 
   // 2. Handle the Embedded Signup Click
@@ -79,6 +83,10 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
 
     // Trigger Meta Oauth Popup
     const handleLoginResponse = (response) => {
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+        loginTimeoutRef.current = null;
+      }
       console.log("➡️ [MetaConnect] FB.login response received:", response);
       
       // 🔥 Enhanced Error Detection
@@ -146,7 +154,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     };
 
     const fbLoginConfig = {
-      scopes: platform === 'whatsapp' 
+      scope: platform === 'whatsapp' 
         ? 'whatsapp_business_management,whatsapp_business_messaging' 
         : 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging',
       return_scopes: true,
@@ -160,7 +168,23 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
       fbLoginConfig.config_id = CONFIG_ID;
     }
 
-    window.FB.login(handleLoginResponse, fbLoginConfig);
+    loginTimeoutRef.current = setTimeout(() => {
+      console.warn('⚠️ [MetaConnect] FB.login did not return a response. Popup may be blocked or Meta SDK may be stuck.', { platform, workspaceId });
+      setLoading(false);
+      alert('Meta popup did not open or was blocked. Please allow popups for this site and try again.');
+    }, 20000);
+
+    try {
+      window.FB.login(handleLoginResponse, fbLoginConfig);
+    } catch (error) {
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+        loginTimeoutRef.current = null;
+      }
+      console.error('❌ [MetaConnect] FB.login threw an error:', error);
+      setLoading(false);
+      alert(`Meta popup failed to open: ${error.message || 'Unknown browser/SDK error'}`);
+    }
   };
 
   return (
