@@ -340,7 +340,7 @@ export default function Settings() {
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
       <div className="max-w-4xl mx-auto">
         
-        {/* 🚀 FIXED TOP BAR: Cleaned background layout and spacing to remove whitespace strips */}
+        {/* TOP BAR & WORKSPACE SWITCHER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 pt-2">
           <div>
             <div className="flex flex-wrap items-center gap-4 mb-2">
@@ -825,7 +825,7 @@ export default function Settings() {
                     </div>
                   </div>
                   
-                  {/* 🔥 FIXED UI CONNECTION BUTTON ZONE FOR SUB-BRANCH */}
+                  {/* FIXED UI CONNECTION BUTTON ZONE FOR SUB-BRANCH */}
                   <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-800 relative z-10 items-center">
                      {activeWs?._id ? (
                        <>
