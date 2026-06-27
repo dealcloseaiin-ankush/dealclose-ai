@@ -708,7 +708,6 @@ export default function Settings() {
                 </div>
               </form>
             )}
-
             {/* VIEW 2: SUB-BUSINESS (BRANCH SETTINGS) */}
             {!isMain && activeWs && (
               <form onSubmit={handleSave} className="space-y-8 animate-fade-in">
@@ -832,6 +831,7 @@ export default function Settings() {
                     </div>
                   </div>
                   
+                  {/* 🔥 FIXED UI CONNECTION BUTTON ZONE FOR SUB-BRANCH */}
                   <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-800 relative z-10 items-center">
                      {activeWs?._id ? (
                        <>
@@ -845,8 +845,36 @@ export default function Settings() {
                              {activeWs.instagramConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
                            </div>
                          </div>
-                         <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                         <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+
+                         {/* WhatsApp Conditional Layout */}
+                         {!activeWs.whatsappConfig?.accessToken ? (
+                            <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
+                         ) : (
+                            <button type="button"
+                              onClick={() => {
+                                handleWorkspaceChange(wsIndex, 'whatsappConfig', { accessToken: '', phoneNumberId: '', wabaId: '' });
+                                alert('WhatsApp state altered. Please click top-right "Save Settings" to write changes to DB.');
+                              }}
+                              className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
+                            >
+                              Disconnect WhatsApp
+                            </button>
+                         )}
+
+                         {/* Instagram Conditional Layout */}
+                         {!activeWs.instagramConfig?.accessToken ? (
+                            <MetaConnectButton buttonText="Connect Instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                         ) : (
+                            <button type="button"
+                              onClick={() => {
+                                handleWorkspaceChange(wsIndex, 'instagramConfig', { accessToken: '', instagramAccountId: '', facebookPageId: '' });
+                                alert('Instagram state altered. Please click top-right "Save Settings" to write changes to DB.');
+                              }}
+                              className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
+                            >
+                              Disconnect Instagram
+                            </button>
+                         )}
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">
