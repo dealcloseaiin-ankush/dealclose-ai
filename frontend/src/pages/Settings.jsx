@@ -117,18 +117,6 @@ export default function Settings() {
       const savedData = data.user || data.data || data; // CRITICAL FIX: Restored data.user to load DB values
       
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
-      console.log("➡️ [Settings Debug] IG Token status (root):", savedData.instagramConfig?.accessToken ? "Exists ✅" : "Missing ❌");
-      console.log("➡️ [Settings Debug] Workspaces loaded:", (savedData.workspaces || []).map((ws, i) => ({ index: i, name: ws.name, _id: ws._id, hasInstagramConfig: !!ws.instagramConfig?.accessToken })));
-      
-      // 🔥 DETAILED DEBUG LOGS
-      console.log("🔍 WORKSPACES FULL DATA:", JSON.stringify(savedData.workspaces, null, 2));
-      (savedData.workspaces || []).forEach((ws, i) => {
-        console.log(`🔍 WS ${i}: name="${ws.name}", _id="${ws._id}"`);
-        console.log(`    📦 instagramConfig:`, ws.instagramConfig);
-        console.log(`    ✅ Has accessToken: ${!!(ws.instagramConfig?.accessToken)}`);
-        console.log(`    ✅ Has instagramAccountId: ${!!(ws.instagramConfig?.instagramAccountId)}`);
-        console.log(`    ✅ Has facebookPageId: ${!!(ws.instagramConfig?.facebookPageId)}`);
-      });
       
       if (savedData) {
         setConfig({
@@ -171,7 +159,6 @@ export default function Settings() {
         });
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
-        // Derive IG connected state from saved config when rendering instead of relying on multiple setState calls
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
         setGoogleConnectedEmail(savedData.googleSheetsConfig?.connectedEmail || ''); // 🚀 Extract email
       }
@@ -186,14 +173,6 @@ export default function Settings() {
   useEffect(() => {
     fetchSettings();
   }, []);
-
-  // Debug: log active workspace mapping to detect mismatch between DB and UI
-  useEffect(() => {
-    const isMain = activeWorkspace === 'main';
-    const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
-    const aw = !isMain ? config.workspaces?.[wsIndex] : null;
-    console.log('[Settings Debug] activeWorkspace id:', activeWorkspace, 'wsIndex:', wsIndex, 'activeWorkspace config found:', !!aw, aw ? `{name: ${aw.name}, _id: ${aw._id}}` : 'N/A');
-  }, [config.workspaces, activeWorkspace]);
 
   const handleChange = (e) => {
     setConfig({ ...config, [e.target.name]: e.target.value });
@@ -210,7 +189,7 @@ export default function Settings() {
     if (config.workspaces && config.workspaces.length >= 5) {
       return alert("Business limit reached! Please upgrade your plan to add more branches.");
     }
-    setConfig({ ...config, workspaces: [...(config.workspaces || []), { name: 'New Branch', description: '', email: '' }] });
+    setConfig({ ...config, workspaces: [...(config.workspaces || []), { name: 'New Branch', description: '', email: '', whatsappConfig: {}, instagramConfig: {} }] });
     setActiveWorkspace(`ws_${(config.workspaces || []).length}`);
   };
 
@@ -250,9 +229,8 @@ export default function Settings() {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     try {
-      // Transform data so backend overwrites (deletes) old keys completely
       const payload = {
         aiAgentEnabled: config.aiAgentEnabled,
         acceptCollabs: config.acceptCollabs,
@@ -286,11 +264,11 @@ export default function Settings() {
           pixelId: config.metaPixelId,
           accessToken: config.metaAccessToken
         },
-      instagramConfig: {
-        accessToken: config.igAccessToken,
-        instagramAccountId: config.igAccountId,
-        facebookPageId: config.fbPageId
-      },
+        instagramConfig: {
+          accessToken: config.igAccessToken,
+          instagramAccountId: config.igAccountId,
+          facebookPageId: config.fbPageId
+        },
         externalApiUrl: config.externalApiUrl,
         externalApiToken: config.externalApiToken,
         externalApiSearchUrl: config.externalApiSearchUrl,
@@ -301,11 +279,9 @@ export default function Settings() {
         customWebhooks: config.customWebhooks
       };
 
-      console.log("➡️ [DEBUG] Sending this payload to backend on Save:", payload);
-
       await api.put('/users/profile', payload);
       alert('Settings saved successfully! AI is now connected to your accounts.');
-      await fetchSettings(); // 🔥 Refresh background IDs instantly so Meta Connect doesn't fail
+      await fetchSettings(); 
     } catch (error) {
       alert('Error saving settings: ' + (error.response?.data?.message || error.message));
     }
@@ -332,6 +308,7 @@ export default function Settings() {
     setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
   };
 
+  // 🚀 CRITICAL RE-REGRESSION FIX: Dynamically passes the selection context and forces raw DB pull
   const saveInstagramSelection = async (account) => {
     console.log('[Instagram Picker] selected account:', account);
     setIsSavingInstagramSelection(true);
@@ -339,13 +316,17 @@ export default function Settings() {
       const { data } = await api.post('/users/settings/instagram-connect-selected', {
         selectedAccountId: account.accountId,
         selectedPageId: account.pageId,
-        workspaceId: instagramPicker?.workspaceId || 'main'
+        workspaceId: instagramPicker.workspaceId // ✅ DYNAMIC VALUE TRANSMISSION SECURED
       });
       console.log('[Instagram Picker] backend response for selection:', data);
+      
       setInstagramPicker(null);
-      await fetchSettings();
+      await fetchSettings(); // ✅ STATE SYNC FORCED
+      
       if (data.webhookWarning) {
         alert(`Instagram connected, but webhook setup needs Meta permissions: ${data.webhookWarning}`);
+      } else {
+        alert('🎉 Instagram account successfully linked and UI state synchronized.');
       }
     } catch (error) {
       console.error('[Instagram Picker] save selection error:', error.response?.data || error.message);
@@ -360,30 +341,7 @@ export default function Settings() {
   const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
   const activeWs = !isMain ? config.workspaces[wsIndex] : null;
   const mainIgConnected = !!(config.igAccessToken && config.igAccountId);
-  const workspaceIgConnected = !!(activeWs?.instagramConfig?.accessToken && activeWs?.instagramConfig?.instagramAccountId);
-  const isInstagramConnected = isMain ? mainIgConnected : workspaceIgConnected;
   const qrUrl = isMain ? `${window.location.origin}/card/${userId}` : `${window.location.origin}/card/${userId}?ws=${wsIndex}`;
-
-  console.log('ACTIVE WORKSPACE', activeWs);
-  console.log('WORKSPACE IG CONFIG', activeWs?.instagramConfig);
-  console.log('CONNECTED STATUS', isInstagramConnected);
-
-  // 🔥 WORKSPACE DEBUG LOGS
-  if (!isMain) {
-    console.log(`🔍 [Settings] Active Workspace:
-      - activeWorkspace id: ${activeWorkspace}
-      - wsIndex: ${wsIndex}
-      - activeWs object:`, activeWs);
-    if (activeWs?.instagramConfig) {
-      console.log(`🔍 [Settings] Workspace instagramConfig:
-        - accessToken: ${activeWs.instagramConfig.accessToken ? '✅ Present' : '❌ Missing'}
-        - instagramAccountId: ${activeWs.instagramConfig.instagramAccountId}
-        - facebookPageId: ${activeWs.instagramConfig.facebookPageId}
-        - Full Config:`, JSON.stringify(activeWs.instagramConfig, null, 2));
-    } else {
-      console.log(`🔍 [Settings] NO instagramConfig found in activeWs!`);
-    }
-  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
@@ -420,11 +378,7 @@ export default function Settings() {
           <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500"></div></div>
         ) : (
           <>
-            {/* DYNAMIC RENDERING: MAIN WORKSPACE OR SUB-WORKSPACE */}
-            
-            {/* ======================================= */}
             {/* VIEW 1: MAIN BUSINESS (GLOBAL SETTINGS) */}
-            {/* ======================================= */}
             {isMain && (
               <form onSubmit={handleSave} className="space-y-8 animate-fade-in">
                 {/* AI Agent Configuration (Main) */}
@@ -482,11 +436,11 @@ export default function Settings() {
                       </div>
 
                       <label className="block text-sm font-medium text-gray-300 mb-2">Business Knowledge (AI Training Data) <span className="text-rose-500">*</span></label>
-                      <textarea name="businessDescription" value={config.businessDescription} onChange={handleChange} rows="3" placeholder="e.g. We are 'Shoe Mart'. We sell sports shoes. Delivery takes 3 days..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
+                      <textarea name="businessDescription" value={config.businessDescription} onChange={handleChange} rows="3" placeholder="e.g. We are 'Shoe Mart'..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
                       
                       <div className="mt-4">
                         <label className="block text-sm font-medium text-gray-300 mb-2">Custom AI Rules (Limit Response & Behavior)</label>
-                        <textarea name="aiRules" value={config.aiRules} onChange={handleChange} rows="3" placeholder="e.g. Talk in Hinglish. Never offer discounts without asking." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
+                        <textarea name="aiRules" value={config.aiRules} onChange={handleChange} rows="3" placeholder="e.g. Talk in Hinglish..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
                       </div>
                     </div>
                   </div>
@@ -494,17 +448,17 @@ export default function Settings() {
                   {/* WhatsApp Meta Config */}
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold text-green-400 flex items-center">WhatsApp (Meta API)</h2>
-                  <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
+                    <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="md:col-span-2 relative">
+                    <div className="md:col-span-2 relative">
                       <label className="block text-sm font-medium text-gray-400 mb-2">Permanent Access Token</label>
-                        <div className="relative">
-                          <input type={showWhatsappToken ? "text" : "password"} name="whatsappToken" value={config.whatsappToken} onChange={handleChange} placeholder="EAAL..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none pr-10" />
-                          <button type="button" onClick={() => setShowWhatsappToken(!showWhatsappToken)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none">
-                            {showWhatsappToken ? <EyeOff size={18} /> : <Eye size={18} />}
-                          </button>
-                        </div>
+                      <div className="relative">
+                        <input type={showWhatsappToken ? "text" : "password"} name="whatsappToken" value={config.whatsappToken} onChange={handleChange} placeholder="EAAL..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-green-500 outline-none pr-10" />
+                        <button type="button" onClick={() => setShowWhatsappToken(!showWhatsappToken)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none">
+                          {showWhatsappToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-400 mb-2">Phone Number ID</label>
@@ -524,7 +478,7 @@ export default function Settings() {
                     <h2 className="text-xl font-semibold text-emerald-400 flex items-center gap-2"><Database size={20}/> Google Sheets Auto-Sync</h2>
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${googleConnected ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{googleConnected ? 'Connected & Active ✅' : 'Not Connected'}</span>
                   </div>
-                  <p className="text-sm text-gray-400 mb-6 relative z-10">Automatically backup every new Lead (from WhatsApp & Instagram) directly into your Google Sheets to save data forever (BYOS).</p>
+                  <p className="text-sm text-gray-400 mb-6 relative z-10">Automatically backup every new Lead directly into your Google Sheets.</p>
                   
                   {!googleConnected ? (
                     <button type="button" onClick={handleGoogleAuth} className="px-6 py-3 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-xl transition-all flex items-center gap-3 shadow-lg border border-gray-200 relative z-10 hover:-translate-y-1">
@@ -554,7 +508,7 @@ export default function Settings() {
                       <Plus size={16} /> Add New Business
                     </button>
                   </div>
-                  <p className="text-sm text-gray-400 mb-6">Add sub-businesses. These appear automatically as a menu when customers say "Hi" on WhatsApp.</p>
+                  <p className="text-sm text-gray-400 mb-6">Add sub-businesses. These appear automatically as a menu when customers say "Hi".</p>
                   
                   {!config.workspaces || config.workspaces.length === 0 ? (
                     <div className="text-center p-6 border border-dashed border-gray-700 rounded-xl text-gray-500">No secondary branches added.</div>
@@ -580,32 +534,32 @@ export default function Settings() {
                   <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold text-pink-400">Instagram Automation</h2>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${isInstagramConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{isInstagramConnected ? 'Connected ✅' : 'Not Connected'}</span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${mainIgConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{mainIgConnected ? 'Connected ✅' : 'Not Connected'}</span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div className="md:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
-                    <input type="password" name="igAccessToken" value={config.igAccessToken} onChange={handleChange} placeholder="IG Token (Auto-filled or Paste here)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
+                        <input type="password" name="igAccessToken" value={config.igAccessToken} onChange={handleChange} placeholder="IG Token (Auto-filled or Paste here)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
                       </div>
                       <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
-                    <input type="text" name="igAccountId" value={config.igAccountId} onChange={handleChange} placeholder="Target Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
+                        <input type="text" name="igAccountId" value={config.igAccountId} onChange={handleChange} placeholder="Target Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
                       </div>
                     </div>
-                    <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Instagram tokens are automatically fetched securely from Meta when you connect.</p>
+                    <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely.</p>
 
-                    {!isInstagramConnected ? (
-                  <MetaConnectButton 
-                    buttonText="Connect Instagram via Meta" 
-                    platform="instagram" 
-                    workspaceId={isMain ? 'main' : activeWs?._id}
-                    onSuccess={(data) => openInstagramPicker(data, isMain ? 'main' : activeWs?._id)}
-                  />
+                    {!mainIgConnected ? (
+                      <MetaConnectButton 
+                        buttonText="Connect Instagram via Meta" 
+                        platform="instagram" 
+                        workspaceId="main" 
+                        onSuccess={(data) => openInstagramPicker(data, 'main')} 
+                      />
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
-                         <button type="button" onClick={() => { /* Graceful disconnect UI - user can clear token manually */ alert('Disconnect via Settings: paste blank IG token and save.'); }} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
+                         <button type="button" onClick={() => alert('Disconnect via Settings: paste blank IG token and save.')} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
                       </div>
                     )}
                   </div>
@@ -626,7 +580,7 @@ export default function Settings() {
                   <h2 className="text-xl font-semibold text-green-400 mb-4 flex items-center gap-2 relative z-10">
                      🎁 Auto-Discount & Loyalty Offer
                   </h2>
-                  <p className="text-gray-400 text-sm mb-6 relative z-10">When AI asks for a review/follow, it will automatically send this discount code to bring the customer back.</p>
+                  <p className="text-gray-400 text-sm mb-6 relative z-10">When AI asks for a review, it will send this code.</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
                     <div>
                       <label className="block text-sm font-medium text-gray-400 mb-2">Discount %</label>
@@ -740,25 +694,22 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* 🚀 NEW: Developer API & Pabbly/Zapier Integration */}
+                {/* Developer API & Pabbly/Zapier Integration */}
                 <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-blue-500/30 relative overflow-hidden mt-8">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
                   <h2 className="text-xl font-semibold text-blue-400 flex items-center gap-2 relative z-10"><Database size={20}/> Developer API & Webhooks (Zapier/Pabbly)</h2>
-                  <p className="text-sm text-gray-400 mb-6 relative z-10">Connect JustDial, IndiaMart, Facebook Lead Ads, or any CRM. Send a POST request to this Webhook URL, and DealClose AI will auto-capture the lead and trigger a WhatsApp message.</p>
+                  <p className="text-sm text-gray-400 mb-6 relative z-10">Connect JustDial, IndiaMart, Facebook Lead Ads, or any CRM.</p>
                   
                   <div className="bg-[#0a0a0a] border border-gray-700 p-4 rounded-xl relative z-10">
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Your Webhook URL (POST)</label>
                     <code className="text-sm text-blue-300 break-all select-all">{window.location.origin}/api/webhooks/inbound/{devApiKey}</code>
-                    <p className="text-xs text-gray-500 mt-4 font-mono">Payload Format: <br/>{`{ "name": "John Doe", "phone": "919876543210", "source": "IndiaMart", "customMessage": "Hi John, we got your inquiry!" }`}</p>
+                    <p className="text-xs text-gray-500 mt-4 font-mono">Payload Format: <br/>{`{ "name": "John Doe", "phone": "919876543210" }`}</p>
                   </div>
                 </div>
-
               </form>
             )}
 
-            {/* ======================================= */}
-            {/* VIEW 2: SUB-BUSINESS (BRANCH SETTINGS)  */}
-            {/* ======================================= */}
+            {/* VIEW 2: SUB-BUSINESS (BRANCH SETTINGS) */}
             {!isMain && activeWs && (
               <form onSubmit={handleSave} className="space-y-8 animate-fade-in">
                 <div className="bg-[#111111] p-6 md:p-8 rounded-2xl shadow-xl border border-blue-500/30 relative overflow-hidden">
@@ -776,11 +727,11 @@ export default function Settings() {
                   {/* Basic Branch Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 relative z-10">
                     <div>
-                      <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Branch Name <span className="text-rose-500">*</span></label>
+                      <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Branch Name *</label>
                       <input type="text" required value={activeWs.name} onChange={(e) => handleWorkspaceChange(wsIndex, 'name', e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Short Menu Description <span className="text-rose-500">*</span></label>
+                      <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Short Menu Description *</label>
                       <input type="text" required value={activeWs.description} onChange={(e) => handleWorkspaceChange(wsIndex, 'description', e.target.value)} placeholder="e.g. Real Estate Sales" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
                     </div>
                     <div className="md:col-span-2">
@@ -810,8 +761,8 @@ export default function Settings() {
                   {/* Branch AI Knowledge */}
                   <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10">Branch AI Training</h3>
                   <div className="space-y-4 mb-8 relative z-10">
-                    <textarea value={activeWs.businessDescription || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'businessDescription', e.target.value)} rows="3" placeholder="AI Training Data (What does this branch do?)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-blue-500 outline-none"></textarea>
-                    <textarea value={activeWs.aiRules || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'aiRules', e.target.value)} rows="2" placeholder="Custom AI Rules (e.g. Be polite, redirect to main branch if unsure)" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-blue-500 outline-none"></textarea>
+                    <textarea value={activeWs.businessDescription || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'businessDescription', e.target.value)} rows="3" placeholder="AI Training Data..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-blue-500 outline-none"></textarea>
+                    <textarea value={activeWs.aiRules || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'aiRules', e.target.value)} rows="2" placeholder="Custom AI Rules..." className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-blue-500 outline-none"></textarea>
                   </div>
 
                   {/* Branch Specific Discounts */}
@@ -860,24 +811,24 @@ export default function Settings() {
                     </div>
                   </div>
 
-              {/* Branch Independent Meta API Connect (Target Specific Accounts) */}
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10 mt-8">Target Meta Connections</h3>
+                  {/* Branch Independent Meta API Connect */}
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 relative z-10 mt-8">Target Meta Connections</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
                     <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WhatsApp Phone ID</label>
-                  <input type="text" value={activeWs.whatsappConfig?.phoneNumberId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'whatsappConfig', { ...activeWs.whatsappConfig, phoneNumberId: e.target.value })} placeholder="Target Phone ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WABA ID</label>
-                  <input type="text" value={activeWs.whatsappConfig?.wabaId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'whatsappConfig', { ...activeWs.whatsappConfig, wabaId: e.target.value })} placeholder="Target WABA ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
-                  <input type="password" value={activeWs.instagramConfig?.accessToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, accessToken: e.target.value })} placeholder="IG Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WhatsApp Phone ID</label>
+                      <input type="text" value={activeWs.whatsappConfig?.phoneNumberId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'whatsappConfig', { ...activeWs.whatsappConfig, phoneNumberId: e.target.value })} placeholder="Target Phone ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
                     </div>
                     <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
-                  <input type="text" value={activeWs.instagramConfig?.instagramAccountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, instagramAccountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target WABA ID</label>
+                      <input type="text" value={activeWs.whatsappConfig?.wabaId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'whatsappConfig', { ...activeWs.whatsappConfig, wabaId: e.target.value })} placeholder="Target WABA ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Access Token</label>
+                      <input type="password" value={activeWs.instagramConfig?.accessToken || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, accessToken: e.target.value })} placeholder="IG Token" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
+                      <input type="text" value={activeWs.instagramConfig?.instagramAccountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, instagramAccountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
                     </div>
                   </div>
                   
@@ -891,16 +842,15 @@ export default function Settings() {
                            </div>
                            <div className="flex-1 bg-gray-900 p-3 rounded-lg border border-gray-800">
                              <p className="text-xs text-gray-400 mb-1">Instagram Status</p>
-                             {isInstagramConnected ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
+                             {activeWs.instagramConfig?.accessToken ? <span className="text-sm font-bold text-pink-400">Dedicated Account Connected ✅</span> : <span className="text-sm font-bold text-gray-500">Not Connected</span>}
                            </div>
                          </div>
-                         <p className="text-xs text-blue-400 font-medium w-full mb-2">💡 Tip: When connecting a secondary branch, click "Edit Settings" in the Facebook popup and select ONLY the specific page for this branch!</p>
-                     <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
-                      <MetaConnectButton buttonText={isInstagramConnected ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={isMain ? 'main' : activeWs?._id} onSuccess={(data) => openInstagramPicker(data, isMain ? 'main' : activeWs?._id)} />
+                         <MetaConnectButton buttonText={activeWs.whatsappConfig?.accessToken ? "Reconnect WhatsApp" : "Connect WhatsApp"} platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
+                         <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Reconnect Instagram" : "Connect Instagram"} platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">
-                         ⚠️ Please click "Save Settings" first to generate an ID for this branch before connecting Meta.
+                          ⚠️ Please click "Save Settings" first to generate an ID for this branch before connecting Meta.
                        </div>
                      )}
                   </div>
@@ -908,13 +858,11 @@ export default function Settings() {
               </form>
             )}
 
-            {/* ======================================= */}
-            {/* QR CODE PREVIEW (Global to both views)  */}
-            {/* ======================================= */}
+            {/* QR CODE PREVIEW (Global to both views) */}
             <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800 relative overflow-hidden mt-8 animate-fade-in">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gray-500/10 rounded-full blur-2xl"></div>
               <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2 relative z-10">
-                 📱 Branch Specific QR & Digital Card
+                  📱 Branch Specific QR & Digital Card
               </h2>
               
               <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
@@ -924,10 +872,9 @@ export default function Settings() {
                 <div className="flex-1">
                   <p className="text-gray-400 text-sm mb-4 leading-relaxed">
                     {isMain 
-                      ? "Print this QR code and place it at your store counter or share it online. When customers scan it, they can leave their Name/Number (saved directly to your CRM) and easily follow your main profiles."
-                      : `This QR code is strictly routed to the ${activeWs?.name || 'current branch'}. When scanned, it will only show the links configured for this specific branch.`}
+                      ? "Print this QR code and place it at your store counter or share it online."
+                      : `This QR code is strictly routed to the ${activeWs?.name || 'current branch'}.`}
                   </p>
-                  
                   <a href={qrUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition-all shadow-md">
                     Preview {isMain ? 'Main Business' : activeWs?.name} Digital Card ↗
                   </a>
@@ -939,11 +886,12 @@ export default function Settings() {
         )}
       </div>
 
+      {/* PICKER MODAL */}
       {instagramPicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-pink-500/30 bg-[#111] p-6 shadow-2xl">
             <h2 className="text-xl font-bold text-pink-400">Choose an Instagram account</h2>
-            <p className="mt-2 text-sm text-gray-400">Select the Facebook Page and linked Instagram Business Account to connect. Nothing is saved until you choose one.</p>
+            <p className="mt-2 text-sm text-gray-400">Select the Facebook Page and linked Instagram Business Account to connect.</p>
             <div className="mt-5 space-y-3">
               {instagramPicker.accounts.map((account) => (
                 <button
