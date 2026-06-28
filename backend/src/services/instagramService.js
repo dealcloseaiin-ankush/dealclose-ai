@@ -6,7 +6,6 @@ const axios = require('axios');
  */
 exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, caption) => {
   try {
-    // Step 1: Image ko Instagram ke server par upload karke ek container ID lena
     console.log(`[IG Publish] Step 1: Uploading image container for account ${igAccountId}`);
     const containerResponse = await axios.post(
       `https://graph.facebook.com/v19.0/${igAccountId}/media`,
@@ -23,7 +22,6 @@ exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, captio
     }
     console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
 
-    // Step 2: Us container ko user ke feed par publish karna
     console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
     const publishResponse = await axios.post(
       `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`,
@@ -43,7 +41,10 @@ exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, captio
   }
 };
 
-// 🚀 NEW: Publishes Reels or Images directly (Used by AI Video Dashboard)
+/**
+ * 🚀 UPGRADED: Publishes Reels or Images directly with Status Processing Loops
+ * (Used by AI Video Dashboard & Pipelines)
+ */
 exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, mediaType, caption) => {
   try {
     console.log(`[IG Publish] Step 1: Uploading ${mediaType} container for account ${igAccountId}`);
@@ -53,7 +54,9 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
       access_token: accessToken,
     };
 
-    if (mediaType === 'video' || mediaType === 'avatar_video') {
+    const isVideo = mediaType === 'video' || mediaType === 'avatar_video';
+
+    if (isVideo) {
       payload.media_type = 'REELS';
       payload.video_url = mediaUrl;
     } else {
@@ -61,9 +64,39 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
     }
 
     const containerResponse = await axios.post(`https://graph.facebook.com/v19.0/${igAccountId}/media`, payload);
-    
     const creationId = containerResponse.data.id;
     console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
+
+    // 🚀 CRITICAL REELS BUG FIX: Video container processing status check pool loop
+    if (isVideo) {
+      console.log(`⏳ [IG Publish] Video detected. Checking container processing status before publishing...`);
+      let isReady = false;
+      let retries = 0;
+      
+      while (!isReady && retries < 10) {
+        // Wait 5 seconds between every status request check
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        try {
+          const statusCheck = await axios.get(`https://graph.facebook.com/v19.0/${creationId}`, {
+            params: { fields: 'status_code', access_token: accessToken }
+          });
+          
+          const status = statusCheck.data?.status_code;
+          console.log(`   👉 Container ${creationId} Current Processing Status: ${status}`);
+          
+          if (status === 'FINISHED') {
+            isReady = true;
+            console.log(`✅ [IG Publish] Container is completely ready for publishing!`);
+          } else if (status === 'ERROR') {
+            throw new Error("Meta processing failed with ERROR state inside media container.");
+          }
+        } catch (statusErr) {
+          console.warn("⚠️ Retrying status polling check...", statusErr.message);
+        }
+        retries++;
+      }
+    }
 
     console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
     const publishResponse = await axios.post(`https://graph.facebook.com/v19.0/${igAccountId}/media_publish`, {
@@ -81,7 +114,9 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
   }
 };
 
-// 🚀 NEW: Fetches existing posts/reels from Meta to display in templates dropdown
+/**
+ * 🚀 UPGRADED: Fetches existing posts/reels from Meta to display in templates dropdown with safe dynamic array fallback
+ */
 exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
   try {
     const response = await axios.get(
@@ -94,7 +129,7 @@ exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
         }
       }
     );
-    return response.data.data || [];
+    return response.data?.data || [];
   } catch (error) {
     console.error("❌ Meta Graph API Posts Fetch Error:", error.response?.data?.error?.message || error.message);
     throw error;

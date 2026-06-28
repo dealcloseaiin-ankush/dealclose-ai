@@ -24,7 +24,7 @@ export default function MainLayout() {
         {/* Mobile Header with Hamburger Icon */}
         <div className="md:hidden flex items-center justify-between p-4 bg-[#0a0a0a] border-b border-gray-800">
           <span className="text-xl font-bold flex items-center gap-2">
-            <span className="text-blue-500">⚡</span> Scalio AI
+            <span className="text-blue-500">⚡</span> DealClose AI
           </span>
           <button onClick={() => setIsSidebarOpen(true)} className="text-gray-300 hover:text-white p-2">
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
