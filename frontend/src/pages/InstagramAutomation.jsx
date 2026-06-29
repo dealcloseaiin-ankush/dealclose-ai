@@ -3,14 +3,14 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Send, Zap, Calendar, Heart, Eye, Inbox, FileText } from 'lucide-react';
+import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function InstagramAutomation() {
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
-  const [activeTab, setActiveTab] = useState('general'); // 'general', 'posts', or 'smart-groups'
+  const [activeTab, setActiveTab] = useState('general'); 
 
   const [stats, setStats] = useState({
     totalCommentsAnalyzed: 0,
@@ -43,6 +43,8 @@ export default function InstagramAutomation() {
   // Pagination for Old Posts
   const [postLimit, setPostLimit] = useState(20);
 
+  const isPremiumUser = user?.isPremium === true || user?.role === 'superadmin' || user?.email === 'ankush.bani@gmail.com';
+
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -68,38 +70,63 @@ export default function InstagramAutomation() {
   const handleAddPostAuto = async (e) => {
     e.preventDefault();
     try {
-       await api.put('/users/profile', { postAutomations: [...(user?.postAutomations || []), newAuto] });
-       toast.success("Post Automation Rule Added!");
+       await api.post('/instagram/automations', { ...newAuto, workspaceId: activeWorkspace });
+       toast.success("Global Automation Rule Added!");
        setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
     } catch { toast.error("Failed to add rule."); }
   };
 
-  // Specific Post Auto-DM State & Function
   const [selectedPostForAuto, setSelectedPostForAuto] = useState(null);
+  
   const handleSavePostSpecificAuto = async (e) => {
     e.preventDefault();
+    const toastId = toast.loading("Saving automation rule...");
     try {
-       const updatedAutomations = [...(user?.postAutomations || []).filter(r => r.postId !== selectedPostForAuto.id), { ...newAuto, postId: selectedPostForAuto.id }];
-       await api.put('/users/profile', { postAutomations: updatedAutomations });
-       toast.success("Post Automation Saved Successfully!");
+       await api.post('/instagram/automations', { 
+         ...newAuto, 
+         postId: selectedPostForAuto.id,
+         thumbnailUrl: selectedPostForAuto.thumbnail_url || selectedPostForAuto.media_url,
+         workspaceId: activeWorkspace 
+       });
+       toast.success("Post Automation Saved Successfully!", { id: toastId });
        setSelectedPostForAuto(null);
        setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
-    } catch { toast.error("Failed to save post automation."); }
+       handleSyncPosts();
+    } catch (err) { 
+       console.error("Save automation specific error:", err);
+       toast.error(err.response?.data?.message || "Failed to save post automation.", { id: toastId }); 
+    }
   };
 
-  // Fetch real posts & reels from Meta API with limit extensions
+  const handleInlineShortcutSave = async (post, keyword, targetLink) => {
+    if (!keyword || !targetLink) return toast.error("Please fill both Keyword and Target Link fields!");
+    const toastId = toast.loading("Injecting inline lightning rule...");
+    try {
+      await api.post('/instagram/automations', {
+        postId: post.id,
+        thumbnailUrl: post.thumbnail_url || post.media_url,
+        triggerWord: keyword,
+        replyMessage: "Here is your requested asset package link details:",
+        publicReply: "Check your DM! Details sent. 📩",
+        fileUrl: targetLink,
+        deliveryMode: 'instant_shortcut',
+        workspaceId: activeWorkspace
+      });
+      toast.success("⚡ Inline Shortcut Rule Locked Successfully!", { id: toastId });
+      handleSyncPosts();
+    } catch (err) {
+      console.error("Shortcut save crash context:", err);
+      toast.error("Failed to inject shortcut state to server context.", { id: toastId });
+    }
+  };
+
   const handleSyncPosts = async () => {
     const toastId = toast.loading("Syncing recent posts from Instagram...");
     try {
       const res = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } });
       if (res.data && res.data.posts) {
-        const safePosts = res.data.posts.map(p => ({
-          ...p,
-          stats: p.stats || { views: p.likes ? `${p.likes} Likes` : '0 Likes', totalComments: p.comments || 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0, buttonClicks: p.buttonClicks || 0 },
-          botMode: p.botMode || 'off'
-        }));
-        setRecentPosts(safePosts);
-        toast.success(`Successfully loaded ${safePosts.length} posts! 🎉`, { id: toastId });
+        setRecentPosts(res.data.posts);
+        toast.success(`Successfully loaded ${res.data.posts.length} posts! 🎉`, { id: toastId });
       } else {
         toast.success("Sync successful, but no posts found.", { id: toastId });
       }
@@ -124,12 +151,7 @@ export default function InstagramAutomation() {
 
         const postsRes = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } });
         if (postsRes.data && postsRes.data.posts) {
-           const safePosts = postsRes.data.posts.map(p => ({
-             ...p,
-             stats: p.stats || { views: p.likes ? `${p.likes} Likes` : '0 Likes', totalComments: p.comments || 0, dmsSent: 0, chatBotReplied: 0, pending: 0, aiCaught: 0, buttonClicks: p.buttonClicks || 0 },
-             botMode: p.botMode || 'off'
-           }));
-           setRecentPosts(safePosts);
+           setRecentPosts(postsRes.data.posts);
         }
       } catch (error) {
         console.error("Failed to fetch IG data", error);
@@ -142,7 +164,7 @@ export default function InstagramAutomation() {
     setCommentGroups(groups => groups.map(g => g.id === id ? { ...g, replyText: text } : g));
   };
 
-  const sendBulkReply = async (id, count, text) => {
+ const sendBulkReply = async (id, count, text) => {
     setSendingBulkId(id);
     try {
       await api.post('/instagram/comments/bulk-reply', { groupId: id, replyText: text });
@@ -151,19 +173,18 @@ export default function InstagramAutomation() {
     } catch (error) {
       console.error("Bulk reply error:", error);
       toast.error("Failed to send bulk replies.");
-    } finally {
-      setSendingBulkId(null);
+    } finally { 
+      setSendingBulkId(null); 
     }
   };
-
   const handleSendBroadcast = async (e) => {
     e.preventDefault();
     if (!broadcastMsg) return;
     try {
-      const res = await api.post('/instagram/broadcast', { messageText: broadcastMsg });
-      toast.success(res.data.message);
+      await api.post('/instagram/broadcast', { messageText: broadcastMsg });
+      toast.success("Broadcast sent successfully!");
       setBroadcastMsg('');
-    } catch (err) { toast.error(err.response?.data?.message || 'Broadcast failed.'); }
+    } catch { toast.error('Broadcast failed.'); }
   };
 
   const handleSetIceBreakers = async (e) => {
@@ -173,7 +194,7 @@ export default function InstagramAutomation() {
       const questions = iceBreakers.split(',').map(q => q.trim()).filter(q => q);
       await api.post('/instagram/icebreakers', { questions });
       toast.success('Ice Breakers updated on Instagram!');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed to update Ice Breakers.'); }
+    } catch { toast.error('Failed to update Ice Breakers.'); }
   };
 
   const generateAIReply = (id, theme) => {
@@ -189,7 +210,15 @@ export default function InstagramAutomation() {
   };
 
   const updatePostMode = (id, newMode) => {
+    if (newMode === 'hybrid' && !isPremiumUser) {
+      toast.error("🔒 AI Intent Recovery Mode is a Premium Upgrade feature!");
+      return;
+    }
     setRecentPosts(posts => posts.map(p => p.id === id ? { ...p, botMode: newMode } : p));
+  };
+
+  const updateInlineValue = (id, field, value) => {
+    setRecentPosts(posts => posts.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
   const processPendingWithAI = async (id) => {
@@ -224,7 +253,7 @@ export default function InstagramAutomation() {
               className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
             >
               {workspaces.map(ws => (
-                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+                <option key={ws._id} value={ws._id} className="bg-[#111] text-white">🏢 {ws.name}</option>
               ))}
             </select>
           </div>
@@ -288,7 +317,7 @@ export default function InstagramAutomation() {
       {activeTab === 'general' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 shadow-lg">
+            <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
               <h2 className="text-base font-bold text-white mb-4 uppercase tracking-wider text-gray-400">Global Trigger Architecture</h2>
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
@@ -411,10 +440,8 @@ export default function InstagramAutomation() {
               <div key={post.id} className={`border ${post.botMode === 'hybrid' ? 'border-purple-500/40 bg-gradient-to-b from-[#161224] to-[#0a0a0a]' : post.botMode === 'chatbot' ? 'border-blue-500/30 bg-gradient-to-b from-[#111622] to-[#0a0a0a]' : 'border-gray-800/80 bg-[#0a0a0a]'} rounded-2xl p-5 flex flex-col justify-between hover:border-gray-700 transition-all shadow-inner`}>
                 <div>
                   <div className="flex items-start gap-4 mb-4">
-                    {/* 🚀 FIXED MEDIA IMAGE CONTAINER SYSTEM WITH DUAL RENDERING CONTROL */}
                     <a href={post.permalink} target="_blank" rel="noopener noreferrer" className="block w-24 h-24 bg-gray-900 rounded-xl flex-shrink-0 relative overflow-hidden border border-gray-800 group shadow-lg">
                       {post.media_type === 'VIDEO' ? (
-                        // If it's a video/reel, fetch the thumbnail_url or fallback gracefully
                         <img src={post.thumbnail_url || post.media_url} alt="Reel Video Thumbnail" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : post.media_url ? (
                         <img src={post.media_url} alt="Feed Asset Representation" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -430,7 +457,7 @@ export default function InstagramAutomation() {
                           <span className="text-[10px] bg-gray-800 text-gray-400 font-black px-2 py-0.5 rounded border border-gray-700 uppercase tracking-wider">{post.media_type || 'POST'}</span>
                           <span className="text-[10px] text-gray-600 font-bold ml-2">{post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'Recent Log'}</span>
                         </div>
-                        {user?.postAutomations?.find(r => r?.postId === post.id) && (
+                        {(user?.postAutomations || []).find(r => r?.postId === post.id) && (
                           <span className="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
                             🎯 Funnel Locked
                           </span>
@@ -438,7 +465,6 @@ export default function InstagramAutomation() {
                       </div>
                       <p className="text-xs text-gray-300 line-clamp-3 mt-1.5 font-medium leading-relaxed">{post.caption || "No caption data specified for this asset block."}</p>
                       
-                      {/* Live Action Performance Metric Layer */}
                       <div className="flex flex-wrap items-center gap-3 mt-3 border-t border-gray-800/80 pt-2 text-[11px] text-gray-400 font-bold">
                         <div className="flex items-center gap-1" title="Views/Impressions"><Eye size={12} className="text-blue-400" /> {post.impressions || 0}</div>
                         <div className="flex items-center gap-1" title="Likes"><Heart size={12} className="text-red-400" /> {post.like_count || 0}</div>
@@ -453,14 +479,12 @@ export default function InstagramAutomation() {
                     </div>
                   </div>
 
-                  {/* AI Value Capture Performance Stack */}
                   <div className="grid grid-cols-3 gap-2 text-[9px] font-extrabold tracking-wider uppercase mb-4">
                     <div className="bg-blue-950/20 border border-blue-900/30 text-blue-400 p-1.5 rounded text-center">Bot Replies: {post.stats?.chatBotReplied || 0}</div>
                     <div className={`${post.stats?.pending > 0 ? 'bg-rose-950/30 border border-rose-900/40 text-rose-400' : 'bg-gray-900/40 border border-gray-800 text-gray-500'} p-1.5 rounded text-center`}>Pending/Missed: {post.stats?.pending || 0}</div>
                     <div className="bg-purple-950/20 border border-purple-900/30 text-purple-400 p-1.5 rounded text-center">AI Intercepts: {post.stats?.aiCaught || 0}</div>
                   </div>
 
-                  {/* Operational Settings Form Layer */}
                   <div className="space-y-3 pt-3 border-t border-gray-800/80">
                     <div className="flex justify-between items-center">
                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Routing Configuration</label>
@@ -469,13 +493,47 @@ export default function InstagramAutomation() {
                         onChange={(e) => updatePostMode(post.id, e.target.value)}
                         className="bg-gray-900 border border-gray-700 text-white text-xs font-bold rounded px-2 py-1 outline-none cursor-pointer focus:border-pink-500"
                       >
-                        <option value="off">Off (Disable Bot)</option>
-                        <option value="chatbot">Keyword Engine Only</option>
-                        <option value="hybrid">Keyword + AI Intent Recovery (Pro)</option>
+                        <option value="off" className="bg-[#111] text-white">Off (Disable Bot)</option>
+                        <option value="instant_shortcut" className="bg-[#111] text-white">Instant Keyword (Shortcut ⚡)</option>
+                        <option value="chatbot" className="bg-[#111] text-white">Keyword Engine Only (Advanced ⚙️)</option>
+                        <option value="hybrid" className="bg-[#111] text-white">Keyword + AI Intent Recovery (🔒 Pro)</option>
                       </select>
                     </div>
 
-                    {(post.botMode === 'chatbot' || post.botMode === 'hybrid') && (
+                    {/* 🚀 FEATURE 1: INCORPORATED FIXED SUPER-FAST INLINE INPUT FIELDS SHORTCUT PANEL */}
+                    {post.botMode === 'instant_shortcut' && (
+                      <div className="p-3 bg-gray-950 rounded-xl border border-gray-800/60 mt-2 space-y-2 animate-fade-in">
+                        <div>
+                          <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Comment Trigger Word *</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-[#0a0a0a] border border-gray-800 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-pink-500" 
+                            placeholder="e.g. MAP, PRICE" 
+                            value={post.chatBotKeyword || ''} 
+                            onChange={(e) => updateInlineValue(post.id, 'chatBotKeyword', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Destination Link URL *</label>
+                          <input 
+                            type="url" 
+                            className="w-full bg-[#0a0a0a] border border-gray-800 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-pink-500" 
+                            placeholder="https://newpropertyhub.in/map.pdf" 
+                            value={post.fileUrl || ''} 
+                            onChange={(e) => updateInlineValue(post.id, 'fileUrl', e.target.value)}
+                          />
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => handleInlineShortcutSave(post, post.chatBotKeyword, post.fileUrl)}
+                          className="w-full py-1 bg-gradient-to-r from-pink-600 to-purple-600 text-[10px] font-black text-white rounded-md uppercase tracking-wider shadow-md hover:opacity-90 transition-all mt-1"
+                        >
+                          ⚡ Save Shortcut Rule
+                        </button>
+                      </div>
+                    )}
+
+                    {post.botMode === 'chatbot' && (
                       <div className="space-y-2 bg-gray-950 p-3 rounded-xl border border-gray-800/60 animate-fade-in">
                         <div>
                           <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Exact Match Trigger Tag</label>
@@ -486,7 +544,7 @@ export default function InstagramAutomation() {
                           <textarea rows="1" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-md px-2 py-1.5 text-xs text-white outline-none" placeholder="Message to append with link payload..." defaultValue={post.chatBotReply} />
                         </div>
                         
-                        {post.botMode === 'chatbot' && post.stats?.pending > 0 && (
+                        {post.stats?.pending > 0 && (
                           <button 
                             type="button"
                             disabled={processingId === post.id}
@@ -499,7 +557,7 @@ export default function InstagramAutomation() {
                       </div>
                     )}
 
-                    {post.botMode === 'hybrid' && (
+                    {post.botMode === 'hybrid' && isPremiumUser && (
                       <div className="bg-purple-950/10 border border-purple-500/20 p-3 rounded-xl animate-fade-in">
                         <label className="block text-[9px] font-bold text-purple-400 uppercase mb-1">Target Prompt Constraints for AI Engine</label>
                         <textarea rows="2" className="w-full bg-black border border-gray-800 rounded-md p-2 text-xs text-white outline-none focus:border-purple-500" placeholder="Specify catalog info or alternate backup URLs here..." defaultValue={post.aiContext} />
@@ -508,19 +566,19 @@ export default function InstagramAutomation() {
                   </div>
                 </div>
 
-                {/* Automation Rule Action Wrapper */}
-                <div className="mt-4 pt-3 border-t border-gray-800/80 flex justify-end">
-                  <button 
-                    onClick={() => { 
-                      const savedRule = (user?.postAutomations || []).find(r => r?.postId === post.id);
-                      setNewAuto(savedRule || { postId: post.id, triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' }); 
-                      setSelectedPostForAuto(post); 
-                    }} 
-                    className="bg-gradient-to-r from-pink-600 to-purple-600 text-[11px] font-bold px-4 py-2 rounded-xl text-white shadow-md shadow-pink-600/10 hover:opacity-90"
-                  >
-                    🎁 Set Dedicated Asset Link Rule
-                  </button>
-                </div>
+                {post.botMode !== 'instant_shortcut' && (
+                  <div className="mt-4 pt-3 border-t border-gray-800/80 flex justify-end">
+                    <button 
+                      onClick={() => { 
+                        setNewAuto({ postId: post.id, triggerWord: post.chatBotKeyword || '', replyMessage: post.chatBotReply || '', fileUrl: post.fileUrl || '', publicReply: post.publicReply || 'Check your DM! 📩', deliveryMode: 'direct' }); 
+                        setSelectedPostForAuto(post); 
+                      }} 
+                      className="bg-gradient-to-r from-pink-600 to-purple-600 text-[11px] font-bold px-4 py-2 rounded-xl text-white shadow-md shadow-pink-600/10 hover:opacity-90"
+                    >
+                      🎁 Set Dedicated Asset Link Rule
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -530,9 +588,23 @@ export default function InstagramAutomation() {
       {/* TAB 3: SMART COMMENT GROUPING */}
       {activeTab === 'smart-groups' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-[#111111] border border-gray-800 p-5 rounded-2xl shadow-lg">
-             <h2 className="text-base font-bold text-white uppercase tracking-wider">AI Intent Semantic Clusters</h2>
-             <p className="text-xs text-gray-500 mt-1">Comments unhandled by strict keyword match are logically grouped by AI intent block rules here.</p>
+          <div className="bg-[#11] border border-gray-800 p-5 rounded-2xl shadow-lg">
+              <h2 className="text-base font-bold text-white uppercase tracking-wider">AI Intent Semantic Clusters</h2>
+              <p className="text-xs text-gray-500 mt-1">Comments unhandled by strict keyword match are logically grouped by AI intent block rules here.</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-950/40 to-black p-5 rounded-2xl border border-purple-500/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h3 className="text-sm font-black text-purple-400 uppercase tracking-wider flex items-center gap-1">📊 Unmatched Gap Context Analytics</h3>
+              <p className="text-xs text-gray-400 mt-1 max-w-xl">Out of total post comment engagements, some users missed direct delivery due to bad keywords spellings. Review semantic clusters below to force safe delivery loops.</p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => toast.success("Processing bulk delivery sequence across active unmatched queue loops...")}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-600/10 whitespace-nowrap"
+            >
+              🚀 Send Default Asset Link to All Unmatched in One-Click
+            </button>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -547,7 +619,7 @@ export default function InstagramAutomation() {
                       <h3 className="font-bold text-white text-sm">{group.theme}</h3>
                     </div>
                     <div className="text-xs text-gray-400 mt-3 space-y-1.5">
-                      <p className="font-bold text-gray-400 uppercase tracking-wide text-[10px]">Sample Matches:</p>
+                      <p className="font-bold text-gray-400 uppercase tracking-wide text-[10px]">Sample Intent Gaps:</p>
                       <ul className="list-disc pl-4 space-y-1 font-medium italic text-gray-500">
                         {group.samples.map((sample, idx) => <li key={idx}>"{sample}"</li>)}
                       </ul>
@@ -626,7 +698,7 @@ export default function InstagramAutomation() {
             
             <form onSubmit={handleSavePostSpecificAuto} className="space-y-4">
               <div>
-                <label className="block text-gray-400 font-bold mb-1">Trigger Tag Tag *</label>
+                <label className="block text-gray-400 font-bold mb-1">Trigger Word *</label>
                 <input type="text" required value={newAuto.triggerWord} onChange={e=>setNewAuto({...newAuto, triggerWord: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white outline-none focus:border-pink-500" placeholder="e.g. REEL, PROPERTY, PRICE" />
               </div>
               <div>

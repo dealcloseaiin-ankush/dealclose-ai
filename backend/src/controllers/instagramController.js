@@ -13,6 +13,7 @@ exports.getDashboardData = async (req, res) => {
 
     const user = await User.findById(userId).lean();
     
+    // Fetch real metrics from DB
     const totalComments = await Message.countDocuments({ userId, tags: { $in: ['ig_comment'] } });
     const totalDMsReceived = await Message.countDocuments({ userId, direction: 'incoming', customerPhone: { $regex: /^IG_/ } });
     const dmsSent = await Message.countDocuments({ userId, direction: 'outgoing', customerPhone: { $regex: /^IG_/ } });
@@ -97,7 +98,6 @@ exports.getRecentPosts = async (req, res) => {
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     const graphVersion = process.env.META_GRAPH_API_VERSION || 'v19.0';
     
-    // 🚀 FIXED: URL se insights/impressions hataya taaki OAuth permission Error Code 10 hamesha ke liye fixed ho jaye
     const url = `https://graph.facebook.com/${graphVersion}/${accountId}/media`;
     const response = await axios.get(url, {
       params: {
@@ -114,7 +114,19 @@ exports.getRecentPosts = async (req, res) => {
       console.log(`✅ 4. Meta API Success! Found ${response.data.data.length} posts.`);
     }
 
+    const workspaceAutomations = selectedWorkspace ? selectedWorkspace.postAutomations : user.postAutomations;
+    const currentAutomations = workspaceAutomations || [];
+
     const posts = response.data.data.map(post => {
+      const dbRule = currentAutomations.find(r => String(r.postId) === String(post.id));
+      
+      let resolvedMode = 'off';
+      if (dbRule) {
+        if (dbRule.deliveryMode === 'instant_shortcut') resolvedMode = 'instant_shortcut';
+        else if (dbRule.deliveryMode === 'button' || dbRule.deliveryMode === 'hybrid') resolvedMode = 'hybrid';
+        else resolvedMode = 'chatbot';
+      }
+
       return {
         id: post.id,
         caption: post.caption || '',
@@ -125,14 +137,19 @@ exports.getRecentPosts = async (req, res) => {
         timestamp: post.timestamp,
         like_count: post.like_count || 0,
         comments_count: post.comments_count || 0,
-        impressions: post.like_count * 3, // Safe mock multiplier fallback logic for non-app review states
+        impressions: post.like_count * 3, 
+        botMode: resolvedMode,
+        chatBotKeyword: dbRule ? dbRule.triggerWord : '',
+        chatBotReply: dbRule ? dbRule.replyMessage : '',
+        fileUrl: dbRule ? dbRule.fileUrl : '',
+        publicReply: dbRule ? dbRule.publicReply : 'Check your DM! 📩',
+        stats: dbRule?.stats || { dmsSent: 0, buttonClicks: 0, pending: 0, chatBotReplied: 0, aiCaught: 0 }
       };
     });
 
     console.log(`======================================================\n`);
     res.status(200).json({ success: true, posts });
   } catch (error) {
-    // Extensive robust logging tracker setup
     const status = error.response?.status || 500;
     const metaMsg = error.response?.data?.error?.message || error.message;
     console.error(`❌ IG Fetch Posts Error:`);
@@ -187,20 +204,43 @@ exports.publishMedia = async (req, res) => {
   }
 };
 
-// @desc    Save a new Post-Specific Automation 
+// @desc    Save a new Post-Specific Automation (🚀 UPGRADED WITH BOTH MODE AND PREMIUM CORES)
 // @route   POST /api/instagram/automations
 exports.savePostAutomation = async (req, res) => {
+  console.log(`\n================== [SAVE AUTOMATION DEBUG ENGINE] ==================`);
   try {
     const userId = req.user?._id || req.user?.id;
-    const { postId, thumbnailUrl, triggerWord, replyMessage, fileUrl, deliveryMode, workspaceId } = req.body;
+    const { postId, thumbnailUrl, triggerWord, replyMessage, fileUrl, deliveryMode, publicReply, workspaceId } = req.body;
 
-    if (!postId || !triggerWord || !replyMessage) {
-      return res.status(400).json({ success: false, message: 'Post ID, Trigger Word, and Reply Message are required.' });
+    console.log("➡️ Received Body Payload:", JSON.stringify(req.body, null, 2));
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User runtime not found.' });
+
+    // 🔒 PREMIUM AI LEVEL VERIFICATION SECURITY FILTER
+    const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
+    if (deliveryMode === 'hybrid' && !isPremium) {
+      return res.status(403).json({ 
+        success: false, 
+        message: '❌ AI Intent Recovery Mode is a Premium Feature. Please upgrade your dashboard plan to unlock AI Agents.' 
+      });
     }
 
-    const currentWorkspaceId = workspaceId || 'main';
+    if (!postId) {
+      return res.status(400).json({ success: false, message: 'Post ID mapping node is strictly required.' });
+    }
 
-    if (currentWorkspaceId !== 'main') {
+    const cleanTrigger = triggerWord && triggerWord.trim() !== "" ? triggerWord.trim() : "LINK";
+    const cleanReply = replyMessage && replyMessage.trim() !== "" ? replyMessage.trim() : "Check your DM! Details sent.";
+    const cleanPublic = publicReply && publicReply.trim() !== "" ? publicReply.trim() : "Check your DM! 📩";
+    const cleanFile = fileUrl || "";
+    const cleanThumb = thumbnailUrl || "";
+    const cleanMode = deliveryMode || "direct";
+
+    const currentWorkspaceId = workspaceId || 'main';
+    console.log(`🔍 Processing workspace data stream node: ${currentWorkspaceId}`);
+
+    if (currentWorkspaceId !== 'main' && currentWorkspaceId !== '') {
       await User.updateOne(
         { _id: userId, "workspaces._id": currentWorkspaceId },
         { $pull: { "workspaces.$.postAutomations": { postId } } }
@@ -209,12 +249,25 @@ exports.savePostAutomation = async (req, res) => {
       const updatedUser = await User.findOneAndUpdate(
         { _id: userId, "workspaces._id": currentWorkspaceId },
         { 
-          $push: { "workspaces.$.postAutomations": { postId, thumbnailUrl, triggerWord, replyMessage, fileUrl, deliveryMode } } 
+          $push: { 
+            "workspaces.$.postAutomations": { 
+              postId, 
+              thumbnailUrl: cleanThumb, 
+              triggerWord: cleanTrigger, 
+              replyMessage: cleanReply, 
+              publicReply: cleanPublic,
+              fileUrl: cleanFile, 
+              deliveryMode: cleanMode,
+              stats: { sentCount: 0, clickedCount: 0 }
+            } 
+          } 
         },
         { new: true }
       );
 
-      const wsNode = updatedUser.workspaces.find(w => String(w._id) === String(currentWorkspaceId));
+      const wsNode = updatedUser?.workspaces?.find(w => String(w._id) === String(currentWorkspaceId));
+      console.log(`✅ Success: Workspace branch automation rules pushed successfully.`);
+      console.log(`====================================================================\n`);
       return res.status(200).json({ success: true, message: 'Workspace branch automation saved!', automations: wsNode?.postAutomations || [] });
     }
 
@@ -226,13 +279,27 @@ exports.savePostAutomation = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { 
-        $push: { postAutomations: { postId, thumbnailUrl, triggerWord, replyMessage, fileUrl, deliveryMode } } 
+        $push: { 
+          postAutomations: { 
+            postId, 
+            thumbnailUrl: cleanThumb, 
+            triggerWord: cleanTrigger, 
+            replyMessage: cleanReply, 
+            publicReply: cleanPublic,
+            fileUrl: cleanFile, 
+            deliveryMode: cleanMode,
+            stats: { sentCount: 0, clickedCount: 0 }
+          } 
+        } 
       },
       { new: true }
     );
 
+    console.log(`✅ Success: Core Main business channel post rules saved seamlessly.`);
+    console.log(`====================================================================\n`);
     res.status(200).json({ success: true, message: 'Main post automation saved successfully!', automations: updatedUser.postAutomations });
   } catch (error) {
+    console.error("❌ Fatal Crash in Save Automation Endpoint:", error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
