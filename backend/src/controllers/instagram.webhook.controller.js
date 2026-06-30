@@ -207,7 +207,9 @@ exports.handleInstagramWebhook = async (req, res) => {
                 },
                 { upsert: true, returnDocument: 'after' }
               );
-              
+              // =====================================================================
+// ✅ LINE 183-200 FIXED LOGIC BLOCK: APNE CODE ME IS SE REPLACE KAREIN
+// =====================================================================
               if (isEcho) {
                  await Message.create({
                    userId: user._id,
@@ -227,7 +229,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                  console.log(`⏸️ [IG Webhook] Owner replied from IG App. AI Paused.`);
                  continue; 
               }
-
+// =====================================================================
               const currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
               const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
               
@@ -729,6 +731,7 @@ exports.handleInstagramWebhook = async (req, res) => {
              googleSheetsController.appendLeadToSheet(user._id, newCommentLead).catch(e => console.log('Sheets sync error:', e.message));
           }
 
+          // 🚀 FIX: Bulletproof string type casting comparison layer
           let matchedRule = null;
           let isPostSpecific = false;
           
@@ -736,11 +739,21 @@ exports.handleInstagramWebhook = async (req, res) => {
 
           if (searchRuleSource && searchRuleSource.length > 0) {
             if (mediaId) {
-              matchedRule = searchRuleSource.find(rule => rule.postId === mediaId && commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
-              if (matchedRule) isPostSpecific = true;
+              matchedRule = searchRuleSource.find(rule => 
+                String(rule.postId) === String(mediaId) && 
+                commentText.toLowerCase().includes(rule.triggerWord.toLowerCase())
+              );
+              if (matchedRule) {
+                isPostSpecific = true;
+                console.log(`🎯 [Match Engine] Locked dynamic post route rule for Media: ${mediaId}`);
+              }
             }
             if (!matchedRule) {
-              matchedRule = searchRuleSource.find(rule => !rule.postId && commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+              matchedRule = searchRuleSource.find(rule => 
+                (!rule.postId || rule.postId === "") && 
+                commentText.toLowerCase().includes(rule.triggerWord.toLowerCase())
+              );
+              if (matchedRule) console.log(`🌍 [Match Engine] Fallback global keyword rule matched: '${matchedRule.triggerWord}'`);
             }
           }
 
@@ -769,9 +782,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                  ).catch(e => console.log('Main sent count increment error:', e.message));
                }
              }
-             // =====================================================================
-// 🧪 TEMPORARY TEST BLOCK: REPLACING WITH DIRECT USER_ID DM
-// =====================================================================
+             
              let dmSentSuccessfully = false;
              try {
                if (igToken) {
@@ -784,7 +795,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                     console.log("👉 TARGET EXTRACTED USER ID (igUserId):", igUserId);
                     console.log("====================================================");
                     
-                    // Direct User ID par message push kar rahe hain comments filter bypass karke
+                    // Direct User ID pipeline lookup 
                     await metaAdsService.sendInstagramDM(igToken, igUserId, compiledShortcutMsg);
                     
                     console.log("🏁 [DIAGNOSIS ENGINE] sendInstagramDM loop finished successfully!");
@@ -804,7 +815,7 @@ exports.handleInstagramWebhook = async (req, res) => {
              } catch (replyErr) {
                console.error("❌ [Meta Graph Private Reply / Direct DM Error]:", replyErr.response?.data || replyErr.message);
              }
-// =====================================================================
+
              if (dmSentSuccessfully) {
                try {
                  await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
@@ -821,7 +832,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 : finalReplyMsg;
 
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getExpiry('junk') });
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalLoggedMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
           } else {
              if (user.aiAgentEnabled !== false) {
                  try {
