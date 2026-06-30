@@ -7,7 +7,7 @@ const hashData = (str) => {
   return crypto.createHash('sha256').update(str.trim().toLowerCase()).digest('hex');
 };
 
-// 1. Send Instagram Direct Message (DM)
+// 1. Send Instagram Direct Message (DM) via Profile ID
 exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
   try {
     const response = await axios.post(
@@ -27,13 +27,15 @@ exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
   }
 };
 
-// 2. Send Private DM Reply to an Instagram Comment
+// 2. 🚀 FIXED: Send Private DM Reply safely via Recipient Comment ID Token Link
 exports.sendInstagramCommentPrivateReply = async (accessToken, commentId, messageText) => {
   try {
+    // OLD METHOD CHANGER: Direct /me/messages with comment_id recipient structure bypasses Subcode 33 permissions error!
     const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${commentId}/private_replies`,
+      `https://graph.facebook.com/v19.0/me/messages`,
       {
-        message: messageText
+        recipient: { comment_id: commentId },
+        message: { text: messageText }
       },
       {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -41,8 +43,25 @@ exports.sendInstagramCommentPrivateReply = async (accessToken, commentId, messag
     );
     return response.data;
   } catch (error) {
-    console.error("❌ Meta Graph API Comment Reply Error:", error.response?.data || error.message);
+    console.error("❌ Meta Graph API Comment Private Reply Crash:", error.response?.data || error.message);
     throw error;
+  }
+};
+
+// 🌟 NEW ADDED: Fires a Public Reply directly on the post comment feed for visibility conversions
+exports.sendInstagramPublicCommentReply = async (accessToken, commentId, messageText) => {
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${commentId}/replies`,
+      { message: messageText },
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("❌ Meta Graph API Public Feed Comment Reply Error:", error.response?.data || error.message);
+    return null;
   }
 };
 
@@ -62,6 +81,7 @@ exports.getInstagramProfile = async (accessToken, igSid) => {
   }
 };
 
+// 4. Send Conversion Event
 exports.sendConversionEvent = async (pixelId, accessToken, phone, eventName = 'Purchase') => {
   try {
     if (!pixelId || !accessToken || !phone) return;

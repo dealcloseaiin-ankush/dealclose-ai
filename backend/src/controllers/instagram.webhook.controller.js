@@ -391,7 +391,9 @@ exports.handleInstagramWebhook = async (req, res) => {
                     let nextEdge = edges.find(e => e.source === matchedTrigger.id);
                     let currNodeId = nextEdge ? nextEdge.target : null;
                     
-                    while (currNodeId) {
+                    let circuitBreaker = 0;
+                    while (currNodeId && circuitBreaker < 20) {
+                       circuitBreaker++;
                        const nextNode = nodes.find(n => n.id === currNodeId);
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
@@ -662,7 +664,7 @@ exports.handleInstagramWebhook = async (req, res) => {
         }
 
         // ==========================================
-        // 2. HANDLE COMMENTS (🚀 FIXED STACK LOGIC FOR WORKSPACES)
+        // 2. HANDLE COMMENTS 
         // ==========================================
         if (entry.changes && entry.changes[0].field === 'comments') {
           const commentData = entry.changes[0].value;
@@ -686,7 +688,6 @@ exports.handleInstagramWebhook = async (req, res) => {
              continue;
           }
           
-          // Bulletproof runtime workspace identification context
           let incomingWorkspaceId = 'main';
           let activeWorkspaceNode = null;
           let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
@@ -731,7 +732,6 @@ exports.handleInstagramWebhook = async (req, res) => {
           let matchedRule = null;
           let isPostSpecific = false;
           
-          // 🚀 REAL BUG FIXED: Used local isolated workspace nodes context mappings safely!
           const searchRuleSource = incomingWorkspaceId !== 'main' ? activeWorkspaceNode?.postAutomations : user.postAutomations;
 
           if (searchRuleSource && searchRuleSource.length > 0) {
@@ -773,16 +773,22 @@ exports.handleInstagramWebhook = async (req, res) => {
              let dmSentSuccessfully = false;
              try {
                if (igToken) {
-                 if (matchedRule.deliveryMode === 'button') {
+                 if (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') {
+                    const compiledShortcutMsg = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, compiledShortcutMsg);
+                    dmSentSuccessfully = true;
+                 } 
+                 else if (matchedRule.deliveryMode === 'button') {
                     await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
                       recipient: { comment_id: commentData.id },
                       message: {
                         text: `${matchedRule.replyMessage}\n\nTap the button below to get your file:`,
                         quick_replies: [{ content_type: "text", title: "Get Link 🔗", payload: `GET_AUTO_LINK_${mediaId}` }]
                       }
-                    }, { params: { access_token: igToken }});
+                    }, { params: { access_token: igToken } });
                     dmSentSuccessfully = true;
-                 } else {
+                 }
+                 else {
                     await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, finalReplyMsg);
                     dmSentSuccessfully = true;
                  }
@@ -802,8 +808,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                }
              }
              
+             const finalLoggedMsg = (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') 
+                ? `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}` 
+                : finalReplyMsg;
+
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getExpiry('junk') });
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalReplyMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalLoggedMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
           } else {
              if (user.aiAgentEnabled !== false) {
                  try {
