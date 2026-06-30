@@ -769,23 +769,31 @@ exports.handleInstagramWebhook = async (req, res) => {
                  ).catch(e => console.log('Main sent count increment error:', e.message));
                }
              }
-
+             // =====================================================================
+// 🧪 TEMPORARY TEST BLOCK: REPLACING WITH DIRECT USER_ID DM
+// =====================================================================
              let dmSentSuccessfully = false;
              try {
                if (igToken) {
                  if (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') {
                     const compiledShortcutMsg = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, compiledShortcutMsg);
+                    
+                    console.log("\n====================================================");
+                    console.log("🕵️‍♂️ [DIAGNOSIS ENGINE] RUNNING DIRECT USER_ID OVERRIDE");
+                    console.log("👉 TARGET EXTRACTED USER NAME:", username);
+                    console.log("👉 TARGET EXTRACTED USER ID (igUserId):", igUserId);
+                    console.log("====================================================");
+                    
+                    // Direct User ID par message push kar rahe hain comments filter bypass karke
+                    await metaAdsService.sendInstagramDM(igToken, igUserId, compiledShortcutMsg);
+                    
+                    console.log("🏁 [DIAGNOSIS ENGINE] sendInstagramDM loop finished successfully!");
                     dmSentSuccessfully = true;
                  } 
                  else if (matchedRule.deliveryMode === 'button') {
-                    await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
-                      recipient: { comment_id: commentData.id },
-                      message: {
-                        text: `${matchedRule.replyMessage}\n\nTap the button below to get your file:`,
-                        quick_replies: [{ content_type: "text", title: "Get Link 🔗", payload: `GET_AUTO_LINK_${mediaId}` }]
-                      }
-                    }, { params: { access_token: igToken } });
+                    console.log("\n🚀 [TEST DM] Button mode bypass to direct user ID DM text");
+                    const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
+                    await metaAdsService.sendInstagramDM(igToken, igUserId, fallbackText);
                     dmSentSuccessfully = true;
                  }
                  else {
@@ -794,9 +802,9 @@ exports.handleInstagramWebhook = async (req, res) => {
                  }
                }
              } catch (replyErr) {
-               console.error("❌ [Meta Graph Private Reply Error]:", replyErr.response?.data || replyErr.message);
+               console.error("❌ [Meta Graph Private Reply / Direct DM Error]:", replyErr.response?.data || replyErr.message);
              }
-
+// =====================================================================
              if (dmSentSuccessfully) {
                try {
                  await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
