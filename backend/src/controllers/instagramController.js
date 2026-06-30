@@ -64,10 +64,10 @@ exports.getRecentPosts = async (req, res) => {
     }
 
     const workspaceId = req.query.workspaceId || 'main';
-    const selectedWorkspace = workspaceId !== 'main'
+    let selectedWorkspace = workspaceId !== 'main'
       ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
       : null;
-    const selectedInstagram = selectedWorkspace
+    let selectedInstagram = selectedWorkspace
       ? selectedWorkspace.instagramConfig
       : user.instagramConfig;
     let accessToken = selectedInstagram?.accessToken;
@@ -77,6 +77,7 @@ exports.getRecentPosts = async (req, res) => {
     if (workspaceId === 'main' && !accessToken && user?.workspaces) {
       const ws = user.workspaces.find(w => w.instagramConfig?.accessToken);
       if (ws) {
+        selectedWorkspace = ws;
         const workspaceInstagram = ws.instagramConfig;
         accessToken = workspaceInstagram.accessToken;
         accountId = workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
@@ -116,6 +117,12 @@ exports.getRecentPosts = async (req, res) => {
 
     const workspaceAutomations = selectedWorkspace ? selectedWorkspace.postAutomations : user.postAutomations;
     const currentAutomations = workspaceAutomations || [];
+    console.log("[IG POSTS DEBUG] Automation hydrate source:", {
+      workspaceId,
+      source,
+      ruleCount: currentAutomations.length,
+      rules: currentAutomations.map(r => ({ postId: r.postId, triggerWord: r.triggerWord, deliveryMode: r.deliveryMode, hasFileUrl: Boolean(r.fileUrl) }))
+    });
 
     const posts = response.data.data.map(post => {
       const dbRule = currentAutomations.find(r => String(r.postId) === String(post.id));
@@ -170,9 +177,18 @@ exports.getPostAutomations = async (req, res) => {
 
     if (workspaceId !== 'main') {
       const workspace = user.workspaces?.find(w => String(w._id) === String(workspaceId));
+      console.log("[GET AUTOMATIONS DEBUG] Workspace rules loaded:", {
+        workspaceId,
+        foundWorkspace: Boolean(workspace),
+        count: workspace?.postAutomations?.length || 0
+      });
       return res.status(200).json({ success: true, automations: workspace?.postAutomations || [] });
     }
 
+    console.log("[GET AUTOMATIONS DEBUG] Main rules loaded:", {
+      workspaceId,
+      count: user.postAutomations?.length || 0
+    });
     res.status(200).json({ success: true, automations: user.postAutomations || [] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -226,24 +242,31 @@ exports.savePostAutomation = async (req, res) => {
       });
     }
 
-    if (!postId) {
-      return res.status(400).json({ success: false, message: 'Post ID mapping node is strictly required.' });
-    }
-
+    const cleanPostId = postId ? String(postId).trim() : "";
     const cleanTrigger = triggerWord && triggerWord.trim() !== "" ? triggerWord.trim() : "LINK";
     const cleanReply = replyMessage && replyMessage.trim() !== "" ? replyMessage.trim() : "Check your DM! Details sent.";
     const cleanPublic = publicReply && publicReply.trim() !== "" ? publicReply.trim() : "Check your DM! 📩";
     const cleanFile = fileUrl || "";
     const cleanThumb = thumbnailUrl || "";
     const cleanMode = deliveryMode || "direct";
+    const pullFilter = cleanPostId
+      ? { postId: cleanPostId }
+      : { postId: "", triggerWord: cleanTrigger };
 
     const currentWorkspaceId = workspaceId || 'main';
+    console.log("[SAVE AUTOMATION DEBUG] Normalized rule:", {
+      workspaceId: currentWorkspaceId,
+      postId: cleanPostId || "[GLOBAL]",
+      triggerWord: cleanTrigger,
+      deliveryMode: cleanMode,
+      hasFileUrl: Boolean(cleanFile)
+    });
     console.log(`🔍 Processing workspace data stream node: ${currentWorkspaceId}`);
 
     if (currentWorkspaceId !== 'main' && currentWorkspaceId !== '') {
       await User.updateOne(
         { _id: userId, "workspaces._id": currentWorkspaceId },
-        { $pull: { "workspaces.$.postAutomations": { postId } } }
+        { $pull: { "workspaces.$.postAutomations": pullFilter } }
       );
 
       const updatedUser = await User.findOneAndUpdate(
@@ -251,7 +274,7 @@ exports.savePostAutomation = async (req, res) => {
         { 
           $push: { 
             "workspaces.$.postAutomations": { 
-              postId, 
+              postId: cleanPostId, 
               thumbnailUrl: cleanThumb, 
               triggerWord: cleanTrigger, 
               replyMessage: cleanReply, 
@@ -273,7 +296,7 @@ exports.savePostAutomation = async (req, res) => {
 
     await User.updateOne(
       { _id: userId },
-      { $pull: { postAutomations: { postId } } }
+      { $pull: { postAutomations: pullFilter } }
     );
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -281,7 +304,7 @@ exports.savePostAutomation = async (req, res) => {
       { 
         $push: { 
           postAutomations: { 
-            postId, 
+            postId: cleanPostId, 
             thumbnailUrl: cleanThumb, 
             triggerWord: cleanTrigger, 
             replyMessage: cleanReply, 

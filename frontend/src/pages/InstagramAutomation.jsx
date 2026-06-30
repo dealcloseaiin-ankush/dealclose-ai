@@ -30,6 +30,7 @@ export default function InstagramAutomation() {
 
   const [igLeads, setIgLeads] = useState([]);
   const [recentPosts, setRecentPosts] = useState([]);
+  const [savedAutomations, setSavedAutomations] = useState([]);
   const [commentGroups, setCommentGroups] = useState([]);
   const [processingId, setProcessingId] = useState(null);
   const [sendingBulkId, setSendingBulkId] = useState(null);
@@ -44,6 +45,47 @@ export default function InstagramAutomation() {
   const [postLimit, setPostLimit] = useState(20);
 
   const isPremiumUser = user?.isPremium === true || user?.role === 'superadmin' || user?.email === 'ankush.bani@gmail.com';
+
+  const getRuleMode = (rule) => {
+    if (!rule) return 'off';
+    if (rule.deliveryMode === 'instant_shortcut') return 'instant_shortcut';
+    if (rule.deliveryMode === 'button' || rule.deliveryMode === 'hybrid') return 'hybrid';
+    return 'chatbot';
+  };
+
+  const mergePostsWithAutomations = (posts = [], automations = []) => {
+    const ruleMap = new Map(automations.map(rule => [String(rule.postId || ''), rule]));
+    console.log('[IG AUTO UI DEBUG] Hydrating posts with automation rules', {
+      workspaceId: activeWorkspace,
+      postsCount: posts.length,
+      rulesCount: automations.length,
+      rules: automations.map(rule => ({
+        postId: rule.postId || '[GLOBAL]',
+        triggerWord: rule.triggerWord,
+        deliveryMode: rule.deliveryMode,
+        hasFileUrl: Boolean(rule.fileUrl)
+      }))
+    });
+
+    return posts.map(post => {
+      const rule = ruleMap.get(String(post.id));
+      if (!rule) return post;
+      return {
+        ...post,
+        botMode: getRuleMode(rule),
+        chatBotKeyword: rule.triggerWord || '',
+        chatBotReply: rule.replyMessage || '',
+        fileUrl: rule.fileUrl || '',
+        publicReply: rule.publicReply || post.publicReply || 'Check your DM! ðŸ“©',
+        stats: {
+          ...(post.stats || {}),
+          ...(rule.stats || {}),
+          dmsSent: rule.stats?.sentCount ?? post.stats?.dmsSent ?? 0,
+          buttonClicks: rule.stats?.clickedCount ?? post.stats?.buttonClicks ?? 0
+        }
+      };
+    });
+  };
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
@@ -70,10 +112,17 @@ export default function InstagramAutomation() {
   const handleAddPostAuto = async (e) => {
     e.preventDefault();
     try {
-       await api.post('/instagram/automations', { ...newAuto, workspaceId: activeWorkspace });
+       const { data } = await api.post('/instagram/automations', { ...newAuto, workspaceId: activeWorkspace });
+       const nextRules = Array.isArray(data?.automations) ? data.automations : savedAutomations;
+       console.log('[IG AUTO UI DEBUG] Global automation save response', { workspaceId: activeWorkspace, nextRules });
+       setSavedAutomations(nextRules);
+       setRecentPosts(posts => mergePostsWithAutomations(posts, nextRules));
        toast.success("Global Automation Rule Added!");
        setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
-    } catch { toast.error("Failed to add rule."); }
+    } catch (err) {
+       console.error('[IG AUTO UI DEBUG] Failed to add global automation', err.response?.data || err.message);
+       toast.error(err.response?.data?.message || "Failed to add rule.");
+    }
   };
 
   const [selectedPostForAuto, setSelectedPostForAuto] = useState(null);
@@ -82,12 +131,16 @@ export default function InstagramAutomation() {
     e.preventDefault();
     const toastId = toast.loading("Saving automation rule...");
     try {
-       await api.post('/instagram/automations', { 
+       const { data } = await api.post('/instagram/automations', { 
          ...newAuto, 
          postId: selectedPostForAuto.id,
          thumbnailUrl: selectedPostForAuto.thumbnail_url || selectedPostForAuto.media_url,
          workspaceId: activeWorkspace 
        });
+       const nextRules = Array.isArray(data?.automations) ? data.automations : savedAutomations;
+       console.log('[IG AUTO UI DEBUG] Post automation save response', { workspaceId: activeWorkspace, postId: selectedPostForAuto.id, nextRules });
+       setSavedAutomations(nextRules);
+       setRecentPosts(posts => mergePostsWithAutomations(posts, nextRules));
        toast.success("Post Automation Saved Successfully!", { id: toastId });
        setSelectedPostForAuto(null);
        setNewAuto({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
@@ -102,7 +155,7 @@ export default function InstagramAutomation() {
     if (!keyword || !targetLink) return toast.error("Please fill both Keyword and Target Link fields!");
     const toastId = toast.loading("Injecting inline lightning rule...");
     try {
-      await api.post('/instagram/automations', {
+      const { data } = await api.post('/instagram/automations', {
         postId: post.id,
         thumbnailUrl: post.thumbnail_url || post.media_url,
         triggerWord: keyword,
@@ -112,6 +165,10 @@ export default function InstagramAutomation() {
         deliveryMode: 'instant_shortcut',
         workspaceId: activeWorkspace
       });
+      const nextRules = Array.isArray(data?.automations) ? data.automations : savedAutomations;
+      console.log('[IG AUTO UI DEBUG] Inline shortcut save response', { workspaceId: activeWorkspace, postId: post.id, nextRules });
+      setSavedAutomations(nextRules);
+      setRecentPosts(posts => mergePostsWithAutomations(posts, nextRules));
       toast.success("⚡ Inline Shortcut Rule Locked Successfully!", { id: toastId });
       handleSyncPosts();
     } catch (err) {
@@ -123,9 +180,14 @@ export default function InstagramAutomation() {
   const handleSyncPosts = async () => {
     const toastId = toast.loading("Syncing recent posts from Instagram...");
     try {
-      const res = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } });
+      const [res, automationsRes] = await Promise.all([
+        api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } }),
+        api.get('/instagram/automations', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: { automations: [] } }))
+      ]);
+      const rules = Array.isArray(automationsRes.data?.automations) ? automationsRes.data.automations : [];
+      setSavedAutomations(rules);
       if (res.data && res.data.posts) {
-        setRecentPosts(res.data.posts);
+        setRecentPosts(mergePostsWithAutomations(res.data.posts, rules));
         toast.success(`Successfully loaded ${res.data.posts.length} posts! 🎉`, { id: toastId });
       } else {
         toast.success("Sync successful, but no posts found.", { id: toastId });
@@ -149,9 +211,19 @@ export default function InstagramAutomation() {
         if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
         if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
 
-        const postsRes = await api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } });
+        const [postsRes, automationsRes] = await Promise.all([
+          api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } }),
+          api.get('/instagram/automations', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: { automations: [] } }))
+        ]);
+        const rules = Array.isArray(automationsRes.data?.automations) ? automationsRes.data.automations : [];
+        setSavedAutomations(rules);
+        console.log('[IG AUTO UI DEBUG] Initial workspace automation hydrate', {
+          workspaceId: activeWorkspace,
+          rulesCount: rules.length,
+          postsCount: postsRes.data?.posts?.length || 0
+        });
         if (postsRes.data && postsRes.data.posts) {
-           setRecentPosts(postsRes.data.posts);
+           setRecentPosts(mergePostsWithAutomations(postsRes.data.posts, rules));
         }
       } catch (error) {
         console.error("Failed to fetch IG data", error);
@@ -457,7 +529,7 @@ export default function InstagramAutomation() {
                           <span className="text-[10px] bg-gray-800 text-gray-400 font-black px-2 py-0.5 rounded border border-gray-700 uppercase tracking-wider">{post.media_type || 'POST'}</span>
                           <span className="text-[10px] text-gray-600 font-bold ml-2">{post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'Recent Log'}</span>
                         </div>
-                        {(user?.postAutomations || []).find(r => r?.postId === post.id) && (
+                        {savedAutomations.find(r => String(r?.postId || '') === String(post.id)) && (
                           <span className="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
                             🎯 Funnel Locked
                           </span>
@@ -470,7 +542,7 @@ export default function InstagramAutomation() {
                         <div className="flex items-center gap-1" title="Likes"><Heart size={12} className="text-red-400" /> {post.like_count || 0}</div>
                         <div className="flex items-center gap-1" title="Comments"><MessageSquare size={12} className="text-green-400" /> {post.comments_count || 0}</div>
                         <div className="flex items-center gap-1 text-pink-400" title="Auto-DMs Successfully Fired">
-                          <Inbox size={12} /> DMs Fired: { (user?.postAutomations || []).find(r => r?.postId === post.id)?.stats?.sentCount || post.stats?.dmsSent || 0 }
+                          <Inbox size={12} /> DMs Fired: { savedAutomations.find(r => String(r?.postId || '') === String(post.id))?.stats?.sentCount || post.stats?.sentCount || post.stats?.dmsSent || 0 }
                         </div>
                         <div className="flex items-center gap-1 text-purple-400" title="Quick Reply Button Taps">
                           <Zap size={12} /> Taps: { post.stats?.buttonClicks || 0 }

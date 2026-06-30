@@ -34,10 +34,26 @@ metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
 };
 
 metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text) => {
-  if (!token) return;
-  return axios.post(`https://graph.facebook.com/v19.0/${commentId}/private_replies`, {
-    message: text
-  }, { params: { access_token: token } });
+  if (!token) {
+    throw new Error("No Access Token found for private reply (Token is NULL)");
+  }
+
+  console.log(`\n[PRIVATE REPLY DEBUG] Attempting private reply for comment ID: ${commentId}`);
+  console.log(`[PRIVATE REPLY DEBUG] Message preview: ${String(text || '').substring(0, 180)}`);
+
+  try {
+    const response = await axios.post(`https://graph.facebook.com/v19.0/${commentId}/private_replies`, {
+      message: text
+    }, { params: { access_token: token } });
+    console.log("[PRIVATE REPLY SUCCESS] Meta accepted comment private reply:", response.data);
+    return response;
+  } catch (error) {
+    const metaErr = error.response?.data?.error;
+    console.error("[PRIVATE REPLY REJECTED] Meta rejected comment private reply.");
+    console.error("[PRIVATE REPLY REJECTED] Full response:", error.response?.data || error.message);
+    console.error(`[PRIVATE REPLY REJECTED] Code: ${metaErr?.code}, Subcode: ${metaErr?.error_subcode}, Message: ${metaErr?.message || error.message}`);
+    throw error;
+  }
 };
 
 // @desc    Verify Instagram Webhook Setup (Required by Meta)
@@ -429,8 +445,9 @@ exports.handleInstagramWebhook = async (req, res) => {
                 continue; 
               }
 
-              if (!flowReplyHandled && user.postAutomations) {
-                const matchedAuto = user.postAutomations.find(rule => incomingTextLower.includes(rule.triggerWord.toLowerCase()));
+              const dmAutomationSource = incomingWorkspaceId !== 'main' ? (activeWorkspace?.postAutomations || []) : (user.postAutomations || []);
+              if (!flowReplyHandled && dmAutomationSource.length > 0) {
+                const matchedAuto = dmAutomationSource.find(rule => incomingTextLower.includes((rule.triggerWord || '').toLowerCase()));
                 if (matchedAuto && matchedAuto.fileUrl) {
                   try {
                     if (matchedAuto.deliveryMode === 'button') {
@@ -444,10 +461,26 @@ exports.handleInstagramWebhook = async (req, res) => {
                     } else {
                       const directLinkMsg = `${matchedAuto.replyMessage}\n\n📄 Link: ${matchedAuto.fileUrl}`;
                       if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, directLinkMsg);
-                      await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.clickedCount": 1 } });
+                      if (incomingWorkspaceId !== 'main') {
+                        await User.updateOne(
+                          { _id: user._id, "workspaces._id": incomingWorkspaceId },
+                          { $inc: { "workspaces.$.postAutomations.$[elem].stats.clickedCount": 1 } },
+                          { arrayFilters: [{ "elem.postId": matchedAuto.postId }] }
+                        );
+                      } else {
+                        await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.clickedCount": 1 } });
+                      }
                     }
                     
-                    await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.sentCount": 1 } });
+                    if (incomingWorkspaceId !== 'main') {
+                      await User.updateOne(
+                        { _id: user._id, "workspaces._id": incomingWorkspaceId },
+                        { $inc: { "workspaces.$.postAutomations.$[elem].stats.sentCount": 1 } },
+                        { arrayFilters: [{ "elem.postId": matchedAuto.postId }] }
+                      );
+                    } else {
+                      await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.sentCount": 1 } });
+                    }
                     await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: `[Button Sent] ${matchedAuto.replyMessage}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
                   } catch(e) {
                     console.error("Quick Reply DM Error:", e.response?.data || e.message);
@@ -457,7 +490,9 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               const isCreator = user.acceptCollabs === true;
-              const isAiEnabled = user.aiAgentEnabled !== false;
+              const isAiEnabled = incomingWorkspaceId !== 'main'
+                ? activeWorkspace?.aiAgentEnabled === true
+                : user.aiAgentEnabled === true;
 
               if (!isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
                 const menuMessage = isCreator 
@@ -734,14 +769,48 @@ exports.handleInstagramWebhook = async (req, res) => {
           // 🚀 FIX: Bulletproof string type casting comparison layer
           let matchedRule = null;
           let isPostSpecific = false;
+          console.log("\n========================================================");
+          console.log("[WEBHOOK ACCOUNT ANALYSIS]");
+          console.log("META ENTRY ACCOUNT ID (igAccountId) =", igAccountId);
+          console.log("INCOMING REEL/MEDIA ID (mediaId) =", mediaId);
+          console.log("DETECTED WORKSPACE CONTEXT ID =", incomingWorkspaceId);
+          console.log("COMMENT ID =", commentData.id);
+          console.log("COMMENT USER ID =", igUserId);
+          console.log("COMMENT USERNAME =", username);
+          console.log("IG TOKEN AVAILABLE =", Boolean(igToken));
+          console.log("\n[DATABASE LOCKS CHECK]");
+          console.log("MAIN COLLECTION AUTOMATIONS (user.postAutomations) =",
+            user.postAutomations?.map(r => ({ postId: r.postId, trigger: r.triggerWord, delivery: r.deliveryMode, url: r.fileUrl }))
+          );
+
+          if (user.workspaces && user.workspaces.length > 0) {
+            console.log("AVAILABLE WORKSPACES IN DB =");
+            user.workspaces.forEach(w => {
+              console.log(`   - Name: ${w.name} | ID: ${w._id} | IG Account: ${w.instagramConfig?.instagramAccountId || 'N/A'}`);
+              console.log(`     Rules Count: ${w.postAutomations?.length || 0}`);
+              if (w.postAutomations && w.postAutomations.length > 0) {
+                console.log("     Rules Array:", w.postAutomations.map(r => ({ postId: r.postId, trigger: r.triggerWord, delivery: r.deliveryMode, url: r.fileUrl })));
+              }
+            });
+          } else {
+            console.log("WORKSPACES ARRAY IS EMPTY IN USER OBJECT!");
+          }
+          console.log("========================================================\n");
           
-          const searchRuleSource = incomingWorkspaceId !== 'main' ? activeWorkspaceNode?.postAutomations : user.postAutomations;
+          let searchRuleSource = [];
+          if (incomingWorkspaceId !== 'main' && activeWorkspaceNode && activeWorkspaceNode.postAutomations) {
+              searchRuleSource = activeWorkspaceNode.postAutomations;
+              console.log(`[Match Engine] Searching rules inside Workspace source array: ${activeWorkspaceNode.name}`);
+          } else {
+              searchRuleSource = user.postAutomations || [];
+              console.log("[Match Engine] Searching rules inside Main Account source array.");
+          }
 
           if (searchRuleSource && searchRuleSource.length > 0) {
             if (mediaId) {
               matchedRule = searchRuleSource.find(rule => 
                 String(rule.postId) === String(mediaId) && 
-                commentText.toLowerCase().includes(rule.triggerWord.toLowerCase())
+                commentText.toLowerCase().includes((rule.triggerWord || '').toLowerCase())
               );
               if (matchedRule) {
                 isPostSpecific = true;
@@ -751,15 +820,21 @@ exports.handleInstagramWebhook = async (req, res) => {
             if (!matchedRule) {
               matchedRule = searchRuleSource.find(rule => 
                 (!rule.postId || rule.postId === "") && 
-                commentText.toLowerCase().includes(rule.triggerWord.toLowerCase())
+                commentText.toLowerCase().includes((rule.triggerWord || '').toLowerCase())
               );
               if (matchedRule) console.log(`🌍 [Match Engine] Fallback global keyword rule matched: '${matchedRule.triggerWord}'`);
             }
           }
 
-          if (!matchedRule) {
-              matchedRule = (user.autoReplies || []).find(rule => commentText.toLowerCase().includes(rule.triggerWord.toLowerCase()));
+          if (!matchedRule && incomingWorkspaceId === 'main') {
+              matchedRule = (user.autoReplies || []).find(rule => commentText.toLowerCase().includes((rule.triggerWord || '').toLowerCase()));
+              if (matchedRule) console.log(`[Match Engine] Main autoReplies fallback matched: '${matchedRule.triggerWord}'`);
+          } else if (!matchedRule) {
+              console.log("[Match Engine] Skipping main autoReplies fallback because webhook belongs to a workspace page.");
           }
+
+          console.log("[MATCH SUMMARY] FINAL MATCHED RULE OBJECT =", matchedRule);
+          console.log("========================================================\n");
 
           if (matchedRule) {
              console.log(`✅ [Instagram Webhook] Token Context Trigger Lock: '${matchedRule.triggerWord}'`);
@@ -796,7 +871,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                     console.log("====================================================");
                     
                     // Direct User ID pipeline lookup 
-                    await metaAdsService.sendInstagramDM(igToken, igUserId, compiledShortcutMsg);
+                    console.log("COMMENT ID FOR PRIVATE REPLY:", commentData.id);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, compiledShortcutMsg);
                     
                     console.log("🏁 [DIAGNOSIS ENGINE] sendInstagramDM loop finished successfully!");
                     dmSentSuccessfully = true;
@@ -804,7 +880,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                  else if (matchedRule.deliveryMode === 'button') {
                     console.log("\n🚀 [TEST DM] Button mode bypass to direct user ID DM text");
                     const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
-                    await metaAdsService.sendInstagramDM(igToken, igUserId, fallbackText);
+                    console.log("COMMENT ID FOR PRIVATE REPLY:", commentData.id);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, fallbackText);
                     dmSentSuccessfully = true;
                  }
                  else {
@@ -834,7 +911,11 @@ exports.handleInstagramWebhook = async (req, res) => {
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getExpiry('junk') });
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
           } else {
-             if (user.aiAgentEnabled !== false) {
+             const isCommentAiEnabled = incomingWorkspaceId !== 'main'
+               ? activeWorkspaceNode?.aiAgentEnabled === true
+               : user.aiAgentEnabled === true;
+
+             if (isCommentAiEnabled) {
                  try {
                      const aiContext = `You are the friendly social media manager for ${user.businessName || 'this page'}. Reply to this Instagram comment: "${commentText}". Keep it under 15 words.`;
                      const aiReply = await aiService.generateAIResponse(commentText, aiContext);

@@ -90,6 +90,20 @@ const userSchema = new Schema({
     // --- Separate AI Brain for each Workspace ---
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
+    aiAgentEnabled: { type: Boolean, default: false },
+    postAutomations: [{
+      postId: { type: String },
+      thumbnailUrl: { type: String },
+      triggerWord: { type: String },
+      replyMessage: { type: String },
+      publicReply: { type: String },
+      fileUrl: { type: String },
+      deliveryMode: { type: String, enum: ['direct', 'button', 'instant_shortcut', 'hybrid'], default: 'direct' },
+      stats: {
+        sentCount: { type: Number, default: 0 },
+        clickedCount: { type: Number, default: 0 }
+      }
+    }],
     // --- Social links for each specific workspace ---
     instagram: { type: String },
     facebook: { type: String },
@@ -140,8 +154,9 @@ const userSchema = new Schema({
     thumbnailUrl: { type: String }, // To display in UI
     triggerWord: { type: String },
     replyMessage: { type: String },
+    publicReply: { type: String },
     fileUrl: { type: String }, // Cloudinary PDF/Image link
-    deliveryMode: { type: String, enum: ['direct', 'button'], default: 'button' },
+    deliveryMode: { type: String, enum: ['direct', 'button', 'instant_shortcut', 'hybrid'], default: 'direct' },
     stats: {
       sentCount: { type: Number, default: 0 },
       clickedCount: { type: Number, default: 0 }
