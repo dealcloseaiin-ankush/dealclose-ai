@@ -223,9 +223,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 },
                 { upsert: true, returnDocument: 'after' }
               );
-              // =====================================================================
-// ✅ LINE 183-200 FIXED LOGIC BLOCK: APNE CODE ME IS SE REPLACE KAREIN
-// =====================================================================
+              
               if (isEcho) {
                  await Message.create({
                    userId: user._id,
@@ -245,7 +243,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                  console.log(`⏸️ [IG Webhook] Owner replied from IG App. AI Paused.`);
                  continue; 
               }
-// =====================================================================
+
               const currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
               const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
               
