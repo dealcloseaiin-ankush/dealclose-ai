@@ -221,9 +221,9 @@ exports.connectMetaAccount = async (req, res) => {
       } else if (platform === 'instagram') {
         // Note: For IG, phoneNumberId is actually the IG Account ID
         user.workspaces[wsIndex].instagramConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
-        user.workspaces[wsIndex].igConfig = undefined;
       }
       console.log(`✅ [DEBUG Meta Connect] SAVING to Workspace: ${user.workspaces[wsIndex].name}`);
+      console.log(`🔍 [DEBUG Meta Connect] workspace instagramConfig being saved:`, JSON.stringify(user.workspaces[wsIndex].instagramConfig || {}, null, 2));
     } else {
       // Save to main/root config
       if (platform === 'whatsapp') {
@@ -232,9 +232,19 @@ exports.connectMetaAccount = async (req, res) => {
         user.instagramConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
       }
       console.log(`✅ [DEBUG Meta Connect] SAVING to Main Business Config`);
+      console.log(`🔍 [DEBUG Meta Connect] main instagramConfig being saved:`, JSON.stringify(user.instagramConfig || {}, null, 2));
     }
 
     const updatedUser = await user.save();
+
+    if (platform === 'instagram') {
+      if (workspaceId && workspaceId !== 'main') {
+        const savedWs = updatedUser.workspaces.find(ws => ws._id.toString() === workspaceId);
+        console.log(`✅ [DEBUG Meta Connect] saved workspace instagramConfig:`, JSON.stringify(savedWs?.instagramConfig || {}, null, 2));
+      } else {
+        console.log(`✅ [DEBUG Meta Connect] saved root instagramConfig:`, JSON.stringify(updatedUser.instagramConfig || {}, null, 2));
+      }
+    }
 
     console.log(`✅ [Meta Onboarding] ${platform} account connected successfully for User: ${userId}`);
     res.status(200).json({ success: true, message: 'WhatsApp API connected successfully!', user: updatedUser });
@@ -259,7 +269,7 @@ exports.getProfile = async (req, res) => {
     // console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
     // - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
     // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
-    // - IG Connected Token Exist?: ${user.igConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
+    // - IG Connected Token Exist?: ${user.instagramConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
     if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
     res.status(200).json({ success: true, user });
