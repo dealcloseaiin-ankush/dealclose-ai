@@ -739,11 +739,13 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
           let incomingWorkspaceId = 'main';
           let activeWorkspaceNode = null;
           let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
+          let igPageId = user.instagramConfig?.facebookPageId || user.igConfig?.facebookPageId || null;
 
           if (user.workspaces && user.workspaces.length > 0) {
              activeWorkspaceNode = user.workspaces.find(w => w?.instagramConfig?.instagramAccountId === igAccountId);
              if (activeWorkspaceNode?.instagramConfig?.accessToken) {
                 igToken = activeWorkspaceNode.instagramConfig.accessToken;
+                igPageId = activeWorkspaceNode.instagramConfig.facebookPageId || igPageId;
                 incomingWorkspaceId = activeWorkspaceNode._id ? activeWorkspaceNode._id.toString() : 'main';
              }
           }
