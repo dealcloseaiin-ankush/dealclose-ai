@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -53,7 +53,7 @@ export default function InstagramAutomation() {
     return 'chatbot';
   };
 
-  const mergePostsWithAutomations = (posts = [], automations = []) => {
+  const mergePostsWithAutomations = useCallback((posts = [], automations = []) => {
     const ruleMap = new Map(automations.map(rule => [String(rule.postId || ''), rule]));
     console.log('[IG AUTO UI DEBUG] Hydrating posts with automation rules', {
       workspaceId: activeWorkspace,
@@ -76,7 +76,7 @@ export default function InstagramAutomation() {
         chatBotKeyword: rule.triggerWord || '',
         chatBotReply: rule.replyMessage || '',
         fileUrl: rule.fileUrl || '',
-        publicReply: rule.publicReply || post.publicReply || 'Check your DM! ðŸ“©',
+        publicReply: rule.publicReply || post.publicReply || 'Check your DM! 📩',
         stats: {
           ...(post.stats || {}),
           ...(rule.stats || {}),
@@ -85,7 +85,7 @@ export default function InstagramAutomation() {
         }
       };
     });
-  };
+  }, [activeWorkspace]);
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
@@ -230,7 +230,7 @@ export default function InstagramAutomation() {
       }
     };
     fetchIgData();
-  }, [activeWorkspace, postLimit]);
+  }, [activeWorkspace, postLimit, mergePostsWithAutomations]);
 
   const handleReplyChange = (id, text) => {
     setCommentGroups(groups => groups.map(g => g.id === id ? { ...g, replyText: text } : g));

@@ -42,9 +42,16 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text)
   console.log(`[PRIVATE REPLY DEBUG] Message preview: ${String(text || '').substring(0, 180)}`);
 
   try {
-    const response = await axios.post(`https://graph.facebook.com/v19.0/${commentId}/private_replies`, {
-      message: text
-    }, { params: { access_token: token } });
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/me/messages`,
+      {
+        recipient: { comment_id: commentId },
+        message: { text: text }
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
     console.log("[PRIVATE REPLY SUCCESS] Meta accepted comment private reply:", response.data);
     return response;
   } catch (error) {
