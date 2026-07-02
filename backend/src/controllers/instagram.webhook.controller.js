@@ -46,10 +46,11 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text)
       `https://graph.facebook.com/v19.0/me/messages`,
       {
         recipient: { comment_id: commentId },
-        message: { text: text }
+        message: { text: text },
+        messaging_type: "RESPONSE"
       },
       {
-        headers: { Authorization: `Bearer ${token}` }
+        params: { access_token: token }
       }
     );
     console.log("[PRIVATE REPLY SUCCESS] Meta accepted comment private reply:", response.data);
@@ -140,6 +141,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               console.log(`- Matched User Email:`, user?.email);
 
               let igToken = null;
+              let igPageId = null;
               let incomingWorkspaceId = 'main';
               let activeWorkspace = null;
               
@@ -148,12 +150,14 @@ exports.handleInstagramWebhook = async (req, res) => {
                   const workspaceInstagram = activeWorkspace?.instagramConfig;
                   if (workspaceInstagram?.accessToken) {
                      igToken = workspaceInstagram.accessToken;
+                     igPageId = workspaceInstagram.facebookPageId;
                      incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
                  }
               }
               
               if (!igToken && user && user.instagramConfig && user.instagramConfig.accessToken) {
                   igToken = user.instagramConfig.accessToken;
+                  igPageId = user.instagramConfig.facebookPageId;
                   incomingWorkspaceId = 'main';
               }
 
@@ -879,7 +883,7 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
                     
                     // Direct User ID pipeline lookup 
                     console.log("COMMENT ID FOR PRIVATE REPLY:", commentData.id);
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, compiledShortcutMsg);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg);
                     
                     console.log("🏁 [DIAGNOSIS ENGINE] sendInstagramDM loop finished successfully!");
                     dmSentSuccessfully = true;
@@ -888,11 +892,11 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
                     console.log("\n🚀 [TEST DM] Button mode bypass to direct user ID DM text");
                     const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
                     console.log("COMMENT ID FOR PRIVATE REPLY:", commentData.id);
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, fallbackText);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText);
                     dmSentSuccessfully = true;
                  }
                  else {
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, commentData.id, finalReplyMsg);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, finalReplyMsg);
                     dmSentSuccessfully = true;
                  }
                }

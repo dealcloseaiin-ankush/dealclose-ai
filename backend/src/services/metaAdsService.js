@@ -28,17 +28,16 @@ exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
 };
 
 // 2. 🚀 FIXED: Send Private DM Reply safely via Recipient Comment ID Token Link
-exports.sendInstagramCommentPrivateReply = async (accessToken, commentId, messageText) => {
+exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText) => {
   try {
-    // OLD METHOD CHANGER: Direct /me/messages with comment_id recipient structure bypasses Subcode 33 permissions error!
     const response = await axios.post(
-      `https://graph.facebook.com/v19.0/me/messages`,
+      `https://graph.facebook.com/v19.0/${pageId}/messages`,
       {
         recipient: { comment_id: commentId },
         message: { text: messageText }
       },
       {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        params: { access_token: accessToken }
       }
     );
     return response.data;
