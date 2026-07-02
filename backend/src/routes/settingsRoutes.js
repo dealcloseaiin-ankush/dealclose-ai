@@ -15,6 +15,7 @@ router.post('/settings/whatsapp-connect', protect, authController.whatsappConnec
 router.post('/settings/instagram-connect', protect, authController.instagramConnect);
 router.post('/settings/instagram-connect-selected', protect, authController.instagramConnectSelected);
 router.post('/settings/meta-connect', protect, settingsController.connectMetaAccount); // For Embedded Signup
+router.post('/settings/instagram-disconnect', protect, settingsController.instagramDisconnect);
 
 // --- Google Sheets Integration (Premium Only) ---
 router.get('/google/auth-url', protect, googleSheetsController.getAuthUrl);
