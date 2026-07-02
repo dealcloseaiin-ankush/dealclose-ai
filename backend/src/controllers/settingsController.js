@@ -6,9 +6,12 @@ const axios = require('axios');
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
     try {
         // Check if a default flow already exists to prevent duplicates
-        const existingFlow = await Flow.findOne({ userId: userId, name: { $regex: /Instagram Collab Flow|Lead Generation Auto|Real Estate Lead Capture/i } });
+        const existingFlow = await Flow.findOne({ 
+            userId: userId, 
+            name: { $regex: /Instagram Collab Flow|Lead Generation Auto|Real Estate Lead Capture/i } 
+        });
         if (existingFlow) {
-            console.log(`[Magic Onboarding] Default flow already exists for user . Skipping creation.`);
+            console.log(`[Magic Onboarding] Default flow already exists for user. Skipping creation.`);
             return;
         }
 
@@ -55,10 +58,10 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
         }
 
         await Flow.create({ userId, workspaceId: 'main', name: flowName, flowData });
-        console.log(`✅ [Magic Onboarding] Automatically created '' for user .`);
+        console.log(`✅ [Magic Onboarding] Automatically created '${flowName}' for user.`);
 
     } catch (error) {
-        console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user :`, error.message);
+        console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user:`, error.message);
     }
 };
 
@@ -83,19 +86,10 @@ exports.getSettings = async (req, res) => {
 exports.saveSettings = async (req, res) => {
   try {
     console.log(`\n➡️ [DEBUG Settings Update] Request received!`);
-    console.log(`➡️ [DEBUG] Auth Header:`, req.headers.authorization ? 'Present' : 'Missing');
-    console.log(`➡️ [DEBUG] req.user object:`, req.user);
-
     const userId = req.user?._id || req.user?.id; 
-    if (!userId) {
-      console.log('❌ [DEBUG Settings Update] Failed: Unauthorized Session. No user ID.');
-      return res.status(401).json({ success: false, message: 'Unauthorized Session' });
-    }
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
 
     const updates = req.body;
-    console.log("➡️ [Settings Update] Payload Received:", JSON.stringify(updates));
-
-    // Pehle existing user fetch kar lo taaki purana data (jaise access token) delete na ho
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
@@ -103,13 +97,12 @@ exports.saveSettings = async (req, res) => {
 
     if (updates.ownerPhone !== undefined) updateData.ownerPhone = updates.ownerPhone;
     if (updates.pinCode !== undefined) updateData.servedPinCodes = [updates.pinCode];
-    if (updates.businessDesc !== undefined) updateData.businessDescription = updates.businessDesc;
     if (updates.businessDescription !== undefined) updateData.businessDescription = updates.businessDescription;
     if (updates.businessName !== undefined) updateData.businessName = updates.businessName.trim() === '' ? 'Main Business' : updates.businessName;
     if (updates.aiRules !== undefined) updateData.aiRules = updates.aiRules;
     if (updates.fallbackAction !== undefined) updateData.fallbackAction = updates.fallbackAction;
     if (updates.aiAgentEnabled !== undefined) updateData.aiAgentEnabled = updates.aiAgentEnabled;
-    if (updates.businessUrls !== undefined) updateData.businessUrls = updates.businessUrls;
+    if (updates.acceptCollabs !== undefined) updateData.acceptCollabs = updates.acceptCollabs;
     if (updates.externalApiUrl !== undefined) updateData.externalApiUrl = updates.externalApiUrl;
     if (updates.externalApiToken !== undefined) updateData.externalApiToken = updates.externalApiToken;
     if (updates.externalApiSearchUrl !== undefined) updateData.externalApiSearchUrl = updates.externalApiSearchUrl;
@@ -118,92 +111,26 @@ exports.saveSettings = async (req, res) => {
     if (updates.externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = updates.externalApiVisitUrl;
     if (updates.customWebhooks !== undefined) updateData.customWebhooks = updates.customWebhooks;
     
-    // 🔥 MAGIC ONBOARDING: If business description is being set for the first time, create a default flow.
+    // Magic Onboarding automated triggers
     if (updates.businessDescription && !user.businessDescription) {
         await autoCreateDefaultFlow(userId, updates.businessDescription, updates.businessName || user.businessName);
     }
 
-    // Save multiple Workspaces/Businesses
     if (updates.workspaces !== undefined) {
-      // Filter out any empty rows just to be safe
       updateData.workspaces = updates.workspaces.filter(w => w.name && w.name.trim() !== '');
-      
-      // Note: Mongoose automatically generates a unique _id for each item 
-      // inside an array of subdocuments when we save it!
     }
 
-    // Merge existing whatsappConfig with new updates (Overwrites old data securely)
-    const currentWaConfig = user.whatsappConfig || {};
-    let newWaConfig = null;
+    if (updates.whatsappConfig) updateData.whatsappConfig = updates.whatsappConfig;
+    if (updates.twilioConfig) updateData.twilioConfig = updates.twilioConfig;
+    if (updates.digitalCardConfig) updateData.digitalCardConfig = updates.digitalCardConfig;
+    if (updates.metaAdsConfig) updateData.metaAdsConfig = updates.metaAdsConfig;
 
-    // Meta / WhatsApp Config - FIXED FRONTEND PAYLOAD MAPPING
-    if (updates.whatsappConfig) {
-      newWaConfig = {
-        accessToken: updates.whatsappConfig.accessToken || currentWaConfig.accessToken,
-        phoneNumberId: updates.whatsappConfig.phoneNumberId || currentWaConfig.phoneNumberId,
-        wabaId: updates.whatsappConfig.wabaId || currentWaConfig.wabaId
-      };
-    } else if (updates.whatsappToken || updates.phoneNumberId || updates.wabaId) {
-      newWaConfig = {
-        accessToken: updates.whatsappToken || currentWaConfig.accessToken,
-        phoneNumberId: updates.phoneNumberId || currentWaConfig.phoneNumberId,
-        wabaId: updates.wabaId || currentWaConfig.wabaId
-      };
-    }
-
-    if (newWaConfig) {
-      updateData.whatsappConfig = newWaConfig;
-    }
-
-    // Twilio Config - FIXED FRONTEND PAYLOAD MAPPING
-    const currentTwilioConfig = user.twilioConfig || {};
-    let newTwilioConfig = null;
-
-    if (updates.twilioConfig) {
-      newTwilioConfig = { 
-        accountSid: updates.twilioConfig.sid || currentTwilioConfig.accountSid, 
-        authToken: updates.twilioConfig.authToken || currentTwilioConfig.authToken, 
-        phoneNumber: updates.twilioConfig.phone || currentTwilioConfig.phoneNumber 
-      };
-    } else if (updates.twilioSid || updates.twilioAuthToken || updates.twilioPhone) {
-      newTwilioConfig = { 
-        accountSid: updates.twilioSid || currentTwilioConfig.accountSid, 
-        authToken: updates.twilioAuthToken || currentTwilioConfig.authToken, 
-        phoneNumber: updates.twilioPhone || currentTwilioConfig.phoneNumber 
-      };
-    }
-
-    if (newTwilioConfig) {
-      updateData.twilioConfig = newTwilioConfig;
-    }
-
-    // Digital Card Config
-    if (updates.digitalCardConfig) {
-      updateData.digitalCardConfig = updates.digitalCardConfig;
-    }
-
-    // Instagram settings (allow clearing token to disconnect)
-    // Frontend may send { instagramConfig: { accessToken: '' } } to force disconnect
-    if (updates.instagramConfig && typeof updates.instagramConfig === 'object') {
-      const igAccess = updates.instagramConfig.accessToken;
-      if (igAccess === '') {
-        // Force-unset root instagramConfig
-        try {
-          await User.updateOne({ _id: userId }, { $unset: { instagramConfig: '' } });
-          const cleared = await User.findById(userId).lean();
-          return res.status(200).json({ success: true, message: 'Instagram disconnected', user: cleared });
-        } catch (e) {
-          console.error('Failed to clear instagramConfig:', e.message || e);
-          return res.status(500).json({ success: false, message: 'Failed to disconnect Instagram' });
-        }
-      } else if (igAccess) {
-        updateData.instagramConfig = {
-          accessToken: igAccess,
-          instagramAccountId: updates.instagramConfig.instagramAccountId || (user.instagramConfig && user.instagramConfig.instagramAccountId),
-          facebookPageId: updates.instagramConfig.facebookPageId || (user.instagramConfig && user.instagramConfig.facebookPageId),
-          tokenExpiresAt: updates.instagramConfig.tokenExpiresAt || (user.instagramConfig && user.instagramConfig.tokenExpiresAt)
-        };
-      }
+    // 🚀 CRASH-PROOF DISCONNECT ENGINE FOR OVERWRITE PROTECTION
+    if (updates.instagramConfig && updates.instagramConfig.accessToken === '') {
+      await User.updateOne({ _id: userId }, { $unset: { instagramConfig: 1, igConfig: 1 } });
+      console.log(`✅ [saveSettings Path Forced strict $unset] for User: ${userId}`);
+    } else if (updates.instagramConfig && updates.instagramConfig.accessToken) {
+      updateData.instagramConfig = updates.instagramConfig;
     }
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -211,6 +138,7 @@ exports.saveSettings = async (req, res) => {
       { $set: updateData }, 
       { returnDocument: 'after', upsert: true, strict: false }
     ).lean();
+
     res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {
     console.error('Save Settings Error:', error);
@@ -225,9 +153,7 @@ exports.connectMetaAccount = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
 
-    // Frontend SDK will send these details after the Meta popup flow is completed, along with workspaceId
     const { accessToken, wabaId, phoneNumberId, platform, workspaceId } = req.body;
-    console.log(`➡️ [DEBUG Meta Connect] Received for User: ${userId}, Workspace: ${workspaceId}, Platform: ${platform}`);
 
     if (!accessToken || !phoneNumberId) {
       return res.status(400).json({ success: false, message: 'Missing Meta credentials from Embedded Signup.' });
@@ -236,7 +162,6 @@ exports.connectMetaAccount = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // 🚀 CRITICAL FIX: Save to the correct workspace or main config
     if (workspaceId && workspaceId !== 'main') {
       const wsIndex = user.workspaces.findIndex(ws => ws._id.toString() === workspaceId);
       if (wsIndex === -1) return res.status(404).json({ success: false, message: 'Workspace not found' });
@@ -244,35 +169,18 @@ exports.connectMetaAccount = async (req, res) => {
       if (platform === 'whatsapp') {
         user.workspaces[wsIndex].whatsappConfig = { accessToken, phoneNumberId, wabaId: wabaId || '' };
       } else if (platform === 'instagram') {
-        // Note: For IG, phoneNumberId is actually the IG Account ID
         user.workspaces[wsIndex].instagramConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
       }
-      console.log(`✅ [DEBUG Meta Connect] SAVING to Workspace: ${user.workspaces[wsIndex].name}`);
-      console.log(`🔍 [DEBUG Meta Connect] workspace instagramConfig being saved:`, JSON.stringify(user.workspaces[wsIndex].instagramConfig || {}, null, 2));
     } else {
-      // Save to main/root config
       if (platform === 'whatsapp') {
         user.whatsappConfig = { accessToken, phoneNumberId, wabaId: wabaId || '' };
       } else if (platform === 'instagram') {
         user.instagramConfig = { accessToken, instagramAccountId: phoneNumberId, facebookPageId: wabaId || '' };
       }
-      console.log(`✅ [DEBUG Meta Connect] SAVING to Main Business Config`);
-      console.log(`🔍 [DEBUG Meta Connect] main instagramConfig being saved:`, JSON.stringify(user.instagramConfig || {}, null, 2));
     }
 
     const updatedUser = await user.save();
-
-    if (platform === 'instagram') {
-      if (workspaceId && workspaceId !== 'main') {
-        const savedWs = updatedUser.workspaces.find(ws => ws._id.toString() === workspaceId);
-        console.log(`✅ [DEBUG Meta Connect] saved workspace instagramConfig:`, JSON.stringify(savedWs?.instagramConfig || {}, null, 2));
-      } else {
-        console.log(`✅ [DEBUG Meta Connect] saved root instagramConfig:`, JSON.stringify(updatedUser.instagramConfig || {}, null, 2));
-      }
-    }
-
-    console.log(`✅ [Meta Onboarding] ${platform} account connected successfully for User: ${userId}`);
-    res.status(200).json({ success: true, message: 'WhatsApp API connected successfully!', user: updatedUser });
+    res.status(200).json({ success: true, message: 'API connected successfully!', user: updatedUser });
   } catch (error) {
     console.error('Meta Connect Error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -280,28 +188,38 @@ exports.connectMetaAccount = async (req, res) => {
 };
 
 // @desc    Disconnect Instagram from Settings
-// @route   POST /api/users/settings/instagram-disconnect
+// @route   POST /api/settings/instagram-disconnect
 exports.instagramDisconnect = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
 
     const { workspaceId } = req.body || {};
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     if (workspaceId && workspaceId !== 'main') {
-      user.workspaces = user.workspaces || [];
-      const workspace = user.workspaces.find(ws => ws._id.toString() === workspaceId);
-      if (!workspace) return res.status(404).json({ success: false, message: 'Workspace not found' });
-      delete workspace.instagramConfig;
-      await user.save();
-      return res.status(200).json({ success: true, message: 'Instagram disconnected from workspace', user });
+      // Clean workspace config with strict $unset to bypass Mongoose validation freezes
+      await User.updateOne(
+        { _id: userId, "workspaces._id": workspaceId },
+        { $unset: { "workspaces.$.instagramConfig": 1 } }
+      );
+      console.log(`✅ [Workspace IG Disconnect Success] Wiped path for Workspace: ${workspaceId}`);
+    } else {
+      // Strict root $unset for main business layers to clear types collisions
+      await User.updateOne(
+        { _id: userId },
+        { $unset: { instagramConfig: 1, igConfig: 1 } }
+      );
+      console.log(`✅ [Main IG Disconnect Success] Wiped root configuration layers.`);
     }
 
-    delete user.instagramConfig;
-    await user.save();
-    return res.status(200).json({ success: true, message: 'Instagram disconnected', user });
+    // 🚀 FIXED: Fetch naya live user schema state taaki frontend bina page refresh kiye clear screen render kare
+    const clearedUser = await User.findById(userId).lean();
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Instagram disconnected successfully!', 
+      user: clearedUser 
+    });
   } catch (error) {
     console.error('Instagram Disconnect Error:', error);
     res.status(500).json({ success: false, message: 'Failed to disconnect Instagram' });
@@ -313,19 +231,10 @@ exports.instagramDisconnect = async (req, res) => {
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    
-    // Use .lean() here to ensure the full, raw document is returned, including potentially newly added fields
     const user = await User.findById(userId).select('-password').lean();
-
     if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
-    
-    // YAHI WOH LINE THI JO TERMINAL MEIN KACHRA BHAR RAHI THI, ISEY BAND KAR DIYA GAYA HAI
-    // console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
-    // - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
-    // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
-    // - IG Connected Token Exist?: ${user.instagramConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
-    if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
+    if (!user.role) user.role = 'owner'; 
     res.status(200).json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching profile' });

@@ -297,24 +297,37 @@ export default function Settings() {
       setIsChangingPass(false);
     }
   };
-
   const disconnectInstagram = async (workspaceId = 'main') => {
-    try {
-      const payload = workspaceId && workspaceId !== 'main' ? { workspaceId } : {};
-      const res = await api.post('/users/settings/instagram-disconnect', payload);
-      if (res.data.success) {
-        setDisconnectMessage(res.data.message || 'Instagram disconnected successfully.');
-        await fetchSettings();
-        window.setTimeout(() => setDisconnectMessage(''), 5000);
-      } else {
-        alert(res.data.message || 'Could not disconnect Instagram.');
+  if (!window.confirm("🚨 Are you sure you want to disconnect Instagram? All active automations will stop.")) return;
+  try {
+    const payload = workspaceId && workspaceId !== 'main' ? { workspaceId } : {};
+    
+    // 🚀 ROUTE FIXED: Removed the wrong extra '/users' prefix path
+    const res = await api.post('/settings/instagram-disconnect', payload);
+    
+    if (res.data.success) {
+      setDisconnectMessage(res.data.message || 'Instagram disconnected successfully.');
+      
+      // 🚀 UI STATE FORCE CLEAN: Taki dashboard bina refresh kiye instantly 'Not Connected' show kare
+      if (workspaceId === 'main') {
+        setConfig(prev => ({
+          ...prev,
+          igAccessToken: '',
+          igAccountId: '',
+          fbPageId: ''
+        }));
       }
-    } catch (error) {
-      console.error('Instagram Disconnect Error:', error.response?.data || error.message);
-      alert(error.response?.data?.message || 'Instagram disconnect failed.');
+      
+      await fetchSettings(); // Sync state with database logs
+      window.setTimeout(() => setDisconnectMessage(''), 5000);
+    } else {
+      alert(res.data.message || 'Could not disconnect Instagram.');
     }
-  };
-
+  } catch (error) {
+    console.error('Instagram Disconnect Error:', error.response?.data || error.message);
+    alert(error.response?.data?.message || 'Instagram disconnect failed.');
+  }
+};
   const openInstagramPicker = (data, workspaceId = 'main') => {
     if (!data?.availableAccounts?.length) return fetchSettings();
     setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
@@ -565,7 +578,7 @@ export default function Settings() {
                       </div>
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely.</p>
-
+                   {/* ✅ FIXED MAIN BUSINESS INSTAGRAM CONDITIONAL BUTTON DISCONNECT ZONE */}
                     {!mainIgConnected ? (
                       <MetaConnectButton 
                         buttonText="Connect Instagram via Meta" 
@@ -576,12 +589,12 @@ export default function Settings() {
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
-                         <button
-                           type="button"
-                           onClick={() => disconnectInstagram('main')}
-                           className="mt-3 text-sm text-red-400 font-bold hover:underline"
+                         <button 
+                           type="button" 
+                           onClick={() => disconnectInstagram('main')} 
+                           className="mt-3 text-sm text-red-400 font-bold hover:text-red-500 hover:underline cursor-pointer transition-colors"
                          >
-                           Disconnect
+                           Disconnect Account 🔌
                          </button>
                       </div>
                     )}
