@@ -1,5 +1,6 @@
 const User = require('../models/userModel');
 const Flow = require('../models/flowModel');
+const axios = require('axios');
 
 // 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
@@ -275,6 +276,35 @@ exports.connectMetaAccount = async (req, res) => {
   } catch (error) {
     console.error('Meta Connect Error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Disconnect Instagram from Settings
+// @route   POST /api/users/settings/instagram-disconnect
+exports.instagramDisconnect = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+
+    const { workspaceId } = req.body || {};
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (workspaceId && workspaceId !== 'main') {
+      user.workspaces = user.workspaces || [];
+      const workspace = user.workspaces.find(ws => ws._id.toString() === workspaceId);
+      if (!workspace) return res.status(404).json({ success: false, message: 'Workspace not found' });
+      delete workspace.instagramConfig;
+      await user.save();
+      return res.status(200).json({ success: true, message: 'Instagram disconnected from workspace', user });
+    }
+
+    delete user.instagramConfig;
+    await user.save();
+    return res.status(200).json({ success: true, message: 'Instagram disconnected', user });
+  } catch (error) {
+    console.error('Instagram Disconnect Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to disconnect Instagram' });
   }
 };
 
