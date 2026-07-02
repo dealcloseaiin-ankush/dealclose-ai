@@ -265,7 +265,7 @@ exports.instagramConnectSelected = async (req, res) => {
 
     const workspaceId = pending.workspaceId || 'main';
     const instagramConfig = {
-      accessToken: pending.accessToken,
+      accessToken: selected.pageToken || pending.accessToken,
       instagramAccountId: selected.accountId,
       facebookPageId: selected.pageId,
       tokenExpiresAt: pending.tokenExpiresAt
