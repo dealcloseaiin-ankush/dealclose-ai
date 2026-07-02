@@ -181,6 +181,30 @@ exports.saveSettings = async (req, res) => {
       updateData.digitalCardConfig = updates.digitalCardConfig;
     }
 
+    // Instagram settings (allow clearing token to disconnect)
+    // Frontend may send { instagramConfig: { accessToken: '' } } to force disconnect
+    if (updates.instagramConfig && typeof updates.instagramConfig === 'object') {
+      const igAccess = updates.instagramConfig.accessToken;
+      if (igAccess === '') {
+        // Force-unset root instagramConfig
+        try {
+          await User.updateOne({ _id: userId }, { $unset: { instagramConfig: '' } });
+          const cleared = await User.findById(userId).lean();
+          return res.status(200).json({ success: true, message: 'Instagram disconnected', user: cleared });
+        } catch (e) {
+          console.error('Failed to clear instagramConfig:', e.message || e);
+          return res.status(500).json({ success: false, message: 'Failed to disconnect Instagram' });
+        }
+      } else if (igAccess) {
+        updateData.instagramConfig = {
+          accessToken: igAccess,
+          instagramAccountId: updates.instagramConfig.instagramAccountId || (user.instagramConfig && user.instagramConfig.instagramAccountId),
+          facebookPageId: updates.instagramConfig.facebookPageId || (user.instagramConfig && user.instagramConfig.facebookPageId),
+          tokenExpiresAt: updates.instagramConfig.tokenExpiresAt || (user.instagramConfig && user.instagramConfig.tokenExpiresAt)
+        };
+      }
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId, 
       { $set: updateData }, 
