@@ -15,7 +15,6 @@ exports.scrape = async (url, platform) => {
 exports.scrapeInstagram = async (url) => {
     console.log(`\n[Scraper Debug] 🕷️ Extracting data from Instagram URL: ${url}`);
     
-    // Starts the Apify Actor: Instagram Scraper
     console.log(`[Scraper Debug] ⏳ Calling Apify Actor 'apify/instagram-scraper'...`);
     const run = await client.actor("apify/instagram-scraper").call({
         directUrls: [url],
@@ -24,7 +23,6 @@ exports.scrapeInstagram = async (url) => {
     });
     console.log(`[Scraper Debug] ✅ Apify Actor Run Finished. Run ID: ${run.id}. Fetching dataset...`);
 
-    // Fetch the results from the dataset
     const { items } = await client.dataset(run.defaultDatasetId).listItems();
     const post = items[0];
 
@@ -34,7 +32,6 @@ exports.scrapeInstagram = async (url) => {
     }
 
     console.log(`[Scraper Debug] 🎉 Post data extracted successfully! Author: ${post.ownerUsername}`);
-    // Return only the data we need for the AI Prompt
     return {
         caption: post.caption || '',
         hashtags: post.hashtags || [],
@@ -50,7 +47,6 @@ exports.scrapeInstagram = async (url) => {
 exports.scrapeFacebookAds = async (query) => {
     console.log(`\n[Scraper Debug] 🕷️ Scraping Facebook Ad Library for query: "${query}"`);
 
-    // Starts the Apify Actor: Facebook Ads Library Scraper
     console.log(`[Scraper Debug] ⏳ Calling Apify Actor 'drobile/facebook-ads-library-scraper'...`);
     const run = await client.actor("drobile/facebook-ads-library-scraper").call({
         searchTerms: [query],
@@ -59,16 +55,20 @@ exports.scrapeFacebookAds = async (query) => {
     });
     console.log(`[Scraper Debug] ✅ Apify Actor Run Finished. Run ID: ${run.id}. Fetching dataset...`);
 
-    // Fetch the results from the dataset
     const { items } = await client.dataset(run.defaultDatasetId).listItems();
+
+    // 🔍 BUG 3 DEBUG LOG: Ye temporarily add kiya hai taaki hum dekh sakein
+    // Apify actor asal mein kaunse field names return kar raha hai.
+    // Server logs check karo aur dekho pageName/adText/adSnapshotUrl exist
+    // karte hain ya undefined aate hain. Test hone ke baad ye line hata sakte ho.
+    console.log(`[DEBUG - Bug 3 Check] Raw first item:`, JSON.stringify(items[0], null, 2));
 
     if (!items || items.length === 0) {
         console.log(`❌ [Scraper Debug] Error: No ads found in dataset for query "${query}".`);
-        return []; // Return empty array if no ads found
+        return [];
     }
 
     console.log(`[Scraper Debug] 🎉 Found ${items.length} ads. Processing...`);
-    // Return a simplified version of the data
     return items.map(ad => ({
         pageName: ad.pageName,
         adText: ad.adText,

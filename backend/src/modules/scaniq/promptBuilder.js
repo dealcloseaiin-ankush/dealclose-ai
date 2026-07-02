@@ -29,12 +29,40 @@ Views: ${scrapedData.views || 'Unknown'}
 }`;
 
   if (scanType === 'ad') {
-    return `${baseInstruction}\n${scrapedContext}\nYou are a performance marketing expert. Focus on ad effectiveness.\nReturn JSON: ${schema.replace('}', `,\n  "adHook": "<hook strength analysis>",\n  "adCta": "<CTA effectiveness>",\n  "adPlusSides": ["<ad strength 1>", "<strength 2>"],\n  "adMinusSides": ["<ad weakness 1>", "<weakness 2>"]\n}`)}\n\nScoring: Hook(25pts) Visual(20pts) Copy(20pts) CTA(20pts) Audience signal(15pts)`;
+    // 🐛 FIX: Purane code me schema.replace('}', ...) sirf PEHLA '}' replace karta tha,
+    // jo scoreBreakdown ke andar wala closing brace hota hai — isse JSON structure
+    // AI ke liye tuta hua (malformed) example ban jata tha aur galat/incomplete results aate the.
+    // Fix: last '}' hatao (slice se), naye ad-specific fields jodo, fir wapas '}' lagao.
+    const adSchema = schema.slice(0, -1) + `,
+  "adHook": "<hook strength analysis>",
+  "adCta": "<CTA effectiveness>",
+  "adPlusSides": ["<ad strength 1>", "<strength 2>"],
+  "adMinusSides": ["<ad weakness 1>", "<weakness 2>"]
+}`;
+
+    return `${baseInstruction}
+${scrapedContext}
+You are a performance marketing expert. Focus on ad effectiveness.
+Return JSON: ${adSchema}
+
+Scoring: Hook(25pts) Visual(20pts) Copy(20pts) CTA(20pts) Audience signal(15pts)
+Be specific, actionable, and honest. Return ONLY valid JSON, no markdown, no extra text.`;
   }
   
   if (platform === 'youtube') {
-    return `${baseInstruction}\nYou are a YouTube CTR optimization expert. Analyze this thumbnail.\nReturn JSON: ${schema}\n\nScoring: CTR potential(30pts) Visual contrast(20pts) Text clarity(20pts) Emotional hook(20pts) Branding(10pts)`;
+    return `${baseInstruction}
+You are a YouTube CTR optimization expert. Analyze this thumbnail.
+Return JSON: ${schema}
+
+Scoring: CTR potential(30pts) Visual contrast(20pts) Text clarity(20pts) Emotional hook(20pts) Branding(10pts)
+Be specific, actionable, and honest. Return ONLY valid JSON, no markdown, no extra text.`;
   }
   
-  return `${baseInstruction}\n${scrapedContext}\nYou are an Instagram growth expert.\nReturn JSON: ${schema}\n\nScoring: Visual quality(25pts) Caption(20pts) Hashtags(15pts) Engagement hook(25pts) Timing signals(15pts)\nBe specific, actionable, honest. Return ONLY JSON.`;
+  return `${baseInstruction}
+${scrapedContext}
+You are an Instagram growth expert.
+Return JSON: ${schema}
+
+Scoring: Visual quality(25pts) Caption(20pts) Hashtags(15pts) Engagement hook(25pts) Timing signals(15pts)
+Be specific, actionable, honest. Return ONLY JSON.`;
 };

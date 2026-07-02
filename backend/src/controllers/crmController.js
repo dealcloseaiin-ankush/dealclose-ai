@@ -2,25 +2,66 @@ const Lead = require('../models/leadModel');
 const Contact = require('../models/contactModel');
 const Message = require('../models/messageModel');
 const CrmActivity = require('../models/CrmActivitymodel');
+const User = require('../models/userModel');
 const { automationQueue } = require('../workers/automationWorker');
+const metaAdsService = require('../services/metaAdsService');
+
+// Casual greetings that should NOT by themselves qualify a chat as a "real" lead
+const CASUAL_GREETINGS = ['hi', 'hello', 'hey', 'hii', 'hlo', 'menu', 'help', 'options', 'ok', 'okay', 'yes', 'no', 'thanks', 'thank you', 'thankyou'];
 
 // @desc    Get all contacts grouped by CRM Stage (For Kanban Board)
 // @route   GET /api/crm/pipeline
 exports.getPipeline = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id; // BUG FIX: Token me 'id' hota hai, '_id' nahi
+    const userId = req.user?._id || req.user?.id;
     
     console.log(`\n🔍 [CRM Debug] Fetching pipeline for user: ${userId}`);
 
-    // 🚀 NEW: AUTO-SYNC OLD CHATS TO CRM
+    // 🐛 FIX: Purana code Message.distinct() ko 'tags' field pe filter karta tha,
+    // lekin Message documents pe 'tags' kabhi set hi nahi hota (sirf Lead pe hota
+    // hai) — isliye ye query hamesha KHAALI aati thi aur koi bhi purana chat
+    // kabhi CRM mein sync hi nahi hota tha.
+    //
+    // NAYA LOGIC: Har phone number ke liye check karo ki kya unke incoming
+    // messages mein koi ek bhi message casual greeting se zyada hai (real intent
+    // ka signal). Sirf "hi/hello/ok" bhejne wale abhi bhi lead nahi banenge.
     try {
-      // Direct query without ObjectId casting to prevent skipped records
-      const distinctPhones = await Message.distinct('customerPhone', { userId: userId });
-      console.log(`📱 [CRM Debug] Found ${distinctPhones.length} distinct phone numbers in Chat History.`);
-      let leadCount = await Lead.countDocuments({ userId });
-      for (const phone of distinctPhones) {
+      const incomingMessages = await Message.find({ userId, direction: 'incoming' })
+        .select('customerPhone messageText')
+        .lean();
+
+      // Group by phone, check if at least one message is "real" (not just a greeting)
+      const phoneQualifies = new Map();
+      for (const msg of incomingMessages) {
+        const phone = msg.customerPhone;
         if (!phone) continue;
+        if (phoneQualifies.get(phone)) continue; // already qualified
+
+        const text = (msg.messageText || '').trim().toLowerCase();
+        const isJustGreeting = CASUAL_GREETINGS.includes(text) || text.length === 0;
+        if (!isJustGreeting) {
+          phoneQualifies.set(phone, true);
+        } else if (!phoneQualifies.has(phone)) {
+          phoneQualifies.set(phone, false);
+        }
+      }
+
+      const qualifiedPhones = [...phoneQualifies.entries()]
+        .filter(([, qualifies]) => qualifies)
+        .map(([phone]) => phone);
+
+      console.log(`📱 [CRM Debug] ${qualifiedPhones.length} phone numbers have real (non-greeting) message history.`);
+      let leadCount = await Lead.countDocuments({ userId });
+
+      for (const phone of qualifiedPhones) {
+        // 🐛 FIX: Pehle 'IG_User' specific string check tha, jo 'IG_12345' jaisi
+        // generic Instagram phone-IDs ko catch nahi karta tha. Ab generic 'IG_' prefix check.
+        if (!phone || phone.startsWith('IG_')) continue;
+
         try {
+          // 🐛 FIX (ZOMBIE LEADS): findOne YAHAN bhi soft-deleted records ko dhoondega
+          // (kyunki hum ab hard-delete nahi karte), isliye agar user ne pehle
+          // is lead ko delete kiya tha, ye dobara nahi banega.
           const leadExists = await Lead.findOne({ phoneNumber: phone, userId });
           const contactExists = await Contact.findOne({ $or: [{ phone }, { phoneNumber: phone }], userId });
           
@@ -35,7 +76,7 @@ exports.getPipeline = async (req, res) => {
               source: 'WhatsApp (Old Chat)',
               status: 'new'
             });
-            console.log(`✅ [CRM Debug] Auto-created new Lead for missing phone: ${phone}`);
+            console.log(`✅ [CRM Debug] Auto-created Lead for qualified phone: ${phone}`);
           }
         } catch (innerErr) {
           console.error(`[CRM Sync] Skipping phone ${phone} due to error:`, innerErr.message);
@@ -45,18 +86,12 @@ exports.getPipeline = async (req, res) => {
       console.error("Old chat sync error:", syncErr);
     }
 
-    const leads = await Lead.find({ userId })
-      .sort({ updatedAt: -1 })
-      .lean();
-      
-    // Fetch old manually created contacts as well to keep history visible
-    const contacts = await Contact.find({ userId })
-      .sort({ updatedAt: -1 })
-      .lean();
+    // 🐛 FIX: 'deleted' status wale leads ko yahin se exclude karo (soft-deleted tombstones)
+    const leads = await Lead.find({ userId, status: { $ne: 'deleted' } }).sort({ updatedAt: -1 }).lean();
+    const contacts = await Contact.find({ userId }).sort({ updatedAt: -1 }).lean();
       
     console.log(`📊 [CRM Debug] Found ${leads.length} Leads and ${contacts.length} Contacts in DB.`);
 
-    // 🚀 SMART NORMALIZER: Retroactively fix Old Names and extract City dynamically
     const normalizeData = (nameStr, cityStr) => {
       let n = nameStr || '';
       let c = cityStr || '';
@@ -82,7 +117,6 @@ exports.getPipeline = async (req, res) => {
       return { name: finalName, city: c };
     };
 
-    // 🚀 NEW: Platform Determiner (WhatsApp vs Instagram)
     const determinePlatform = (phone, source) => {
       let strPhone = String(phone || '');
       if (strPhone.startsWith('IG_') || /[a-zA-Z]/.test(strPhone) || (source && String(source).toLowerCase().includes('instagram'))) {
@@ -91,69 +125,60 @@ exports.getPipeline = async (req, res) => {
       return 'whatsapp';
     };
 
-    // Default pipeline structure
     const pipeline = {
-      new: [],
-      hot: [],
-      warm: [],
-      cold: [],
-      existing: [],
-      vip: [],
-      converted: [], // For backwards compatibility
-      lost: []
+      new: [], hot: [], warm: [], cold: [], existing: [], vip: [], converted: [], lost: []
     };
 
-    // Group contacts by their current stage
     leads.forEach(lead => {
-      // 🚀 FIX: Prevent crash if a null/corrupted record exists in the DB
       if (!lead) return;
-
-      // Exclude IG users/fans who haven't shown business intent yet
       if (lead.status === 'visitor' || lead.status === 'unqualified' || lead.status === 'deleted') return;
 
       const norm = normalizeData(lead.name, lead.city);
       lead.name = norm.name;
       lead.city = norm.city;
-      lead.phoneNumber = lead.phoneNumber || lead.phone || ''; // Retroactive fix for missing phone numbers
-      lead.phone = lead.phoneNumber; // Fallback for UI if it strictly expects 'phone'
+      lead.phoneNumber = lead.phoneNumber || lead.phone || ''; 
+      lead.phone = lead.phoneNumber; 
       lead.platform = determinePlatform(lead.phoneNumber, lead.source);
-      let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); // Map AI status to pipeline
+      
+      let stage = (lead.status || lead.crmStage || 'new').toLowerCase(); 
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
-      if (stage === 'interested') stage = 'warm'; // Legacy Mapping
-      if (stage === 'negotiating') stage = 'hot'; // Legacy Mapping
+      if (stage === 'interested') stage = 'warm'; 
+      if (stage === 'negotiating') stage = 'hot'; 
+      if (stage === 'contacted') stage = 'warm';
       
-      if (!pipeline[stage]) stage = 'new'; // Safe Fallback
-      lead.status = stage; // Ensure lowercase for Kanban board strict match
-      lead.id = lead._id ? lead._id.toString() : String(lead.phoneNumber); // Ensure 'id' is strictly a string
+      if (!pipeline[stage]) stage = 'new'; 
+      lead.status = stage; 
+      lead.id = lead._id ? lead._id.toString() : String(lead.phoneNumber); 
 
       if (pipeline[stage]) {
         pipeline[stage].push(lead);
       } else {
-        pipeline.new.push(lead); // Fallback
+        pipeline.new.push(lead); 
       }
     });
     
-    // Group old contacts into the pipeline too
     contacts.forEach(contact => {
-      // 🚀 FIX: Prevent crash if a null/corrupted record exists in the DB
       if (!contact) return;
 
       let stage = (contact.crmStage || 'new').toLowerCase();
       if (stage === 'won' || stage === 'completed') stage = 'converted';
       if (stage === 'pending') stage = 'new';
+      if (stage === 'interested') stage = 'warm';
+      if (stage === 'negotiating') stage = 'hot';
+      if (stage === 'contacted') stage = 'warm';
       if (stage === 'deleted') return;
 
       const norm = normalizeData(contact.name, contact.city);
       const platform = determinePlatform(contact.phone || contact.phoneNumber, contact.source);
-      // Normalize contact structure to match frontend expectations for Lead
+      
       const normalizedContact = {
         ...contact,
-        id: contact._id ? contact._id.toString() : String(contact.phone || contact.phoneNumber), // Ensure 'id' is strictly a string
+        id: contact._id ? contact._id.toString() : String(contact.phone || contact.phoneNumber), 
         name: norm.name,
         city: norm.city,
-        phoneNumber: contact.phoneNumber || contact.phone || '', // Map correct field for Kanban display
-        phone: contact.phoneNumber || contact.phone || '', // Fallback for UI
+        phoneNumber: contact.phoneNumber || contact.phone || '', 
+        phone: contact.phoneNumber || contact.phone || '', 
         status: stage,
         source: 'Manual Contact (Old Data)',
         platform: platform,
@@ -181,14 +206,13 @@ exports.updateStage = async (req, res) => {
     const { newStage, reason, dealValue, notes } = req.body;
     const targetStage = newStage || req.body.stage || req.body.status;
 
-    // Check in Leads first, if not found, check in old Contacts
     let record = null;
     let isLead = true;
 
     try {
       record = await Lead.findOne({ _id: id, userId });
     } catch (e) {
-      record = null; // Prevent Mongoose CastError if id is sent as phone number
+      record = null; 
     }
 
     if (!record) {
@@ -200,7 +224,6 @@ exports.updateStage = async (req, res) => {
       }
     }
 
-    // Fallback: If drag-and-drop sent phone number instead of ObjectId (For Old leads)
     if (!record) {
       record = await Lead.findOne({ phoneNumber: id, userId });
       isLead = true;
@@ -219,7 +242,6 @@ exports.updateStage = async (req, res) => {
     let isStageChanged = false;
     if (targetStage && oldStage !== targetStage.toLowerCase()) {
       isStageChanged = true;
-      // Update contact stage & history
       if (isLead) record.status = targetStage.toLowerCase(); 
       record.crmStage = targetStage.toLowerCase();
       if (!record.crmStageHistory) record.crmStageHistory = [];
@@ -230,7 +252,6 @@ exports.updateStage = async (req, res) => {
         reason: reason || 'Manual update via CRM Panel'
       });
 
-      // 🚀 CRM UPGRADE: Lead Timeline
       if (!record.timeline) record.timeline = [];
       record.timeline.push({ eventType: 'Status Changed', description: `Stage moved from ${oldStage} to ${targetStage.toLowerCase()}`, timestamp: new Date() });
       if (['won', 'converted', 'completed'].includes(targetStage.toLowerCase())) {
@@ -240,16 +261,13 @@ exports.updateStage = async (req, res) => {
       }
     }
 
-    // 🚀 NEW: Save Deal Value and Notes
     if (dealValue !== undefined) record.dealValue = dealValue;
     if (notes !== undefined && notes.trim() !== '') {
       const humanLog = `[Human: ${req.user?.fullName || 'Staff'}] Added Note: ${notes}`;
       
-      // Ensure notes is an array and push the new log
       if (Array.isArray(record.notes)) record.notes.push(humanLog);
       else record.notes = record.notes ? [record.notes, humanLog] : [humanLog];
 
-      // 🚀 CRM UPGRADE: Lead Timeline
       if (!record.timeline) record.timeline = [];
       record.timeline.push({ eventType: 'Follow-up Completed', description: `Note added: ${notes}`, timestamp: new Date() });
     }
@@ -257,19 +275,31 @@ exports.updateStage = async (req, res) => {
     await record.save();
 
     if (isStageChanged) {
-      // Log activity in 360-degree timeline
       await CrmActivity.create({
         userId,
         contactId: record._id,
         type: 'stage_change',
-        description: `Stage changed: ${oldStage} → ${newStage}`,
+        description: `Stage changed: ${oldStage} → ${targetStage.toLowerCase()}`,
         performedBy: req.user?.fullName || 'system',
-        metadata: { oldStage, newStage }
+        metadata: { oldStage, newStage: targetStage.toLowerCase() }
       });
 
-      // Jab deal convert ya complete ho jaye, 15 din baad ROI/Repeat pitch ka auto-followup set karein
-      if (newStage === 'converted' || newStage === 'completed') {
+      if (targetStage.toLowerCase() === 'converted' || targetStage.toLowerCase() === 'completed') {
         await automationQueue.add('campaign_followup', { contactId: record._id, userId }, { delay: 60 * 1000 });
+
+        try {
+          const user = await User.findById(userId).lean();
+          const pixelId = user?.metaConfig?.pixelId;
+          const metaAccessToken = user?.metaConfig?.accessToken;
+          const customerPhone = record.phoneNumber || record.phone;
+
+          if (pixelId && metaAccessToken && customerPhone) {
+            await metaAdsService.sendConversionEvent(pixelId, metaAccessToken, customerPhone, 'Purchase');
+            console.log(`✅ [CRM] Meta Conversion Event sent for converted lead: ${customerPhone}`);
+          }
+        } catch (metaErr) {
+          console.error('⚠️ [CRM] Meta Conversion sync failed (non-blocking):', metaErr.message);
+        }
       }
     }
 
@@ -280,43 +310,55 @@ exports.updateStage = async (req, res) => {
   }
 };
 
-// @desc    Delete a contact/lead permanently
+// @desc    Delete a contact/lead permanently (Leads: SOFT delete to prevent zombie recreation)
 // @route   DELETE /api/crm/contacts/:id
 exports.deleteContact = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { id } = req.params;
 
-    console.log(`\n🗑️ [CRM DEBUG DELETE] Attempting to PERMANENTLY delete Contact/Lead with ID: ${id} for User: ${userId}`);
-    
-    // 🚀 FIX: PERMANENT HARD DELETE + CLEAN MESSAGES
-    // Jisse database ekdum clean rahega aur auto-sync inko dobara nahi layega.
-    let record = null;
-    try {
-      record = await Lead.findOneAndDelete({ _id: id, userId });
-      if (!record) record = await Contact.findOneAndDelete({ _id: id, userId });
-    } catch (e) {
-      record = await Lead.findOneAndDelete({ phoneNumber: id, userId });
-      if (!record) record = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
+    console.log(`\n🗑️ [CRM DELETE] Processing delete for ID: ${id}`);
+
+    // 🐛 FIX (ZOMBIE LEADS): Leads ab SOFT-delete hote hain (status: 'deleted'),
+    // record database mein rehta hai taaki webhook.controller.js ka
+    // `Lead.findOne(...)` ise dobara "naya customer" samajh ke recreate na kare.
+    // Contact (manual entries) abhi bhi hard-delete hote hain kyunki unke liye
+    // koi auto-recreation webhook nahi hai.
+    let lead = await Lead.findOne({ _id: id, userId }) || await Lead.findOne({ phoneNumber: id, userId });
+
+    if (lead) {
+      lead.status = 'deleted';
+      lead.isArchived = true;
+      lead.archivedAt = new Date();
+      lead.deletedAt = new Date();
+      lead.deletedBy = req.user?.fullName || 'system';
+      await lead.save();
+
+      const phoneToClean = lead.phoneNumber || lead.phone;
+      if (phoneToClean) {
+        await Message.deleteMany({ customerPhone: phoneToClean, userId });
+        console.log(`🧹 [CRM DELETE] Wiped chat history for ${phoneToClean}. Lead soft-deleted (tombstoned).`);
+      }
+
+      return res.status(200).json({ success: true, message: 'Deleted successfully' });
     }
-    
-    if (!record) {
-      console.log(`❌ [CRM DEBUG DELETE] Failed: No record found for ID/Phone: ${id}. It may already be deleted.`);
+
+    // Fallback to Contact (still hard delete, no recreation risk)
+    let contact = await Contact.findOneAndDelete({ _id: id, userId })
+      || await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
+
+    if (!contact) {
       return res.status(404).json({ success: false, message: 'Record not found or already deleted' });
     }
 
-    // Wipe message history to guarantee a clean DB
-    const phoneToClean = record.phoneNumber || record.phone;
+    const phoneToClean = contact.phoneNumber || contact.phone;
     if (phoneToClean) {
       await Message.deleteMany({ customerPhone: phoneToClean, userId });
-      console.log(`🧹 [CRM DEBUG DELETE] Wiped all chat history for ${phoneToClean} to keep Database CLEAN.`);
     }
 
-    console.log(`🗑️ [CRM DEBUG DELETE] Success: Record and history PERMANENTLY deleted.`);
-    
     res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
-    console.error('🚨 [CRM DEBUG DELETE] Critical Error:', error);
+    console.error('🚨 Critical deletion crash:', error);
     res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };

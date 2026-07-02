@@ -76,7 +76,6 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
     }
   }
   
-  // AI kabhi kabhi markdown (```json ... ```) bhej deta hai, usko hatane ke liye:
   const cleaned = rawResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   
   return JSON.parse(cleaned);
@@ -91,7 +90,6 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
 
   let searchData = "";
   try {
-    // 1. SerpAPI se live data lana (Google Search)
     console.log(`[Vision Debug] 🌐 Step 1: Requesting SerpAPI (Google Search)...`);
     const serpApiKey = process.env.SERP_API_KEY;
     if (serpApiKey) {
@@ -100,7 +98,6 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
       });
       if (response.data.organic_results && response.data.organic_results.length > 0) {
         console.log(`[Vision Debug] ✅ SerpAPI Success: Found ${response.data.organic_results.length} organic results.`);
-        // AI ko sirf Title, Link aur snippet bhejenge taaki wo confuse na ho aur URLs zaroor de
         searchData = JSON.stringify(response.data.organic_results.slice(0, 5).map(res => ({
           title: res.title,
           link: res.link,
@@ -124,14 +121,17 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   let metaAdsData = "";
   try {
     console.log(`[Vision Debug] 🔵 Step 2: Requesting Official Meta Ad Library API using Master Token...`);
-    // Naye token ka naam META_MASTER_TOKEN rakha gaya hai
     const metaToken = process.env.META_MASTER_TOKEN || process.env.META_AD_API_TOKEN;
     
     if (metaToken && !metaToken.includes('DUMMY')) {
       const metaRes = await axios.get('https://graph.facebook.com/v19.0/ads_archive', {
         params: {
           search_terms: query,
-          ad_reached_countries: "['IN', 'US']",
+          // 🐛 BUG 1 FIX: Pehle ye Python-style string thi "['IN', 'US']" jo Meta
+          // Graph API reject/mis-parse kar deta tha (isliye ye call hamesha fail
+          // hoke silently Apify fallback pe chala jata tha). Ab JSON.stringify se
+          // proper JSON array string bhej rahe hain: '["IN","US"]'
+          ad_reached_countries: JSON.stringify(["IN", "US"]),
           ad_active_status: 'ACTIVE',
           fields: 'page_name,ad_creative_bodies,ad_creation_time',
           access_token: metaToken
@@ -151,7 +151,6 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
     const errMsg = error.response?.data?.error?.message || error.message;
     console.log(`❌ [Vision Debug] Meta API Failed (${errMsg}). Switching to Apify Scraper Fallback...`);
     
-    // Fallback to Apify agar Meta API block karta hai
     try {
       const apifyToken = process.env.APIFY_TOKEN;
       if (apifyToken && !apifyToken.includes('DUMMY')) {
@@ -166,7 +165,6 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
     }
   }
 
-  // 2. AI ko comparison aur analysis ke liye command (Prompt) dena
   console.log(`[Vision Debug] 🧠 Step 3: Sending Combined Data (Google + Meta) to AI...`);
   const prompt = `
   You are an expert Ad Analyst and Marketer.

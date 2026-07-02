@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getLeads, createLead, exportLeads, shareLeadsToWhatsApp, getLeadAnalytics, updateLeadStatus, updateLead, deleteLead, getMarketInsights, analyzeCampaignROI } = require('../controllers/leadController');
+const { getLeads, createLead, exportLeads, shareLeadsToWhatsApp, getLeadAnalytics, updateLeadStatus, updateLead, deleteLead, getMarketInsights, analyzeCampaignROI, bulkImportLeads } = require('../controllers/leadController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.use(protect); // Secures all lead routes below
@@ -8,6 +8,7 @@ router.use(protect); // Secures all lead routes below
 router.get('/export', exportLeads);
 router.post('/share-whatsapp', shareLeadsToWhatsApp);
 router.get('/analytics', getLeadAnalytics);
+router.post('/bulk-import', bulkImportLeads);
 
 router.route('/')
   .get(getLeads)

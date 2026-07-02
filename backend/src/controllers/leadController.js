@@ -12,7 +12,8 @@ exports.getLeads = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    const leads = await Lead.find({ userId }).sort({ createdAt: -1 });
+    // 🐛 FIX: Exclude soft-deleted leads (status: 'deleted') from list view
+    const leads = await Lead.find({ userId, status: { $ne: 'deleted' } }).sort({ createdAt: -1 });
     res.status(200).json(leads);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -31,12 +32,27 @@ exports.createLead = async (req, res) => {
       return res.status(400).json({ message: 'Name and Phone Number are required' });
     }
 
-    // 🚀 CRM UPGRADE: Old Customer Detection
-    // Agar number daalte hi pata karna hai ki purana customer hai ya nahi
     let formattedPhone = phoneNumber.replace(/\D/g, '');
     const existingLead = await Lead.findOne({ phoneNumber: { $regex: new RegExp(formattedPhone.slice(-10) + '$') }, userId });
     
     if (existingLead) {
+      // 🐛 FIX: If the existing match is a soft-deleted (tombstoned) lead, RESTORE it
+      // instead of blocking creation with "already exists" — user explicitly wants
+      // to bring this contact back into the CRM.
+      if (existingLead.status === 'deleted') {
+        existingLead.status = 'new';
+        existingLead.name = name;
+        existingLead.email = email || existingLead.email;
+        existingLead.source = source || existingLead.source;
+        existingLead.deletedAt = null;
+        existingLead.deletedBy = null;
+        existingLead.isArchived = false;
+        existingLead.timeline = existingLead.timeline || [];
+        existingLead.timeline.push({ eventType: 'Lead Restored', description: 'Lead was manually re-added after being deleted', timestamp: new Date() });
+        await existingLead.save();
+        return res.status(201).json(existingLead);
+      }
+
       const lastContactDate = existingLead.updatedAt ? new Date(existingLead.updatedAt).toLocaleDateString('en-IN') : 'N/A';
       return res.status(400).json({ 
         message: `Customer already exists in CRM! \nStatus: ${existingLead.status.toUpperCase()} \nLast Contacted: ${lastContactDate}` 
@@ -117,45 +133,56 @@ exports.deleteLead = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     const { id } = req.params;
-    let deletedRecord = null;
 
-    console.log(`\n🗑️ [DEBUG DELETE] Attempting to PERMANENTLY Delete Lead with ID: ${id} for User: ${userId}`);
+    console.log(`\n🗑️ [leadController DELETE] Processing delete for ID: ${id}`);
 
-    // 🚀 FIX: HARD DELETE
+    // 🐛 FIX (ZOMBIE LEADS): Ye route pehle HARD delete karta tha — agar koi
+    // frontend jagah abhi bhi is route (/api/leads/:id) ko call karti hai
+    // (CrmPage.jsx ke alawa), to zombie-lead bug wapas aa sakta tha. Ab
+    // crmController.deleteContact jaisa hi SOFT delete behavior.
+    let lead = null;
     try {
       if (mongoose.Types.ObjectId.isValid(id)) {
-        deletedRecord = await Lead.findOneAndDelete({ _id: id, userId });
+        lead = await Lead.findOne({ _id: id, userId });
       }
-    } catch (e) {
-      console.log(`⚠️ [DEBUG DELETE] Error querying Lead by ObjectId:`, e.message);
+    } catch (e) {}
+    if (!lead) lead = await Lead.findOne({ phoneNumber: id, userId });
+
+    if (lead) {
+      lead.status = 'deleted';
+      lead.isArchived = true;
+      lead.archivedAt = new Date();
+      lead.deletedAt = new Date();
+      lead.deletedBy = req.user?.fullName || 'system';
+      await lead.save();
+
+      const phoneToClean = lead.phoneNumber || lead.phone;
+      if (phoneToClean) {
+        await Message.deleteMany({ customerPhone: phoneToClean, userId });
+        console.log(`🧹 [leadController DELETE] Wiped messages for ${phoneToClean}. Lead soft-deleted.`);
+      }
+      return res.status(200).json({ success: true, message: 'Deleted successfully' });
     }
 
-    if (!deletedRecord) {
-      try {
-        if (mongoose.Types.ObjectId.isValid(id)) {
-          deletedRecord = await Contact.findOneAndDelete({ _id: id, userId });
-        }
-      } catch (e) {
-        console.log(`⚠️ [DEBUG DELETE] Error querying Contact by ObjectId:`, e.message);
+    // Fallback: Contact (manual entries) — still hard delete, no recreation risk
+    let deletedRecord = null;
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        deletedRecord = await Contact.findOneAndDelete({ _id: id, userId });
       }
-    }
-
-    if (!deletedRecord) {
-      deletedRecord = await Lead.findOneAndDelete({ phoneNumber: id, userId });
-    }
+    } catch (e) {}
     if (!deletedRecord) {
       deletedRecord = await Contact.findOneAndDelete({ $or: [{ phone: id }, { phoneNumber: id }], userId });
     }
-    
+
     if (!deletedRecord) {
-      console.log(`❌ [DEBUG DELETE] Failed: No record found for ID/Phone: ${id}`);
+      console.log(`❌ [leadController DELETE] Failed: No record found for ID/Phone: ${id}`);
       return res.status(404).json({ message: 'Lead or Contact not found' });
     }
-    
+
     const phoneToClean = deletedRecord.phoneNumber || deletedRecord.phone;
     if (phoneToClean) {
       await Message.deleteMany({ customerPhone: phoneToClean, userId });
-      console.log(`🧹 [DEBUG DELETE] Wiped all messages for ${phoneToClean} to keep Database CLEAN.`);
     }
 
     res.status(200).json({ success: true, message: 'Deleted successfully' });
@@ -171,10 +198,10 @@ exports.exportLeads = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    const leads = await Lead.find({ userId }).sort({ createdAt: -1 }).lean();
+    // 🐛 FIX: Exclude soft-deleted leads from export
+    const leads = await Lead.find({ userId, status: { $ne: 'deleted' } }).sort({ createdAt: -1 }).lean();
     const contacts = await Contact.find({ userId }).sort({ createdAt: -1 }).lean();
     
-    // Simple CSV Generation
     const headers = ['Name', 'Phone', 'Email', 'Status', 'Source', 'Created At'];
     const csvRows = [headers.join(',')];
     
@@ -210,7 +237,6 @@ exports.shareLeadsToWhatsApp = async (req, res) => {
       return res.status(400).json({ message: 'WhatsApp configuration missing.' });
     }
 
-    // 🚀 SMART UPGRADE: Auto fallback to ownerPhone
     if (!targetPhoneNumber) {
       if (user.ownerPhone) {
         targetPhoneNumber = user.ownerPhone;
@@ -219,8 +245,8 @@ exports.shareLeadsToWhatsApp = async (req, res) => {
       }
     }
 
-    // Get the latest 50 CRM leads
-    const leads = await Lead.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
+    // 🐛 FIX: Exclude soft-deleted leads from WhatsApp backup
+    const leads = await Lead.find({ userId, status: { $ne: 'deleted' } }).sort({ createdAt: -1 }).limit(50).lean();
     
     if (leads.length === 0) return res.status(400).json({ message: 'No leads found to share.' });
 
@@ -256,10 +282,8 @@ exports.getLeadAnalytics = async (req, res) => {
     if (!userId) return res.status(401).json({ message: "Not authorized" });
 
     const { workspaceId, platform } = req.query;
-    console.log(`🔍 [Lead Analytics Debug] Fetching graph data for userId: ${userId}, workspace: ${workspaceId}, platform: ${platform}`);
     const userIdObj = new mongoose.Types.ObjectId(userId);
 
-    // 🚀 AUTO-SYNC: Ensure leads exist for all past conversations before calculating stats
     try {
       const distinctPhones = await Message.distinct('customerPhone', { userId: userIdObj });
       if (distinctPhones && distinctPhones.length > 0) {
@@ -285,15 +309,12 @@ exports.getLeadAnalytics = async (req, res) => {
         }
         if (newLeadsToCreate.length > 0) {
           await Lead.insertMany(newLeadsToCreate);
-          console.log(`✅ [Dashboard Sync] Auto-created ${newLeadsToCreate.length} missing leads.`);
         }
       }
     } catch (syncErr) {
       console.error("Dashboard lead sync error:", syncErr.message);
     }
 
-    //  DYNAMIC WORKSPACE FILTER LOGIC
-    // 🚀 FIX: Ignore visitor, unqualified, AND 'deleted' statuses
     const leadQuery = { userId, status: { $nin: ['visitor', 'unqualified', 'deleted'] } };
     const aggLeadQuery = { userId: userIdObj, status: { $nin: ['visitor', 'unqualified', 'deleted'] } };
     
@@ -305,7 +326,6 @@ exports.getLeadAnalytics = async (req, res) => {
         $or: [
           { lastSelectedWorkspaceId: 'main' },
           { lastSelectedWorkspaceId: 'main_business' },
-          // Handle older chats mapped to 'default'
           { lastSelectedWorkspaceId: 'default' },
           { lastSelectedWorkspaceId: { $exists: false } },
           { lastSelectedWorkspaceId: null },
@@ -316,23 +336,12 @@ exports.getLeadAnalytics = async (req, res) => {
       Object.assign(aggLeadQuery, mainFilter);
     }
 
-    // 🚀 NEW: Platform Filter Logic (WhatsApp / Instagram)
     if (platform === 'instagram') {
-      const igFilter = {
-        $or: [
-          { phoneNumber: { $regex: /^IG_/i } },
-          { source: { $regex: /instagram/i } }
-        ]
-      };
+      const igFilter = { $or: [{ phoneNumber: { $regex: /^IG_/i } }, { source: { $regex: /instagram/i } }] };
       Object.assign(leadQuery, igFilter);
       Object.assign(aggLeadQuery, igFilter);
     } else if (platform === 'whatsapp') {
-      const waFilter = {
-        $and: [
-          { phoneNumber: { $not: /^IG_/i } },
-          { source: { $not: /instagram/i } }
-        ]
-      };
+      const waFilter = { $and: [{ phoneNumber: { $not: /^IG_/i } }, { source: { $not: /instagram/i } }] };
       Object.assign(leadQuery, waFilter);
       Object.assign(aggLeadQuery, waFilter);
     }
@@ -344,49 +353,71 @@ exports.getLeadAnalytics = async (req, res) => {
     const newLeads = await Lead.countDocuments({ ...leadQuery, status: 'new' });
     const lost = await Lead.countDocuments({ ...leadQuery, status: 'lost' });
 
-    // 🚀 CRM UPGRADE: Smart Categories
     const hot = await Lead.countDocuments({ ...leadQuery, status: { $in: ['hot', 'negotiating'] } });
     const warm = await Lead.countDocuments({ ...leadQuery, status: { $in: ['warm', 'interested'] } });
     const cold = await Lead.countDocuments({ ...leadQuery, status: 'cold' });
     const existing = await Lead.countDocuments({ ...leadQuery, status: 'existing' });
     const vip = await Lead.countDocuments({ ...leadQuery, status: 'vip' });
 
-    // Follow-ups due today
     const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
     const followUpsToday = await Lead.countDocuments({ ...leadQuery, nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } });
     
-    console.log(`📊 [Lead Analytics Debug] Found -> New: ${newLeads}, Interested: ${interested}, Converted: ${converted}, Lost/Ignored: ${lost + ignored}`);
-    
-    // Calculations
     const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(2) : 0;
     
-    // 🚀 BULLETPROOF FIX: Calculate REAL Message Stats directly from DB, filtered by workspace.
-    // STRICTLY for WhatsApp API Delivery Report (Excluded Instagram 'IG_' numbers)
     const leadsForMessageStats = await Lead.find(leadQuery).select('phoneNumber').lean();
     const phoneNumbersForStats = leadsForMessageStats
       .map(l => l.phoneNumber)
       .filter(phone => phone && !phone.toUpperCase().startsWith('IG_'));
 
-    const messageQuery = { 
-      userId: userIdObj, 
-      customerPhone: { $in: phoneNumbersForStats } 
-    };
+    const messageQuery = { userId: userIdObj, customerPhone: { $in: phoneNumbersForStats } };
 
     const actualSent = await Message.countDocuments({ ...messageQuery, direction: 'outgoing' });
     const actualDelivered = await Message.countDocuments({ ...messageQuery, direction: 'outgoing', status: { $in: ['delivered', 'read'] } });
     const actualRead = await Message.countDocuments({ ...messageQuery, direction: 'outgoing', status: 'read' });
     
-    const messageStats = {
-      sent: actualSent,
-      delivered: actualDelivered,
-      read: actualRead
-    };
+    const messageStats = { sent: actualSent, delivered: actualDelivered, read: actualRead };
 
-    // 🚀 LIVE: Total Investment Fix (Meta charges per 24h conversation, NOT per message)
-    // Assuming ~4 messages equal 1 conversation session. Incoming/free window replies don't cost ₹0.80 each.
-    const estimatedConversations = Math.ceil(messageStats.sent / 4);
-    const totalInvestment = estimatedConversations * 0.80; 
+    // 🐛 FIX: Sahi Meta-style 24-hour conversation-window billing.
+    // Rule: Customer ka koi bhi incoming message 24-ghante ka FREE window kholta hai.
+    // Is window ke andar business ke saare outgoing replies FREE hain (chahe kitne bhi ho).
+    // Business sirf tabhi paisa deta hai jab wo koi outgoing message bheje aur us waqt
+    // koi active customer-window na ho (matlab customer ne 24hr se kuch nahi bheja tha) —
+    // isse ek NAYA paid conversation window khulta hai (jo khud bhi 24hr ke liye free reply allow karta hai).
+    const billingMessages = await Message.find(messageQuery)
+      .select('customerPhone direction timestamp')
+      .sort({ customerPhone: 1, timestamp: 1 })
+      .lean();
+
+    let totalConversations = 0;
+    let currentPhone = null;
+    let windowExpiry = null;
+
+    for (const msg of billingMessages) {
+      if (msg.customerPhone !== currentPhone) {
+        currentPhone = msg.customerPhone;
+        windowExpiry = null; // Naya customer, purana window reset
+      }
+
+      const msgTime = new Date(msg.timestamp);
+      if (isNaN(msgTime.getTime())) continue; // Corrupt/missing timestamp safety
+
+      if (msg.direction === 'incoming') {
+        // Customer ne message bheja -> 24hr free window (re)open/extend hota hai
+        windowExpiry = new Date(msgTime.getTime() + 24 * 60 * 60 * 1000);
+      } else if (msg.direction === 'outgoing') {
+        const isWithinFreeWindow = windowExpiry && msgTime <= windowExpiry;
+        if (!isWithinFreeWindow) {
+          // Koi active free window nahi tha -> business ne naya conversation kholna pada (PAID)
+          totalConversations++;
+          // Ye naya business-initiated window bhi agle 24hr tak free replies allow karta hai
+          windowExpiry = new Date(msgTime.getTime() + 24 * 60 * 60 * 1000);
+        }
+        // Agar free window ke andar hai -> bilkul free, kuch charge nahi
+      }
+    }
+
+    const totalInvestment = totalConversations * 0.80;
     const costPerLead = totalLeads > 0 ? (totalInvestment / totalLeads).toFixed(2) : 0;
 
     const graphData = [
@@ -396,11 +427,8 @@ exports.getLeadAnalytics = async (req, res) => {
       { name: 'Lost/Ignored', value: ignored + lost }
     ];
 
-    const smartCrmData = {
-      hot, warm, cold, existing, vip, followUpsToday, new: newLeads, lost
-    };
+    const smartCrmData = { hot, warm, cold, existing, vip, followUpsToday, new: newLeads, lost };
 
-    // 🚀 NEW: Lead Source Breakdown (Bar Chart)
     const leadsBySource = await Lead.aggregate([
       { $match: aggLeadQuery },
       { $group: { _id: '$source', count: { $sum: 1 } } },
@@ -408,35 +436,26 @@ exports.getLeadAnalytics = async (req, res) => {
       { $sort: { leads: -1 } }
     ]);
 
-    // 🚀 NEW: Daily Lead Trend (Line Chart for last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const dailyLeadsData = await Lead.aggregate([
         { $match: { ...aggLeadQuery, createdAt: { $gte: sevenDaysAgo } } },
-        {
-            $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-                count: { $sum: 1 }
-            }
-        },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
         { $project: { date: '$_id', leads: '$count', _id: 0 } }
     ]);
 
-    // 🚀 NEW: Fetch Recent Activity for Live AI Activity Section
     const recentActivity = await Lead.find(leadQuery)
       .sort({ updatedAt: -1 })
       .limit(8)
       .select('name status source createdAt updatedAt notes aiFeedbackScore');
 
-    // 🚀 NEW: Advanced Reply Analytics
     const replyAnalytics = await Message.aggregate([
         { $match: { userId: userIdObj } },
         {
             $group: {
                 _id: '$direction',
                 uniqueCustomers: { $addToSet: '$customerPhone' },
-                // For outgoing messages, group by sentBy
                 botReplies: { $sum: { $cond: [ { $and: [ { $eq: ['$direction', 'outgoing'] }, { $in: ['$sentBy', ['auto-reply', 'system']] } ] }, 1, 0 ] } },
                 aiReplies: { $sum: { $cond: [ { $and: [ { $eq: ['$direction', 'outgoing'] }, { $eq: ['$sentBy', 'ai'] } ] }, 1, 0 ] } },
                 humanReplies: { $sum: { $cond: [ { $and: [ { $eq: ['$direction', 'outgoing'] }, { $eq: ['$sentBy', 'staff'] } ] }, 1, 0 ] } },
@@ -444,11 +463,7 @@ exports.getLeadAnalytics = async (req, res) => {
         }
     ]);
 
-    let customersReplied = 0;
-    let weRepliedTo = 0;
-    let botReplyCount = 0;
-    let aiReplyCount = 0;
-    let humanReplyCount = 0;
+    let customersReplied = 0, weRepliedTo = 0, botReplyCount = 0, aiReplyCount = 0, humanReplyCount = 0;
 
     replyAnalytics.forEach(group => {
         if (group._id === 'incoming') {
@@ -465,13 +480,7 @@ exports.getLeadAnalytics = async (req, res) => {
 
     res.status(200).json({
       stats: { totalLeads, converted, conversionRate, totalInvestment, costPerLead },
-      graphData,
-      leadsBySource,
-      dailyLeads: dailyLeadsData,
-      messageStats,
-      recentActivity,
-      advancedStats,
-      smartCrmData,
+      graphData, leadsBySource, dailyLeads: dailyLeadsData, messageStats, recentActivity, advancedStats, smartCrmData,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -485,19 +494,12 @@ exports.getMarketInsights = async (req, res) => {
     const userId = req.user ? req.user._id : null;
     if (!userId) return res.status(401).json({ message: "Not authorized" });
 
-    // Get the last 50 interested/won deals (brands approaching the influencer)
-    const recentLeads = await Lead.find({ 
-      userId, 
-      source: { $regex: /Instagram/i } 
-    }).sort({ createdAt: -1 }).limit(50);
+    const recentLeads = await Lead.find({ userId, source: { $regex: /Instagram/i }, status: { $ne: 'deleted' } }).sort({ createdAt: -1 }).limit(50);
 
     if (recentLeads.length < 5) {
-      return res.status(200).json({ 
-        message: "Not enough data yet. Let the AI talk to at least 5 brands to generate market insights." 
-      });
+      return res.status(200).json({ message: "Not enough data yet. Let the AI talk to at least 5 brands to generate market insights." });
     }
 
-    // Create a summarized string of recent deals
     const dealHistory = recentLeads.map(lead => `- Status: ${lead.status}, Notes: ${lead.notes}`).join('\n');
 
     const aiContext = `You are a top-tier Business Strategist and Influencer Marketing Expert.
@@ -552,5 +554,63 @@ exports.analyzeCampaignROI = async (req, res) => {
     res.status(200).json({ success: true, analysis: analysisReport });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Bulk import leads (from Lead Extractor / Google Maps scraper)
+// @route   POST /api/leads/bulk-import
+exports.bulkImportLeads = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const { leads, source } = req.body;
+
+    if (!Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({ success: false, message: 'No leads provided to import.' });
+    }
+
+    const existingLeads = await Lead.find({ userId }).select('phoneNumber').lean();
+    const existingPhoneSet = new Set(
+      existingLeads.map(l => (l.phoneNumber || '').replace(/\D/g, '').slice(-10)).filter(Boolean)
+    );
+
+    const toInsert = [];
+    let skippedNoPhone = 0;
+    let skippedDuplicate = 0;
+
+    for (const lead of leads) {
+      const cleanPhone = (lead.phone || '').replace(/\D/g, '');
+      if (!cleanPhone) { skippedNoPhone++; continue; }
+
+      const last10 = cleanPhone.slice(-10);
+      if (existingPhoneSet.has(last10)) { skippedDuplicate++; continue; }
+      existingPhoneSet.add(last10);
+
+      toInsert.push({
+        userId,
+        createdBy: userId,
+        name: lead.name || 'Unknown Business',
+        phoneNumber: cleanPhone,
+        status: 'new',
+        source: source || 'Lead Extractor (Google Maps)',
+        notes: [lead.address, lead.type, lead.website].filter(Boolean).join(' | '),
+        timeline: [{ eventType: 'Lead Created', description: `Imported via Lead Extractor${lead.city ? ` (${lead.city})` : ''}`, timestamp: new Date() }]
+      });
+    }
+
+    let inserted = [];
+    if (toInsert.length > 0) inserted = await Lead.insertMany(toInsert);
+
+    res.status(201).json({
+      success: true,
+      importedCount: inserted.length,
+      skippedNoPhone,
+      skippedDuplicate,
+      message: `${inserted.length} leads imported. ${skippedDuplicate} duplicates and ${skippedNoPhone} no-phone leads skipped.`
+    });
+  } catch (error) {
+    console.error('Bulk Import Leads Error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

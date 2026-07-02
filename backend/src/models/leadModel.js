@@ -22,7 +22,17 @@ const leadSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['new', 'contacted', 'interested', 'negotiating', 'not_interested', 'converted', 'lost', 'ignored'],
+    // 🐛 FIX: Pehle sirf 8 values thi, jinme Kanban columns 'hot', 'warm',
+    // 'cold', 'existing', 'vip' missing the. Isse jab bhi lead in columns
+    // mein drag hoti thi, .save() Mongoose ValidationError se crash ho
+    // jaata tha (silent 500 error). 'deleted' bhi add kiya hai for soft-delete,
+    // 'visitor'/'unqualified' bhi (pipeline already inhe filter karta hai).
+    enum: [
+      'new', 'contacted', 'interested', 'negotiating', 'not_interested',
+      'converted', 'lost', 'ignored',
+      'hot', 'warm', 'cold', 'existing', 'vip',
+      'deleted', 'visitor', 'unqualified'
+    ],
     default: 'new',
   },
   source: {
@@ -62,7 +72,6 @@ const leadSchema = new Schema({
     type: String,
     default: 'main'
   },
-  // Custom fields can be stored in a flexible way
   customFields: {
     type: Map,
     of: String,
@@ -75,19 +84,21 @@ const leadSchema = new Schema({
   expiresAt: {
     type: Date
   },
-  // --- Retention & Cold Storage (For 120-Day Rule) ---
-  isArchived: { type: Boolean, default: false }, // Hides from UI but stays in DB
+  isArchived: { type: Boolean, default: false },
   archivedAt: { type: Date },
-  archiveUrl: { type: String }, // AWS S3 / Cloud Link if moved to cold storage
+  archiveUrl: { type: String },
 
   // --- Call AI Tracking ---
   lastCallSummary: { type: String },
   lastCallActionTaken: { type: String },
   lastCallDate: { type: Date },
-  callConfidenceStatus: { type: String, enum: ['High', 'Medium', 'Low'] }
+  callConfidenceStatus: { type: String, enum: ['High', 'Medium', 'Low'] },
+
+  // 🆕 NEW: Soft-delete tombstone tracking (prevents zombie leads)
+  deletedAt: { type: Date, default: null },
+  deletedBy: { type: String, default: null }
 });
 
-// TTL Index: MongoDB will automatically delete the document when current time > expiresAt
 leadSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Lead = mongoose.model('Lead', leadSchema);

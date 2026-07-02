@@ -518,8 +518,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 });
                 continue; 
               }
-
-              if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('collab') || incomingTextLower.includes('brand') || incomingTextLower.includes('promotion'))) {
+if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('collab') || incomingTextLower.includes('brand') || incomingTextLower.includes('promotion'))) {
                 const collabMsg = `Thank you for your interest in collaborating! 🤝 Our team has received your request and will review it soon.`;
                 
                 let deliveryStatus = 'sent';
@@ -542,16 +541,19 @@ exports.handleInstagramWebhook = async (req, res) => {
                   expiresAt: getExpiry('junk')
                 });
                 
+                // 🐛 FIX: Status ko 'new' se badalkar hataya (jo pehle se hai — 'visitor' —
+                // wahi rahega). Placeholder name (`IG User ${senderId}`) bhi hataya taaki
+                // "half-empty" lead Kanban mein na dikhe. Sirf note add ho raha hai ki
+                // customer ne collab option choose kiya — asli lead tab banegi jab AI
+                // extract_brand_deal/extract_lead_requirements tool call se real brand
+                // name, budget, deliverables capture karega (niche wale AI block mein).
                 await Lead.findOneAndUpdate(
                   { phoneNumber: `IG_${senderId}` }, 
                   { 
                     $set: {
                       userId: user._id, 
-                      name: `IG User ${senderId}`, 
-                      source: 'Instagram DM (Collab)', 
-                      status: 'new', 
-                      notes: `IG Handle: @${senderId}\nDeal Type: Collab`,
-                      expiresAt: getExpiry('lead')
+                      source: 'Instagram DM (Collab Intent)', 
+                      notes: `Customer selected "Collab/Brand" option. Awaiting brand name, budget, and deliverables.`
                     }
                   }, 
                   { upsert: true }
