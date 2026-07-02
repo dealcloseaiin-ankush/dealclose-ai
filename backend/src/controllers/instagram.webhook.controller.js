@@ -33,20 +33,23 @@ metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
   }
 };
 
-metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text) => {
+metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentId, text) => {
   if (!token) {
     throw new Error("No Access Token found for private reply (Token is NULL)");
   }
+  if (!pageId) {
+    throw new Error("No Facebook Page ID found for private reply (pageId is NULL)");
+  }
 
-  console.log(`\n[PRIVATE REPLY DEBUG] Attempting private reply for comment ID: ${commentId}`);
+  console.log(`\n[PRIVATE REPLY DEBUG] Attempting private reply for pageId: ${pageId}, commentId: ${commentId}`);
   console.log(`[PRIVATE REPLY DEBUG] Message preview: ${String(text || '').substring(0, 180)}`);
 
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/v19.0/me/messages`,
+      `https://graph.facebook.com/v19.0/${pageId}/messages`,
       {
         recipient: { comment_id: commentId },
-        message: { text: text },
+        message: { text },
         messaging_type: "RESPONSE"
       },
       {
@@ -58,8 +61,29 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, commentId, text)
   } catch (error) {
     const metaErr = error.response?.data?.error;
     console.error("[PRIVATE REPLY REJECTED] Meta rejected comment private reply.");
+    console.error("[PRIVATE REPLY REJECTED] Request debug:", {
+      pageId,
+      commentId,
+      tokenSnippet: token ? `${token.slice(0, 10)}...` : null
+    });
     console.error("[PRIVATE REPLY REJECTED] Full response:", error.response?.data || error.message);
     console.error(`[PRIVATE REPLY REJECTED] Code: ${metaErr?.code}, Subcode: ${metaErr?.error_subcode}, Message: ${metaErr?.message || error.message}`);
+
+    if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+      try {
+        const appToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
+        const debugResponse = await axios.get(`https://graph.facebook.com/debug_token`, {
+          params: {
+            input_token: token,
+            access_token: appToken
+          }
+        });
+        console.error("[PRIVATE REPLY DEBUG_TOKEN]", debugResponse.data);
+      } catch (debugError) {
+        console.error("[PRIVATE REPLY DEBUG_TOKEN ERROR]", debugError.response?.data || debugError.message);
+      }
+    }
+
     throw error;
   }
 };
@@ -740,6 +764,7 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
           let activeWorkspaceNode = null;
           let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
           let igPageId = user.instagramConfig?.facebookPageId || user.igConfig?.facebookPageId || null;
+          console.log("[COMMENT WEBHOOK DEBUG] initial pageId:", igPageId, "initial token present:", Boolean(igToken));
 
           if (user.workspaces && user.workspaces.length > 0) {
              activeWorkspaceNode = user.workspaces.find(w => w?.instagramConfig?.instagramAccountId === igAccountId);
@@ -881,6 +906,8 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
                     console.log("🕵️‍♂️ [DIAGNOSIS ENGINE] RUNNING DIRECT USER_ID OVERRIDE");
                     console.log("👉 TARGET EXTRACTED USER NAME:", username);
                     console.log("👉 TARGET EXTRACTED USER ID (igUserId):", igUserId);
+                    console.log("👉 TARGET PAGE ID:", igPageId);
+                    console.log("👉 IG TOKEN PRESENT:", Boolean(igToken));
                     console.log("====================================================");
                     
                     // Direct User ID pipeline lookup 
@@ -894,16 +921,25 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
                     console.log("\n🚀 [TEST DM] Button mode bypass to direct user ID DM text");
                     const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
                     console.log("COMMENT ID FOR PRIVATE REPLY:", commentData.id);
+                    console.log("👉 PRIVATE REPLY PAGE ID:", igPageId);
                     await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText);
                     dmSentSuccessfully = true;
                  }
                  else {
+                    console.log("COMMENT ID FOR PRIVATE REPLY:", commentData.id);
+                    console.log("👉 PRIVATE REPLY PAGE ID:", igPageId);
                     await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, finalReplyMsg);
                     dmSentSuccessfully = true;
                  }
                }
              } catch (replyErr) {
-               console.error("❌ [Meta Graph Private Reply / Direct DM Error]:", replyErr.response?.data || replyErr.message);
+               console.error("❌ [Meta Graph Private Reply / Direct DM Error]:", {
+                 message: replyErr.message,
+                 status: replyErr.response?.status,
+                 data: replyErr.response?.data,
+                 pageId: igPageId,
+                 commentId: commentData.id
+               });
              }
 
              if (dmSentSuccessfully) {

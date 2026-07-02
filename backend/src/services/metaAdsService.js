@@ -29,20 +29,58 @@ exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
 
 // 2. 🚀 FIXED: Send Private DM Reply safely via Recipient Comment ID Token Link
 exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText) => {
+  if (!accessToken) {
+    throw new Error("[PRIVATE_REPLY] Missing access token");
+  }
+  if (!pageId) {
+    throw new Error("[PRIVATE_REPLY] Missing Facebook Page ID");
+  }
+  if (!commentId) {
+    throw new Error("[PRIVATE_REPLY] Missing comment ID");
+  }
+
+  const url = `https://graph.facebook.com/v19.0/${pageId}/messages`;
+  console.log("\n[PRIVATE REPLY REQUEST] URL:", url);
+  console.log("[PRIVATE REPLY REQUEST] token snippet:", `${accessToken.slice(0, 12)}...${accessToken.slice(-12)}`);
+  console.log("[PRIVATE REPLY REQUEST] payload:", {
+    recipient: { comment_id: commentId },
+    message: { text: messageText },
+    messaging_type: "RESPONSE"
+  });
+
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${pageId}/messages`,
+      url,
       {
         recipient: { comment_id: commentId },
-        message: { text: messageText }
+        message: { text: messageText },
+        messaging_type: "RESPONSE"
       },
       {
         params: { access_token: accessToken }
       }
     );
+    console.log("[PRIVATE REPLY SUCCESS] response:", response.data);
     return response.data;
   } catch (error) {
-    console.error("❌ Meta Graph API Comment Private Reply Crash:", error.response?.data || error.message);
+    const metaErr = error.response?.data?.error;
+    console.error("[PRIVATE REPLY ERROR] request failed", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+      pageId,
+      commentId,
+      tokenSnippet: accessToken ? `${accessToken.slice(0, 12)}...${accessToken.slice(-12)}` : null
+    });
+    if (metaErr) {
+      console.error("[PRIVATE REPLY ERROR] meta error details", {
+        type: metaErr.type,
+        code: metaErr.code,
+        subcode: metaErr.error_subcode,
+        message: metaErr.message,
+        fbtrace_id: metaErr.fbtrace_id
+      });
+    }
     throw error;
   }
 };
