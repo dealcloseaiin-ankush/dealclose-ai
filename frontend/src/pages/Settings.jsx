@@ -49,6 +49,7 @@ export default function Settings() {
   const [showExternalToken, setShowExternalToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
+  const [disconnectMessage, setDisconnectMessage] = useState('');
   
   const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [isChangingPass, setIsChangingPass] = useState(false);
@@ -297,6 +298,23 @@ export default function Settings() {
     }
   };
 
+  const disconnectInstagram = async (workspaceId = 'main') => {
+    try {
+      const payload = workspaceId && workspaceId !== 'main' ? { workspaceId } : {};
+      const res = await api.post('/users/settings/instagram-disconnect', payload);
+      if (res.data.success) {
+        setDisconnectMessage(res.data.message || 'Instagram disconnected successfully.');
+        await fetchSettings();
+        window.setTimeout(() => setDisconnectMessage(''), 5000);
+      } else {
+        alert(res.data.message || 'Could not disconnect Instagram.');
+      }
+    } catch (error) {
+      console.error('Instagram Disconnect Error:', error.response?.data || error.message);
+      alert(error.response?.data?.message || 'Instagram disconnect failed.');
+    }
+  };
+
   const openInstagramPicker = (data, workspaceId = 'main') => {
     if (!data?.availableAccounts?.length) return fetchSettings();
     setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
@@ -366,6 +384,12 @@ export default function Settings() {
             <CheckCircle size={18}/> Save Settings
           </button>
         </div>
+
+        {disconnectMessage && (
+          <div className="mb-6 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-green-100">
+            <strong>Success:</strong> {disconnectMessage}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500"></div></div>
@@ -552,7 +576,13 @@ export default function Settings() {
                     ) : (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
-                         <button type="button" onClick={() => alert('Disconnect via Settings: paste blank IG token and save.')} className="mt-3 text-sm text-red-400 font-bold hover:underline">Disconnect</button>
+                         <button
+                           type="button"
+                           onClick={() => disconnectInstagram('main')}
+                           className="mt-3 text-sm text-red-400 font-bold hover:underline"
+                         >
+                           Disconnect
+                         </button>
                       </div>
                     )}
                   </div>
@@ -860,10 +890,7 @@ export default function Settings() {
                             <MetaConnectButton buttonText="Connect Instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                          ) : (
                             <button type="button"
-                              onClick={() => {
-                                handleWorkspaceChange(wsIndex, 'instagramConfig', { accessToken: '', instagramAccountId: '', facebookPageId: '' });
-                                alert('Instagram status changed. Please click top-right "Save Settings" to write changes to DB.');
-                              }}
+                              onClick={() => disconnectInstagram(activeWs?._id)}
                               className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
                             >
                               Disconnect Instagram

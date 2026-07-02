@@ -673,13 +673,42 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
-    if (instagramConfig !== undefined) updateData.instagramConfig = instagramConfig;
-    
-    console.log(`➡️ [DEBUG Profile Update] Data being set in DB:`, updateData);
+
+    if (workspaces !== undefined) {
+      updateData.workspaces = (workspaces || []).map(ws => {
+        if (ws.instagramConfig && ws.instagramConfig.accessToken === '') {
+          const { instagramConfig, ...cleanWs } = ws;
+          return cleanWs;
+        }
+        return ws;
+      });
+    }
+
+    if (instagramConfig !== undefined) {
+      if (instagramConfig && instagramConfig.accessToken === '') {
+        // Remove root instagramConfig when the user clears the access token
+        updateData.instagramConfig = undefined;
+      } else {
+        updateData.instagramConfig = instagramConfig;
+      }
+    }
+
+    // Build update operations to support both $set and $unset
+    const updateOps = {};
+    if (Object.keys(updateData).length) {
+      updateOps.$set = updateData;
+    }
+    if (instagramConfig !== undefined && instagramConfig && instagramConfig.accessToken === '') {
+      updateOps.$set = updateOps.$set || {};
+      delete updateOps.$set.instagramConfig;
+      updateOps.$unset = { instagramConfig: '' };
+    }
+
+    console.log(`➡️ [DEBUG Profile Update] Data being set in DB:`, updateOps);
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { $set: updateData },
+      updateOps,
       { returnDocument: 'after', strict: false }
     );
 
