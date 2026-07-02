@@ -9,13 +9,13 @@ const { protect } = require('../middleware/authMiddleware');
 router.post('/login', authController.supabaseAuth);
 
 // --- Settings & Integration Routes ---
-router.get('/settings', protect, settingsController.getSettings);
-router.post('/settings', protect, settingsController.saveSettings);
-router.post('/settings/whatsapp-connect', protect, authController.whatsappConnect);
-router.post('/settings/instagram-connect', protect, authController.instagramConnect);
-router.post('/settings/instagram-connect-selected', protect, authController.instagramConnectSelected);
-router.post('/settings/meta-connect', protect, settingsController.connectMetaAccount); // For Embedded Signup
-router.post('/settings/instagram-disconnect', protect, settingsController.instagramDisconnect);
+router.get('/', protect, settingsController.getSettings);
+router.post('/', protect, settingsController.saveSettings);
+router.post('/whatsapp-connect', protect, authController.whatsappConnect);
+router.post('/instagram-connect', protect, authController.instagramConnect);
+router.post('/instagram-connect-selected', protect, authController.instagramConnectSelected);
+router.post('/meta-connect', protect, settingsController.connectMetaAccount); // For Embedded Signup
+router.post('/instagram-disconnect', protect, settingsController.instagramDisconnect);
 
 // --- Google Sheets Integration (Premium Only) ---
 router.get('/google/auth-url', protect, googleSheetsController.getAuthUrl);

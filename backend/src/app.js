@@ -66,11 +66,11 @@ app.use('/uploads', express.static('public/uploads'));
 
 // API Routes
 // Link all routes to the Main App
-app.use('/api/settings', settingsRoutes); // 🔥 FIX: Google Auth 404 Error resolved here
+app.use('/api/settings', settingsRoutes); // 🔥 Fixed settings routes mount
 app.use('/api/leads', leadRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/forms', formRoutes);
-app.use('/api/users', settingsRoutes); // Handles both User Auth & Integrations/Settings
+app.use('/api/users/settings', settingsRoutes); // Preserve compatibility for /api/users/settings
 app.use('/api/users', userRoutes); // Handles Profile & AI Training Rules
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
