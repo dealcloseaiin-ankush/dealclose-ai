@@ -328,6 +328,32 @@ export default function Settings() {
     alert(error.response?.data?.message || 'Instagram disconnect failed.');
   }
 };
+
+  const disconnectWhatsApp = async (workspaceId = 'main') => {
+    if (!window.confirm("🚨 Are you sure you want to disconnect WhatsApp? This will stop WhatsApp automations until you reconnect.")) return;
+    try {
+      const payload = workspaceId && workspaceId !== 'main' ? { workspaceId } : {};
+      const res = await api.post('/settings/whatsapp-disconnect', payload);
+      if (res.data.success) {
+        alert(res.data.message || 'WhatsApp disconnected successfully.');
+        if (workspaceId === 'main') {
+          setConfig(prev => ({
+            ...prev,
+            whatsappToken: '',
+            phoneNumberId: '',
+            wabaId: ''
+          }));
+        }
+        await fetchSettings();
+      } else {
+        alert(res.data.message || 'Could not disconnect WhatsApp.');
+      }
+    } catch (error) {
+      console.error('WhatsApp Disconnect Error:', error.response?.data || error.message);
+      alert(error.response?.data?.message || 'WhatsApp disconnect failed.');
+    }
+  };
+
   const openInstagramPicker = (data, workspaceId = 'main') => {
     if (!data?.availableAccounts?.length) return fetchSettings();
     setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
@@ -476,9 +502,24 @@ export default function Settings() {
                   </div>
 
                   {/* WhatsApp Meta Config */}
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold text-green-400 flex items-center">WhatsApp (Meta API)</h2>
-                    <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-xl font-semibold text-green-400 flex items-center">WhatsApp (Meta API)</h2>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${config.whatsappToken || config.phoneNumberId ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>
+                          {config.whatsappToken || config.phoneNumberId ? 'Connected ✅' : 'Not connected'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400">Use this to log out and log back into WhatsApp for testing. Sub-branches can also connect or logout with their own WhatsApp number.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
+                      {(config.whatsappToken || config.phoneNumberId) && (
+                        <button type="button" onClick={() => disconnectWhatsApp('main')} className="px-4 py-2 bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded-xl border border-rose-500/20 text-sm font-semibold transition-all">
+                          Logout WhatsApp
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2 relative">
@@ -545,10 +586,15 @@ export default function Settings() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {config.workspaces.map((ws, i) => (
-                         <div key={i} className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-700 flex justify-between items-center group hover:border-blue-500 transition-all">
+                         <div key={i} className="bg-[#1a1a1a] p-4 rounded-xl border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center group hover:border-blue-500 transition-all gap-3">
                            <div className="overflow-hidden pr-4">
                              <p className="font-bold text-white truncate">{ws.name || 'Unnamed Branch'}</p>
-                             <p className="text-xs text-gray-500 truncate">{ws.description || 'No description'}</p>
+                             <p className="text-xs text-gray-500 truncate mb-2">{ws.description || 'No description'}</p>
+                             <div className="flex flex-wrap gap-2">
+                               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${ws.whatsappConfig?.accessToken ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'}`}>
+                                 {ws.whatsappConfig?.accessToken ? 'WhatsApp Dedicated Connected ✅' : 'Using Main WhatsApp 🔀'}
+                               </span>
+                             </div>
                            </div>
                            <button type="button" onClick={() => setActiveWorkspace(`ws_${i}`)} className="text-sm bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-bold shrink-0">Edit Config</button>
                          </div>
@@ -888,13 +934,10 @@ export default function Settings() {
                             <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId={activeWs?._id} onSuccess={fetchSettings} />
                          ) : (
                             <button type="button"
-                              onClick={() => {
-                                handleWorkspaceChange(wsIndex, 'whatsappConfig', { accessToken: '', phoneNumberId: '', wabaId: '' });
-                                alert('WhatsApp status changed. Please click top-right "Save Settings" to write changes to DB.');
-                              }}
+                              onClick={() => disconnectWhatsApp(activeWs?._id)}
                               className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
                             >
-                              Disconnect WhatsApp
+                              Logout WhatsApp
                             </button>
                          )}
 

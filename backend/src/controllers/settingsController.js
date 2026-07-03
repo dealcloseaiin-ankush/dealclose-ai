@@ -226,6 +226,41 @@ exports.instagramDisconnect = async (req, res) => {
   }
 };
 
+// @desc    Disconnect WhatsApp from Settings
+// @route   POST /api/settings/whatsapp-disconnect
+exports.whatsappDisconnect = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized Session' });
+
+    const { workspaceId } = req.body || {};
+
+    if (workspaceId && workspaceId !== 'main') {
+      await User.updateOne(
+        { _id: userId, "workspaces._id": workspaceId },
+        { $unset: { "workspaces.$.whatsappConfig": 1 } }
+      );
+      console.log(`✅ [Workspace WhatsApp Disconnect Success] Wiped path for Workspace: ${workspaceId}`);
+    } else {
+      await User.updateOne(
+        { _id: userId },
+        { $unset: { whatsappConfig: 1 } }
+      );
+      console.log(`✅ [Main WhatsApp Disconnect Success] Wiped root configuration layers.`);
+    }
+
+    const clearedUser = await User.findById(userId).lean();
+    return res.status(200).json({
+      success: true,
+      message: 'WhatsApp disconnected successfully!',
+      user: clearedUser
+    });
+  } catch (error) {
+    console.error('WhatsApp Disconnect Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to disconnect WhatsApp' });
+  }
+};
+
 // @desc    Get Current User Profile
 // @route   GET /api/users/profile
 exports.getProfile = async (req, res) => {
