@@ -91,6 +91,11 @@ const userSchema = new Schema({
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
     aiAgentEnabled: { type: Boolean, default: false },
+    commentAiReplyEnabled: { type: Boolean, default: false },
+    commentAiPostSettings: [{
+      postId: { type: String },
+      commentAiReplyEnabled: { type: Boolean, default: true }
+    }],
     postAutomations: [{
       postId: { type: String },
       thumbnailUrl: { type: String },
@@ -99,6 +104,7 @@ const userSchema = new Schema({
       publicReply: { type: String },
       fileUrl: { type: String },
       deliveryMode: { type: String, enum: ['direct', 'button', 'instant_shortcut', 'hybrid'], default: 'direct' },
+      commentAiReplyEnabled: { type: Boolean, default: false },
       stats: {
         sentCount: { type: Number, default: 0 },
         clickedCount: { type: Number, default: 0 }
@@ -145,6 +151,11 @@ const userSchema = new Schema({
   aiRules: { type: String, default: '' }, // Custom rules for AI
   fallbackAction: { type: String, enum: ['notify_owner', 'wait_for_human'], default: 'notify_owner' }, // AI fallback
   aiAgentEnabled: { type: Boolean, default: true }, // Master switch for AI
+  commentAiReplyEnabled: { type: Boolean, default: false },
+  commentAiPostSettings: [{
+    postId: { type: String },
+    commentAiReplyEnabled: { type: Boolean, default: true }
+  }],
   autoReplies: [{
     triggerWord: { type: String },
     replyMessage: { type: String }

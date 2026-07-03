@@ -3,6 +3,43 @@ const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel');
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
+const IORedis = require('ioredis');
+
+const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
+const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
+
+const loadThreadState = async (threadKey) => {
+  try {
+    const raw = await redis.get(threadKey);
+    if (!raw) return {
+      lastAuthorId: null,
+      aiReplyCount: 0,
+      humanTookOver: false,
+      pausedUntil: null,
+      manualOverride: false,
+      lastAiReplyAt: null
+    };
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error('⚠️ [Redis ThreadState] Load error:', error.message);
+    return {
+      lastAuthorId: null,
+      aiReplyCount: 0,
+      humanTookOver: false,
+      pausedUntil: null,
+      manualOverride: false,
+      lastAiReplyAt: null
+    };
+  }
+};
+
+const saveThreadState = async (threadKey, state) => {
+  try {
+    await redis.set(threadKey, JSON.stringify(state), 'EX', THREAD_STATE_TTL);
+  } catch (error) {
+    console.error('⚠️ [Redis ThreadState] Save error:', error.message);
+  }
+};
 
 // @desc    Get Instagram Dashboard Analytics
 // @route   GET /api/instagram/dashboard
@@ -23,6 +60,11 @@ exports.getDashboardData = async (req, res) => {
       status: { $nin: ['visitor', 'unqualified'] } 
     });
 
+    const workspaceId = req.query.workspaceId || 'main';
+    const selectedWorkspace = workspaceId !== 'main'
+      ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
+      : null;
+
     res.status(200).json({
       success: true,
       stats: {
@@ -34,7 +76,8 @@ exports.getDashboardData = async (req, res) => {
         conversionRate: totalDMsReceived > 0 ? ((leadsExtracted / totalDMsReceived) * 100).toFixed(1) + '%' : '0%'
       },
       config: {
-        aiSmartReply: user?.aiAgentEnabled !== false,
+        aiSmartReply: selectedWorkspace ? selectedWorkspace.aiAgentEnabled !== false : user.aiAgentEnabled !== false,
+        commentAiReplyEnabled: selectedWorkspace ? selectedWorkspace.commentAiReplyEnabled === true : user.commentAiReplyEnabled === true,
         autoDmOnComment: true,
         extractPhoneNumbers: true,
         forceWhatsappRedirect: true
@@ -116,6 +159,7 @@ exports.getRecentPosts = async (req, res) => {
     }
 
     const workspaceAutomations = selectedWorkspace ? selectedWorkspace.postAutomations : user.postAutomations;
+    const workspacePostSettings = selectedWorkspace ? selectedWorkspace.commentAiPostSettings || [] : user.commentAiPostSettings || [];
     const currentAutomations = workspaceAutomations || [];
     console.log("[IG POSTS DEBUG] Automation hydrate source:", {
       workspaceId,
@@ -134,6 +178,8 @@ exports.getRecentPosts = async (req, res) => {
         else resolvedMode = 'chatbot';
       }
 
+      const postSetting = workspacePostSettings.find(setting => String(setting.postId) === String(post.id));
+      const commentAiReplyEnabled = postSetting ? postSetting.commentAiReplyEnabled !== false : true;
       return {
         id: post.id,
         caption: post.caption || '',
@@ -150,6 +196,7 @@ exports.getRecentPosts = async (req, res) => {
         chatBotReply: dbRule ? dbRule.replyMessage : '',
         fileUrl: dbRule ? dbRule.fileUrl : '',
         publicReply: dbRule ? dbRule.publicReply : 'Check your DM! 📩',
+        commentAiReplyEnabled,
         stats: dbRule?.stats || { dmsSent: 0, buttonClicks: 0, pending: 0, chatBotReplied: 0, aiCaught: 0 }
       };
     });
@@ -195,6 +242,140 @@ exports.getPostAutomations = async (req, res) => {
   }
 };
 
+// @desc    Update Comment AI Configuration (Global or Workspace Specific)
+// @route   PATCH /api/instagram/comment-ai/config
+exports.updateCommentAiConfig = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { workspaceId = 'main', commentAiReplyEnabled, aiAgentEnabled } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    if (workspaceId && workspaceId !== 'main') {
+      const workspaceIndex = user.workspaces.findIndex(w => String(w._id) === String(workspaceId));
+      if (workspaceIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Workspace not found.' });
+      }
+      if (typeof commentAiReplyEnabled === 'boolean') {
+        user.workspaces[workspaceIndex].commentAiReplyEnabled = commentAiReplyEnabled;
+      }
+      if (typeof aiAgentEnabled === 'boolean') {
+        user.workspaces[workspaceIndex].aiAgentEnabled = aiAgentEnabled;
+      }
+      await user.save();
+      return res.status(200).json({ success: true, message: 'Workspace comment AI config updated.', config: {
+        workspaceId,
+        commentAiReplyEnabled: user.workspaces[workspaceIndex].commentAiReplyEnabled,
+        aiAgentEnabled: user.workspaces[workspaceIndex].aiAgentEnabled
+      }});
+    }
+
+    if (typeof commentAiReplyEnabled === 'boolean') {
+      user.commentAiReplyEnabled = commentAiReplyEnabled;
+    }
+    if (typeof aiAgentEnabled === 'boolean') {
+      user.aiAgentEnabled = aiAgentEnabled;
+    }
+    await user.save();
+    res.status(200).json({ success: true, message: 'Comment AI config updated.', config: {
+      commentAiReplyEnabled: user.commentAiReplyEnabled,
+      aiAgentEnabled: user.aiAgentEnabled
+    }});
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update per-post Comment AI enable/disable setting
+// @route   PATCH /api/instagram/comment-ai/post-toggle
+exports.updateCommentAiPostSetting = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { workspaceId = 'main', postId, commentAiReplyEnabled } = req.body;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!postId) return res.status(400).json({ success: false, message: 'postId is required.' });
+    if (typeof commentAiReplyEnabled !== 'boolean') return res.status(400).json({ success: false, message: 'commentAiReplyEnabled must be boolean.' });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    if (workspaceId !== 'main') {
+      const workspaceIndex = user.workspaces.findIndex(w => String(w._id) === String(workspaceId));
+      if (workspaceIndex === -1) return res.status(404).json({ success: false, message: 'Workspace not found.' });
+
+      const workspace = user.workspaces[workspaceIndex];
+      const settingIndex = workspace.commentAiPostSettings?.findIndex(setting => String(setting.postId) === String(postId));
+      if (settingIndex >= 0) {
+        user.workspaces[workspaceIndex].commentAiPostSettings[settingIndex].commentAiReplyEnabled = commentAiReplyEnabled;
+      } else {
+        user.workspaces[workspaceIndex].commentAiPostSettings = workspace.commentAiPostSettings || [];
+        user.workspaces[workspaceIndex].commentAiPostSettings.push({ postId: String(postId), commentAiReplyEnabled });
+      }
+      await user.save();
+      return res.status(200).json({ success: true, message: 'Workspace post-level comment AI setting updated.', setting: { postId, commentAiReplyEnabled, workspaceId } });
+    }
+
+    const settingIndex = user.commentAiPostSettings?.findIndex(setting => String(setting.postId) === String(postId));
+    if (settingIndex >= 0) {
+      user.commentAiPostSettings[settingIndex].commentAiReplyEnabled = commentAiReplyEnabled;
+    } else {
+      user.commentAiPostSettings = user.commentAiPostSettings || [];
+      user.commentAiPostSettings.push({ postId: String(postId), commentAiReplyEnabled });
+    }
+    await user.save();
+    res.status(200).json({ success: true, message: 'Post-level comment AI setting updated.', setting: { postId, commentAiReplyEnabled, workspaceId } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update Comment AI thread state controls (pause/resume/handover/clear)
+// @route   PATCH /api/instagram/comment-ai/thread
+exports.updateCommentAiThreadState = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { igAccountId, threadId, action, pauseMinutes } = req.body;
+    if (!igAccountId || !threadId || !action) {
+      return res.status(400).json({ success: false, message: 'igAccountId, threadId and action are required.' });
+    }
+
+    const threadKey = `ig_thread_state:${igAccountId}:${threadId}`;
+    let state = await loadThreadState(threadKey);
+
+    switch (action) {
+      case 'pause':
+        state.pausedUntil = new Date(Date.now() + ((pauseMinutes || 15) * 60 * 1000));
+        state.manualOverride = true;
+        break;
+      case 'resume':
+        state.pausedUntil = null;
+        state.manualOverride = false;
+        break;
+      case 'human_took_over':
+        state.humanTookOver = true;
+        state.manualOverride = false;
+        break;
+      case 'clear':
+        state = {
+          lastAuthorId: null,
+          aiReplyCount: 0,
+          humanTookOver: false,
+          pausedUntil: null,
+          manualOverride: false,
+          lastAiReplyAt: null
+        };
+        break;
+      default:
+        return res.status(400).json({ success: false, message: `Unsupported action: ${action}` });
+    }
+
+    await saveThreadState(threadKey, state);
+    res.status(200).json({ success: true, message: 'Thread state updated.', threadState: state });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Publish Media (Image/Reel) to Instagram
 // @route   POST /api/instagram/publish-media
 exports.publishMedia = async (req, res) => {
@@ -226,7 +407,7 @@ exports.savePostAutomation = async (req, res) => {
   console.log(`\n================== [SAVE AUTOMATION DEBUG ENGINE] ==================`);
   try {
     const userId = req.user?._id || req.user?.id;
-    const { postId, thumbnailUrl, triggerWord, replyMessage, fileUrl, deliveryMode, publicReply, workspaceId } = req.body;
+    const { postId, thumbnailUrl, triggerWord, replyMessage, fileUrl, deliveryMode, publicReply, workspaceId, commentAiReplyEnabled } = req.body;
 
     console.log("➡️ Received Body Payload:", JSON.stringify(req.body, null, 2));
 
@@ -281,6 +462,7 @@ exports.savePostAutomation = async (req, res) => {
               publicReply: cleanPublic,
               fileUrl: cleanFile, 
               deliveryMode: cleanMode,
+              commentAiReplyEnabled: Boolean(commentAiReplyEnabled),
               stats: { sentCount: 0, clickedCount: 0 }
             } 
           } 
@@ -311,6 +493,7 @@ exports.savePostAutomation = async (req, res) => {
             publicReply: cleanPublic,
             fileUrl: cleanFile, 
             deliveryMode: cleanMode,
+            commentAiReplyEnabled: Boolean(commentAiReplyEnabled),
             stats: { sentCount: 0, clickedCount: 0 }
           } 
         } 

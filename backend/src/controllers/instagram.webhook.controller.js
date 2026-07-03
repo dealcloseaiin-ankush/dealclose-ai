@@ -6,6 +6,45 @@ const Flow = require('../models/flowModel');
 const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); 
 const googleSheetsController = require('./googleSheetsController');
+const IORedis = require('ioredis');
+
+// Lightweight Redis client for deduplication and rate-limits (falls back to local)
+const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
+redis.on && redis.on('error', (e) => console.error('⚠️ [Redis] Connection error in IG webhook controller:', e.message));
+const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
+
+const loadThreadState = async (threadKey) => {
+  try {
+    const raw = await redis.get(threadKey);
+    if (!raw) return {
+      lastAuthorId: null,
+      aiReplyCount: 0,
+      humanTookOver: false,
+      pausedUntil: null,
+      manualOverride: false,
+      lastAiReplyAt: null
+    };
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('⚠️ [Redis ThreadState] Load error:', e.message);
+    return {
+      lastAuthorId: null,
+      aiReplyCount: 0,
+      humanTookOver: false,
+      pausedUntil: null,
+      manualOverride: false,
+      lastAiReplyAt: null
+    };
+  }
+};
+
+const saveThreadState = async (threadKey, state) => {
+  try {
+    await redis.set(threadKey, JSON.stringify(state), 'EX', THREAD_STATE_TTL);
+  } catch (e) {
+    console.error('⚠️ [Redis ThreadState] Save error:', e.message);
+  }
+};
 
 // 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
 metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
@@ -244,20 +283,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 timestamp: new Date(),
                 expiresAt: getExpiry('junk')
               });
-
-              const savedIgLead = await Lead.findOneAndUpdate(
-                { phoneNumber: `IG_${senderId}`, userId: user._id },
-                { 
-                  $set: { name: realName },
-                  $setOnInsert: Object.assign({ 
-                    source: 'Instagram DM', 
-                    status: 'visitor', 
-                    createdBy: user._id
-                  }, getExpiry('junk') ? { expiresAt: getExpiry('junk') } : {}),
-                  $push: { timeline: { eventType: 'Instagram DM Received', description: 'Customer sent an Instagram DM', timestamp: new Date() } }
-                },
-                { upsert: true, returnDocument: 'after' }
-              );
+              let currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
               
               if (isEcho) {
                  await Message.create({
@@ -279,7 +305,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                  continue; 
               }
 
-              const currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
+            
               const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
               
               if (isCurrentlyPaused) {
@@ -297,23 +323,38 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let cName = realName.startsWith('IG User') ? '' : realName.split(' ')[0];
                 return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
               };
-
               const sendIGFlowMessage = async (text, nodeToPauseAt = null, flowIdToPauseAt = null) => {
-                  let deliveryStatus = 'sent';
-                  let displayMsg = text;
-                  try {
-                      if (!igToken) throw new Error("IG Token is missing or invalid");
-                      await metaAdsService.sendInstagramDM(igToken, senderId, text);
-                  } catch (e) {
-                      console.error("❌ [IG Flow DM Error]:", e.message);
-                      deliveryStatus = 'failed';
-                      displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${e.message}]`;
-                  }
-                  await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
-                  if (nodeToPauseAt && flowIdToPauseAt) {
-                      await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flowIdToPauseAt, nodeId: nodeToPauseAt } } }, { strict: false });
-                  }
-              };
+    let deliveryStatus = 'sent';
+    let displayMsg = text;
+    try {
+        if (!igToken) throw new Error("IG Token is missing or invalid");
+        await metaAdsService.sendInstagramDM(igToken, senderId, text);
+    } catch (e) {
+        console.error("❌ [IG Flow DM Error]:", e.message);
+        deliveryStatus = 'failed';
+        displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${e.message}]`;
+    }
+    await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+    if (nodeToPauseAt && flowIdToPauseAt) {
+        // Lazy-create: Lead sirf tabhi banegi jab flow genuinely pause hokar 
+        // user ke jawab ka wait kar raha ho — casual messages ke liye kabhi nahi
+        if (!currentLeadCheck) {
+            currentLeadCheck = await Lead.findOneAndUpdate(
+                { phoneNumber: `IG_${senderId}`, userId: user._id },
+                { 
+                    $setOnInsert: Object.assign({ 
+                        name: realName,
+                        source: 'Instagram DM', 
+                        status: 'visitor', 
+                        createdBy: user._id
+                    }, getExpiry('junk') ? { expiresAt: getExpiry('junk') } : {})
+                },
+                { upsert: true, new: true }
+            );
+        }
+        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: flowIdToPauseAt, nodeId: nodeToPauseAt } } }, { strict: false });
+    }
+};
 
               let flowQuery = { userId: user._id };
               if (incomingWorkspaceId !== 'main') {
@@ -582,17 +623,7 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
                 // customer ne collab option choose kiya — asli lead tab banegi jab AI
                 // extract_brand_deal/extract_lead_requirements tool call se real brand
                 // name, budget, deliverables capture karega (niche wale AI block mein).
-                await Lead.findOneAndUpdate(
-                  { phoneNumber: `IG_${senderId}` }, 
-                  { 
-                    $set: {
-                      userId: user._id, 
-                      source: 'Instagram DM (Collab Intent)', 
-                      notes: `Customer selected "Collab/Brand" option. Awaiting brand name, budget, and deliverables.`
-                    }
-                  }, 
-                  { upsert: true }
-                );
+                
                 continue; 
               }
 
@@ -744,8 +775,45 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
           const igUserId = commentData.from.id;
           const username = commentData.from.username || `IG_User_${igUserId}`;
           const mediaId = commentData.media ? commentData.media.id : null;
+          const threadId = commentData.parent_id || commentData.id || mediaId || 'unknown_thread';
+          const threadKey = `ig_thread_state:${igAccountId}:${threadId}`;
+          let threadState = await loadThreadState(threadKey);
 
           console.log(`[Meta Comment (IG/FB)] Received from ${username}: ${commentText}`);
+
+          // ====== SELF-COMMENT / SELF-REPLY FILTER ======
+          try {
+            if (String(igUserId) === String(igAccountId)) {
+              if (threadState.lastAiCommentId && String(threadState.lastAiCommentId) === String(commentData.id)) {
+                console.log('Skipped: own AI reply acknowledgement event for thread', threadId);
+                threadState.lastAuthorId = igAccountId;
+                await saveThreadState(threadKey, threadState);
+                continue;
+              }
+
+              threadState.humanTookOver = true;
+              threadState.lastAuthorId = igAccountId;
+              await saveThreadState(threadKey, threadState);
+              console.log('Skipped: human takeover detected in thread', threadId, '- AI comment replies permanently disabled for this thread');
+              continue;
+            }
+          } catch (e) {
+            console.error('Error during self-comment check:', e.message);
+          }
+
+          // ====== DEDUPLICATION: prevent processing same comment twice ======
+          const dedupKey = `processed_comment:${commentData.id}`;
+          try {
+            const already = await redis.get(dedupKey);
+            if (already) {
+              console.log('Skipped: duplicate comment (already processed within TTL)');
+              continue;
+            }
+            // mark as processed for 24 hours
+            await redis.set(dedupKey, '1', 'EX', 24 * 60 * 60);
+          } catch (e) {
+            console.error('⚠️ [Redis Dedup] Error checking/setting dedup key:', e.message);
+          }
 
           let user = await User.findOne({
             $or: [
@@ -897,6 +965,19 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
              }
              
              let dmSentSuccessfully = false;
+            // ====== RATE LIMIT / CIRCUIT BREAKER (per-thread) ======
+            const rateKey = `ig_reply_count:${igAccountId}:${threadId}`;
+            try {
+              const replyCount = await redis.incr(rateKey);
+              if (replyCount === 1) await redis.expire(rateKey, 10 * 60); // 10 minutes window
+              if (replyCount > 5) {
+                console.log(`Skipped: rate limit exceeded for thread ${threadId} (count=${replyCount})`);
+                await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[SYSTEM] Reply skipped due to rate limit for this thread. Count=${replyCount}`, direction: 'outgoing', status: 'skipped', sentBy: 'system', tags: ['ig_rate_limited'], timestamp: new Date(), expiresAt: getExpiry('junk') });
+                continue;
+              }
+            } catch (e) {
+              console.error('⚠️ [Redis RateLimit] Error incrementing rate key:', e.message);
+            }
              try {
                if (igToken) {
                  if (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') {
@@ -960,29 +1041,72 @@ if (isCreator && (incomingTextLower === '1' || incomingTextLower.includes('colla
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getExpiry('junk') });
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
           } else {
-             const isCommentAiEnabled = incomingWorkspaceId !== 'main'
-               ? activeWorkspaceNode?.aiAgentEnabled === true
-               : user.aiAgentEnabled === true;
+             const accountAiEnabled = incomingWorkspaceId !== 'main'
+               ? activeWorkspaceNode?.aiAgentEnabled !== false
+               : user.aiAgentEnabled !== false;
+             const commentAiGloballyEnabled = incomingWorkspaceId !== 'main'
+               ? activeWorkspaceNode?.commentAiReplyEnabled === true
+               : user.commentAiReplyEnabled === true;
+             const workspacePostSettings = incomingWorkspaceId !== 'main'
+               ? (activeWorkspaceNode?.commentAiPostSettings || [])
+               : (user.commentAiPostSettings || []);
+             const postCommentAiConfig = mediaId
+               ? workspacePostSettings.find(setting => String(setting.postId) === String(mediaId))?.commentAiReplyEnabled
+               : undefined;
+             const isCommentAiEnabled = accountAiEnabled && commentAiGloballyEnabled && (postCommentAiConfig !== false);
 
-             if (isCommentAiEnabled) {
-                 try {
-                     const aiContext = `You are the friendly social media manager for ${user.businessName || 'this page'}. Reply to this Instagram comment: "${commentText}". Keep it under 15 words.`;
-                     const aiReply = await aiService.generateAIResponse(commentText, aiContext);
-                     
-                     await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
-                         message: aiReply,
-                         access_token: igToken
-                     });
-                     
-                     await Message.create({
-                       userId: user._id, customerPhone: `IG_${igUserId}`,
-                       messageText: `[Public AI Reply]: ${aiReply}`,
-                       direction: 'outgoing', status: 'sent', sentBy: 'ai',
-                       tags: ['ig_comment_reply'], timestamp: new Date(), expiresAt: getExpiry('junk')
-                     });
-                 } catch (aiCommentErr) {
-                     console.error("❌ [Instagram AI Comment Reply Error]:", aiCommentErr.message);
+             if (!isCommentAiEnabled) {
+               console.log('Skipped: AI comment replies disabled for this account/post or AI agent is turned off.');
+               continue;
+             }
+
+             if (threadState.humanTookOver) {
+               console.log(`Skipped: human takeover active for thread ${threadId}. AI comment replies are disabled until owner re-enables.`);
+               continue;
+             }
+
+             if (threadState.pausedUntil && new Date(threadState.pausedUntil) > new Date()) {
+               console.log(`Skipped: thread ${threadId} is paused until ${threadState.pausedUntil}.`);
+               continue;
+             }
+
+             if (threadState.aiReplyCount >= 3 && !threadState.manualOverride) {
+               console.log(`Skipped: AI reply cap (3) reached for thread ${threadId}, needs owner review.`);
+               continue;
+             }
+
+             try {
+                 let aiContext = `You are the friendly social media manager for ${user.businessName || 'this page'}. Reply to this Instagram comment: "${commentText}".`;
+                 aiContext += "\n\n[COMMENT AI RULES]: If the comment is just emoji, generic praise, spam, or does not need a response, reply with exactly NO_REPLY_NEEDED. Do not repeat similar phrasing to your last replies in this thread. Only answer what was actually asked, and do not initiate a new topic.";
+                 aiContext += "\n\nKeep your reply extremely short, polite, and focused only on the comment. If you are sending a public reply, keep it under 15 words.";
+                 const aiReply = await aiService.generateAIResponse(commentText, aiContext, 'instagram');
+
+                 if (!aiReply || aiReply.trim().toUpperCase().includes('NO_REPLY_NEEDED')) {
+                   console.log(`Skipped: AI decided NO_REPLY_NEEDED for thread ${threadId}.`);
+                   threadState.lastAuthorId = igUserId;
+                   await saveThreadState(threadKey, threadState);
+                   continue;
                  }
+
+                 const replyResponse = await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
+                     message: aiReply,
+                     access_token: igToken
+                 });
+
+                 const replyCommentId = replyResponse?.data?.id || null;
+                 threadState.aiReplyCount = (threadState.aiReplyCount || 0) + 1;
+                 threadState.lastAuthorId = igAccountId;
+                 threadState.lastAiCommentId = replyCommentId;
+                 await saveThreadState(threadKey, threadState);
+
+                 await Message.create({
+                   userId: user._id, customerPhone: `IG_${igUserId}`,
+                   messageText: `[Public AI Reply]: ${aiReply}`,
+                   direction: 'outgoing', status: 'sent', sentBy: 'ai',
+                   tags: ['ig_comment_reply'], timestamp: new Date(), expiresAt: getExpiry('junk')
+                 });
+             } catch (aiCommentErr) {
+                 console.error("❌ [Instagram AI Comment Reply Error]:", aiCommentErr.message);
              }
              
              await Message.create({

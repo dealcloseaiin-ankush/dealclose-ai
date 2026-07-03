@@ -23,6 +23,7 @@ export default function InstagramAutomation() {
 
   const [config, setConfig] = useState({
     aiSmartReply: false,
+    commentAiReplyEnabled: false,
     autoDmOnComment: false,
     extractPhoneNumbers: false,
     forceWhatsappRedirect: false
@@ -277,8 +278,38 @@ export default function InstagramAutomation() {
     handleReplyChange(id, aiGenerated);
   };
 
-  const handleToggle = (key) => {
-    setConfig({ ...config, [key]: !config[key] });
+  const handleToggle = async (key) => {
+    if (key === 'commentAiReplyEnabled') {
+      const nextValue = !config.commentAiReplyEnabled;
+      setConfig(prev => ({ ...prev, commentAiReplyEnabled: nextValue }));
+      try {
+        await api.patch('/instagram/comment-ai/config', { workspaceId: activeWorkspace, commentAiReplyEnabled: nextValue });
+        toast.success(`Comment AI replies ${nextValue ? 'enabled' : 'disabled'} for this workspace.`);
+      } catch (err) {
+        setConfig(prev => ({ ...prev, commentAiReplyEnabled: !nextValue }));
+        console.error('Comment AI config update failed:', err.response?.data || err.message);
+        toast.error('Failed to update Comment AI setting.');
+      }
+      return;
+    }
+    setConfig(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const togglePostCommentAi = async (postId, currentValue) => {
+    const nextValue = !currentValue;
+    setRecentPosts(posts => posts.map(p => p.id === postId ? { ...p, commentAiReplyEnabled: nextValue } : p));
+    try {
+      await api.patch('/instagram/comment-ai/post-toggle', {
+        workspaceId: activeWorkspace,
+        postId,
+        commentAiReplyEnabled: nextValue
+      });
+      toast.success(`Post AI comments ${nextValue ? 'enabled' : 'disabled'}.`);
+    } catch (err) {
+      setRecentPosts(posts => posts.map(p => p.id === postId ? { ...p, commentAiReplyEnabled: currentValue } : p));
+      console.error('Post AI toggle failed:', err.response?.data || err.message);
+      toast.error('Failed to update post AI setting.');
+    }
   };
 
   const updatePostMode = (id, newMode) => {
@@ -558,13 +589,21 @@ export default function InstagramAutomation() {
                   </div>
 
                   <div className="space-y-3 pt-3 border-t border-gray-800/80">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Routing Configuration</label>
-                      <select 
-                        value={post.botMode || 'off'} 
-                        onChange={(e) => updatePostMode(post.id, e.target.value)}
-                        className="bg-gray-900 border border-gray-700 text-white text-xs font-bold rounded px-2 py-1 outline-none cursor-pointer focus:border-pink-500"
+                      <button
+                        type="button"
+                        onClick={() => togglePostCommentAi(post.id, post.commentAiReplyEnabled !== false)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-black transition-colors ${post.commentAiReplyEnabled !== false ? 'bg-emerald-500 text-black' : 'bg-gray-700 text-white'}`}
                       >
+                        {post.commentAiReplyEnabled !== false ? 'AI Comment Replies ON' : 'AI Comment Replies OFF'}
+                      </button>
+                    </div>
+                    <select 
+                      value={post.botMode || 'off'} 
+                      onChange={(e) => updatePostMode(post.id, e.target.value)}
+                      className="bg-gray-900 border border-gray-700 text-white text-xs font-bold rounded px-2 py-1 outline-none cursor-pointer focus:border-pink-500"
+                    >
                         <option value="off" className="bg-[#111] text-white">Off (Disable Bot)</option>
                         <option value="instant_shortcut" className="bg-[#111] text-white">Instant Keyword (Shortcut ⚡)</option>
                         <option value="chatbot" className="bg-[#111] text-white">Keyword Engine Only (Advanced ⚙️)</option>
@@ -636,7 +675,6 @@ export default function InstagramAutomation() {
                       </div>
                     )}
                   </div>
-                </div>
 
                 {post.botMode !== 'instant_shortcut' && (
                   <div className="mt-4 pt-3 border-t border-gray-800/80 flex justify-end">
