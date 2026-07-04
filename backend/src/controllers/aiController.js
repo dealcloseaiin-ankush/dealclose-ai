@@ -6,11 +6,12 @@ const Flow = require('../models/flowModel');
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 
-// 🌊 ULTRA COST-EFFECTIVE MODELS CONFIGURATION
+// 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
 const MODELS = {
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+  GEMINI_1_5_FLASH: 'gemini-1.5-flash',       // Priority 1 (Highly Available Standard Fallback King)
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 2 (Latest Cheapest Lite String)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 3 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',                 // Priority 4 (Final AI Fallback Loop)
 };
 
 // @desc    Get unanswered queries for AI training
@@ -455,27 +456,27 @@ exports.generateFlow = async (req, res) => {
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
 
-      // Level 1: Try Gemini 3.1 Flash Lite
+      // Level 1: Try Gemini 1.5 Flash (Global King - Avoids 403 Forbidden Restrictions)
       try {
-        console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LITE}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+        console.log(`[Flow Gen] 🤖 Requesting stable model: ${MODELS.GEMINI_1_5_FLASH}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
         const result = await model.generateContent([systemPrompt, prompt]);
         rawResponse = result.response.text();
         flowGenSuccess = true;
-      } catch (gemini3Err) {
-        console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_3_1_LITE} failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
+      } catch (gemini15Err) {
+        console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_1_5_FLASH} failed, trying ${MODELS.GEMINI_3_1_LITE}...`);
       }
 
-      // Level 2: Try Gemini 2.5 Flash Lite
+      // Level 2: Try Gemini 3.1 Flash Lite
       if (!flowGenSuccess) {
         try {
-          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_2_5_LITE}`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
+          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
           const result = await model.generateContent([systemPrompt, prompt]);
           rawResponse = result.response.text();
           flowGenSuccess = true;
-        } catch (gemini2Err) {
-          console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_2_5_LITE} failed, falling back to OpenAI...`);
+        } catch (gemini3Err) {
+          console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_3_1_LITE} failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
         }
       }
     }

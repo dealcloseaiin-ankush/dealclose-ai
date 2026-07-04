@@ -9,9 +9,10 @@ const openai = new OpenAI({
 
 // 🌊 ULTRA COST-EFFECTIVE & RE-CORRECTED OFFICIAL LITE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Cheapest, Latest & Fast - Corrected Spelling)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini Onboarding - Corrected Spelling)
-  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3 (Final AI Tools Fallback Layer)
+  GEMINI_1_5_FLASH: 'gemini-1.5-flash',       // 🚀 Stable Production King (403 Forbidden Error bypass ke liye)
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 2 (Cheapest, Latest & Fast - Corrected Spelling)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 3 (Backup Gemini Onboarding - Corrected Spelling)
+  OPENAI_MINI: 'gpt-4o-mini',                 // Priority 4 (Final AI Tools Fallback Layer)
 };
 
 /**
@@ -36,21 +37,36 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     let rawResponse = "";
     let aiSuccess = false;
 
-    // 🚀 Priority 1: Try Gemini 3.1 Flash Lite
+    // 🚀 Priority 1: Try Gemini 1.5 Flash (Global Base Model to bypass billing blocks)
     if (genAI) {
       try {
-        console.log(`[AI Service] 🤖 Requesting model: ${MODELS.GEMINI_3_1_LITE}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+        console.log(`[AI Service] 🤖 Requesting model: ${MODELS.GEMINI_1_5_FLASH}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
         const result = await model.generateContent([finalContext, prompt]);
         const response = await result.response;
         rawResponse = response.text();
         aiSuccess = true;
         return rawResponse;
       } catch (geminiError) {
-        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_3_1_LITE} failed/busy: ${geminiError.message}. Trying ${MODELS.GEMINI_2_5_LITE}...`);
+        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_1_5_FLASH} failed/busy: ${geminiError.message}. Trying ${MODELS.GEMINI_3_1_LITE}...`);
       }
 
-      // 🚀 Priority 2: Try Gemini 2.5 Flash Lite
+      // 🚀 Priority 2: Try Gemini 3.1 Flash Lite
+      if (!aiSuccess) {
+        try {
+          console.log(`[AI Service] 🤖 Requesting model: ${MODELS.GEMINI_3_1_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+          const result = await model.generateContent([finalContext, prompt]);
+          const response = await result.response;
+          rawResponse = response.text();
+          aiSuccess = true;
+          return rawResponse;
+        } catch (gemini3Error) {
+          console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_3_1_LITE} failed/busy: ${gemini3Error.message}. Trying ${MODELS.GEMINI_2_5_LITE}...`);
+        }
+      }
+
+      // 🚀 Priority 3: Try Gemini 2.5 Flash Lite
       if (!aiSuccess) {
         try {
           console.log(`[AI Service] 🤖 Requesting model: ${MODELS.GEMINI_2_5_LITE}`);
@@ -66,7 +82,7 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
       }
     }
 
-    // 🚀 Priority 3: Fallback to OpenAI gpt-4o-mini
+    // 🚀 Priority 4: Fallback to OpenAI gpt-4o-mini
     if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy')) {
       try { 
         console.log(`[AI Service] 🤖 Requesting fallback model: ${MODELS.OPENAI_MINI}`);
@@ -103,21 +119,36 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
     const apiKey = process.env.GEMINI_API_KEY;
     const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
 
-    // 🚀 Priority 1: Try Gemini 3.1 Flash Lite
     if (apiKey && genAI) {
+      // 🚀 Priority 1: Try Gemini 1.5 Flash
       try {
-        console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.GEMINI_3_1_LITE}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+        console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.GEMINI_1_5_FLASH}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
         const result = await model.generateContent([systemContext, prompt]);
         const response = await result.response;
         rawResponse = response.text();
         aiSuccess = true;
         return { content: rawResponse };
-      } catch (gemini3Err) {
-        console.warn(`⚠️ [Dashboard Assistant] ${MODELS.GEMINI_3_1_LITE} failed: ${gemini3Err.message}. Trying 2.5 Lite...`);
+      } catch (gemini15Err) {
+        console.warn(`⚠️ [Dashboard Assistant] ${MODELS.GEMINI_1_5_FLASH} failed: ${gemini15Err.message}. Trying 3.1 Lite...`);
       }
 
-      // 🚀 Priority 2: Try Gemini 2.5 Flash Lite
+      // 🚀 Priority 2: Try Gemini 3.1 Flash Lite
+      if (!aiSuccess) {
+        try {
+          console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.GEMINI_3_1_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+          const result = await model.generateContent([systemContext, prompt]);
+          const response = await result.response;
+          rawResponse = response.text();
+          aiSuccess = true;
+          return { content: rawResponse };
+        } catch (gemini3Err) {
+          console.warn(`⚠️ [Dashboard Assistant] ${MODELS.GEMINI_3_1_LITE} failed: ${gemini3Err.message}. Trying 2.5 Lite...`);
+        }
+      }
+
+      // 🚀 Priority 3: Try Gemini 2.5 Flash Lite
       if (!aiSuccess) {
         try {
           console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.GEMINI_2_5_LITE}`);
@@ -133,7 +164,7 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
       }
     }
 
-    // 🚀 Priority 3: Fallback to OpenAI gpt-4o-mini
+    // 🚀 Priority 4: Fallback to OpenAI gpt-4o-mini
     if (!aiSuccess && hasOpenAI) {
       console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.OPENAI_MINI}`);
       const completion = await openai.chat.completions.create({
