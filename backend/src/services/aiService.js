@@ -1,22 +1,21 @@
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { OpenAI } = require('openai');
 
-// 🚀 SMART AI SWITCHER: Automatically switch between Gemini & OpenAI
-const useGemini = !!process.env.GEMINI_API_KEY;
-
+// Initialize AI clients safely, even if keys are missing.
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 const openai = new OpenAI({
-  apiKey: useGemini ? process.env.GEMINI_API_KEY : (process.env.OPENAI_API_KEY || 'sk-dummy-key'),
-  baseURL: useGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined
+  apiKey: process.env.OPENAI_API_KEY || 'sk-dummy-key'
 });
 
-// 🌊 WATERFALL MODEL ARRAY: System upar se shuru karega aur jo pehla model active milega, usko use kar lega.
-const GEMINI_MODELS = [
-  "gemini-2.5-pro"
-];
-
-const OPENAI_MODELS = ["gpt-4o"];
+// 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY MODELS
+const MODELS = {
+  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Cheapest & Latest)
+  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+};
 
 /**
- * Generates a response from OpenAI's chat model.
+ * Generates a response using the most cost-effective AI model available with dynamic fallback.
  * @param {string} prompt The user's message.
  * @param {string} [systemContext="You are a helpful AI assistant."] The system message to set the AI's behavior.
  * @param {string} [platform="whatsapp"] The platform where the reply will be sent (whatsapp or instagram).
@@ -35,30 +34,54 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     
     finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are strictly an exclusive AI agent for THIS specific business only. You MUST NOT answer general knowledge questions, write code, or discuss any other businesses. If a user asks something unrelated to your products/services, politely say 'I can only assist with [Business Name] related queries.' Keep all your responses extremely concise, short, and to the point.";
 
-    const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
-    let lastError;
+    // 🚀 MULTI-MODEL ROUTING & FALLBACK CHAIN
 
-    // Loop through all models until one succeeds
-    for (const model of modelsToTry) {
+    // Priority 1: Try Gemini 3.1 Flash Light
+    if (genAI) {
       try {
-        const completion = await openai.chat.completions.create({
-          messages: [
-            { role: "system", content: finalContext },
-            { role: "user", content: prompt }
-          ],
-          model: model,
-        });
-        console.log(`✅ [AI Service] Successfully responded using model: ${model}`);
-        return completion.choices[0].message.content;
-      } catch (err) {
-        console.log(`⚠️ [AI Service] Model ${model} is not active or failed. Trying next...`);
-        lastError = err;
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        const result = await model.generateContent([finalContext, prompt]);
+        const response = await result.response;
+        console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_3_1_LIGHT}`);
+        return response.text();
+      } catch (geminiError) {
+        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_3_1_LIGHT} failed/busy: ${geminiError.message}. Trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+      }
+
+      // Priority 2: Try Gemini 2.5 Flash Light
+      try {
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+        const result = await model.generateContent([finalContext, prompt]);
+        const response = await result.response;
+        console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_2_5_LIGHT}`);
+        return response.text();
+      } catch (gemini2Error) {
+        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_2_5_LIGHT} failed/busy: ${gemini2Error.message}. Falling back to OpenAI...`);
       }
     }
-    throw new Error('All AI models failed to respond: ' + lastError.message);
+
+    // Priority 3: Fallback to OpenAI gpt-4o-mini
+    if (process.env.OPENAI_API_KEY) {
+      try { 
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: finalContext },
+                { role: "user", content: prompt }
+            ], 
+            model: MODELS.OPENAI_MINI,
+        });
+        console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
+        return completion.choices[0].message.content;
+      } catch (openaiError) {
+        console.error(`❌ [AI Service] OpenAI also failed: ${openaiError.message}`);
+        throw openaiError;
+      }
+    } 
+
+    throw new Error('All AI models failed to respond. Please check API keys in the .env file.');
   } catch (error) {
     console.error('AI Service Error:', error);
-    throw new Error('Failed to generate AI response');
+    throw new Error(`Failed to generate AI response: ${error.message}`);
   }
 };
 
@@ -68,6 +91,9 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
  */
 exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key is required for the Dashboard Assistant feature.");
+    }
     const requestPayload = {
       messages: [
         { role: "system", content: systemContext },
@@ -167,38 +193,30 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
       tool_choice: "auto"
     };
 
-    const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
-    let lastError;
+    const completion = await openai.chat.completions.create({
+      ...requestPayload,
+      model: MODELS.OPENAI_MINI
+    });
+    console.log(`✅ [AI Dashboard Service] Responded using model: ${MODELS.OPENAI_MINI}`);
+    return completion.choices[0].message;
 
-    for (const model of modelsToTry) {
-      try {
-        const completion = await openai.chat.completions.create({ ...requestPayload, model: model });
-        console.log(`✅ [AI Dashboard Service] Successfully responded using model: ${model}`);
-        return completion.choices[0].message;
-      } catch (err) {
-        console.log(`⚠️ [AI Dashboard Service] Model ${model} failed. Trying next...`);
-        lastError = err;
-      }
-    }
-    throw new Error('All AI models failed in dashboard tool calling: ' + lastError.message);
   } catch (error) {
     console.error('AI Dashboard Tool Service Error:', error);
-    throw new Error('Failed to generate AI dashboard response');
+    throw new Error(`Failed to generate AI dashboard response: ${error.message}`);
   }
 };
 
 /**
  * Generates a response from OpenAI with Function Calling (Tools) capabilities.
  * Used for extracting Real Estate data or triggering Outbound calls.
- * @param {string} prompt The user's message.
- * @param {string} systemContext The system message.
- * @param {string} [platform="whatsapp"] The platform.
  */
 exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "whatsapp", customWebhooks = []) => {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key is required for AI tool usage.");
+    }
     let finalContext = systemContext || "You are a business AI assistant.";
     
-    // Platform-Aware Prompt Injection
     if (platform === 'instagram') {
       finalContext += "\n\n[CRITICAL RULE]: You are on Instagram. Keep responses under 20 words. No long lists.";
     } else if (platform === 'whatsapp') {
@@ -497,7 +515,7 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
             }
           }
         }
-      ];
+    ];
 
     // 🚀 DYNAMIC SAAS WEBHOOKS: Inject user's custom API URLs as AI Tools
     if (customWebhooks && customWebhooks.length > 0) {
@@ -506,8 +524,8 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
           toolsArray.push({
             type: "function",
             function: {
-              name: webhook.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(), // Ensure valid tool name
-              description: webhook.description, // THIS TELLS AI WHEN TO USE THE URL
+              name: webhook.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),
+              description: webhook.description,
               parameters: {
                 type: "object",
                 properties: {
@@ -529,30 +547,21 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
       tool_choice: "auto"
     };
 
-    const modelsToTry = useGemini ? GEMINI_MODELS : OPENAI_MODELS;
-    let lastError;
-
-    // Loop through all models for tool calling until one succeeds
-    for (const model of modelsToTry) {
-      try {
-        const completion = await openai.chat.completions.create({ ...requestPayload, model: model });
-        console.log(`✅ [AI Tool Service] Successfully responded using model: ${model}`);
-        return completion.choices[0].message;
-      } catch (err) {
-        console.log(`⚠️ [AI Tool Service] Model ${model} is not active or failed. Trying next...`);
-        lastError = err;
-      }
-    }
-    throw new Error('All AI models failed in tool calling: ' + lastError.message);
+    // Use gpt-4o-mini as it has reliable tool-calling capabilities.
+    const completion = await openai.chat.completions.create({
+      ...requestPayload,
+      model: MODELS.OPENAI_MINI
+    });
+    console.log(`✅ [AI Tool Service] Responded using model: ${MODELS.OPENAI_MINI}`);
+    return completion.choices[0].message;
   } catch (error) {
     console.error('AI Tool Service Error:', error);
-    throw new Error('Failed to generate AI tool response');
+    throw new Error(`Failed to generate AI tool response: ${error.message}`);
   }
 };
 
 /**
  * Analyzes social media comments/DMs to extract phone numbers and intent.
- * This prevents generic replies and captures high-value leads automatically.
  */
 exports.analyzeSocialMediaComment = async (commentText) => {
   try {

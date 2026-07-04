@@ -1,5 +1,11 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+// 🌊 ULTRA COST-EFFECTIVE MODELS FOR VISION / OCR
+const VISION_MODELS = {
+  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest, Cheapest & Fast)
+  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+};
+
 /**
  * Extracts text and structured data from an image buffer using Google Gemini Vision.
  * @param {Buffer} imageBuffer The binary data of the image.
@@ -25,24 +31,29 @@ exports.extractTextFromImage = async (imageBuffer, mimeType) => {
       }
     ];
 
-    let result;
-    let lastError;
-    const GEMINI_MODELS = ["gemini-2.5-pro"];
+    // 🚀 DYNAMIC MULTI-MODEL FALLBACK CHAIN FOR VISION
     
-    for (const modelName of GEMINI_MODELS) {
-      try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        result = await model.generateContent([prompt, ...imageParts]);
-        console.log(`[OCR AI] Successfully used model: ${modelName}`);
-        break;
-      } catch (e) {
-        console.log(`[OCR AI] Model ${modelName} failed, trying next...`);
-        lastError = e;
-      }
+    // Priority 1: Try Gemini 3.1 Flash Light (Vision Supported)
+    try {
+      const model = genAI.getGenerativeModel({ model: VISION_MODELS.GEMINI_3_1_LIGHT });
+      const result = await model.generateContent([prompt, ...imageParts]);
+      console.log(`✅ [OCR AI] Successfully extracted text using model: ${VISION_MODELS.GEMINI_3_1_LIGHT}`);
+      return result.response.text();
+    } catch (gemini3Error) {
+      console.warn(`⚠️ [OCR AI] ${VISION_MODELS.GEMINI_3_1_LIGHT} failed or busy: ${gemini3Error.message}. Trying ${VISION_MODELS.GEMINI_2_5_LIGHT}...`);
     }
-    if (!result) throw lastError;
-    
-    return result.response.text();
+
+    // Priority 2: Try Gemini 2.5 Flash Light (Vision Supported)
+    try {
+      const model = genAI.getGenerativeModel({ model: VISION_MODELS.GEMINI_2_5_LIGHT });
+      const result = await model.generateContent([prompt, ...imageParts]);
+      console.log(`✅ [OCR AI] Successfully extracted text using model: ${VISION_MODELS.GEMINI_2_5_LIGHT}`);
+      return result.response.text();
+    } catch (gemini2Error) {
+      console.error(`❌ [OCR AI] Both Vision models failed.`);
+      throw gemini2Error; // Agar dono models fail ho jayein toh error aage pass karein
+    }
+
   } catch (error) {
     console.error('Gemini Vision API Error:', error);
     throw error;

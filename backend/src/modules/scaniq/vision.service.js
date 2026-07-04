@@ -4,6 +4,13 @@ const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const scraperService = require('./scraper.service');
 
+// 🌊 ULTRA COST-EFFECTIVE MODELS CONFIGURATION
+const MODELS = {
+  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest, Cheapest & Fast)
+  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+};
+
 exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) => {
   const prompt = promptBuilder.buildPrompt(platform, scanType, scrapedData);
   
@@ -18,6 +25,7 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
 
   let rawResponse = "";
 
+  // Helper for OpenAI call if both Gemini models fail
   const callAI = async (client, model) => {
     const response = await client.chat.completions.create({
       model: model,
@@ -33,51 +41,64 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
     return response.choices[0].message.content;
   };
 
-  try {
-    if (hasGemini) {
-      console.log("[Vision AI] Trying Gemini 1.5 Flash (Official SDK)...");
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      
-      console.log(`[Vision Debug] 📥 Downloading image to buffer for Gemini...`);
+  // 🚀 MULTI-MODEL ROUTING FOR VISION PIPELINE
+  let geminiSuccess = false;
+
+  if (hasGemini) {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    
+    console.log(`[Vision Debug] 📥 Downloading image to buffer for Gemini...`);
+    let imagePart;
+    try {
       const imageResp = await axios.get(imageUrl, { responseType: 'arraybuffer' });
       const base64Data = Buffer.from(imageResp.data, 'binary').toString('base64');
-      
-      const imagePart = { inlineData: { data: base64Data, mimeType: imageResp.headers['content-type'] || 'image/jpeg' } };
-      
-      let result;
-      let lastError;
-      const GEMINI_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash"];
-      
-      for (const modelName of GEMINI_MODELS) {
+      imagePart = { inlineData: { data: base64Data, mimeType: imageResp.headers['content-type'] || 'image/jpeg' } };
+    } catch (downloadErr) {
+      console.error(`[Vision Debug] ❌ Image downloading failed: ${downloadErr.message}`);
+    }
+
+    if (imagePart) {
+      // Level 1: Try Gemini 3.1 Flash Light
+      try {
+        console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_3_1_LIGHT}...`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        const result = await model.generateContent([prompt, imagePart]);
+        rawResponse = result.response.text();
+        console.log(`[Vision Debug] ✅ Successfully generated response using: ${MODELS.GEMINI_3_1_LIGHT}`);
+        geminiSuccess = true;
+      } catch (gemini3Error) {
+        console.warn(`⚠️ [Vision AI] ${MODELS.GEMINI_3_1_LIGHT} failed/busy: ${gemini3Error.message}. Trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+      }
+
+      // Level 2: Try Gemini 2.5 Flash Light
+      if (!geminiSuccess) {
         try {
-          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${modelName}...`);
-          const model = genAI.getGenerativeModel({ model: modelName });
-          result = await model.generateContent([prompt, imagePart]);
-          console.log(`[Vision Debug] ✅ Successfully generated response using: ${modelName}`);
-          break;
-        } catch (e) {
-          console.log(`⚠️ [Vision Debug] Model ${modelName} failed. Reason: ${e.message}. Trying next...`);
-          lastError = e;
+          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_2_5_LIGHT}...`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+          const result = await model.generateContent([prompt, imagePart]);
+          rawResponse = result.response.text();
+          console.log(`[Vision Debug] ✅ Successfully generated response using: ${MODELS.GEMINI_2_5_LIGHT}`);
+          geminiSuccess = true;
+        } catch (gemini2Error) {
+          console.warn(`⚠️ [Vision AI] ${MODELS.GEMINI_2_5_LIGHT} also failed: ${gemini2Error.message}. Falling back to OpenAI...`);
         }
       }
-      if (!result) throw lastError;
-      rawResponse = result.response.text();
-    } else {
-      throw new Error("Gemini key not found, skipping to OpenAI.");
     }
-  } catch (geminiError) {
+  }
+
+  // Level 3: Fallback to OpenAI gpt-4o-mini
+  if (!geminiSuccess) {
     if (hasOpenAI) {
-      console.log(`[Vision AI] Gemini skipped/failed. Falling back to OpenAI GPT-4o...`);
+      console.log(`[Vision AI] Gemini options skipped/failed. Falling back to OpenAI GPT-4o Mini...`);
       const openAiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      rawResponse = await callAI(openAiClient, 'gpt-4o');
+      rawResponse = await callAI(openAiClient, MODELS.OPENAI_MINI);
     } else {
-      console.error("[Vision AI] Both AI options failed or keys missing.");
-      throw geminiError;
+      console.error("[Vision AI] All AI options failed or keys missing.");
+      throw new Error("All vision model attempts failed.");
     }
   }
   
   const cleaned = rawResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  
   return JSON.parse(cleaned);
 };
 
@@ -117,7 +138,7 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
     searchData = `SerpAPI Failed: ${errMsg}`;
   }
 
-  // 1.5. Meta Ad Library API se live Facebook/Instagram Ads lana
+  // Meta Ad Library API integration
   let metaAdsData = "";
   try {
     console.log(`[Vision Debug] 🔵 Step 2: Requesting Official Meta Ad Library API using Master Token...`);
@@ -127,10 +148,6 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
       const metaRes = await axios.get('https://graph.facebook.com/v19.0/ads_archive', {
         params: {
           search_terms: query,
-          // 🐛 BUG 1 FIX: Pehle ye Python-style string thi "['IN', 'US']" jo Meta
-          // Graph API reject/mis-parse kar deta tha (isliye ye call hamesha fail
-          // hoke silently Apify fallback pe chala jata tha). Ab JSON.stringify se
-          // proper JSON array string bhej rahe hain: '["IN","US"]'
           ad_reached_countries: JSON.stringify(["IN", "US"]),
           ad_active_status: 'ACTIVE',
           fields: 'page_name,ad_creative_bodies,ad_creation_time',
@@ -195,34 +212,52 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
   `;
 
   let aiResponseText = "";
+  let textAnalysisSuccess = false;
+
+  // 🚀 FALLBACK CHAIN FOR MARKETING DATA ANALYSIS
   try {
     if (hasGemini) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      let result;
-      let lastError;
-      const GEMINI_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash"];
-      
-      for (const modelName of GEMINI_MODELS) {
+
+      // Level 1: Gemini 3.1 Flash Light
+      try {
+        console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_3_1_LIGHT}...`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        const result = await model.generateContent(prompt);
+        aiResponseText = result.response.text();
+        console.log(`[Vision Debug] ✅ AI Analysis completed using: ${MODELS.GEMINI_3_1_LIGHT}`);
+        textAnalysisSuccess = true;
+      } catch (gemini3Err) {
+        console.warn(`⚠️ [Vision Debug] ${MODELS.GEMINI_3_1_LIGHT} failed: ${gemini3Err.message}. Trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+      }
+
+      // Level 2: Gemini 2.5 Flash Light
+      if (!textAnalysisSuccess) {
         try {
-          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${modelName}...`);
-          const model = genAI.getGenerativeModel({ model: modelName });
-          result = await model.generateContent(prompt);
-          console.log(`[Vision Debug] ✅ AI Analysis completed using: ${modelName}`);
-          break;
-        } catch (e) {
-          console.log(`⚠️ [Vision Debug] Model ${modelName} failed. Reason: ${e.message}. Trying next...`);
-          lastError = e;
+          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_2_5_LIGHT}...`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+          const result = await model.generateContent(prompt);
+          aiResponseText = result.response.text();
+          console.log(`[Vision Debug] ✅ AI Analysis completed using: ${MODELS.GEMINI_2_5_LIGHT}`);
+          textAnalysisSuccess = true;
+        } catch (gemini2Err) {
+          console.warn(`⚠️ [Vision Debug] ${MODELS.GEMINI_2_5_LIGHT} failed: ${gemini2Err.message}. Falling back to OpenAI...`);
         }
       }
-      if (!result) throw lastError;
-      aiResponseText = result.response.text();
-    } else {
-      console.log(`[Vision Debug] 🤖 Triggering OpenAI GPT-4o...`);
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const aiResponse = await client.chat.completions.create({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }] });
-      aiResponseText = aiResponse.choices[0].message.content;
-      console.log(`[Vision Debug] ✅ AI Analysis completed using: GPT-4o`);
     }
+
+    // Level 3: OpenAI gpt-4o-mini
+    if (!textAnalysisSuccess && hasOpenAI) {
+      console.log(`[Vision Debug] 🤖 Triggering OpenAI: ${MODELS.OPENAI_MINI}...`);
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const aiResponse = await client.chat.completions.create({ model: MODELS.OPENAI_MINI, messages: [{ role: 'user', content: prompt }] });
+      aiResponseText = aiResponse.choices[0].message.content;
+      console.log(`[Vision Debug] ✅ AI Analysis completed using: ${MODELS.OPENAI_MINI}`);
+      textAnalysisSuccess = true;
+    }
+
+    if (!textAnalysisSuccess) throw new Error("No available models completed the text analysis.");
+
   } catch (aiErr) {
     console.error("❌ [Vision Debug] AI Inference Error:", aiErr);
     throw new Error("AI generation failed: " + aiErr.message);

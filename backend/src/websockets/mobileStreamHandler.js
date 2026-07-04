@@ -7,6 +7,13 @@ const Lead = require('../models/leadModel');
 // 🚀 GLOBAL CACHE: Taki Fallback Audio ka kharcha baar baar na aaye
 let cachedMobileFallbackAudio = null;
 
+// 🌊 ULTRA COST-EFFECTIVE MODELS FOR VOICE ENGINE & SUMMARY
+const MODELS = {
+  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest & Fastest for Voice)
+  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+};
+
 module.exports = function (ws) {
   let callSid = 'MOBILE_' + Date.now(); 
   let rawTranscript = []; 
@@ -76,31 +83,49 @@ module.exports = function (ws) {
 
       const systemPromptText = "You are a friendly DealClose AI calling assistant. Keep answers short (1 sentence). Speak in conversational Hinglish. CRITICAL RULE: DO NOT use complex Hindi words. Use simple words so an American AI voice can pronounce them naturally. Do NOT use Devanagari script.";
 
-      let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
+      let aiSuccess = false;
 
-      // 1. Try Gemini First
-      if (useGemini && genAI) {
-         console.log(`🧠 [AI] Using Gemini 2.5 Flash...`);
-         try {
-             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-             let promptStr = systemPromptText + "\n\nConversation History:\n";
-             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
-             promptStr += "AI:";
-             
-             const result = await model.generateContent(promptStr);
-             aiText = result.response.text();
-         } catch (geminiErr) {
-             console.error(`⚠️ [AI] Gemini Error: ${geminiErr.message}. Falling back to OpenAI...`);
-             useGemini = false; 
-         }
+      // 🚀 MULTI-MODEL FALLBACK ENGINE FOR LIVE STREAMING
+      if (genAI) {
+        // Level 1: Try Gemini 3.1 Flash Light
+        try {
+          console.log(`🧠 [AI] Trying model: ${MODELS.GEMINI_3_1_LIGHT}...`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+          let promptStr = systemPromptText + "\n\nConversation History:\n";
+          conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
+          promptStr += "AI:";
+          
+          const result = await model.generateContent(promptStr);
+          aiText = result.response.text();
+          aiSuccess = true;
+        } catch (gemini3Err) {
+          console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_3_1_LIGHT} failed or busy: ${gemini3Err.message}. Trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+        }
+
+        // Level 2: Try Gemini 2.5 Flash Light
+        if (!aiSuccess) {
+          try {
+            console.log(`🧠 [AI] Trying model: ${MODELS.GEMINI_2_5_LIGHT}...`);
+            const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+            let promptStr = systemPromptText + "\n\nConversation History:\n";
+            conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
+            promptStr += "AI:";
+            
+            const result = await model.generateContent(promptStr);
+            aiText = result.response.text();
+            aiSuccess = true;
+          } catch (gemini2Err) {
+            console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_2_5_LIGHT} also failed: ${gemini2Err.message}. Falling back to OpenAI...`);
+          }
+        }
       }
 
-      // 2. Fallback to OpenAI
-      if (!useGemini) {
-          if (!openai) throw new Error("OpenAI API Key is missing and Gemini failed.");
-          console.log(`🧠 [AI] Using OpenAI GPT-4o-mini...`);
-          const chatCompletion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "system", content: systemPromptText }, ...conversationHistory] });
-          aiText = chatCompletion.choices[0].message.content;
+      // Level 3: Final Fallback to OpenAI gpt-4o-mini
+      if (!aiSuccess) {
+        if (!openai) throw new Error("OpenAI API Key is missing and Gemini failed.");
+        console.log(`🧠 [AI] Using OpenAI fallback model: ${MODELS.OPENAI_MINI}...`);
+        const chatCompletion = await openai.chat.completions.create({ model: MODELS.OPENAI_MINI, messages: [{ role: "system", content: systemPromptText }, ...conversationHistory] });
+        aiText = chatCompletion.choices[0].message.content;
       }
 
       aiText = aiText.replace(/\*/g, '').trim();
@@ -134,7 +159,7 @@ module.exports = function (ws) {
       }
     } catch (error) {
       console.error("❌ AI/TTS Error:", error.message);
-      // 🚀 NEW: FALLBACK AUDIO IF AI SERVER IS DOWN
+      // 🚀 FALLBACK AUDIO IF AI SERVER IS DOWN
       try {
         if (cachedMobileFallbackAudio) {
           console.log(`🔊 [Fallback TTS] Using CACHED busy message (Zero Cost)...`);
@@ -154,8 +179,7 @@ module.exports = function (ws) {
             const arrayBuffer = await fallbackTts.arrayBuffer();
             cachedMobileFallbackAudio = Buffer.from(arrayBuffer).toString('base64');
             ws.send(JSON.stringify({ event: 'audio', data: cachedMobileFallbackAudio }));
-          // Call automatically close kar do 5 seconds baad taaki aawaz poori sunayi de
-          setTimeout(() => { if (ws.readyState === WebSocket.OPEN) ws.close(); }, 5000);
+            setTimeout(() => { if (ws.readyState === WebSocket.OPEN) ws.close(); }, 5000);
           }
         }
       } catch (fallbackErr) {
@@ -172,7 +196,6 @@ module.exports = function (ws) {
       if (msg.event === 'start') {
         console.log(`📞 [Mobile Stream] Android App started recording.`);
         
-        // 🚀 NEW: Extract Lead ID or Phone to track Timeline
         if (msg.leadId) activeLeadId = msg.leadId;
         if (msg.phone) activePhone = msg.phone;
         if (msg.userId) activeUserId = msg.userId;
@@ -182,7 +205,7 @@ module.exports = function (ws) {
         if (activeLeadId || activePhone) {
           try {
             const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
-            await Lead.findOneAndUpdate(query, {
+            Lead.findOneAndUpdate(query, {
               $push: { timeline: { eventType: 'Call Received', description: 'Voice Call session started via Mobile/Web App.', timestamp: new Date() } }
             }).exec().catch(() => {});
           } catch(e) {}
@@ -196,7 +219,6 @@ module.exports = function (ws) {
            console.log(`🎤 [Audio Debug] Receiving voice data from mic... (Chunks: ${audioChunkCount})`);
         }
         
-        // Receive raw mic audio from Android
         const audioBuffer = Buffer.from(msg.data, 'base64');
         if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) {
           deepgramLive.send(audioBuffer);
@@ -207,7 +229,6 @@ module.exports = function (ws) {
         if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) deepgramLive.close();
       }
     } catch(e) {
-       // If sending raw binary instead of JSON
        if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) {
           deepgramLive.send(message);
        }
@@ -227,17 +248,42 @@ module.exports = function (ws) {
            const summaryPrompt = "Analyze this call transcript and provide a short summary (2-3 lines). Identify the customer's intent, whether an order was placed, or if a follow-up is needed. Format: \nIntent: ... \nOutcome: ...";
            const transcriptText = JSON.stringify(rawTranscript.map(t => `${t.speaker}: ${t.text}`));
            
-           if (genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy') {
-               const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-               const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
-               callSummary = result.response.text();
-           } else if (openai) {
-               const summaryResponse = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "system", content: summaryPrompt }, { role: "user", content: transcriptText }] });
-               callSummary = summaryResponse.choices[0].message.content;
+           let summarySuccess = false;
+
+           if (genAI) {
+              // Level 1 Summary: Gemini 3.1 Flash Light
+              try {
+                console.log(`🧠 [Summary Engine] Requesting report using: ${MODELS.GEMINI_3_1_LIGHT}`);
+                const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+                const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+                callSummary = result.response.text();
+                summarySuccess = true;
+              } catch (sErr3) {
+                console.warn(`⚠️ [Summary Engine] ${MODELS.GEMINI_3_1_LIGHT} failed, trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+              }
+
+              // Level 2 Summary: Gemini 2.5 Flash Light
+              if (!summarySuccess) {
+                try {
+                  console.log(`🧠 [Summary Engine] Requesting report using: ${MODELS.GEMINI_2_5_LIGHT}`);
+                  const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+                  const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+                  callSummary = result.response.text();
+                  summarySuccess = true;
+                } catch (sErr2) {
+                  console.warn(`⚠️ [Summary Engine] ${MODELS.GEMINI_2_5_LIGHT} failed, falling back to OpenAI...`);
+                }
+              }
+           }
+
+           // Level 3 Summary: OpenAI gpt-4o-mini
+           if (!summarySuccess && openai) {
+              console.log(`🧠 [Summary Engine] Requesting report using fallback: ${MODELS.OPENAI_MINI}`);
+              const summaryResponse = await openai.chat.completions.create({ model: MODELS.OPENAI_MINI, messages: [{ role: "system", content: summaryPrompt }, { role: "user", content: transcriptText }] });
+              callSummary = summaryResponse.choices[0].message.content;
            }
         }
 
-        // 🚀 FIX: Map 'AI' to 'Agent' and add missing 'to' field to satisfy MongoDB Schema
         const formattedTranscript = rawTranscript.map(t => ({ ...t, speaker: t.speaker === 'AI' ? 'Agent' : t.speaker }));
         await Call.create({ 
             userId: activeUserId,
@@ -254,7 +300,6 @@ module.exports = function (ws) {
         });
         console.log("💾 [DB] Mobile Call Transcript saved successfully.");
         
-        // 🚀 NEW: Record Call Completion in Timeline
         if (activeLeadId || activePhone) {
            const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
            await Lead.findOneAndUpdate(query, {

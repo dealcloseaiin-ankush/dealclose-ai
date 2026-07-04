@@ -1,9 +1,17 @@
 const User = require('../models/userModel');
 const aiService = require('../services/aiService');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const Flow = require('../models/flowModel');
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
+
+// 🌊 ULTRA COST-EFFECTIVE MODELS CONFIGURATION
+const MODELS = {
+  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest, Cheapest & Fast)
+  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+};
 
 // @desc    Get unanswered queries for AI training
 // @route   GET /api/ai/training-data
@@ -44,8 +52,6 @@ exports.handleWebChat = async (req, res) => {
     const { message } = req.body;
     if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
 
-    // 🧠 DEALCLOSE AI MASTER PROMPT (Properly wrapped in a JavaScript String)
-    // This prompt defines the personality of the AI on the main public website.
     const systemContext = `
     # CORE IDENTITY & PERSONA
     - You are "DealClose AI", a world-class AI Sales & Marketing Automation expert.
@@ -58,9 +64,9 @@ exports.handleWebChat = async (req, res) => {
     # PLATFORM KNOWLEDGE (MY CAPABILITIES)
     - I can automate WhatsApp & Instagram chats, make AI voice calls, analyze competitor ads with ScanIQ, and manage CRM.
     - Pricing Plans:
-      1. Basic Automation: ₹199/mo (WhatsApp OR Instagram, keyword-based). Comes with 30-Day Free Trial.
-      2. AI Starter Offer: ₹99/mo for the 1st month (Smart AI Chatbot, abandoned cart recovery). Renews at ₹299/mo.
-      3. Omnichannel Pro: ₹498/mo (WhatsApp AND Instagram, AI Voice Calls).
+      1. Basic Automation: ₹999/mo (WhatsApp OR Instagram, keyword-based). Comes with 30-Day Free Trial.
+      2. AI Starter Offer: ₹499/mo (Smart AI Chatbot, abandoned cart recovery).
+      3. Omnichannel Pro: ₹4,999/mo (WhatsApp AND Instagram, AI Voice Calls).
     - Instagram Manager: I can automatically reply to Instagram DMs, handle comments, filter spam, manage brand collaborations, and extract lead details.
     - AI Voice Calling: I can make smart outbound calls to customers using Exotel integration to close deals.
     - ScanIQ Ads: I analyze competitor Meta and Google ads to give a viral score and suggest improvements.
@@ -94,21 +100,16 @@ exports.trainAI = async (req, res) => {
     
     const { question, answer, aiRules, businessDescription, fallbackAction, workspaceId, type, triggerWord, replyMessage } = req.body;
     let updateQuery = {};
-
-    // MongoDB strict update rules ke liye $set aur $push ko alag kiya gaya hai
     let setQuery = {};
 
-    // 🚀 NEW: Handle 1-Click Auto-Reply addition (Bypass AI Cost feature)
     if (type === 'auto_reply' && triggerWord && replyMessage) {
       updateQuery.$push = { autoReplies: { triggerWord, replyMessage } };
     }
-    // Agar specific Q&A aaya hai
     else if (question && answer) {
       updateQuery.$push = { trainingData: { question, answer, status: 'answered' } };
     }
     
     if (workspaceId && workspaceId !== 'main' && workspaceId !== 'main_business') {
-      // Update Specific Workspace
       if (aiRules !== undefined) setQuery["workspaces.$.aiRules"] = aiRules;
       if (businessDescription !== undefined) setQuery["workspaces.$.businessDescription"] = businessDescription;
       
@@ -120,7 +121,6 @@ exports.trainAI = async (req, res) => {
         console.log(`✅ [DEBUG] AI Brain / Rules successfully saved to Workspace ${workspaceId}!`);
       }
     } else {
-      // Update Main Business
       if (aiRules !== undefined) setQuery.aiRules = aiRules;
       if (businessDescription !== undefined) setQuery.businessDescription = businessDescription;
       if (fallbackAction !== undefined) setQuery.fallbackAction = fallbackAction;
@@ -143,7 +143,7 @@ exports.trainAI = async (req, res) => {
 // @route   PUT /api/ai/training-data/:id/answer
 exports.answerTrainingQuestion = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
     const { id } = req.params;
@@ -155,8 +155,6 @@ exports.answerTrainingQuestion = async (req, res) => {
       { _id: userId, "trainingData._id": id },
       { $set: { "trainingData.$.answer": answer, "trainingData.$.status": "answered" } }
     );
-
-    // FUTURE TODO: We can write code here to automatically send this answer back to the customer on WhatsApp too!
 
     res.status(200).json({ success: true, message: 'Question answered and AI trained successfully' });
   } catch (error) {
@@ -175,7 +173,7 @@ exports.handleDashboardAssistant = async (req, res) => {
     
     if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
     console.log(`🤖 [Dashboard Assistant] Received message: "${message}" from user: ${userId}`);
-    const user = await User.findById(userId).lean(); // 🔥 Added .lean()
+    const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const systemContext = `You are DealClose AI, a world-class AI Sales & Marketing Automation expert acting as an Onboarding Assistant.
@@ -225,10 +223,9 @@ exports.handleDashboardAssistant = async (req, res) => {
           if (args.businessName) updateData.businessName = args.businessName;
           if (args.businessDescription) updateData.businessDescription = args.businessDescription;
           
-          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after', strict: false });
+          await User.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after', strict: false });
           const verifyDb = await User.findById(userId).lean();
-          console.log(`\n🔍 [DB VERIFY AFTER AI PROFILE UPDATE]
-            - Business Desc in DB: ${verifyDb.businessDescription ? '✅ SAVED' : '❌ MISSING'}`);
+          console.log(`\n🔍 [DB VERIFY AFTER AI PROFILE UPDATE] - Business Desc in DB: ${verifyDb.businessDescription ? '✅ SAVED' : '❌ MISSING'}`);
           responseMessage = "✅ I have updated your business profile successfully! What would you like to set up next? Auto-replies or WhatsApp templates?";
           actionTaken = "profile_updated";
         } 
@@ -239,18 +236,16 @@ exports.handleDashboardAssistant = async (req, res) => {
           const updated = await User.findByIdAndUpdate(userId, {
             $push: { autoReplies: { triggerWord: args.triggerWord, replyMessage: args.replyMessage } }
           }, { returnDocument: 'after', strict: false });
-          console.log(`\n🔍 [DB VERIFY AFTER AI AUTOREPLY]
-            - Total Auto-Replies in DB: ${updated.autoReplies?.length || 0}`);
+          console.log(`\n🔍 [DB VERIFY AFTER AI AUTOREPLY] - Total Auto-Replies in DB: ${updated.autoReplies?.length || 0}`);
           responseMessage = `⚡ Done! I've added an auto-reply. When someone says *'${args.triggerWord}'*, I will automatically reply with: '${args.replyMessage}'.`;
           actionTaken = "auto_reply_added";
         }
         else if (toolCall.function.name === "update_ai_rules") {
           updateData.aiRules = args.customRules;
           updateData.fallbackAction = args.fallbackAction;
-          const updated = await User.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after', strict: false });
+          await User.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after', strict: false });
           const verifyDb = await User.findById(userId).lean();
-          console.log(`\n🔍 [DB VERIFY AFTER AI RULES UPDATE]
-            - AI Rules in DB: ${verifyDb.aiRules ? '✅ SAVED' : '❌ MISSING'}`);
+          console.log(`\n🔍 [DB VERIFY AFTER AI RULES UPDATE] - AI Rules in DB: ${verifyDb.aiRules ? '✅ SAVED' : '❌ MISSING'}`);
           responseMessage = `🧠 Perfect! I have updated my brain. I will strictly follow these rules with your customers:\n- ${args.customRules}\n\nAnd if I get stuck, I will: ${args.fallbackAction}.`;
           actionTaken = "rules_updated";
         }
@@ -308,7 +303,7 @@ exports.handleDashboardAssistant = async (req, res) => {
       responseMessage = aiMessage.content;
     }
 
-    // 🚀 NEW: CATCH BULK SEND JSON COMMAND
+    // CATCH BULK SEND JSON COMMAND
     if (responseMessage && responseMessage.includes('"action":') && responseMessage.includes('"send_bulk"')) {
         try {
             const jsonMatch = responseMessage.match(/\{[\s\S]*\}/);
@@ -334,7 +329,7 @@ exports.handleDashboardAssistant = async (req, res) => {
         }
     }
 
-    // 🚀 NEW: CATCH IVR CAMPAIGN JSON COMMAND & GENERATE VOICE
+    // CATCH IVR CAMPAIGN JSON COMMAND & GENERATE VOICE
     if (responseMessage && responseMessage.includes('"action":') && responseMessage.includes('"create_ivr"')) {
         try {
             const jsonMatch = responseMessage.match(/\{[\s\S]*\}/);
@@ -370,7 +365,7 @@ exports.handleDashboardAssistant = async (req, res) => {
   }
 };
 
-// @desc    Generate ReactFlow data using Gemini 2.5 Flash
+// @desc    Generate ReactFlow data using high-availability fallback chain
 // @route   POST /api/ai/generate-flow
 exports.generateFlow = async (req, res) => {
   try {
@@ -390,14 +385,12 @@ exports.generateFlow = async (req, res) => {
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY is missing. Please add it to your .env file.");
+    const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
+
+    if (!apiKey && !hasOpenAI) {
+      console.warn("AI Keys missing.");
       return res.status(500).json({ success: false, reply: 'Mera AI engine abhi disconnect ho gaya hai (API Key missing).' });
     }
-
-    // 🚀 NEW: Using Gemini 2.5 Flash as requested!
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const systemPrompt = `You are the DealClose AI Flow Builder Assistant, a highly intelligent automation expert.
     The user will describe what automation flow they want to build in any language (like Hindi, Hinglish, or English).
@@ -430,7 +423,7 @@ exports.generateFlow = async (req, res) => {
     Node Types & EXACT Data Schema YOU MUST USE:
     - 'trigger': { "id": "1", "type": "trigger", "position": {"x":250,"y":50}, "data": { "triggerType": "keyword", "keyword": "hi" } }
     - 'message': { "id": "node_2", "type": "message", "position": {"x":250,"y":150}, "data": { "message": "Write the actual reply text here!" } }
-    - 'askQuestion': { "id": "node_3", "type": "askQuestion", "position": {"x":250,"y":250}, "data": { "question": "Write the actual question here!", "replyType": "open" } } // Set replyType to "open" for free-text like Name/City, or "yes_no" for confirmation.
+    - 'askQuestion': { "id": "node_3", "type": "askQuestion", "position": {"x":250,"y":250}, "data": { "question": "Write the actual question here!", "replyType": "open" } }
     - 'menu': { "id": "node_m", "type": "menu", "position": {"x":250,"y":250}, "data": { "message": "Choose option:", "opt1": "Collab", "opt2": "Ads", "opt3": "Fan" } }
     - 'delay': { "id": "node_4", "type": "delay", "position": {"x":250,"y":350}, "data": { "delay": "15", "unit": "Minutes" } }
     - 'condition': { "id": "node_5", "type": "condition", "position": {"x":250,"y":450}, "data": { "condition": "If User Replied" } }
@@ -443,21 +436,61 @@ exports.generateFlow = async (req, res) => {
     CRITICAL RULES:
     0. If asked to "hand over to AI", just end the flow with a 'message' node. Do NOT invent new node types.
     1. ALWAYS PUT REAL TEXT IN 'data.message' AND 'data.question'. Never leave them blank! Write the Hindi/English text inside them!
-    2. SMART MODIFICATION: Deeply analyze 'Current Canvas Nodes'. If a node with a similar purpose already exists (e.g., asking for Name/City, or a Start Trigger), DO NOT create a duplicate! REUSE existing nodes, update their text if needed, and just fix the edges. Take the 'Current Canvas Nodes' and 'Current Canvas Edges', modify them, and return the FULL updated arrays.
+    2. SMART MODIFICATION: Deeply analyze 'Current Canvas Nodes'. If a node with a similar purpose already exists, DO NOT create a duplicate! REUSE existing nodes, update their text if needed, and just fix the edges. Take the 'Current Canvas Nodes' and 'Current Canvas Edges', modify them, and return the FULL updated arrays.
     3. Edges must logically connect 'source' to 'target'. If a node has multiple outputs, you MUST specify "sourceHandle" in the edge. 
-       - For 'condition' node, sourceHandle MUST be "true" or "false".
-       - For 'askQuestion' node with "yes_no", sourceHandle MUST be "yes", "no", or "other".
-       - For 'askQuestion' node with "open", sourceHandle MUST be "replied".
-       - For 'menu' node, sourceHandle MUST be "opt_0" (for opt1), "opt_1" (for opt2), or "opt_2" (for opt3).
-       Example Edge: { "id": "e1-2", "source": "node_1", "target": "node_2", "sourceHandle": "yes" }
     4. EVEN IF YOU ARE JUST CHATTING, YOU MUST RETURN JSON! Do NOT output plain text outside the JSON. Format: {"reply": "...", "nodes": [], "edges": []}
     5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting, trailing commas, or unescaped newlines in strings. If you need a newline in a message, use \\n.
-    6. FALLBACK MESSAGE RULE: Always ensure your flow has a fallback or ending 'message' node that says something like: "🙏 Hum abhi available nahi hain, network milte hi hum aapse contact karenge." This ensures the user is never ignored.`;
+    6. FALLBACK MESSAGE RULE: Always ensure your flow has a fallback or ending 'message' node.`;
 
     let rawResponse = "";
-    const result = await model.generateContent([systemPrompt, prompt]);
-    rawResponse = result.response.text();
-    
+    let flowGenSuccess = false;
+
+    // 🚀 DYNAMIC MULTI-MODEL ROUTING & FALLBACK CHAIN
+    if (apiKey) {
+      const genAI = new GoogleGenerativeAI(apiKey);
+
+      // Level 1: Try Gemini 3.1 Flash Light
+      try {
+        console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LIGHT}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        const result = await model.generateContent([systemPrompt, prompt]);
+        rawResponse = result.response.text();
+        flowGenSuccess = true;
+      } catch (gemini3Err) {
+        console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_3_1_LIGHT} failed, trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+      }
+
+      // Level 2: Try Gemini 2.5 Flash Light
+      if (!flowGenSuccess) {
+        try {
+          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_2_5_LIGHT}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+          const result = await model.generateContent([systemPrompt, prompt]);
+          rawResponse = result.response.text();
+          flowGenSuccess = true;
+        } catch (gemini2Err) {
+          console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_2_5_LIGHT} failed, falling back to OpenAI...`);
+        }
+      }
+    }
+
+    // Level 3: Final Fallback to OpenAI gpt-4o-mini
+    if (!flowGenSuccess && hasOpenAI) {
+      console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.OPENAI_MINI}`);
+      const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const chatCompletion = await openaiClient.chat.completions.create({
+        model: MODELS.OPENAI_MINI,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt }
+        ],
+      });
+      rawResponse = chatCompletion.choices[0].message.content;
+      flowGenSuccess = true;
+    }
+
+    if (!flowGenSuccess) throw new Error("All pipeline generation models failed.");
+
     let cleaned = rawResponse.replace(/```json\n?/gi, '').replace(/```\n?/gi, '').trim();
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
@@ -465,14 +498,7 @@ exports.generateFlow = async (req, res) => {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
     
-    let flowData;
-    try {
-      flowData = JSON.parse(cleaned);
-    } catch (parseError) {
-      console.error('❌ [Flow Gen JSON Parse Error]:', cleaned);
-      return res.status(500).json({ success: false, reply: "Maafi chahunga, lambe flow ke karan AI ne formatting me galti kar di. Kripya ek-ek karke block banwayein (e.g. 'Pehle sirf Name/City poochne ka block lagao')." });
-    }
-
+    const flowData = JSON.parse(cleaned);
     res.status(200).json(flowData);
   } catch (error) {
     console.error('Flow Gen Error:', error.message);

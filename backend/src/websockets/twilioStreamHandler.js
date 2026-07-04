@@ -8,6 +8,13 @@ const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 // 🚀 GLOBAL CACHE: Twilio calls (mulaw) ke liye alag cache
 let cachedTwilioFallbackAudio = null;
 
+// 🌊 ULTRA COST-EFFECTIVE MODELS FOR TWILIO AUDIO PIPELINE
+const MODELS = {
+  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest, Fast & Ultra-Cheapest)
+  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final Tools Fallback)
+};
+
 module.exports = function (ws) {
   let streamSid = null;
   let callSid = null; 
@@ -54,51 +61,71 @@ module.exports = function (ws) {
       let aiText = "";
 
       const systemPromptText = "You are a friendly DealClose AI sales agent. Keep answers extremely short. Speak in conversational Hinglish. CRITICAL RULE: Use simple words so an American AI voice can pronounce them. DO NOT use Devanagari script.";
-      let useGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy');
+      let aiSuccess = false;
 
-      if (useGemini && genAI) {
-         console.log(`🧠 [AI] Using Gemini 2.5 Flash...`);
-         try {
-             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-             let promptStr = systemPromptText + "\n\nConversation History:\n";
-             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
-             promptStr += "AI:";
-             
-             const result = await model.generateContent(promptStr);
-             aiText = result.response.text();
-         } catch (geminiErr) {
-             console.error(`⚠️ [AI] Gemini Error: ${geminiErr.message}. Falling back to OpenAI...`);
-             useGemini = false; 
-         }
+      // 🚀 MULTI-MODEL DYNAMIC CHAIN FOR TWILIO INTERACTION
+      if (genAI) {
+        // Level 1: Try Gemini 3.1 Flash Light
+        try {
+          console.log(`🧠 [AI] Trying model: ${MODELS.GEMINI_3_1_LIGHT}...`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+          let promptStr = systemPromptText + "\n\nConversation History:\n";
+          conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
+          promptStr += "AI:";
+          
+          const result = await model.generateContent(promptStr);
+          aiText = result.response.text();
+          aiSuccess = true;
+        } catch (gemini3Err) {
+          console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_3_1_LIGHT} busy/failed: ${gemini3Err.message}. Trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+        }
+
+        // Level 2: Try Gemini 2.5 Flash Light
+        if (!aiSuccess) {
+          try {
+            console.log(`🧠 [AI] Trying model: ${MODELS.GEMINI_2_5_LIGHT}...`);
+            const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+            let promptStr = systemPromptText + "\n\nConversation History:\n";
+            conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
+            promptStr += "AI:";
+            
+            const result = await model.generateContent(promptStr);
+            aiText = result.response.text();
+            aiSuccess = true;
+          } catch (gemini2Err) {
+            console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_2_5_LIGHT} also failed: ${gemini2Err.message}. Falling back to OpenAI...`);
+          }
+        }
       }
 
-      if (!useGemini) {
-          if (!openai) throw new Error("OpenAI API Key is missing and Gemini failed.");
-          console.log(`🧠 [AI] Using OpenAI GPT-4o-mini...`);
-          const chatCompletion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "system", content: systemPromptText }, ...conversationHistory],
-            tools: [
-              { type: "function", function: { name: "create_sales_order", description: "Punch an order.", parameters: { type: "object", properties: { itemName: { type: "string" }, quantity: { type: "number" }, deliveryCity: { type: "string" } }, required: ["itemName", "quantity"] } } },
-              { type: "function", function: { name: "add_call_notes", description: "Save notes.", parameters: { type: "object", properties: { noteSummary: { type: "string" } }, required: ["noteSummary"] } } }
-            ]
-          });
-          
-          const responseMessage = chatCompletion.choices[0].message;
-          if (responseMessage.tool_calls) {
-            for (const toolCall of responseMessage.tool_calls) {
-              const args = JSON.parse(toolCall.function.arguments);
-              if (toolCall.function.name === "create_sales_order") {
-                console.log(`🛍️ [AI SALES TOOL] Taking Order: ${args.quantity}x ${args.itemName}`);
-                aiText = `Done! Maine aapka ${args.quantity} ${args.itemName} ka order punch kar diya hai. Kuch aur help karu?`;
-              } else if (toolCall.function.name === "add_call_notes") {
-                console.log(`📝 [AI CRM TOOL] Saving Note: ${args.noteSummary}`);
-                aiText = "Maine aapki requirement note kar li hai. Hamari team aapse jaldi connect karegi.";
-              }
+      // Level 3: Fallback to OpenAI gpt-4o-mini (Supports Function Calling / Sales Tools)
+      if (!aiSuccess) {
+        if (!openai) throw new Error("OpenAI API Key is missing and Gemini failed.");
+        console.log(`🧠 [AI] Using OpenAI model: ${MODELS.OPENAI_MINI}...`);
+        const chatCompletion = await openai.chat.completions.create({
+          model: MODELS.OPENAI_MINI,
+          messages: [{ role: "system", content: systemPromptText }, ...conversationHistory],
+          tools: [
+            { type: "function", function: { name: "create_sales_order", description: "Punch an order.", parameters: { type: "object", properties: { itemName: { type: "string" }, quantity: { type: "number" }, deliveryCity: { type: "string" } }, required: ["itemName", "quantity"] } } },
+            { type: "function", function: { name: "add_call_notes", description: "Save notes.", parameters: { type: "object", properties: { noteSummary: { type: "string" } }, required: ["noteSummary"] } } }
+          ]
+        });
+        
+        const responseMessage = chatCompletion.choices[0].message;
+        if (responseMessage.tool_calls) {
+          for (const toolCall of responseMessage.tool_calls) {
+            const args = JSON.parse(toolCall.function.arguments);
+            if (toolCall.function.name === "create_sales_order") {
+              console.log(`🛍️ [AI SALES TOOL] Taking Order: ${args.quantity}x ${args.itemName}`);
+              aiText = `Done! Maine aapka ${args.quantity} ${args.itemName} ka order punch kar diya hai. Kuch aur help karu?`;
+            } else if (toolCall.function.name === "add_call_notes") {
+              console.log(`📝 [AI CRM TOOL] Saving Note: ${args.noteSummary}`);
+              aiText = "Maine aapki requirement note kar li hai. Hamari team aapse jaldi connect karegi.";
             }
-          } else {
-            aiText = responseMessage.content;
           }
+        } else {
+          aiText = responseMessage.content;
+        }
       }
 
       aiText = aiText.replace(/\*/g, '').trim();
@@ -128,7 +155,7 @@ module.exports = function (ws) {
 
     } catch (error) {
       console.error("❌ AI/TTS Error:", error.message);
-      // 🚀 NEW: FALLBACK AUDIO IF AI SERVER IS DOWN
+      // 🚀 FALLBACK AUDIO IF AI SERVER IS DOWN
       try {
         if (cachedTwilioFallbackAudio) {
           console.log(`🔊 [Fallback TTS] Using CACHED audio for Twilio (Zero Cost)...`);
@@ -190,13 +217,39 @@ module.exports = function (ws) {
            const summaryPrompt = "Analyze this call transcript and provide a short summary (2-3 lines). Identify the customer's intent, whether an order was placed, or if a follow-up is needed. Format: \nIntent: ... \nOutcome: ...";
            const transcriptText = JSON.stringify(rawTranscript.map(t => `${t.speaker}: ${t.text}`));
            
-           if (genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'dummy') {
-               const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-               const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
-               callSummary = result.response.text();
-           } else if (openai) {
-               const summaryResponse = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "system", content: summaryPrompt }, { role: "user", content: transcriptText }] });
-               callSummary = summaryResponse.choices[0].message.content;
+           let summarySuccess = false;
+
+           if (genAI) {
+              // Level 1 Summary: Gemini 3.1 Flash Light
+              try {
+                console.log(`🧠 [Summary Engine] Requesting report using: ${MODELS.GEMINI_3_1_LIGHT}`);
+                const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+                const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+                callSummary = result.response.text();
+                summarySuccess = true;
+              } catch (sErr3) {
+                console.warn(`⚠️ [Summary Engine] ${MODELS.GEMINI_3_1_LIGHT} failed, trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+              }
+
+              // Level 2 Summary: Gemini 2.5 Flash Light
+              if (!summarySuccess) {
+                try {
+                  console.log(`🧠 [Summary Engine] Requesting report using: ${MODELS.GEMINI_2_5_LIGHT}`);
+                  const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+                  const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+                  callSummary = result.response.text();
+                  summarySuccess = true;
+                } catch (sErr2) {
+                  console.warn(`⚠️ [Summary Engine] ${MODELS.GEMINI_2_5_LIGHT} failed, falling back to OpenAI...`);
+                }
+              }
+           }
+
+           // Level 3 Summary: OpenAI gpt-4o-mini
+           if (!summarySuccess && openai) {
+              console.log(`🧠 [Summary Engine] Requesting report using fallback: ${MODELS.OPENAI_MINI}`);
+              const summaryResponse = await openai.chat.completions.create({ model: MODELS.OPENAI_MINI, messages: [{ role: "system", content: summaryPrompt }, { role: "user", content: transcriptText }] });
+              callSummary = summaryResponse.choices[0].message.content;
            }
            console.log(`✅ [Post-Call Analysis] Summary:\n${callSummary}`);
         }
