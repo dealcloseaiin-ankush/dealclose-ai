@@ -8,8 +8,8 @@ const whatsappService = require('../services/whatsappService');
 
 // 🌊 ULTRA COST-EFFECTIVE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
   OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
 };
 
@@ -455,27 +455,27 @@ exports.generateFlow = async (req, res) => {
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
 
-      // Level 1: Try Gemini 3.1 Flash Light
+      // Level 1: Try Gemini 3.1 Flash Lite
       try {
-        console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LIGHT}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LITE}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
         const result = await model.generateContent([systemPrompt, prompt]);
         rawResponse = result.response.text();
         flowGenSuccess = true;
       } catch (gemini3Err) {
-        console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_3_1_LIGHT} failed, trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+        console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_3_1_LITE} failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
       }
 
-      // Level 2: Try Gemini 2.5 Flash Light
+      // Level 2: Try Gemini 2.5 Flash Lite
       if (!flowGenSuccess) {
         try {
-          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_2_5_LIGHT}`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_2_5_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
           const result = await model.generateContent([systemPrompt, prompt]);
           rawResponse = result.response.text();
           flowGenSuccess = true;
         } catch (gemini2Err) {
-          console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_2_5_LIGHT} failed, falling back to OpenAI...`);
+          console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_2_5_LITE} failed, falling back to OpenAI...`);
         }
       }
     }

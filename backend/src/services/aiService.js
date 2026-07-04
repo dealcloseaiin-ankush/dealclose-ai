@@ -7,11 +7,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'sk-dummy-key'
 });
 
-// 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY MODELS
+// 🌊 ULTRA COST-EFFECTIVE & RE-CORRECTED OFFICIAL LITE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Cheapest & Latest)
-  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Cheapest, Latest & Fast - Corrected Spelling)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini Onboarding - Corrected Spelling)
+  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3 (Final AI Tools Fallback Layer)
 };
 
 /**
@@ -25,7 +25,6 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
   try {
     let finalContext = systemContext;
     
-    // Platform-Aware Prompt Injection (AI Magic)
     if (platform === 'instagram') {
       finalContext += "\n\n[CRITICAL RULE]: You are replying to a PUBLIC Instagram comment. Keep your reply EXTREMELY short (1-2 sentences max), polite, and use emojis. Never give long explanations or private details. Direct them to check the 'Link in Bio' or say 'We have DM'd you!'.";
     } else if (platform === 'whatsapp') {
@@ -34,35 +33,43 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     
     finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are strictly an exclusive AI agent for THIS specific business only. You MUST NOT answer general knowledge questions, write code, or discuss any other businesses. If a user asks something unrelated to your products/services, politely say 'I can only assist with [Business Name] related queries.' Keep all your responses extremely concise, short, and to the point.";
 
-    // 🚀 MULTI-MODEL ROUTING & FALLBACK CHAIN
+    let rawResponse = "";
+    let aiSuccess = false;
 
-    // Priority 1: Try Gemini 3.1 Flash Light
+    // 🚀 Priority 1: Try Gemini 3.1 Flash Lite
     if (genAI) {
       try {
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        console.log(`[AI Service] 🤖 Requesting model: ${MODELS.GEMINI_3_1_LITE}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
         const result = await model.generateContent([finalContext, prompt]);
         const response = await result.response;
-        console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_3_1_LIGHT}`);
-        return response.text();
+        rawResponse = response.text();
+        aiSuccess = true;
+        return rawResponse;
       } catch (geminiError) {
-        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_3_1_LIGHT} failed/busy: ${geminiError.message}. Trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_3_1_LITE} failed/busy: ${geminiError.message}. Trying ${MODELS.GEMINI_2_5_LITE}...`);
       }
 
-      // Priority 2: Try Gemini 2.5 Flash Light
-      try {
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
-        const result = await model.generateContent([finalContext, prompt]);
-        const response = await result.response;
-        console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_2_5_LIGHT}`);
-        return response.text();
-      } catch (gemini2Error) {
-        console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_2_5_LIGHT} failed/busy: ${gemini2Error.message}. Falling back to OpenAI...`);
+      // 🚀 Priority 2: Try Gemini 2.5 Flash Lite
+      if (!aiSuccess) {
+        try {
+          console.log(`[AI Service] 🤖 Requesting model: ${MODELS.GEMINI_2_5_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
+          const result = await model.generateContent([finalContext, prompt]);
+          const response = await result.response;
+          rawResponse = response.text();
+          aiSuccess = true;
+          return rawResponse;
+        } catch (gemini2Error) {
+          console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_2_5_LITE} failed/busy: ${gemini2Error.message}. Falling back to OpenAI...`);
+        }
       }
     }
 
-    // Priority 3: Fallback to OpenAI gpt-4o-mini
-    if (process.env.OPENAI_API_KEY) {
+    // 🚀 Priority 3: Fallback to OpenAI gpt-4o-mini
+    if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy')) {
       try { 
+        console.log(`[AI Service] 🤖 Requesting fallback model: ${MODELS.OPENAI_MINI}`);
         const completion = await openai.chat.completions.create({
             messages: [
                 { role: "system", content: finalContext },
@@ -70,10 +77,9 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
             ], 
             model: MODELS.OPENAI_MINI,
         });
-        console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
         return completion.choices[0].message.content;
       } catch (openaiError) {
-        console.error(`❌ [AI Service] OpenAI also failed: ${openaiError.message}`);
+        console.error(`❌ [AI Service] OpenAI fallback also failed: ${openaiError.message}`);
         throw openaiError;
       }
     } 
@@ -97,41 +103,41 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
     const apiKey = process.env.GEMINI_API_KEY;
     const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
 
-    // Level 1: Try Gemini 3.1 Flash Light
-    if (apiKey) {
+    // 🚀 Priority 1: Try Gemini 3.1 Flash Lite
+    if (apiKey && genAI) {
       try {
-        console.log(`[Dashboard Assistant] 🤖 Requesting model: gemini-3.1-flash-light`);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-light' });
+        console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.GEMINI_3_1_LITE}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
         const result = await model.generateContent([systemContext, prompt]);
         const response = await result.response;
         rawResponse = response.text();
         aiSuccess = true;
-        return { content: rawResponse }; // Return standard shape matching response text
+        return { content: rawResponse };
       } catch (gemini3Err) {
-        console.warn(`⚠️ [Dashboard Assistant] Gemini 3.1 Light failed: ${gemini3Err.message}. Trying 2.5 Light...`);
+        console.warn(`⚠️ [Dashboard Assistant] ${MODELS.GEMINI_3_1_LITE} failed: ${gemini3Err.message}. Trying 2.5 Lite...`);
       }
 
-      // Level 2: Try Gemini 2.5 Flash Light
+      // 🚀 Priority 2: Try Gemini 2.5 Flash Lite
       if (!aiSuccess) {
         try {
-          console.log(`[Dashboard Assistant] 🤖 Requesting model: gemini-2.5-flash-light`);
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-light' });
+          console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.GEMINI_2_5_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
           const result = await model.generateContent([systemContext, prompt]);
           const response = await result.response;
           rawResponse = response.text();
           aiSuccess = true;
           return { content: rawResponse };
         } catch (gemini2Err) {
-          console.warn(`⚠️ [Dashboard Assistant] Gemini 2.5 Light failed: ${gemini2Err.message}. Falling back to OpenAI...`);
+          console.warn(`⚠️ [Dashboard Assistant] ${MODELS.GEMINI_2_5_LITE} failed: ${gemini2Err.message}. Falling back to OpenAI...`);
         }
       }
     }
 
-    // Level 3: Final Fallback to OpenAI gpt-4o-mini
+    // 🚀 Priority 3: Fallback to OpenAI gpt-4o-mini
     if (!aiSuccess && hasOpenAI) {
-      console.log(`[Dashboard Assistant] 🤖 Requesting model: gpt-4o-mini`);
+      console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.OPENAI_MINI}`);
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: MODELS.OPENAI_MINI,
         messages: [
           { role: "system", content: systemContext },
           { role: "user", content: prompt }
@@ -146,13 +152,14 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
     throw new Error(`Failed to generate AI dashboard response: ${error.message}`);
   }
 };
+
 /**
  * Generates a response from OpenAI with Function Calling (Tools) capabilities.
  * Used for extracting Real Estate data or triggering Outbound calls.
  */
 exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "whatsapp", customWebhooks = []) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.includes('dummy')) {
       throw new Error("OpenAI API key is required for AI tool usage.");
     }
     let finalContext = systemContext || "You are a business AI assistant.";
@@ -457,7 +464,6 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
         }
     ];
 
-    // 🚀 DYNAMIC SAAS WEBHOOKS: Inject user's custom API URLs as AI Tools
     if (customWebhooks && customWebhooks.length > 0) {
       customWebhooks.forEach(webhook => {
         if (webhook.name && webhook.description) {
@@ -469,7 +475,7 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
               parameters: {
                 type: "object",
                 properties: {
-                  payloadData: { type: "string", description: "JSON string containing all the necessary parameters needed for this action based on user conversation." }
+                  payloadData: { type: "string", description: "JSON string containing parameters needed for this action." }
                 }
               }
             }
@@ -487,7 +493,6 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
       tool_choice: "auto"
     };
 
-    // Use gpt-4o-mini as it has reliable tool-calling capabilities.
     const completion = await openai.chat.completions.create({
       ...requestPayload,
       model: MODELS.OPENAI_MINI
@@ -509,7 +514,7 @@ exports.analyzeSocialMediaComment = async (commentText) => {
     Extract the following details and return strictly in JSON format:
     - "intent": "high", "medium", or "low" (High if they want to buy, ask price, or leave a number).
     - "hasPhoneNumber": boolean.
-    - "phoneNumber": The extracted phone number (with country code if possible), or null.
+    - "phoneNumber": The extracted phone number, or null.
     - "productMentioned": What product/service they are talking about, or null.
     - "suggestedReply": A short, friendly, non-robotic reply to acknowledge their specific comment.`;
 
