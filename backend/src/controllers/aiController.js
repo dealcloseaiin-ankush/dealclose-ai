@@ -143,7 +143,7 @@ exports.trainAI = async (req, res) => {
 // @route   PUT /api/ai/training-data/:id/answer
 exports.answerTrainingQuestion = async (req, res) => {
   try {
-    userId = req.user?._id || req.user?.id;
+    const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
     const { id } = req.params;
@@ -303,10 +303,15 @@ exports.handleDashboardAssistant = async (req, res) => {
       responseMessage = aiMessage.content;
     }
 
+    // Object safe fallback conversion layer
+    const responseTextString = typeof responseMessage === 'string' 
+      ? responseMessage 
+      : (responseMessage?.content || "");
+
     // CATCH BULK SEND JSON COMMAND
-    if (responseMessage && responseMessage.includes('"action":') && responseMessage.includes('"send_bulk"')) {
+    if (responseTextString && responseTextString.includes('"action":') && responseTextString.includes('"send_bulk"')) {
         try {
-            const jsonMatch = responseMessage.match(/\{[\s\S]*\}/);
+            const jsonMatch = responseTextString.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const bulkCmd = JSON.parse(jsonMatch[0]);
                 if (bulkCmd.action === 'send_bulk') {
@@ -330,9 +335,9 @@ exports.handleDashboardAssistant = async (req, res) => {
     }
 
     // CATCH IVR CAMPAIGN JSON COMMAND & GENERATE VOICE
-    if (responseMessage && responseMessage.includes('"action":') && responseMessage.includes('"create_ivr"')) {
+    if (responseTextString && responseTextString.includes('"action":') && responseTextString.includes('"create_ivr"')) {
         try {
-            const jsonMatch = responseMessage.match(/\{[\s\S]*\}/);
+            const jsonMatch = responseTextString.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const ivrCmd = JSON.parse(jsonMatch[0]);
                 if (ivrCmd.action === 'create_ivr') {
@@ -358,7 +363,8 @@ exports.handleDashboardAssistant = async (req, res) => {
         } catch (e) { console.log("Failed to parse IVR command", e.message); }
     }
 
-    res.status(200).json({ success: true, reply: responseMessage, actionTaken });
+    const finalReplyText = typeof responseMessage === 'string' ? responseMessage : (responseMessage?.content || "Hello! How can I help you manage your dashboard today?");
+    res.status(200).json({ success: true, reply: finalReplyText, actionTaken });
   } catch (error) {
     console.error('Dashboard Assistant Error:', error);
     res.status(500).json({ success: false, reply: 'Oops, something went wrong while processing your request.' });

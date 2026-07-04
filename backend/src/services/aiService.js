@@ -91,121 +91,61 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
  */
 exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OpenAI API key is required for the Dashboard Assistant feature.");
-    }
-    const requestPayload = {
-      messages: [
-        { role: "system", content: systemContext },
-        { role: "user", content: prompt }
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "update_business_profile",
-            description: "Update the user's business profile details.",
-            parameters: {
-              type: "object",
-              properties: {
-                businessName: { type: "string", description: "The name of their business/store" },
-                businessDescription: { type: "string", description: "What their business does or sells" }
-              },
-              required: ["businessDescription"]
-            }
-          }
-        },
-        {
-          type: "function",
-          function: {
-            name: "draft_whatsapp_template",
-            description: "Create a draft WhatsApp marketing template based on user's input.",
-            parameters: {
-              type: "object",
-              properties: {
-                templateName: { type: "string", description: "Lowercase, no spaces e.g., 'summer_sale'" },
-                messageBody: { type: "string", description: "The marketing text of the template." }
-              },
-              required: ["templateName", "messageBody"]
-            }
-          }
-        },
-        {
-          type: "function",
-          function: {
-            name: "add_auto_reply_rule",
-            description: "Add a new auto-reply rule for the WhatsApp bot.",
-            parameters: {
-              type: "object",
-              properties: {
-                triggerWord: { type: "string", description: "The exact word the customer might text (e.g., 'menu')" },
-                replyMessage: { type: "string", description: "The automated reply to send." }
-              },
-              required: ["triggerWord", "replyMessage"]
-            }
-          }
-        },
-        {
-          type: "function",
-          function: {
-            name: "update_ai_rules",
-            description: "Save the personal AI rules and fallback instructions decided by the business owner.",
-            parameters: {
-              type: "object",
-              properties: {
-                customRules: { type: "string", description: "Specific instructions like 'Never give discounts', 'Talk in Hinglish', etc." },
-                fallbackAction: { type: "string", description: "What to do if the AI doesn't know the answer (e.g., 'notify_owner', 'wait_for_human')" }
-              },
-              required: ["customRules", "fallbackAction"]
-            }
-          }
-        },
-        {
-          type: "function",
-          function: {
-            name: "log_business_observation",
-            description: "Log an observation or missing knowledge gap the AI noticed to discuss with the owner.",
-            parameters: {
-              type: "object",
-              properties: {
-                observationText: { type: "string", description: "What the AI noticed (e.g., 'Customers are asking for return policy, but it is not in the system')" }
-              },
-              required: ["observationText"]
-            }
-          }
-        },
-        {
-          type: "function",
-          function: {
-            name: "create_automation_flow",
-            description: "Automatically create and save a pre-built Flow Builder automation for the user's business type.",
-            parameters: {
-              type: "object",
-              properties: {
-                flowName: { type: "string", description: "Name of the flow (e.g., 'Real Estate Auto-Reply', 'E-commerce Bot')" },
-                businessType: { type: "string", enum: ["real_estate", "ecommerce", "influencer", "general"], description: "The type of business to generate the correct nodes." }
-              },
-              required: ["flowName", "businessType"]
-            }
-          }
+    let rawResponse = "";
+    let aiSuccess = false;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
+
+    // Level 1: Try Gemini 3.1 Flash Light
+    if (apiKey) {
+      try {
+        console.log(`[Dashboard Assistant] 🤖 Requesting model: gemini-3.1-flash-light`);
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-light' });
+        const result = await model.generateContent([systemContext, prompt]);
+        const response = await result.response;
+        rawResponse = response.text();
+        aiSuccess = true;
+        return { content: rawResponse }; // Return standard shape matching response text
+      } catch (gemini3Err) {
+        console.warn(`⚠️ [Dashboard Assistant] Gemini 3.1 Light failed: ${gemini3Err.message}. Trying 2.5 Light...`);
+      }
+
+      // Level 2: Try Gemini 2.5 Flash Light
+      if (!aiSuccess) {
+        try {
+          console.log(`[Dashboard Assistant] 🤖 Requesting model: gemini-2.5-flash-light`);
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-light' });
+          const result = await model.generateContent([systemContext, prompt]);
+          const response = await result.response;
+          rawResponse = response.text();
+          aiSuccess = true;
+          return { content: rawResponse };
+        } catch (gemini2Err) {
+          console.warn(`⚠️ [Dashboard Assistant] Gemini 2.5 Light failed: ${gemini2Err.message}. Falling back to OpenAI...`);
         }
-      ],
-      tool_choice: "auto"
-    };
+      }
+    }
 
-    const completion = await openai.chat.completions.create({
-      ...requestPayload,
-      model: MODELS.OPENAI_MINI
-    });
-    console.log(`✅ [AI Dashboard Service] Responded using model: ${MODELS.OPENAI_MINI}`);
-    return completion.choices[0].message;
+    // Level 3: Final Fallback to OpenAI gpt-4o-mini
+    if (!aiSuccess && hasOpenAI) {
+      console.log(`[Dashboard Assistant] 🤖 Requesting model: gpt-4o-mini`);
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: "system", content: systemContext },
+          { role: "user", content: prompt }
+        ],
+      });
+      return completion.choices[0].message;
+    }
 
+    throw new Error('All AI Models failed or API keys are missing/dummy.');
   } catch (error) {
     console.error('AI Dashboard Tool Service Error:', error);
     throw new Error(`Failed to generate AI dashboard response: ${error.message}`);
   }
 };
-
 /**
  * Generates a response from OpenAI with Function Calling (Tools) capabilities.
  * Used for extracting Real Estate data or triggering Outbound calls.
