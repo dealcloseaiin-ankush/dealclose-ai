@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { OpenAI } = require('openai');
+const aiUsageTracker = require('./aiUsageTracker');
 
 // Initialize AI clients safely, even if keys are missing.
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -20,9 +21,10 @@ const MODELS = {
  * @param {string} prompt The user's message.
  * @param {string} [systemContext="You are a helpful AI assistant."] The system message to set the AI's behavior.
  * @param {string} [platform="whatsapp"] The platform where the reply will be sent (whatsapp or instagram).
+ * @param {string} [userId] The ID of the user to associate the usage with.
  * @returns {Promise<string>} The AI-generated response text.
  */
-exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp") => {
+exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp", userId = null) => {
   try {
     let finalContext = systemContext;
     
@@ -44,6 +46,12 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
         const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
         const result = await model.generateContent([finalContext, prompt]);
         const response = await result.response;
+        
+        if (userId) {
+          aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'gemini', model: MODELS.GEMINI_1_5_FLASH, usage: response.usageMetadata });
+        }
+
+        console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_1_5_FLASH}`);
         rawResponse = response.text();
         aiSuccess = true;
         return rawResponse;
@@ -58,6 +66,12 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
           const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
           const result = await model.generateContent([finalContext, prompt]);
           const response = await result.response;
+
+          if (userId) {
+            aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'gemini', model: MODELS.GEMINI_3_1_LITE, usage: response.usageMetadata });
+          }
+
+          console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
           rawResponse = response.text();
           aiSuccess = true;
           return rawResponse;
@@ -73,6 +87,12 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
           const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
           const result = await model.generateContent([finalContext, prompt]);
           const response = await result.response;
+
+          if (userId) {
+            aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'gemini', model: MODELS.GEMINI_2_5_LITE, usage: response.usageMetadata });
+          }
+
+          console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_2_5_LITE}`);
           rawResponse = response.text();
           aiSuccess = true;
           return rawResponse;
@@ -93,6 +113,12 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
             ], 
             model: MODELS.OPENAI_MINI,
         });
+
+        if (userId) {
+          aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'openai', model: MODELS.OPENAI_MINI, usage: completion.usage });
+        }
+
+        console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
         return completion.choices[0].message.content;
       } catch (openaiError) {
         console.error(`❌ [AI Service] OpenAI fallback also failed: ${openaiError.message}`);
@@ -111,7 +137,7 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
  * Generates a response for the Dashboard Onboarding Setup Assistant.
  * Used to automatically configure user settings via Chat.
  */
-exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
+exports.generateDashboardAssistantResponse = async (prompt, systemContext, userId = null) => {
   try {
     let rawResponse = "";
     let aiSuccess = false;
@@ -126,6 +152,12 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
         const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
         const result = await model.generateContent([systemContext, prompt]);
         const response = await result.response;
+
+        if (userId) {
+          aiUsageTracker.trackUsage({ userId, feature: 'dashboard-assistant', provider: 'gemini', model: MODELS.GEMINI_1_5_FLASH, usage: response.usageMetadata });
+        }
+
+        console.log(`✅ [Dashboard Assistant] Responded using model: ${MODELS.GEMINI_1_5_FLASH}`);
         rawResponse = response.text();
         aiSuccess = true;
         return { content: rawResponse };
@@ -140,6 +172,12 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
           const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
           const result = await model.generateContent([systemContext, prompt]);
           const response = await result.response;
+
+          if (userId) {
+            aiUsageTracker.trackUsage({ userId, feature: 'dashboard-assistant', provider: 'gemini', model: MODELS.GEMINI_3_1_LITE, usage: response.usageMetadata });
+          }
+
+          console.log(`✅ [Dashboard Assistant] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
           rawResponse = response.text();
           aiSuccess = true;
           return { content: rawResponse };
@@ -155,6 +193,12 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
           const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
           const result = await model.generateContent([systemContext, prompt]);
           const response = await result.response;
+
+          if (userId) {
+            aiUsageTracker.trackUsage({ userId, feature: 'dashboard-assistant', provider: 'gemini', model: MODELS.GEMINI_2_5_LITE, usage: response.usageMetadata });
+          }
+
+          console.log(`✅ [Dashboard Assistant] Responded using model: ${MODELS.GEMINI_2_5_LITE}`);
           rawResponse = response.text();
           aiSuccess = true;
           return { content: rawResponse };
@@ -174,6 +218,12 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
           { role: "user", content: prompt }
         ],
       });
+
+      if (userId) {
+        aiUsageTracker.trackUsage({ userId, feature: 'dashboard-assistant', provider: 'openai', model: MODELS.OPENAI_MINI, usage: completion.usage });
+      }
+
+      console.log(`✅ [Dashboard Assistant] Responded using model: ${MODELS.OPENAI_MINI}`);
       return completion.choices[0].message;
     }
 
@@ -188,7 +238,7 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext) => {
  * Generates a response from OpenAI with Function Calling (Tools) capabilities.
  * Used for extracting Real Estate data or triggering Outbound calls.
  */
-exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "whatsapp", customWebhooks = []) => {
+exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "whatsapp", customWebhooks = [], userId = null) => {
   try {
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.includes('dummy')) {
       throw new Error("OpenAI API key is required for AI tool usage.");
@@ -528,6 +578,11 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
       ...requestPayload,
       model: MODELS.OPENAI_MINI
     });
+
+    if (userId) {
+      aiUsageTracker.trackUsage({ userId, feature: `tools-response-${platform}`, provider: 'openai', model: MODELS.OPENAI_MINI, usage: completion.usage });
+    }
+
     console.log(`✅ [AI Tool Service] Responded using model: ${MODELS.OPENAI_MINI}`);
     return completion.choices[0].message;
   } catch (error) {
@@ -539,7 +594,7 @@ exports.generateAIResponseWithTools = async (prompt, systemContext, platform = "
 /**
  * Analyzes social media comments/DMs to extract phone numbers and intent.
  */
-exports.analyzeSocialMediaComment = async (commentText) => {
+exports.analyzeSocialMediaComment = async (commentText, userId = null) => {
   try {
     const prompt = `You are a lead extraction AI. Analyze this Instagram comment/DM: "${commentText}".
     Extract the following details and return strictly in JSON format:
@@ -549,7 +604,7 @@ exports.analyzeSocialMediaComment = async (commentText) => {
     - "productMentioned": What product/service they are talking about, or null.
     - "suggestedReply": A short, friendly, non-robotic reply to acknowledge their specific comment.`;
 
-    const response = await exports.generateAIResponse(prompt, "You are a JSON data extractor. Output ONLY valid JSON.");
+    const response = await exports.generateAIResponse(prompt, "You are a JSON data extractor. Output ONLY valid JSON.", "instagram", userId);
     return JSON.parse(response);
   } catch (error) {
     console.error('Social Media AI Analyzer Error:', error);

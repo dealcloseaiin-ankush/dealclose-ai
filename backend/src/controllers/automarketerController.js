@@ -7,8 +7,8 @@ const OpenAI = require('openai');
 
 // 🌊 ULTRA COST-EFFECTIVE MODELS FOR AUTOMARKETER
 const MODELS = {
-  GEMINI_3_1_LIGHT: 'gemini-3.1-flash-light', // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LIGHT: 'gemini-2.5-flash-light', // Priority 2 (Backup Gemini)
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
   OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
 };
 
@@ -31,10 +31,15 @@ exports.generatePost = async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
 
+    // 🚀 NEW: Fetch user's business data for context
+    const user = await User.findById(req.user._id).lean();
+    const businessContext = user?.businessDescription ? `My business is about: ${user.businessDescription}.` : '';
+
     const systemPrompt = `You are a professional social media marketing assistant for small businesses. 
     Write a highly engaging, creative Instagram post caption based on the user's topic. 
     Include attractive emojis, a clear call-to-action (e.g., "Tap the link in bio to shop!"), and relevant hashtags.
-    Keep your language friendly, clean, and modern. Do not use Devanagari script for captions; use clean Hinglish or English.`;
+    Keep your language friendly, clean, and modern. Do not use Devanagari script for captions; use clean Hinglish or English.
+    ${businessContext}`;
 
     const apiKey = process.env.GEMINI_API_KEY;
     const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
@@ -48,25 +53,27 @@ exports.generatePost = async (req, res) => {
 
       // Level 1: Try Gemini 3.1 Flash Light
       try {
-        console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.GEMINI_3_1_LIGHT}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LIGHT });
+        console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.GEMINI_3_1_LITE}`);
+        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
         const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
+        console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
         generatedCaption = result.response.text();
         aiSuccess = true;
       } catch (gemini3Err) {
-        console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_3_1_LIGHT} busy/failed, trying ${MODELS.GEMINI_2_5_LIGHT}...`);
+        console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_3_1_LITE} busy/failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
       }
 
       // Level 2: Try Gemini 2.5 Flash Light
       if (!aiSuccess) {
         try {
-          console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.GEMINI_2_5_LIGHT}`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LIGHT });
+          console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.GEMINI_2_5_LITE}`);
+          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
           const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
+          console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.GEMINI_2_5_LITE}`);
           generatedCaption = result.response.text();
           aiSuccess = true;
         } catch (gemini2Err) {
-          console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_2_5_LIGHT} failed, falling back to OpenAI...`);
+          console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_2_5_LITE} failed, falling back to OpenAI...`);
         }
       }
     }
@@ -82,6 +89,7 @@ exports.generatePost = async (req, res) => {
           { role: "user", content: `Topic: "${prompt}"` }
         ],
       });
+      console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.OPENAI_MINI}`);
       generatedCaption = chatCompletion.choices[0].message.content;
       aiSuccess = true;
     }

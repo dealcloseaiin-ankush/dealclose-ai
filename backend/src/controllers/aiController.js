@@ -81,6 +81,7 @@ exports.handleWebChat = async (req, res) => {
     
     const prompt = `Website Visitor says: "${message}"\nRespond directly to this visitor.`;
     
+    // Note: This function already logs the model used internally.
     const aiReply = await aiService.generateAIResponse(prompt, systemContext, "web");
     
     res.status(200).json({ success: true, reply: aiReply });
@@ -175,38 +176,53 @@ exports.handleDashboardAssistant = async (req, res) => {
     if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
     console.log(`🤖 [Dashboard Assistant] Received message: "${message}" from user: ${userId}`);
     const user = await User.findById(userId).lean();
+    // 🚀 NEW: Fetch user's created flows to give AI context
+    const userFlows = await Flow.find({ userId }).select('name').lean();
+    const flowNames = userFlows.map(f => f.name).join(', ');
+    const userAccountAge = Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24));
+
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const systemContext = `You are DealClose AI, a world-class AI Sales & Marketing Automation expert acting as an Onboarding Assistant.
-    The user's business name is '${user.businessName || 'Not Set'}'. 
-    BUSINESS DESCRIPTION: '${user.businessDescription || 'Not Set'}'.
-    SUB-DIVISIONS/WORKSPACES: ${user.workspaces ? user.workspaces.map(w=>w.name).join(', ') : 'None'}.
-    The user currently has ${user.aiCredits || 0} AI Credits remaining.
+    // 🚀 NEW: Create a concise summary of the user's progress for the AI.
+    const onboardingChecklist = `
+    - Business Profile Setup: ${user.businessDescription ? '✅ Done' : '❌ Pending'}
+    - Custom AI Rules Defined: ${user.aiRules ? '✅ Done' : '❌ Pending'}
+    - Automation Flows Created: ${userFlows.length > 0 ? `✅ Done (${userFlows.length} flows)` : '❌ Pending'}
+    - WhatsApp Connected: ${user.whatsappConfig?.accessToken ? '✅ Done' : '❌ Pending'}
+    - Instagram Connected: ${user.instagramConfig?.accessToken ? '✅ Done' : '❌ Pending'}
+    `;
+
+    const systemContext = `You are DealClose AI, an expert Onboarding Assistant.
+    Your goal is to help the user complete their setup by looking at their progress checklist.
+    Do NOT ask them to do things that are already marked as 'Done'.
     
-    YOUR PLATFORM KNOWLEDGE (What DealClose AI can do):
-    1. WhatsApp Chat Automation & Voice Calling
-    2. Meta Ad integration & Lead Extraction
-    3. Creating Marketing Templates (e.g., "Google/Insta Star Rating" templates to boost followers/reviews).
+    --- USER PROFILE SUMMARY ---
+    Business Name: ${user.businessName || 'Not Set'}
+    Business Category: ${user.businessDescription ? user.businessDescription.substring(0, 100) + '...' : 'Not Set'}
+    User Plan: ${user.isPremium ? 'Premium' : 'Free Trial'}
+    Account Age: ${userAccountAge} days
+    AI Credits: ${user.aiCredits || 0}
     
-    YOUR JOB WITH THE OWNER:
-    1. DO NOT ask them to describe their business if you already know it from the BUSINESS DESCRIPTION above. Help them directly!
-    2. If their credits are 50 or below, kindly inform them.
-    3. Ask them to define their personal AI Rules (e.g., "Do you want me to offer discounts?", "Should I talk in English or Hindi?").
-    3. Ask for a fallback plan: "If a customer asks a question I don't know the answer to, should I notify your personal WhatsApp number, or just say 'Please wait for our team'?"
-    4. Suggest features actively: Tell them they should set up a Star Rating template to grow their business, OR set up an AI Voice IVR Campaign!
-    5. IVR CAMPAIGN GENERATOR: If the user asks to create an IVR or Voice campaign (e.g. "Create a campaign saying Press 1 for AI"), ask them what the AI should speak. Once they tell you, you MUST output EXACTLY this JSON format and NOTHING ELSE: {"action": "create_ivr", "campaignName": "Custom Name", "ttsText": "The text to speak", "menuOptions": {"1": {"action": "connect_to_ai"}}}
-    5. Observe their business needs and log any knowledge gaps you notice.
+    --- ONBOARDING CHECKLIST ---
+    ${onboardingChecklist}
     
-    Use your tools to update rules, profile, or draft templates immediately when they agree. Talk like a friendly, intelligent human business partner.
+    --- YOUR JOB ---
+    1. Greet the user and review their checklist.
+    2. Proactively suggest the NEXT logical step from the 'Pending' items. For example, if their profile is not set up, say "I see your business profile is not set up. Can you tell me about your business so I can configure the AI?".
+    3. If all items are 'Done', congratulate them and ask what advanced automation they want to build next.
+    4. If the user asks to modify something that is already 'Done' (e.g., "change my business description"), then help them with that.
+    5. CREDIT AWARENESS: If the user's AI Credits are below 50, you MUST gently remind them: "I noticed your AI credits are getting low. To ensure uninterrupted service, please recharge from your wallet."
+    5. Keep your answers extremely short and to the point.
     
     CRITICAL RULES:
     1. STRICT SCOPE: You are a B2B AI Assistant. You must STRICTLY REFUSE to answer any questions that are unrelated to DealClose AI, marketing automation, CRM, or the user's specific business. If asked about random topics, politely decline and steer the conversation back to business growth.
     2. CRM ANALYTICS: If asked about leads or analytics, base your answers ONLY on the platform's summarized CRM metrics. Do not invent raw data.
     3. MATCH LANGUAGE: Always reply in the EXACT same language the user is speaking. If the user types in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish. Do not reply in English if the user asks a question in Hindi.
     4. BULK MESSAGING: If the user explicitly asks you to send a message to certain leads (e.g. "send this template to lost leads" or "sabko bhej do"), you MUST output EXACTLY this JSON format and NOTHING ELSE:
-    {"action": "send_bulk", "status": "lost", "message": "Your crafted message here"}`;
+    {"action": "send_bulk", "status": "lost", "message": "Your crafted message here"}
+    5. BE CONCISE: Keep your answers extremely short, clear, and to the point. Use 1-2 sentences maximum. Do not write long paragraphs. Get straight to the action.`;
 
-    const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext);
+    const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext, userId);
 
     let responseMessage = "";
     let actionTaken = null;
@@ -461,6 +477,7 @@ exports.generateFlow = async (req, res) => {
         console.log(`[Flow Gen] 🤖 Requesting stable model: ${MODELS.GEMINI_1_5_FLASH}`);
         const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
         const result = await model.generateContent([systemPrompt, prompt]);
+        console.log(`✅ [Flow Gen] Responded using model: ${MODELS.GEMINI_1_5_FLASH}`);
         rawResponse = result.response.text();
         flowGenSuccess = true;
       } catch (gemini15Err) {
@@ -473,6 +490,7 @@ exports.generateFlow = async (req, res) => {
           console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LITE}`);
           const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
           const result = await model.generateContent([systemPrompt, prompt]);
+          console.log(`✅ [Flow Gen] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
           rawResponse = result.response.text();
           flowGenSuccess = true;
         } catch (gemini3Err) {
@@ -492,6 +510,7 @@ exports.generateFlow = async (req, res) => {
           { role: "user", content: prompt }
         ],
       });
+      console.log(`✅ [Flow Gen] Responded using model: ${MODELS.OPENAI_MINI}`);
       rawResponse = chatCompletion.choices[0].message.content;
       flowGenSuccess = true;
     }

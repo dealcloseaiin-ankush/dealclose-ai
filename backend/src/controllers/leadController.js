@@ -5,6 +5,7 @@ const User = require('../models/userModel');
 const aiService = require('../services/aiService');
 const mongoose = require('mongoose');
 const whatsappService = require('../services/whatsappService');
+const AiUsageLog = require('../models/aiUsageLogModel'); // Import the new model
 
 // @desc    Get all leads
 // @route   GET /api/leads
@@ -478,9 +479,19 @@ exports.getLeadAnalytics = async (req, res) => {
 
     const advancedStats = { customersReplied, weRepliedTo, replySources: { bot: botReplyCount, ai: aiReplyCount, human: humanReplyCount } };
 
+    // 🚀 NEW: Centralized AI Token Usage Aggregation
+    const aiUsage = await AiUsageLog.aggregate([
+      { $match: { userId: userIdObj } },
+      { $group: { _id: null, totalTokens: { $sum: '$totalTokens' } } }
+    ]);
+    const totalTokensUsed = aiUsage[0]?.totalTokens || 0;
+
     res.status(200).json({
       stats: { totalLeads, converted, conversionRate, totalInvestment, costPerLead },
       graphData, leadsBySource, dailyLeads: dailyLeadsData, messageStats, recentActivity, advancedStats, smartCrmData,
+      aiStats: {
+        totalTokensUsed,
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

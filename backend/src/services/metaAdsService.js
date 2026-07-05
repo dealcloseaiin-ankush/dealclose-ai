@@ -1,5 +1,6 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const Lead = require('../models/leadModel'); // 🚀 NEW: To fetch lead data
 
 // Meta requires user data to be hashed in SHA256 before sending
 const hashData = (str) => {
@@ -141,5 +142,75 @@ exports.sendConversionEvent = async (pixelId, accessToken, phone, eventName = 'P
     console.log(`✅ [Meta Ads] Conversion event '${eventName}' successfully synced for lead: ${phone}`);
   } catch (error) {
     console.error(`❌ [Meta Ads] Conversion API Error:`, error.response?.data || error.message);
+  }
+};
+
+// 6. 🚀 NEW: Get all Ad Accounts linked to a user's Meta token
+exports.getAdAccounts = async (accessToken) => {
+  try {
+    const response = await axios.get(
+      `https://graph.facebook.com/v19.0/me/adaccounts`,
+      {
+        params: {
+          fields: 'name,account_id,balance,currency',
+          access_token: accessToken,
+        }
+      }
+    );
+    return response.data.data;
+  } catch (error) {
+    console.error("❌ Meta Ad Accounts Fetch Error:", error.response?.data?.error || error.message);
+    throw error;
+  }
+};
+
+// 5. 🚀 NEW: Create a Custom Audience from WhatsApp Leads
+exports.createCustomAudience = async (adAccountId, accessToken, audienceName, description, leadStatus) => {
+  try {
+    // 1. Fetch leads from your database based on status
+    // leadStatus can be 'converted', 'hot', 'lost', etc.
+    const leads = await Lead.find({ status: leadStatus }).select('phoneNumber email').lean();
+    if (leads.length === 0) {
+      throw new Error(`No leads found with status '${leadStatus}' to create an audience.`);
+    }
+
+    // 2. Prepare the data for hashing (phone numbers and emails)
+    const usersData = leads.map(lead => {
+      const phone = lead.phoneNumber ? lead.phoneNumber.replace(/\D/g, '') : null;
+      // Assuming Indian numbers, add country code if missing
+      const formattedPhone = phone && phone.length === 10 ? `91${phone}` : phone;
+      return {
+        // Meta recommends sending both email and phone for better matching
+        email: lead.email ? hashData(lead.email) : null,
+        phone: formattedPhone ? hashData(formattedPhone) : null,
+      };
+    }).filter(u => u.email || u.phone); // Filter out leads with no contact info
+
+    const schema = ['EMAIL', 'PHONE'];
+    const dataToUpload = usersData.map(u => [u.email, u.phone]);
+
+    // 3. Create a new Custom Audience on Meta
+    const createAudienceResponse = await axios.post(
+      `https://graph.facebook.com/v19.0/${adAccountId}/customaudiences`,
+      {
+        name: audienceName,
+        description: description,
+        subtype: 'CUSTOM',
+        customer_file_source: 'USER_PROVIDED_ONLY',
+        access_token: accessToken,
+      }
+    );
+    const audienceId = createAudienceResponse.data.id;
+
+    // 4. Add the hashed user data to this new audience
+    await axios.post(
+      `https://graph.facebook.com/v19.0/${audienceId}/users`,
+      { payload: { schema, data: dataToUpload }, access_token: accessToken }
+    );
+
+    return { success: true, audienceId, audienceName, userCount: dataToUpload.length };
+  } catch (error) {
+    console.error("❌ Meta Custom Audience Error:", error.response?.data?.error || error.message);
+    throw error;
   }
 };

@@ -42,6 +42,8 @@ import WhatsAppRules from './pages/WhatsAppRules';
 import SuperAdmin from './pages/SuperAdmin';
 import SolutionRecommender from './pages/SolutionRecommender';
 import AutoMarketerDashboard from './pages/AutoMarketerDashboard'; // 🚀 NEW
+import MetaAdsManager from './pages/MetaAdsManager'; // 🚀 NEW: Meta Ads Page
+import BillingPage from './pages/BillingPage'; // 🚀 NEW: Billing Page
 import { useAuth } from './hooks/useAuth';
 
 // Placeholder component for Change Password until we build the real one
@@ -215,6 +217,8 @@ export default function App() {
             <Route path="scaniq" element={<ScanIQ />} />
             <Route path="super-admin" element={<SuperAdmin />} />
             <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
+            <Route path="meta-ads" element={<MetaAdsManager />} /> {/* 🚀 NEW: Meta Ads Route */}
+            <Route path="billing" element={<BillingPage />} /> {/* 🚀 NEW: Billing Page Route */}
           </Route>
         </Route>
       </Routes>

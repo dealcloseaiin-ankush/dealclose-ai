@@ -115,6 +115,10 @@ exports.handleWhatsApp = async (req, res) => {
         // 2. CHECK FOR INCOMING MESSAGES
         if (value.messages && value.messages.length > 0) {
           const msg = value.messages[0];
+          // 🚀 DEBUG LOG: Check what ID Meta is sending for Instagram
+          if (changes.field === 'instagram') {
+            console.log(`[DEBUG INSTAGRAM ID] Meta sent PSID: ${msg.from} for entry ID: ${entry.id}`);
+          }
           const fromNumber = msg.from;
           console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
           console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
@@ -215,7 +219,7 @@ exports.handleWhatsApp = async (req, res) => {
 
             try {
               const { buffer, mimeType } = await whatsappService.downloadMedia(user.whatsappConfig.accessToken, mediaId);
-              const extractedData = await ocrService.extractTextFromImage(buffer, mimeType || 'image/jpeg');
+              const extractedData = await ocrService.extractTextFromImage(buffer, mimeType || 'image/jpeg', user._id);
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `*Here is what I read from your list:*\n\n${extractedData}\n\nWould you like me to create an order or quotation for these items?`);
               await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai' });
@@ -881,19 +885,6 @@ exports.handleWhatsApp = async (req, res) => {
                 responseMessage = "Thank you for reaching out! Our support team is currently reviewing your request and will assist you shortly. ⏳" + autoLinks;
                 repliedBy = 'system';
               } else {
-                if (!isFreeTestUser) {
-                  user.aiCredits -= 1;
-                  if (user.aiCredits === 0 && user.ownerPhone) {
-                    await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, "🚨 *AI Limit Exhausted*\n\nAapka DealClose AI ka free trial (50 messages) khatam ho gaya hai. AI ne aapke customers ko automatically reply karna band kar diya hai.\n\nPlease apne dashboard se recharge karein taaki AI aage kaam kar sake.");
-                    user.aiCredits = -1; // Change to -1 so the alert doesn't fire on the next message
-                  }
-                  await user.save();
-                  try {
-                    await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
-                  } catch (billingErr) {
-                    console.error("Billing deduction error:", billingErr.message);
-                  }
-                }
               
               try {
                 // Har SaaS User ka apna personal AI context! 
@@ -970,7 +961,7 @@ exports.handleWhatsApp = async (req, res) => {
                     2. NEVER cut off your message in the middle. Always provide a full, complete sentence.`;
                 }
                 
-                const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext);
+                const aiMessage = await aiService.generateAIResponseWithTools(incomingText, aiContext, "whatsapp", user.customWebhooks, user._id);
               
                 if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
                   for (const toolCall of aiMessage.tool_calls) {
