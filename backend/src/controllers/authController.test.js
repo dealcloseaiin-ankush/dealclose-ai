@@ -176,6 +176,38 @@ describe('Auth Controller - Login', () => {
     expect(mockRes.status).toHaveBeenCalledWith(401);
     expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'Invalid Password. Please try again.' }); // Corrected assertion
   });
+
+  it('should login a user with a legacy $2y$ bcrypt hash', async () => {
+    const mockReq = {
+      body: { email: 'LEGACY@example.com ', password: 'password123' }
+    };
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+    const mockUser = {
+      _id: 'legacyUserId',
+      email: 'legacy@example.com',
+      password: '$2y$10$legacyHashedPassword',
+      role: 'owner',
+      save: jest.fn().mockResolvedValue(this)
+    };
+
+    User.findOne.mockResolvedValue(mockUser);
+    bcrypt.compare.mockResolvedValue(true);
+    jwt.sign.mockReturnValue('legacy-jwt-token');
+    Flow.findOne.mockResolvedValue(null);
+
+    await login(mockReq, mockRes);
+
+    expect(User.findOne).toHaveBeenCalledWith({ email: 'legacy@example.com' });
+    expect(bcrypt.compare).toHaveBeenCalledWith('password123', '$2y$10$legacyHashedPassword');
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      token: 'legacy-jwt-token'
+    }));
+  });
 });
 
 describe('Auth Controller - Supabase Google Login', () => {

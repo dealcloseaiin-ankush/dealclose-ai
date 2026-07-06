@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const Schema = mongoose.Schema;
 
 const userSchema = new Schema({
@@ -12,6 +13,11 @@ const userSchema = new Schema({
   password: {
     type: String,
     required: true,
+  },
+  supabaseId: {
+    type: String,
+    unique: true,
+    sparse: true,
   },
   fullName: {
     type: String,
@@ -191,6 +197,18 @@ const userSchema = new Schema({
     spreadsheetId: { type: String } // User ki Google Sheet ka ID jahan data jayega
   }
   // You might want to add roles, profile pictures, etc.
+});
+
+userSchema.pre('save', async function hashPassword(next) {
+  if (!this.isModified('password')) return next();
+  if (!this.password || /^\$2[aby]\$\d{2}\$/.test(this.password)) return next();
+
+  try {
+    this.password = await bcrypt.hash(this.password, 10);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 const User = mongoose.model('User', userSchema);

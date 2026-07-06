@@ -6,6 +6,19 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
+
+const normalizeEmail = (email) => (email || '').trim().toLowerCase();
+
+const isBcryptHash = (password) => BCRYPT_HASH_PATTERN.test(password || '');
+
+const compareLoginPassword = async (inputPassword, storedPassword) => {
+  if (!storedPassword) return false;
+  if (isBcryptHash(storedPassword)) {
+    return bcrypt.compare(inputPassword, storedPassword);
+  }
+  return inputPassword === storedPassword;
+};
 
 // 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
@@ -71,7 +84,8 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
 // @route   POST /api/users/supabase-auth
 exports.supabaseAuth = async (req, res) => {
   console.log('\n\n🚀 [DEBUG] /api/users/supabase-auth endpoint hit!');
-  const { email, supabaseId, name } = req.body;
+  const { supabaseId, name } = req.body;
+  const email = normalizeEmail(req.body.email);
 
   try {
     if (!email || !supabaseId) {
@@ -542,7 +556,8 @@ exports.instagramConnect = async (req, res) => {
 // @route   POST /api/users/register
 exports.register = async (req, res) => {
   try {
-    const { fullName, email, password, businessName, businessDescription } = req.body;
+    const { fullName, password, businessName, businessDescription } = req.body;
+    const email = normalizeEmail(req.body.email);
     
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
@@ -578,7 +593,8 @@ exports.register = async (req, res) => {
 // @route   POST /api/users/login
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
     if (!email || !password) return res.status(400).json({ success: false, message: 'Please provide email and password' });
 
     const user = await User.findOne({ email });
@@ -590,15 +606,18 @@ exports.login = async (req, res) => {
       await user.save();
     }
 
-    // Bulletproof Password Check: Handles both Encrypted and Plain Text passwords
-    let isMatch = false;
-    if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'))) {
-      isMatch = await bcrypt.compare(password, user.password); // Compare Hashed
-    } else {
-      isMatch = (password === user.password); // Fallback: Compare Plain text
-    }
+    // Handles current bcrypt hashes, legacy bcrypt variants, and old plain-text records.
+    const isMatch = await compareLoginPassword(password, user.password);
 
-    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid Password. Please try again.' });
+    if (!isMatch) {
+      const googleOnlyAccount = user.supabaseId && isBcryptHash(user.password);
+      return res.status(401).json({
+        success: false,
+        message: googleOnlyAccount
+          ? 'This email is connected with Google login. Please use Continue with Google or reset your password.'
+          : 'Invalid Password. Please try again.'
+      });
+    }
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
 
