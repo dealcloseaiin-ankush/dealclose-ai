@@ -20,6 +20,14 @@ export const AuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true); // Initial loading state
 
+  const clearSupabaseStorage = () => {
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
+
   const clearLocalAuth = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -27,9 +35,17 @@ export const AuthProvider = ({ children }) => {
     delete api.defaults.headers.common['Authorization'];
   };
 
-  const logout = () => {
+  const logout = async () => {
+    sessionStorage.setItem('auth_logout_requested', 'true');
     clearLocalAuth();
-    supabase.auth.signOut(); // Also sign out from Supabase
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (error) {
+      console.warn('Supabase logout failed, clearing local session anyway:', error.message);
+    } finally {
+      clearLocalAuth();
+      clearSupabaseStorage();
+    }
   };
 
   useEffect(() => {
@@ -49,11 +65,26 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         try {
+          const logoutRequested = sessionStorage.getItem('auth_logout_requested') === 'true';
+          if (logoutRequested) {
+            clearLocalAuth();
+            clearSupabaseStorage();
+            if (session) {
+              await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+            }
+            if (event === 'SIGNED_OUT' || !session) {
+              sessionStorage.removeItem('auth_logout_requested');
+            }
+            return;
+          }
+
           if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
             // Google se login hone ke baad backend JWT create/sync karein.
             await syncSupabaseSession(session);
           } else if (event === 'SIGNED_OUT') {
             clearLocalAuth();
+            clearSupabaseStorage();
+            sessionStorage.removeItem('auth_logout_requested');
           }
         } catch (error) {
           console.error('Google login sync failed:', error.response?.data || error.message);
@@ -67,6 +98,15 @@ export const AuthProvider = ({ children }) => {
     // Check initial session on load
     const checkInitialSession = async () => {
       try {
+        const logoutRequested = sessionStorage.getItem('auth_logout_requested') === 'true';
+        if (logoutRequested) {
+          clearLocalAuth();
+          clearSupabaseStorage();
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+          sessionStorage.removeItem('auth_logout_requested');
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           await syncSupabaseSession(session);
