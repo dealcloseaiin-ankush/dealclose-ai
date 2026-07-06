@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -10,7 +12,7 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
 
       // Token verify karna
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      const decoded = jwt.verify(token, JWT_SECRET);
 
       // Logged-in User ko request object me daalna (Password hata kar)
       req.user = await User.findById(decoded.id).select('-password');

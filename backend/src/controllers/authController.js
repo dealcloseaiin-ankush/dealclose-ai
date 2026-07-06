@@ -5,6 +5,8 @@ const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
+
 // 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
     try {
@@ -71,6 +73,10 @@ exports.supabaseAuth = async (req, res) => {
   const { email, supabaseId, name } = req.body;
 
   try {
+    if (!email || !supabaseId) {
+      return res.status(400).json({ success: false, message: 'Missing Google account details. Please try login again.' });
+    }
+
     // Check agar user pehle se MongoDB me hai
     let isNewUser = false;
     let user = await User.findOne({ email });
@@ -78,14 +84,21 @@ exports.supabaseAuth = async (req, res) => {
     if (!user) {
       // Agar naya user hai, toh create kar do. 
       // Agar model me password required hai toh ye dummy password usko bypass kar dega.
-      isNewUser = true;
-      user = await User.create({ 
-        email, 
-        supabaseId,
-        name: name || 'New Google User', // 🐛 FIX: Fallback for name to prevent crash
-        fullName: name || 'New Google User', // 🐛 FIX: Ensure fullName is never null
-        password: supabaseId || `google-oauth-dummy-${Date.now()}` // Use a more unique dummy password
-      });
+      try {
+        isNewUser = true;
+        user = await User.create({ 
+          email, 
+          supabaseId,
+          name: name || 'New Google User', // 🐛 FIX: Fallback for name to prevent crash
+          fullName: name || 'New Google User', // 🐛 FIX: Ensure fullName is never null
+          password: supabaseId || `google-oauth-dummy-${Date.now()}` // Use a more unique dummy password
+        });
+      } catch (createError) {
+        if (createError?.code !== 11000) throw createError;
+        user = await User.findOne({ email });
+        isNewUser = false;
+        if (!user) throw createError;
+      }
     } else if (!user.role) {
       // Agar purana user hai jisme role add nahi tha, usko owner bana do
       user.role = 'owner';
@@ -99,7 +112,7 @@ exports.supabaseAuth = async (req, res) => {
         // The user can get a more specific one when they update their profile.
         await autoCreateDefaultFlow(user._id, "", user.fullName);
     }
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
     res.status(200).json({ success: true, token, user });
   } catch (error) {
     console.error('Supabase Sync Error:', error);
@@ -540,7 +553,7 @@ exports.register = async (req, res) => {
         await autoCreateDefaultFlow(user._id, user.businessDescription, user.businessName);
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({ success: true, token, user });
   } catch (error) {
     console.error('Register Error:', error);
@@ -574,7 +587,7 @@ exports.login = async (req, res) => {
 
     if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid Password. Please try again.' });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'supersecretkey123', { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
 
     // 🔥 RETROACTIVE MAGIC ONBOARDING: Create flow for old users if missing (runs silently in background)
     autoCreateDefaultFlow(user._id, user.businessDescription, user.businessName)
@@ -745,13 +758,18 @@ exports.getProfile = async (req, res) => {
     // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
     // - IG Connected Token Exist?: ${user.instagramConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
-    if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
+    // 🐛 FIX: Prevent crash for new users who don't have a 'workspaces' array yet.
+    // The previous code would crash with "Cannot read properties of undefined (reading 'find')"
+    // because user.workspaces was undefined. This check ensures the code runs safely.
+    if (!user.workspaces) user.workspaces = [];
+    if (!user.role) user.role = 'owner';
+
     // Manually remove sensitive fields before sending to frontend
     delete user.password;
     delete user.pendingInstagramConnection;
 
     res.status(200).json({ success: true, user });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error fetching profile' });
+    res.status(500).json({ success: false, message: `Server error fetching profile: ${error.message}` });
   }
 };

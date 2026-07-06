@@ -171,7 +171,13 @@ exports.handleInstagramWebhook = async (req, res) => {
         // ==========================================
         if (entry.messaging && entry.messaging.length > 0) {
           for (let event of entry.messaging) {
-            if (event.message && event.message.text) {
+            // 🐛 FIX: Add a safety check to handle non-text events like 'read' receipts.
+            // The server was crashing because it tried to access `event.message.text`
+            // on events that don't have a `message` object (e.g., read receipts).
+            if (event.read) {
+              console.log(`[IG Webhook] Ignoring 'read' receipt event from ${event.sender.id}.`);
+              continue; // Skip to the next event
+            } else if (event.message && event.message.text) {
               
               const isEcho = event.message.is_echo;
               const appId = event.message.app_id;

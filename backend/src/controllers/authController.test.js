@@ -5,7 +5,7 @@ const User = require('../models/userModel');
 const Flow = require('../models/flowModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { register, login } = require('./authController'); // Apne controller function ko import karein
+const { register, login, supabaseAuth } = require('./authController'); // Apne controller function ko import karein
 
 // 'jest.mock()' ka istemaal karke hum models ko mock kar rahe hain
 // Isse asli database calls nahi honge
@@ -175,5 +175,106 @@ describe('Auth Controller - Login', () => {
 
     expect(mockRes.status).toHaveBeenCalledWith(401);
     expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'Invalid Password. Please try again.' }); // Corrected assertion
+  });
+});
+
+describe('Auth Controller - Supabase Google Login', () => {
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should create and sync a new Google user successfully', async () => {
+    const mockReq = {
+      body: {
+        email: 'google@example.com',
+        supabaseId: 'supabase-user-id',
+        name: 'Google User'
+      }
+    };
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+    const mockUser = {
+      _id: 'mockGoogleUserId',
+      email: 'google@example.com',
+      fullName: 'Google User',
+      role: 'owner'
+    };
+
+    User.findOne.mockResolvedValue(null);
+    User.create.mockResolvedValue(mockUser);
+    Flow.create.mockResolvedValue({});
+    jwt.sign.mockReturnValue('mock-google-jwt-token');
+
+    await supabaseAuth(mockReq, mockRes);
+
+    expect(User.create).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'google@example.com',
+      fullName: 'Google User',
+      password: 'supabase-user-id'
+    }));
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      token: 'mock-google-jwt-token',
+      user: mockUser
+    }));
+  });
+
+  it('should reject Google sync when required account details are missing', async () => {
+    const mockReq = { body: { email: 'google@example.com' } };
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+
+    await supabaseAuth(mockReq, mockRes);
+
+    expect(User.findOne).not.toHaveBeenCalled();
+    expect(mockRes.status).toHaveBeenCalledWith(400);
+    expect(mockRes.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Missing Google account details. Please try login again.'
+    });
+  });
+
+  it('should recover if two Google sync requests try to create the same user', async () => {
+    const mockReq = {
+      body: {
+        email: 'race@example.com',
+        supabaseId: 'supabase-race-id',
+        name: 'Race User'
+      }
+    };
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+    const mockUser = {
+      _id: 'raceUserId',
+      email: 'race@example.com',
+      fullName: 'Race User',
+      role: 'owner'
+    };
+
+    User.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(mockUser);
+    User.create.mockRejectedValue({ code: 11000 });
+    jwt.sign.mockReturnValue('race-jwt-token');
+
+    await supabaseAuth(mockReq, mockRes);
+
+    expect(User.findOne).toHaveBeenNthCalledWith(1, { email: 'race@example.com' });
+    expect(User.findOne).toHaveBeenNthCalledWith(2, { email: 'race@example.com' });
+    expect(Flow.create).not.toHaveBeenCalled();
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      token: 'race-jwt-token',
+      user: mockUser
+    }));
   });
 });

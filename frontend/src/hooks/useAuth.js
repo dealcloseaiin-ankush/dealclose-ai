@@ -20,44 +20,63 @@ export const AuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true); // Initial loading state
 
-  const logout = () => {
+  const clearLocalAuth = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     delete api.defaults.headers.common['Authorization'];
+  };
+
+  const logout = () => {
+    clearLocalAuth();
     supabase.auth.signOut(); // Also sign out from Supabase
   };
 
   useEffect(() => {
+    const syncSupabaseSession = async (session) => {
+      const { data } = await api.post('/users/supabase-auth', {
+        email: session.user.email,
+        supabaseId: session.user.id,
+        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
+      });
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          // Google se login hone ke baad ye chalega
-          const { data } = await api.post('/users/supabase-auth', {
-            email: session.user.email,
-            supabaseId: session.user.id,
-            name: session.user.user_metadata.full_name,
-          });
-          // Humare backend se mila token aur user data save karein
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          setUser(data.user);
-          api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-        } else if (event === 'SIGNED_OUT') {
-          logout();
+        try {
+          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+            // Google se login hone ke baad backend JWT create/sync karein.
+            await syncSupabaseSession(session);
+          } else if (event === 'SIGNED_OUT') {
+            clearLocalAuth();
+          }
+        } catch (error) {
+          console.error('Google login sync failed:', error.response?.data || error.message);
+          clearLocalAuth();
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     // Check initial session on load
     const checkInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session && localStorage.getItem('token')) {
-        // User has our token but not supabase's, probably email/pass login
-        // We are already handling this in useState initial value
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await syncSupabaseSession(session);
+        }
+      } catch (error) {
+        console.error('Initial auth check failed:', error.response?.data || error.message);
+        if (!localStorage.getItem('token')) clearLocalAuth();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     checkInitialSession();

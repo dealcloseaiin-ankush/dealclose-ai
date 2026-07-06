@@ -73,7 +73,8 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/users/settings', settingsRoutes); // Preserve compatibility for /api/users/settings
-app.use('/api/users', userRoutes); // Handles Profile & AI Training Rules
+app.use('/api/users', authRoutes); // Frontend auth/profile routes
+app.use('/api/users', userRoutes); // Backward-compatible profile routes
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/whatsapp/templates', whatsappTemplateRoutes);
