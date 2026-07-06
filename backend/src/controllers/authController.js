@@ -733,8 +733,10 @@ exports.getProfile = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     
-    // Use .lean() here to ensure the full, raw document is returned, including potentially newly added fields
-    const user = await User.findById(userId).select('-password -pendingInstagramConnection').lean();
+    // 🐛 FIX: Using .select() with .lean() can cause crashes if a selected-out field
+    // doesn't exist on a document. Fetching the full document and manually deleting
+    // sensitive fields is safer and resolves the post-login blank screen issue.
+    const user = await User.findById(userId).lean();
 
     if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
     
@@ -744,6 +746,10 @@ exports.getProfile = async (req, res) => {
     // - IG Connected Token Exist?: ${user.instagramConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
 
     if (!user.role) user.role = 'owner'; // UI ke liye safe fallback
+    // Manually remove sensitive fields before sending to frontend
+    delete user.password;
+    delete user.pendingInstagramConnection;
+
     res.status(200).json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching profile' });
