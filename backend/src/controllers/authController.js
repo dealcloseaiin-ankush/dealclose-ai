@@ -81,10 +81,10 @@ exports.supabaseAuth = async (req, res) => {
       isNewUser = true;
       user = await User.create({ 
         email, 
-        supabaseId, 
-        name: name,
-        fullName: name || 'Google User', // Fix: MongoDB schema requires 'fullName'
-        password: supabaseId || 'google-oauth-dummy-pass' 
+        supabaseId,
+        name: name || 'New Google User', // 🐛 FIX: Fallback for name to prevent crash
+        fullName: name || 'New Google User', // 🐛 FIX: Ensure fullName is never null
+        password: supabaseId || `google-oauth-dummy-${Date.now()}` // Use a more unique dummy password
       });
     } else if (!user.role) {
       // Agar purana user hai jisme role add nahi tha, usko owner bana do
