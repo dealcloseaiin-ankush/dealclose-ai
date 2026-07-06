@@ -15,5 +15,6 @@ router.post('/icebreakers', protect, instagramController.setIceBreakers);
 router.post('/broadcast', protect, instagramController.sendBroadcast);
 router.post('/publish-media', protect, instagramController.publishMedia);
 router.patch('/comment-ai/post-toggle', protect, instagramController.updateCommentAiPostSetting);
+router.get('/posts/:id/insights', protect, instagramController.getPostInsights); // Naya route
 
 module.exports = router;

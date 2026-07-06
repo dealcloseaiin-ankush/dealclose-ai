@@ -3,8 +3,9 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText } from 'lucide-react';
+import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText, BarChart3 } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
+import PostInsightsModal from '../components/PostInsightsModal'; // Naya component import karein
 
 export default function InstagramAutomation() {
   const { user } = useAuth() || {};
@@ -41,6 +42,9 @@ export default function InstagramAutomation() {
   // Post Automation Form State
   const [newAuto, setNewAuto] = useState({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+
+  // Insights Modal ke liye state
+  const [selectedPostForInsights, setSelectedPostForInsights] = useState(null);
 
   // Pagination for Old Posts
   const [postLimit, setPostLimit] = useState(20);
@@ -343,6 +347,11 @@ export default function InstagramAutomation() {
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans">
       
+      {/* Insights Modal */}
+      {selectedPostForInsights && (
+        <PostInsightsModal post={selectedPostForInsights} workspaceId={activeWorkspace} onClose={() => setSelectedPostForInsights(null)} />
+      )}
+
       {/* Top Header Layout */}
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -578,6 +587,10 @@ export default function InstagramAutomation() {
                         <div className="flex items-center gap-1 text-purple-400" title="Quick Reply Button Taps">
                           <Zap size={12} /> Taps: { post.stats?.buttonClicks || 0 }
                         </div>
+                        {/* View Insights Button */}
+                        <button onClick={() => setSelectedPostForInsights(post)} className="flex items-center gap-1 text-blue-400 hover:underline" title="View Post Insights">
+                          <BarChart3 size={12} /> Insights
+                        </button>
                       </div>
                     </div>
                   </div>

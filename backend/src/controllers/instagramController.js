@@ -594,3 +594,33 @@ exports.sendBroadcast = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get Insights for a specific Instagram Post
+// @route   GET /api/instagram/posts/:id/insights
+exports.getPostInsights = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id: mediaId } = req.params;
+    const { workspaceId } = req.query;
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    // Sahi workspace se token nikalein
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Instagram not connected.' });
+    }
+
+    const insights = await instagramService.getPostInsights(mediaId, accessToken);
+    res.status(200).json({ success: true, insights });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
