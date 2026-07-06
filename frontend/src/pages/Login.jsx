@@ -29,14 +29,19 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        // Ab ye seedha dashboard pe jayega, baar-bar details nahi mangega
-        redirectTo: window.location.origin + '/dashboard'
+    setError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/dashboard'
+        }
+      });
+      if (error) {
+        throw error;
       }
-    });
-    if (error) {
+    } catch (error) {
       setError(error.message);
       console.error(error);
     }
