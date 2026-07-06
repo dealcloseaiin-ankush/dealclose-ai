@@ -791,3 +791,25 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ success: false, message: `Server error fetching profile: ${error.message}`, stack: error.stack });
   }
 };
+
+// @desc    Logout user and invalidate Supabase session
+// @route   POST /api/users/logout
+exports.logout = async (req, res) => {
+  try {
+    const { supabaseToken } = req.body;
+    if (!supabaseToken) {
+      return res.status(400).json({ success: false, message: 'Supabase token is required for a clean logout.' });
+    }
+
+    // 🐛 FIX: Invalidate the user's session on the Supabase server.
+    // This is the critical step that was missing, causing users to be
+    // automatically logged back in on page refresh.
+    const supabaseUrl = `https://${process.env.SUPABASE_PROJECT_ID}.supabase.co/auth/v1/logout`;
+    await axios.post(supabaseUrl, {}, { headers: { 'Authorization': `Bearer ${supabaseToken}`, 'apikey': process.env.SUPABASE_ANON_KEY } });
+
+    res.status(200).json({ success: true, message: 'Logged out successfully from all sessions.' });
+  } catch (error) {
+    console.error('Logout Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Failed to logout from Supabase session.' });
+  }
+};
