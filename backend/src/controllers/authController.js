@@ -70,6 +70,7 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
 // @desc    Sync Supabase User with MongoDB
 // @route   POST /api/users/supabase-auth
 exports.supabaseAuth = async (req, res) => {
+  console.log('\n\n🚀 [DEBUG] /api/users/supabase-auth endpoint hit!');
   const { email, supabaseId, name } = req.body;
 
   try {
@@ -77,37 +78,48 @@ exports.supabaseAuth = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing Google account details. Please try login again.' });
     }
 
+    console.log(`[DEBUG] 1. Received Supabase details: Email=${email}, Name=${name || 'N/A'}`);
+
     // Check agar user pehle se MongoDB me hai
     let isNewUser = false;
     let user = await User.findOne({ email });
+    console.log(`[DEBUG] 2. User exists in DB? ${user ? '✅ Yes' : '❌ No'}`);
 
     if (!user) {
       // Agar naya user hai, toh create kar do. 
       // Agar model me password required hai toh ye dummy password usko bypass kar dega.
       try {
+        console.log(`[DEBUG] 3. Creating new user in MongoDB...`);
         isNewUser = true;
         user = await User.create({ 
           email, 
           supabaseId,
-          name: name || 'New Google User', // 🐛 FIX: Fallback for name to prevent crash
-          fullName: name || 'New Google User', // 🐛 FIX: Ensure fullName is never null
+          // 🐛 FIX: Use a more robust fallback for fullName to prevent crashes if name is null from Google.
+          // The 'fullName' field is required in the User model.
+          name: name || `User-${email.split('@')[0]}`,
+          fullName: name || `User-${email.split('@')[0]}`,
           password: supabaseId || `google-oauth-dummy-${Date.now()}` // Use a more unique dummy password
         });
+        console.log(`[DEBUG] 4. New user created successfully! User ID: ${user._id}`);
       } catch (createError) {
+        console.error('❌ [DEBUG] CRITICAL: Failed to create new user!', createError);
         if (createError?.code !== 11000) throw createError;
         user = await User.findOne({ email });
         isNewUser = false;
         if (!user) throw createError;
       }
     } else if (!user.role) {
+      console.log(`[DEBUG] 3a. Existing user found, but role is missing. Setting role to 'owner'.`);
       // Agar purana user hai jisme role add nahi tha, usko owner bana do
       user.role = 'owner';
       await user.save();
+      console.log(`[DEBUG] 4a. Role updated successfully.`);
     }
 
     // Humara apna Backend JWT token generate karke frontend ko wapas bhejenge
     // 🔥 MAGIC ONBOARDING: Auto-create a default flow for new users
     if (isNewUser) {
+        console.log(`[DEBUG] 5. New user detected, triggering Magic Onboarding...`);
         // We don't have business description here, so we create a general one.
         // The user can get a more specific one when they update their profile.
         await autoCreateDefaultFlow(user._id, "", user.fullName);
@@ -115,8 +127,9 @@ exports.supabaseAuth = async (req, res) => {
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
     res.status(200).json({ success: true, token, user });
   } catch (error) {
-    console.error('Supabase Sync Error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    // 🐛 FIX: Added detailed logging to catch the exact crash reason.
+    console.error('❌ [DEBUG] CRITICAL CRASH in supabaseAuth:', error);
+    res.status(500).json({ success: false, message: `Server error during Google login sync: ${error.message}`, stack: error.stack });
   }
 };
 
@@ -743,33 +756,38 @@ exports.updateProfile = async (req, res) => {
 // @desc    Get Current User Profile
 // @route   GET /api/users/profile
 exports.getProfile = async (req, res) => {
+  console.log('\n\n🚀 [DEBUG] /api/users/profile endpoint hit!');
   try {
     const userId = req.user?._id || req.user?.id;
+    console.log(`[DEBUG] 1. Extracted User ID: ${userId}`);
     
-    // 🐛 FIX: Using .select() with .lean() can cause crashes if a selected-out field
-    // doesn't exist on a document. Fetching the full document and manually deleting
-    // sensitive fields is safer and resolves the post-login blank screen issue.
     const user = await User.findById(userId).lean();
+    console.log(`[DEBUG] 2. Fetched user from DB. User found: ${user ? '✅ Yes' : '❌ No'}`);
 
-    if (!user) return res.status(404).json({ success: false, message: 'User profile not found.' });
-    
-    // console.log(`\n🔍 [FETCHING PROFILE FOR FRONTEND]
-    // - AI Rules Exist?: ${user.aiRules ? '✅ YES' : '❌ NO'}
-    // - Business Desc Exist?: ${user.businessDescription ? '✅ YES' : '❌ NO'}
-    // - IG Connected Token Exist?: ${user.instagramConfig?.accessToken ? '✅ YES' : '❌ NO'}`);
+    if (!user) {
+      console.error('[DEBUG] ❌ CRITICAL: User not found in database for this ID.');
+      return res.status(404).json({ success: false, message: 'User profile not found.' });
+    }
 
-    // 🐛 FIX: Prevent crash for new users who don't have a 'workspaces' array yet.
-    // The previous code would crash with "Cannot read properties of undefined (reading 'find')"
-    // because user.workspaces was undefined. This check ensures the code runs safely.
+    console.log(`[DEBUG] 3. Checking for 'workspaces' array...`);
     if (!user.workspaces) user.workspaces = [];
+    console.log(`[DEBUG] 4. 'workspaces' array is now present.`);
+
+    console.log(`[DEBUG] 5. Checking for 'role'...`);
     if (!user.role) user.role = 'owner';
+    console.log(`[DEBUG] 6. 'role' is now set.`);
 
     // Manually remove sensitive fields before sending to frontend
+    console.log(`[DEBUG] 7. Deleting sensitive fields (password, pendingInstagramConnection)...`);
     delete user.password;
     delete user.pendingInstagramConnection;
+    console.log(`[DEBUG] 8. Sensitive fields deleted.`);
 
+    console.log(`[DEBUG] 9. Sending final user object to frontend.`);
     res.status(200).json({ success: true, user });
   } catch (error) {
-    res.status(500).json({ success: false, message: `Server error fetching profile: ${error.message}` });
+    // 🐛 FIX: Added detailed console.error to see the full stack trace in Render logs
+    console.error('❌ [DEBUG] CRITICAL CRASH in getProfile:', error);
+    res.status(500).json({ success: false, message: `Server error fetching profile: ${error.message}`, stack: error.stack });
   }
 };
