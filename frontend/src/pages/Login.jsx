@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'; // Centralized Supabase client
 export default function Login() {
   const [email, setEmail] = useState('ankush.bani@gmail.com');
   const [password, setPassword] = useState('ak@7828289433');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -78,13 +79,23 @@ export default function Login() {
           </div>
           <div>
             <label className="block text-gray-400 text-sm mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 bg-[#0a0a0a] border border-gray-700 text-white rounded-lg focus:border-purple-500 outline-none"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-3 pr-16 bg-[#0a0a0a] border border-gray-700 text-white rounded-lg focus:border-purple-500 outline-none"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute inset-y-0 right-3 text-sm font-semibold text-gray-400 hover:text-white"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'View'}
+              </button>
+            </div>
           </div>
           {error && <p className="text-sm text-red-500 text-center">{error}</p>}
           <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-lg font-bold hover:opacity-90 transition-opacity">
