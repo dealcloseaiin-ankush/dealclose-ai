@@ -201,7 +201,7 @@ describe('Auth Controller - Login', () => {
     await login(mockReq, mockRes);
 
     expect(User.findOne).toHaveBeenCalledWith({ email: 'legacy@example.com' });
-    expect(bcrypt.compare).toHaveBeenCalledWith('password123', '$2y$10$legacyHashedPassword');
+    expect(bcrypt.compare).toHaveBeenCalledWith('password123', '$2b$10$legacyHashedPassword');
     expect(mockRes.status).toHaveBeenCalledWith(200);
     expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
       success: true,

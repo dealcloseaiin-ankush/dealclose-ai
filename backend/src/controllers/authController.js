@@ -15,7 +15,10 @@ const isBcryptHash = (password) => BCRYPT_HASH_PATTERN.test(password || '');
 const compareLoginPassword = async (inputPassword, storedPassword) => {
   if (!storedPassword) return false;
   if (isBcryptHash(storedPassword)) {
-    return bcrypt.compare(inputPassword, storedPassword);
+    const bcryptCompatibleHash = storedPassword.startsWith('$2y$')
+      ? storedPassword.replace('$2y$', '$2b$')
+      : storedPassword;
+    return bcrypt.compare(inputPassword, bcryptCompatibleHash);
   }
   return inputPassword === storedPassword;
 };
