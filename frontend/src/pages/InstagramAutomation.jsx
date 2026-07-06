@@ -3,7 +3,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText, BarChart3 } from 'lucide-react';
+import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText, BarChart3, Sparkles, BrainCircuit } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 import PostInsightsModal from '../components/PostInsightsModal'; // Naya component import karein
 
@@ -45,6 +45,10 @@ export default function InstagramAutomation() {
 
   // Insights Modal ke liye state
   const [selectedPostForInsights, setSelectedPostForInsights] = useState(null);
+  
+  // AI Analysis Modal ke liye state
+  const [analyzingPost, setAnalyzingPost] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState('');
 
   // Pagination for Old Posts
   const [postLimit, setPostLimit] = useState(20);
@@ -91,6 +95,24 @@ export default function InstagramAutomation() {
       };
     });
   }, [activeWorkspace]);
+
+  const handleAnalyzePost = async (post) => {
+    if (user.aiCredits <= 0 && user.role !== 'superadmin') {
+      return toast.error("You have 0 AI credits. Please recharge from Wallet.");
+    }
+    setAnalyzingPost(post);
+    setAnalysisResult('');
+    try {
+      const { data } = await api.post(`/instagram/posts/${post.id}/analyze`, { workspaceId: activeWorkspace });
+      setAnalysisResult(data.analysis);
+      toast.success(`Analysis complete! Credits left: ${data.remainingCredits}`);
+    } catch (err) {
+      console.error("Analysis Error:", err);
+      toast.error(err.response?.data?.message || "Failed to analyze post.");
+      setAnalyzingPost(null); // Close modal on error
+    }
+  };
+
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
@@ -352,6 +374,26 @@ export default function InstagramAutomation() {
         <PostInsightsModal post={selectedPostForInsights} workspaceId={activeWorkspace} onClose={() => setSelectedPostForInsights(null)} />
       )}
 
+      {/* AI Analysis Modal */}
+      {analyzingPost && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setAnalyzingPost(null)}>
+          <div className="bg-[#111] border border-purple-500/50 rounded-2xl p-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-purple-400 mb-4 flex items-center gap-2"><BrainCircuit size={20} /> AI Performance Analysis</h2>
+            {!analysisResult ? (
+              <div className="text-center py-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                <p className="text-gray-400">AI is analyzing post performance...</p>
+              </div>
+            ) : (
+              <div className="whitespace-pre-wrap bg-[#0a0a0a] p-4 rounded-lg border border-gray-800 text-sm text-gray-300 max-h-[60vh] overflow-y-auto">
+                {analysisResult}
+              </div>
+            )}
+            <button onClick={() => setAnalyzingPost(null)} className="mt-6 w-full bg-purple-600 text-white p-2 rounded-lg font-semibold">Close</button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Layout */}
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -371,14 +413,17 @@ export default function InstagramAutomation() {
           </div>
           <p className="text-gray-400">Convert your Instagram comments and reels traffic into tracked conversion leads.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center bg-[#111] border border-gray-800 rounded-xl px-3 py-1.5 gap-2">
-            <span className="text-xs text-gray-400 font-bold">Load Posts:</span>
-            <select value={postLimit} onChange={(e)=>setPostLimit(Number(e.target.value))} className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer">
-              <option value={10}>10 Recent</option>
-              <option value={20}>20 Recent</option>
-              <option value={50}>50 (Include Old)</option>
-            </select>
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center bg-[#111] border border-gray-800 rounded-xl p-1 gap-1 w-full md:w-auto">
+            {[10, 20, 50].map(limit => (
+              <button 
+                key={limit}
+                onClick={() => setPostLimit(limit)}
+                className={`flex-1 md:flex-none text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${postLimit === limit ? 'bg-pink-500/20 text-pink-400' : 'text-gray-400 hover:bg-gray-800'}`}
+              >
+                Load {limit}
+              </button>
+            ))}
           </div>
           <button onClick={handleSyncPosts} className="px-5 py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-pink-500/10 transition-all flex items-center gap-2">
             <RefreshCw size={16} /> Sync Feed
@@ -590,6 +635,10 @@ export default function InstagramAutomation() {
                         {/* View Insights Button */}
                         <button onClick={() => setSelectedPostForInsights(post)} className="flex items-center gap-1 text-blue-400 hover:underline" title="View Post Insights">
                           <BarChart3 size={12} /> Insights
+                        </button>
+                        {/* Analyze with AI Button */}
+                        <button onClick={() => handleAnalyzePost(post)} className="flex items-center gap-1 text-purple-400 hover:underline" title="Analyze with AI">
+                          <Sparkles size={12} /> Analyze
                         </button>
                       </div>
                     </div>

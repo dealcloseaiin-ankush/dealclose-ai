@@ -137,8 +137,17 @@ exports.handleWhatsApp = async (req, res) => {
             // 🚀 FIX: Prevented ReferenceError Crash for getExpiry
             const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
             const getExpiry = (type) => {
-              if (type === 'lead') return isPremium ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-              return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+              const hasPremiumAccess = user.isPremium === true || user.role === 'superadmin' || user.role === 'tester' || user.email === 'ankush.bani@gmail.com';
+              if (hasPremiumAccess) {
+                // Tester ke liye 90 din, asli premium ke liye permanent
+                if (user.role === 'tester') {
+                  return new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+                }
+                // Premium user ke saare WhatsApp messages permanent
+                return null;
+              }
+              // Free user ke saare WhatsApp messages 30 din me delete
+              return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             };
             
             let savedLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });

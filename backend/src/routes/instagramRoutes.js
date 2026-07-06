@@ -16,5 +16,6 @@ router.post('/broadcast', protect, instagramController.sendBroadcast);
 router.post('/publish-media', protect, instagramController.publishMedia);
 router.patch('/comment-ai/post-toggle', protect, instagramController.updateCommentAiPostSetting);
 router.get('/posts/:id/insights', protect, instagramController.getPostInsights); // Naya route
+router.post('/posts/:id/analyze', protect, instagramController.analyzePostPerformance); // AI Analysis route
 
 module.exports = router;

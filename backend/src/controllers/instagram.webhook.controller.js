@@ -237,11 +237,18 @@ exports.handleInstagramWebhook = async (req, res) => {
               }
 
               const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
-              const getExpiry = (type) => {
-                if (type === 'lead') {
-                  return isPremium ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+              const getExpiry = (type, isComment = false) => {
+                // Comments hamesha 1 din me delete honge
+                if (isComment) {
+                  return new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
                 }
-                return isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+                // DMs ke liye logic
+                if (isPremium) {
+                  // Premium user ke 'lead' wale DMs permanent, baaki 30 din
+                  return type === 'lead' ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                }
+                // Free user ke saare DMs 1 din me delete
+                return new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
               };
 
               const quickReplyPayload = event.message?.quick_reply?.payload || event.postback?.payload || null;

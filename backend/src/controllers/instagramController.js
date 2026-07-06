@@ -1,6 +1,7 @@
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel');
+const PostAnalysis = require('../models/PostAnalysisModel'); // Naya model import karein
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
@@ -619,6 +620,107 @@ exports.getPostInsights = async (req, res) => {
 
     const insights = await instagramService.getPostInsights(mediaId, accessToken);
     res.status(200).json({ success: true, insights });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Analyze a post's performance with AI
+// @route   POST /api/instagram/posts/:id/analyze
+exports.analyzePostPerformance = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id: mediaId } = req.params;
+    const { workspaceId } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    // AI Credit Check
+    if (user.aiCredits <= 0 && user.role !== 'superadmin') {
+      return res.status(402).json({ message: 'Insufficient AI credits for analysis.' });
+    }
+
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ message: 'Instagram not connected.' });
+    }
+
+    // Fetch post insights
+    const insights = await instagramService.getPostInsights(mediaId, accessToken);
+
+    // 🚀 NEW: Fetch the most recent previous analysis for this post
+    const previousAnalysis = await PostAnalysis.findOne({
+      userId: user._id,
+      postId: mediaId,
+    }).sort({ createdAt: -1 });
+
+    // Check if it's too soon to re-analyze
+    if (previousAnalysis) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      if (previousAnalysis.createdAt > sevenDaysAgo) {
+        return res.status(429).json({ 
+          message: `You can re-analyze this post after 7 days. Last analysis was on ${new Date(previousAnalysis.createdAt).toLocaleDateString()}.` 
+        });
+      }
+    }
+
+    const prompt = `
+      Analyze the performance of this Instagram post and provide actionable suggestions.
+      
+      Post Metrics:
+      - Reach: ${insights.reach || 'N/A'}
+      - Impressions: ${insights.impressions || 'N/A'}
+      - Likes: ${insights.likes || 'N/A'}
+      - Comments: ${insights.comments || 'N/A'}
+      - Saves: ${insights.saved || 'N/A'}
+      - Video Views: ${insights.video_views || 'N/A'}
+
+      ${previousAnalysis ? `
+      ---
+      PREVIOUS ANALYSIS (from ${new Date(previousAnalysis.createdAt).toLocaleDateString()}):
+      Previous Metrics: Reach: ${previousAnalysis.metrics?.reach || 'N/A'}, Likes: ${previousAnalysis.metrics?.likes || 'N/A'}
+      Previous AI Summary: "${previousAnalysis.analysisText}"
+      ---
+      ` : ''}
+
+      Based on these numbers, provide:
+      1. A one-sentence summary of the performance.
+      2. Two strengths of this post.
+      3. Two weaknesses or areas for improvement.
+      4. A concrete suggestion for the next post to get better engagement.
+      ${previousAnalysis ? '5. A "Then vs. Now" comparison highlighting the growth or changes since the last analysis.' : ''}
+    `;
+
+    const analysis = await aiService.generateAIResponse(prompt, "You are a social media expert.", "instagram-analysis");
+
+    // Delete the old analysis to save space
+    if (previousAnalysis) {
+      await PostAnalysis.findByIdAndDelete(previousAnalysis._id);
+    }
+
+    // 🚀 NEW: Save the analysis to the database
+    await PostAnalysis.create({
+      userId: user._id,
+      workspaceId: workspaceId || 'main',
+      postId: mediaId,
+      analysisText: analysis,
+      metrics: insights, // Save the stats at the time of analysis
+    });
+
+    // Deduct 1 credit for the analysis
+    if (user.role !== 'superadmin') {
+      user.aiCredits -= 1;
+      await user.save();
+    }
+
+    res.status(200).json({ success: true, analysis, remainingCredits: user.aiCredits });
 
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
