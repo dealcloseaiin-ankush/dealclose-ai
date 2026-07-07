@@ -113,7 +113,9 @@ exports.saveSettings = async (req, res) => {
     
     // Magic Onboarding automated triggers
     if (updates.businessDescription && !user.businessDescription) {
-        await autoCreateDefaultFlow(userId, updates.businessDescription, updates.businessName || user.businessName);
+        // 🚀 UPGRADE: Call the magic onboarding flow helper here as well.
+        // This ensures that if an old user updates their profile for the first time, they also get a default flow.
+        autoCreateDefaultFlow(userId, updates.businessDescription, updates.businessName || user.businessName).catch(e => console.log("Retroactive flow creation error:", e.message));
     }
 
     if (updates.workspaces !== undefined) {

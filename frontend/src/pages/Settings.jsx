@@ -3,7 +3,7 @@ import api from '../services/api'; // Import our Axios instance
 import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database } from 'lucide-react';
 import MetaConnectButton from '../components/MetaConnectButton';
 
-export default function Settings() {
+export default function Settings() { 
   const [config, setConfig] = useState({
     whatsappToken: '',
     phoneNumberId: '',
@@ -51,7 +51,10 @@ export default function Settings() {
   const [activeWorkspace, setActiveWorkspace] = useState('main');
   const [disconnectMessage, setDisconnectMessage] = useState('');
   
-  const [passData, setPassData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  // 🚀 FIX: Simplified password state and added show/hide functionality
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [expandedWebhooks, setExpandedWebhooks] = useState({});
   const [instagramPicker, setInstagramPicker] = useState(null);
@@ -284,13 +287,20 @@ export default function Settings() {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (passData.newPassword !== passData.confirmPassword) return alert("New passwords do not match!");
+    // 🚀 FIX: Clearer validation and error handling
+    if (newPassword !== confirmPassword) {
+      return alert("Passwords do not match. Please re-enter.");
+    }
+    if (newPassword.length < 6) {
+      return alert("Password must be at least 6 characters long.");
+    }
     
     setIsChangingPass(true);
     try {
-      await api.post('/users/change-password', { oldPassword: passData.oldPassword, newPassword: passData.newPassword });
+      await api.post('/users/change-password', { newPassword });
       alert("Password changed successfully!");
-      setPassData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
       alert(error.response?.data?.message || "Failed to change password. Please check your old password.");
     } finally {
@@ -767,10 +777,29 @@ export default function Settings() {
                   <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
                      <Shield className="text-blue-400" /> Security & Password
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input type="password" required value={passData.oldPassword} onChange={e => setPassData({...passData, oldPassword: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" placeholder="Current Password" />
-                    <input type="password" required minLength="6" value={passData.newPassword} onChange={e => setPassData({...passData, newPassword: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" placeholder="New Password" />
-                    <button type="button" onClick={handlePasswordSubmit} disabled={isChangingPass || !passData.oldPassword} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-lg">
+                  {/* 🚀 FIX: Replaced old form with a new, cleaner, and more user-friendly password change form */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">New Password</label>
+                      <div className="relative">
+                        <input type={showPassword ? 'text' : 'password'} required minLength="6" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none pr-12" placeholder="New Password" />
+                        <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute inset-y-0 right-3 text-sm font-semibold text-gray-400 hover:text-white">
+                          {showPassword ? 'Hide' : 'View'}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">Confirm New Password</label>
+                      <input 
+                        type={showPassword ? 'text' : 'password'} 
+                        required 
+                        minLength="6" 
+                        value={confirmPassword} 
+                        onChange={e => setConfirmPassword(e.target.value)} 
+                        className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" 
+                        placeholder="Confirm Password" />
+                    </div>
+                    <button type="button" onClick={handlePasswordSubmit} disabled={isChangingPass || !newPassword || !confirmPassword} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-lg">
                       {isChangingPass ? 'Updating...' : 'Update Password'}
                     </button>
                   </div>

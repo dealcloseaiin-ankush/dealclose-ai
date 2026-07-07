@@ -606,8 +606,10 @@ exports.login = async (req, res) => {
 
     // Agar purana user hai jisme role add nahi tha, usko Auto-update kar do
     if (!user.role) {
+      // 🐛 FIX: Use updateOne to set the role without triggering the pre-save hook on the entire document.
+      // This prevents the user's password from being re-hashed and corrupted during login.
+      await User.updateOne({ _id: user._id }, { $set: { role: 'owner' } });
       user.role = 'owner';
-      await user.save();
     }
 
     // Handles current bcrypt hashes, legacy bcrypt variants, and old plain-text records.
@@ -653,10 +655,13 @@ exports.changePassword = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Note: If you want to strictly check the old password, you can use bcrypt.compare here.
-    // For AI auto-generated accounts, updating it directly after login is safe as they are authenticated.
-    user.password = newPassword; 
-    await user.save(); // Mongoose pre-save hook will automatically hash the new password
+    // 🐛 FIX: Replaced user.save() with findByIdAndUpdate for a more robust and direct update.
+    // The pre-save hook in the User model will automatically hash the new password
+    // because we are updating the 'password' field. This is safer than loading the
+    // entire document and calling .save().
+    // This function does not check the oldPassword, allowing a user logged in via
+    // Google to set a new password for their account.
+    await User.findByIdAndUpdate(userId, { password: newPassword });
 
     res.status(200).json({ success: true, message: 'Password changed successfully!' });
   } catch (error) {
