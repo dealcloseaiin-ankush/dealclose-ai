@@ -127,9 +127,10 @@ exports.supabaseAuth = async (req, res) => {
       }
     } else if (!user.role) {
       console.log(`[DEBUG] 3a. Existing user found, but role is missing. Setting role to 'owner'.`);
-      // Agar purana user hai jisme role add nahi tha, usko owner bana do
+      // 🐛 FIX: Use updateOne to prevent re-hashing password via pre-save hook.
+      // The user.save() call was triggering the password hash logic again, corrupting it.
+      await User.updateOne({ _id: user._id }, { $set: { role: 'owner' } });
       user.role = 'owner';
-      await user.save();
       console.log(`[DEBUG] 4a. Role updated successfully.`);
     }
 

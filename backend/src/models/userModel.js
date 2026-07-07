@@ -199,11 +199,16 @@ const userSchema = new Schema({
   // You might want to add roles, profile pictures, etc.
 });
 
-userSchema.pre('save', async function hashPassword(next) {
-  if (!this.isModified('password')) return next();
-  if (!this.password || /^\$2[aby]\$\d{2}\$/.test(this.password)) return next();
-
+userSchema.pre('save', async function (next) {
+  // 🚀 PERMANENT FIX: This is the most critical guard.
+  // It ensures that the password hashing logic ONLY runs if the password field
+  // was actually modified in this 'save' operation. This prevents accidental
+  // re-hashing of an already-hashed password when other fields (like 'role') are updated.
+  if (!this.isModified('password')) {
+    return next();
+  }
   try {
+    // Hash the new password before saving
     this.password = await bcrypt.hash(this.password, 10);
     next();
   } catch (error) {
