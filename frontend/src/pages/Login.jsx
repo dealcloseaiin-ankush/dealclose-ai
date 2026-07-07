@@ -21,8 +21,14 @@ export default function Login() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      // Use the error message from the backend if available
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      // 🚀 SMART ERROR HANDLING: Ab network errors (jaise server ka so jaana) ke liye
+      // user ko ek behtar aur saaf message dikhega.
+      if (err.code === 'ERR_NETWORK') {
+        setError('Network error. The server might be starting up. Please wait a moment and try again.');
+      } else {
+        // Baaki errors (jaise galat password) ke liye backend se aaya message dikhao
+        setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      }
       console.error(err);
     } finally {
       setLoading(false);

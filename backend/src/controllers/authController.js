@@ -613,12 +613,17 @@ exports.login = async (req, res) => {
     const isMatch = await compareLoginPassword(password, user.password);
 
     if (!isMatch) {
-      const googleOnlyAccount = user.supabaseId && isBcryptHash(user.password);
+      // 🐛 FIX: Refined logic to detect Google-only accounts.
+      // This now correctly identifies users who signed up via Google and *never* set a manual password.
+      // The old logic could incorrectly block users who signed up with Google and later added a password.
+      const isGoogleAccount = !!user.supabaseId;
+      const hasDummyPassword = user.password.includes('google-oauth-dummy') || user.password === user.supabaseId;
+
       return res.status(401).json({
         success: false,
-        message: googleOnlyAccount
-          ? 'This email is connected with Google login. Please use Continue with Google or reset your password.'
-          : 'Invalid Password. Please try again.'
+        message: (isGoogleAccount && hasDummyPassword)
+          ? 'This email is connected with Google login. Please use "Continue with Google" or reset your password.'
+          : 'Invalid Password. Please try again.',
       });
     }
 
