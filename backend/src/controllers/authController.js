@@ -596,12 +596,16 @@ exports.register = async (req, res) => {
 // @desc    Login User
 // @route   POST /api/users/login
 exports.login = async (req, res) => {
+  console.log('\n\n🚀 [DEBUG] /api/users/login endpoint hit!');
   try {
     const { password } = req.body;
     const email = normalizeEmail(req.body.email);
+    console.log(`[DEBUG] 1. Attempting login for email: ${email}`);
     if (!email || !password) return res.status(400).json({ success: false, message: 'Please provide email and password' });
 
     const user = await User.findOne({ email });
+    console.log(`[DEBUG] 2. User found in DB? ${user ? '✅ Yes' : '❌ No'}`);
+
     if (!user) return res.status(404).json({ success: false, message: 'User not found. Please register first.' });
 
     // Agar purana user hai jisme role add nahi tha, usko Auto-update kar do
@@ -614,12 +618,14 @@ exports.login = async (req, res) => {
 
     // Handles current bcrypt hashes, legacy bcrypt variants, and old plain-text records.
     const isMatch = await compareLoginPassword(password, user.password);
+    console.log(`[DEBUG] 3. Password match result: ${isMatch ? '✅ Success' : '❌ Failed'}`);
 
     if (!isMatch) {
       // 🐛 FIX: Refined logic to detect Google-only accounts.
       // This now correctly identifies users who signed up via Google and *never* set a manual password.
       // The old logic could incorrectly block users who signed up with Google and later added a password.
       const isGoogleAccount = !!user.supabaseId;
+      // 🐛 FIX: More specific check for dummy password to avoid false positives.
       const hasDummyPassword = user.password.includes('google-oauth-dummy') || user.password === user.supabaseId;
 
       return res.status(401).json({
@@ -630,6 +636,7 @@ exports.login = async (req, res) => {
       });
     }
 
+    console.log(`[DEBUG] 4. Login successful. Generating JWT token...`);
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
 
     // 🔥 RETROACTIVE MAGIC ONBOARDING: Create flow for old users if missing (runs silently in background)
@@ -638,7 +645,7 @@ exports.login = async (req, res) => {
 
     res.status(200).json({ success: true, token, user });
   } catch (error) {
-    console.error('Login Error:', error);
+    console.error('❌ [DEBUG] CRITICAL CRASH in login:', error);
     res.status(500).json({ success: false, message: 'Server error during login' });
   }
 };

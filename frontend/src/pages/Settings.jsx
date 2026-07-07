@@ -3,7 +3,7 @@ import api from '../services/api'; // Import our Axios instance
 import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database } from 'lucide-react';
 import MetaConnectButton from '../components/MetaConnectButton';
 
-export default function Settings() { 
+export default function Settings() {
   const [config, setConfig] = useState({
     whatsappToken: '',
     phoneNumberId: '',
