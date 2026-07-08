@@ -22,15 +22,15 @@ const leadSchema = new Schema({
   },
   status: {
     type: String,
-    // 🐛 FIX: Pehle sirf 8 values thi, jinme Kanban columns 'hot', 'warm',
-    // 'cold', 'existing', 'vip' missing the. Isse jab bhi lead in columns
-    // mein drag hoti thi, .save() Mongoose ValidationError se crash ho
-    // jaata tha (silent 500 error). 'deleted' bhi add kiya hai for soft-delete,
-    // 'visitor'/'unqualified' bhi (pipeline already inhe filter karta hai).
+    //  UPGRADE: Expanded the enum to include all possible CRM stages from the Kanban board
+    // and system processes. This prevents validation errors when a lead's status is
+    // updated to a stage like 'hot', 'warm', 'cold', or the soft-delete status 'deleted'.
     enum: [
       'new', 'contacted', 'interested', 'negotiating', 'not_interested',
       'converted', 'lost', 'ignored',
+      // Kanban Stages
       'hot', 'warm', 'cold', 'existing', 'vip',
+      // System & Filter Stages
       'deleted', 'visitor', 'unqualified'
     ],
     default: 'new',
@@ -76,30 +76,31 @@ const leadSchema = new Schema({
     type: Map,
     of: String,
   },
-  timeline: [{
-    eventType: { type: String },
-    description: { type: String },
-    timestamp: { type: Date, default: Date.now }
-  }],
-  expiresAt: {
-    type: Date
-  },
-  isArchived: { type: Boolean, default: false },
-  archivedAt: { type: Date },
-  archiveUrl: { type: String },
-
   // --- Call AI Tracking ---
   lastCallSummary: { type: String },
   lastCallActionTaken: { type: String },
   lastCallDate: { type: Date },
   callConfidenceStatus: { type: String, enum: ['High', 'Medium', 'Low'] },
 
-  // 🆕 NEW: Soft-delete tombstone tracking (prevents zombie leads)
+  // 🚀 UPGRADE: Soft-delete tombstone tracking (prevents zombie leads)
+  // Jab user CRM se lead delete karega, to hum use permanent delete nahi karenge,
+  // balki 'deleted' status set kar denge. Isse agar woh customer dobara message
+  // karta hai, to system use pehchan lega aur naya "zombie lead" nahi banega.
+  isArchived: { type: Boolean, default: false }, // Legacy, use status:'deleted'
+  archivedAt: { type: Date },
   deletedAt: { type: Date, default: null },
-  deletedBy: { type: String, default: null }
+  deletedBy: { type: String, default: null },
+  deletionBatchId: { type: String, default: null, index: true },
+  restoredAt: { type: Date, default: null },
+  restoredFrom: { type: String, default: null },
+  restoreCount: { type: Number, default: 0 },
+  // 🚀 NEW: Separate timeline for better auditing and performance.
+  timeline: [{
+    eventType: { type: String },
+    description: { type: String },
+    timestamp: { type: Date, default: Date.now }
+  }],
 });
-
-leadSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Lead = mongoose.model('Lead', leadSchema);
 

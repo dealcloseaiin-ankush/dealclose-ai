@@ -60,6 +60,10 @@ export default function Settings() {
   const [instagramPicker, setInstagramPicker] = useState(null);
   const [isSavingInstagramSelection, setIsSavingInstagramSelection] = useState(false);
 
+  // 🚀 NEW: State for Google Drive Backup
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupMessage, setBackupMessage] = useState('');
+
   // --- Functions ---
   const addCustomWebhook = () => {
     if (config.customWebhooks && config.customWebhooks.length >= 10) return alert("Maximum 10 custom actions allowed.");
@@ -396,6 +400,26 @@ export default function Settings() {
     }
   };
 
+  // 🚀 NEW: Google Drive Backup Function
+  const handleCreateBackup = async () => {
+    if (!googleConnected) {
+      return alert('Please connect your Google Account first to enable backups.');
+    }
+    if (!window.confirm('This will create a secure, encrypted backup of your leads and flows on your Google Drive. Proceed?')) {
+      return;
+    }
+    setIsBackingUp(true);
+    setBackupMessage('');
+    try {
+      const { data } = await api.post('/api/backup/create');
+      setBackupMessage(data.message || 'Backup created successfully!');
+    } catch (error) {
+      setBackupMessage(error.response?.data?.message || 'Backup failed. Please try again.');
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
   // --- Dynamic View Setup ---
   const isMain = activeWorkspace === 'main';
   const wsIndex = isMain ? -1 : parseInt(activeWorkspace.replace('ws_', ''));
@@ -562,7 +586,7 @@ export default function Settings() {
                   <p className="text-sm text-gray-400 mb-6 relative z-10">Automatically backup every new Lead directly into your Google Sheets.</p>
                   
                   {!googleConnected ? (
-                    <button type="button" onClick={handleGoogleAuth} className="px-6 py-3 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-xl transition-all flex items-center gap-3 shadow-lg border border-gray-200 relative z-10 hover:-translate-y-1">
+                    <button type="button" onClick={handleGoogleAuth} className="px-6 py-3 bg-white hover:bg-gray-200 text-gray-800 font-bold rounded-xl transition-all flex items-center gap-3 shadow-lg border border-gray-300 relative z-10 hover:-translate-y-0.5">
                        <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                          <path fill="#4285F4" d="M22.56 12.25 c0-.78-.07-1.53-.2-2.25 H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31 v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                          <path fill="#34A853" d="M12 23 c2.97 0 5.46-.98 7.28-2.66 l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -572,9 +596,17 @@ export default function Settings() {
                        <span>Connect Google Sheets</span>
                     </button>
                   ) : (
-                    <div className="relative z-10">
-                      <p className="text-sm font-semibold text-emerald-500 mb-1">✅ Connected to: <span className="text-white font-bold">{googleConnectedEmail || 'Your Google Account'}</span></p>
-                      <p className="text-xs text-emerald-600 font-medium">Your leads are automatically syncing to this Drive.</p>
+                    <div className="relative z-10 space-y-4">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-500 mb-1">✅ Connected to: <span className="text-white font-bold">{googleConnectedEmail || 'Your Google Account'}</span></p>
+                        <p className="text-xs text-emerald-600 font-medium">Auto-sync to Google Sheets is active.</p>
+                      </div>
+                      <div>
+                        <button type="button" onClick={handleCreateBackup} disabled={isBackingUp} className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-lg flex items-center gap-2">
+                          <Database size={16} /> {isBackingUp ? 'Backing up...' : 'Backup Data to Drive'}
+                        </button>
+                        {backupMessage && <p className="text-xs text-gray-400 mt-2">{backupMessage}</p>}
+                      </div>
                     </div>
                   )}
                 </div>

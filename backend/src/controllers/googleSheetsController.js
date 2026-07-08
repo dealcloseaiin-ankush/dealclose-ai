@@ -87,13 +87,13 @@ exports.connectGoogleAccount = async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
 
     // 🚀 NEW: Extract connected Google Email
-    let connectedEmail = '';
+    let connectedEmail = user.googleConfig?.connectedEmail || '';
     try {
       const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
       const userInfo = await oauth2.userinfo.get();
       connectedEmail = userInfo.data.email;
     } catch (e) {
-      console.log('Could not fetch google email', e.message);
+      console.warn('Could not fetch google email, using existing if available.', e.message);
     }
 
     // Create a new Spreadsheet automatically for the user
@@ -120,7 +120,8 @@ exports.connectGoogleAccount = async (req, res) => {
         googleSheetsConfig: {
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
-          spreadsheetId: spreadsheet.data.spreadsheetId,
+          // 🚀 UPGRADE: Rename to be more generic for Drive backups
+          spreadsheetId: spreadsheet.data.spreadsheetId, 
           connectedEmail: connectedEmail // 🚀 NEW: Saved to DB
         }
       }

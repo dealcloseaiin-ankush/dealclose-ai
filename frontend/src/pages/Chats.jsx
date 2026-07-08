@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { useAuth } from '../hooks/useAuth';
-import { Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth'; 
+import { Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck, Trash2, MapPin, CornerDownLeft, X } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function Chats() {
@@ -22,6 +22,9 @@ export default function Chats() {
   const [newChatName, setNewChatName] = useState('');
   const [newChatSource, setNewChatSource] = useState('Manual Entry');
   const [sendAutoOffer, setSendAutoOffer] = useState(false);
+  // 🚀 NEW: State for replying to a specific message
+  const [replyingTo, setReplyingTo] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -49,18 +52,18 @@ export default function Chats() {
         const { data } = await api.get('/chats');
         const messages = Array.isArray(data) ? data : data.data || [];
         
-        setAllMessages(prev => {
-          // 🚀 PLAY SOUND IF NEW INCOMING MESSAGE DETECTED
-          if (!isFirstLoad && prev.length > 0 && messages.length > prev.length) {
-             // 🚀 FIX: Safer comparison using message IDs instead of array slice
-             const existingIds = new Set(prev.map(p => p._id));
-             const newMsgs = messages.filter(m => !existingIds.has(m._id));
-             if (newMsgs.some(m => m.direction === 'incoming')) {
-                playNotificationSound();
-             }
+        // 🚀 FIX: Real-time update logic
+        const currentMessages = allMessagesRef.current;
+        if (!isFirstLoad && messages.length > currentMessages.length) {
+          const existingIds = new Set(currentMessages.map(m => m._id));
+          const newIncomingMessages = messages.filter(m => !existingIds.has(m._id) && m.direction === 'incoming');
+          if (newIncomingMessages.length > 0) {
+            playNotificationSound();
           }
-          return messages;
-        });
+        }
+        
+        setAllMessages(messages);
+        allMessagesRef.current = messages; // Update ref for next comparison
 
       } catch (error) {
         console.error("Failed to fetch chats", error);
@@ -74,8 +77,11 @@ export default function Chats() {
     
     fetchChats();
     const intervalId = setInterval(fetchChats, 4000); // 🚀 Auto-refresh data every 4 seconds silently
-    return () => clearInterval(intervalId); // Cleanup
-  }, []);
+    
+    // 🚀 FIX: Use a ref to store messages for comparison inside interval
+    const allMessagesRef = { current: allMessages };
+    return () => clearInterval(intervalId);
+  }, [allMessages]);
 
   // 🔥 Filter messages by selected Workspace
   const filteredMessages = useMemo(() => {
@@ -223,21 +229,56 @@ export default function Chats() {
 
     // Optimistic UI update
     setAllMessages(prev => [...prev, newMessage]);
+    // 🚀 NEW: Clear reply-to and input box
     setReplyText("");
+    setReplyingTo(null);
 
     try {
-      const res = await api.post('/chats/send', { customerPhone: activeCustomer, messageText: replyText });
+      // 🚀 NEW: Add repliedToMessageId to payload if it exists
+      const payload = { 
+        customerPhone: activeCustomer, 
+        messageText: replyText,
+        repliedToMessageId: replyingTo?._id 
+      };
+      const res = await api.post('/chats/send', payload);
       
-      // Update optimistic message with real DB ID if backend returns it
+      // Update optimistic message with real DB ID from backend
       if (res.data?.message) {
         setAllMessages(prev => prev.map(m => m._id === newMessage._id ? res.data.message : m));
       }
     } catch (error) {
       console.error("Failed to send message", error);
-        toast.error(error.response?.data?.message || "Failed to send message");
+      toast.error(error.response?.data?.message || "Failed to send message");
       // Remove the optimistic message if API fails
       setAllMessages(prev => prev.filter(m => m._id !== newMessage._id));
     }
+  };
+
+  // 🚀 NEW: Function to delete a single message
+  const deleteMessage = async (messageId) => {
+    if (!window.confirm("Are you sure you want to delete this message? This cannot be undone.")) return;
+
+    // Optimistic UI update
+    setAllMessages(prev => prev.filter(m => m._id !== messageId));
+
+    try {
+      await api.delete(`/chats/${messageId}`);
+      toast.success("Message deleted.");
+    } catch {
+      toast.error("Failed to delete message.");
+      // Re-fetch to revert UI state on failure
+      const { data } = await api.get('/chats');
+      setAllMessages(Array.isArray(data) ? data : data.data || []);
+    }
+  };
+
+  // 🚀 NEW: Function to send current location
+  const sendLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        setReplyText(`Here is my current location: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`);
+      });
+    } else { toast.error("Geolocation is not supported by this browser."); }
   };
 
   // 🚀 Helper to format Time (e.g., 10:30 AM)
@@ -489,7 +530,12 @@ export default function Chats() {
                       </div>
                     )}
                     <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`p-4 max-w-sm rounded-2xl ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
+                      <div className={`group p-4 max-w-sm rounded-2xl relative ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
+                        {/* 🚀 NEW: Reply and Delete buttons on hover */}
+                        <div className="absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/20 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity -left-20">
+                          <button onClick={() => setReplyingTo(msg)} className="text-gray-300 hover:text-white p-1.5 rounded hover:bg-gray-700" title="Reply"><CornerDownLeft size={14}/></button>
+                          <button onClick={() => deleteMessage(msg._id)} className="text-gray-300 hover:text-rose-400 p-1.5 rounded hover:bg-gray-700" title="Delete"><Trash2 size={14}/></button>
+                        </div>
                         <p className="whitespace-pre-wrap">{msg.messageText || "📎 [Attachment / Shared Post]"}</p>
                         <div className="flex justify-between items-center gap-4 mt-2">
                           <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
@@ -515,6 +561,17 @@ export default function Chats() {
 
             <div className="p-4 bg-[#111] border-t border-gray-800 rounded-br-2xl flex flex-col gap-3">
               
+              {/* 🚀 NEW: Replying To Banner */}
+              {replyingTo && (
+                <div className="bg-[#1a1a1a] border border-gray-700 p-2 rounded-lg flex justify-between items-start animate-fade-in">
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-green-400">Replying to {replyingTo.direction === 'incoming' ? 'Customer' : 'You'}</p>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-1 italic">"{replyingTo.messageText}"</p>
+                  </div>
+                  <button onClick={() => setReplyingTo(null)} className="text-gray-500 hover:text-white p-1"><X size={14}/></button>
+                </div>
+              )}
+              
               {/* 🚀 AI SUGGESTED / QUICK REPLIES */}
               <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
                  {['Here is our catalog 📦', 'Please share your location 📍', 'I will call you shortly 📞', 'Let me check and revert ⏳'].map((qr, idx) => (
@@ -526,6 +583,7 @@ export default function Chats() {
 
               <div className="flex items-center gap-3">
                 <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Send Approved Template">📄</button>
+                <button onClick={sendLocation} disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Share Location"><MapPin size={16}/></button>
                 <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Attach Image or Document">📎</button>
                 <button onClick={() => setReplyText("Thank you for your visit! 🙏\n\n⭐ Please leave us a 5-star review: [Review Link]\n📸 Follow us on Instagram: [Instagram Link]\n\n🎁 *Special Offer:* Use code *WELCOME10* on your next visit to get 10% OFF!")} disabled={!activeCustomer} className="p-3 text-yellow-500 hover:text-yellow-400 bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Load Rating & Discount Offer">⭐</button>
                 

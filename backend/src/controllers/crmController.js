@@ -317,6 +317,7 @@ exports.deleteContact = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const { id } = req.params;
 
+    const batchId = `del_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
     console.log(`\n🗑️ [CRM DELETE] Processing delete for ID: ${id}`);
 
     // 🐛 FIX (ZOMBIE LEADS): Leads ab SOFT-delete hote hain (status: 'deleted'),
@@ -332,6 +333,7 @@ exports.deleteContact = async (req, res) => {
       lead.archivedAt = new Date();
       lead.deletedAt = new Date();
       lead.deletedBy = req.user?.fullName || 'system';
+      lead.deletionBatchId = batchId;
       await lead.save();
 
       const phoneToClean = lead.phoneNumber || lead.phone;
@@ -360,5 +362,60 @@ exports.deleteContact = async (req, res) => {
   } catch (error) {
     console.error('🚨 Critical deletion crash:', error);
     res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+// @desc    Get all soft-deleted leads for the trash view
+// @route   GET /api/crm/trash
+exports.getTrash = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const deletedLeads = await Lead.find({ userId, status: 'deleted' }).sort({ deletedAt: -1 }).lean();
+    
+    // Group by deletionBatchId for a cleaner UI
+    const grouped = {};
+    deletedLeads.forEach(l => {
+      const key = l.deletionBatchId || 'legacy_deleted';
+      if (!grouped[key]) grouped[key] = { date: l.deletedAt, items: [] };
+      grouped[key].items.push(l);
+    });
+    res.status(200).json({ success: true, data: grouped });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Restore a single soft-deleted lead from the trash
+// @route   POST /api/crm/trash/:id/restore
+exports.restoreLead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { id } = req.params;
+    const lead = await Lead.findOne({ _id: id, userId, status: 'deleted' });
+    if (!lead) return res.status(404).json({ success: false, message: 'Lead not found in trash.' });
+
+    lead.status = 'new'; // Restore to 'new' stage
+    lead.isArchived = false;
+    lead.restoredAt = new Date();
+    lead.restoredFrom = 'trash';
+    lead.restoreCount = (lead.restoreCount || 0) + 1;
+    await lead.save();
+
+    res.status(200).json({ success: true, message: 'Lead restored successfully.', data: lead });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Permanently delete a lead from the trash
+// @route   DELETE /api/crm/trash/:id
+exports.permanentlyDeleteLead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { id } = req.params;
+    await Lead.deleteOne({ _id: id, userId, status: 'deleted' });
+    res.status(200).json({ success: true, message: 'Lead permanently deleted.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

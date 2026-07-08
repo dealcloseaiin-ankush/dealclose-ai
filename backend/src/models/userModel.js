@@ -192,11 +192,16 @@ const userSchema = new Schema({
   },
   // --- Cloud Storage & Backup Integrations ---
   googleSheetsConfig: {
+    // 🚀 DEPRECATED: This will be merged into the new `googleConfig` object.
+    // This is kept temporarily for backward compatibility during migration.
     accessToken: { type: String },
     refreshToken: { type: String },
-    spreadsheetId: { type: String } // User ki Google Sheet ka ID jahan data jayega
-  }
-  // You might want to add roles, profile pictures, etc.
+    spreadsheetId: { type: String },
+    connectedEmail: { type: String },
+    // 🚀 NEW: Centralized Google Config for Sheets, Drive, etc.
+    backupFolderId: { type: String }, // ID of the 'DealClose AI Backups' folder in user's Drive
+    lastBackupAt: { type: Date }
+  },
 });
 
 userSchema.pre('save', async function (next) {

@@ -1,3 +1,4 @@
+const axios = require('axios'); // 🛠️ BUG FIX: axios was used in many places below (search_external_catalog, real-estate tools, publish_blog, etc.) but was never imported. This caused a silent ReferenceError crash on every one of those AI tool calls.
 const aiService = require('../services/aiService');
 const whatsappService = require('../services/whatsappService');
 const ocrService = require('../services/ocrService');
@@ -7,6 +8,7 @@ const Message = require('../models/messageModel');
 const callService = require('../services/callService');
 const billing = require('../utils/billing');
 const metaAdsService = require('../services/metaAdsService');
+const { getMessageExpiry } = require('../utils/retentionPolicy'); // 🚀 NEW: Centralized policy
 const Flow = require('../models/flowModel');
 const googleSheetsController = require('./googleSheetsController');
 const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 NEW: Auto-Marketer DB
@@ -73,7 +75,9 @@ exports.handleWhatsApp = async (req, res) => {
 
         // 🚀 PRIVACY FIX: Check if the message is for the page itself, not a personal DM forwarded by Meta
         const recipientId = entry.id; // This is the ID of the page that received the event
-        const pageIgId = user.instagramConfig?.accountId;
+        // 🛠️ BUG FIX: schema field is "instagramAccountId", not "accountId" — this was always undefined,
+        // silently disabling the privacy guard right below it.
+        const pageIgId = user.instagramConfig?.instagramAccountId;
         if (changes.field === 'messages' && pageIgId && recipientId !== pageIgId) {
           console.log(`🚫 [Privacy Guard] Ignored a personal DM forwarded to webhook. Page ID: ${pageIgId}, Recipient ID: ${recipientId}`);
           continue; // Stop processing this message
@@ -90,8 +94,10 @@ exports.handleWhatsApp = async (req, res) => {
           
           // 🚀 NEW: Update Message Status for Ticks (Sent, Delivered, Read)
           if (['sent', 'delivered', 'read'].includes(statusStr)) {
+            // 🛠️ BUG FIX: added userId scope — without it, this could match & silently
+            // overwrite another business's message status for a customer with the same phone number.
             await Message.findOneAndUpdate(
-              { customerPhone: value.statuses[0].recipient_id, direction: 'outgoing' },
+              { userId: user._id, customerPhone: value.statuses[0].recipient_id, direction: 'outgoing' },
               { $set: { status: statusStr } },
               { sort: { _id: -1 } } // Sabse latest message ko update karega
             );
@@ -103,8 +109,9 @@ exports.handleWhatsApp = async (req, res) => {
              console.error(`❌ [Webhook] Message Failed to send. Reason: ${failReason}`);
              if (failReason.includes('24 hours')) console.error(`🔍 [DEBUG RULE]: Remember, the customer must message your number first to start the 24-hour clock.`);
              // Aap message ka status database me update kar sakte hain
+             // 🛠️ BUG FIX: added userId scope for the same cross-tenant reason as above.
              await Message.findOneAndUpdate(
-               { customerPhone: value.statuses[0].recipient_id, status: 'sent' },
+               { userId: user._id, customerPhone: value.statuses[0].recipient_id, status: 'sent' },
                { $set: { status: 'failed', messageText: `[⚠️ Failed: 24-Hour Window Closed]` } },
                { sort: { timestamp: -1 } } // Update the latest message
              );
@@ -126,30 +133,10 @@ exports.handleWhatsApp = async (req, res) => {
           // 🚀 NEW: Meta Ad Click Tracking (Attribution)
           let adReferral = null;
           if (msg.referral) {
-            adReferral = msg.referral;
-            console.log(`🎯 [Ad Tracking] Customer came from Meta Ad! Source ID: ${adReferral.source_id}`);
-          }
-
-          // 🚀 NEW: AUTO-ADD EVERY SENDER TO CRM (So it shows on your board immediately)
-          try {
-            console.log(`[Webhook Debug] Attempting to save Lead ${fromNumber} for user ${user._id}`);
-            
-            // 🚀 FIX: Prevented ReferenceError Crash for getExpiry
-            const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
-            const getExpiry = (type) => {
-              const hasPremiumAccess = user.isPremium === true || user.role === 'superadmin' || user.role === 'tester' || user.email === 'ankush.bani@gmail.com';
-              if (hasPremiumAccess) {
-                // Tester ke liye 90 din, asli premium ke liye permanent
-                if (user.role === 'tester') {
-                  return new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-                }
-                // Premium user ke saare WhatsApp messages permanent
-                return null;
-              }
-              // Free user ke saare WhatsApp messages 30 din me delete
-              return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-            };
-            
+            adReferral = msg.referral; 
+            console.log(`🎯 [Ad Tracking] Customer came from Meta Ad! Source ID: ${adReferral.source_id}`); 
+          } 
+          try { 
             let savedLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
             if (!savedLead) {
               const leadCount = await Lead.countDocuments({ userId: user._id });
@@ -169,37 +156,18 @@ exports.handleWhatsApp = async (req, res) => {
                 timeline: [
                   { eventType: 'Lead Created', description: 'Lead auto-captured from WhatsApp Inbound', timestamp: new Date() },
                   { eventType: 'WhatsApp Conversation Started', description: 'Customer initiated a new WhatsApp chat', timestamp: new Date() },
-                  ...(adReferral ? [{ eventType: 'Ad Click Tracking', description: `Customer clicked Meta Ad: ${adReferral.headline}`, timestamp: new Date() }] : [])
-                ],
-                ...(getExpiry('junk') && { expiresAt: getExpiry('junk') })
+                  ...(adReferral ? [{ eventType: 'Ad Click Tracking', description: `Customer clicked Meta Ad: ${adReferral.headline}`, timestamp: new Date() }] : []),
+                ]
               });
             } else if (adReferral) {
                // 🚀 UPDATE EXISTING LEAD: If old customer clicks a new Ad!
-               const newSource = `Meta Ad (${adReferral.headline || 'Click-to-WA'})`;
-               await Lead.updateOne({ _id: savedLead._id }, { 
-                 $set: { 
-                   source: newSource,
-                   "customFields.adId": String(adReferral.source_id || ''),
-                   "customFields.adHeadline": String(adReferral.headline || ''),
-                   "customFields.sourceUrl": String(adReferral.source_url || '')
-                 },
-                 $push: { timeline: { eventType: 'Ad Click Tracking', description: `Customer re-engaged via Meta Ad: ${adReferral.headline}`, timestamp: new Date() } }
-               });
+               const newSource = `Meta Ad (${adReferral.headline || 'Click-to-WA'})`; 
+               await Lead.updateOne({ _id: savedLead._id }, { $set: { source: newSource, "customFields.adId": String(adReferral.source_id || ''), "customFields.adHeadline": String(adReferral.headline || ''), "customFields.sourceUrl": String(adReferral.source_url || '') }, $push: { timeline: { eventType: 'Ad Click Tracking', description: `Customer re-engaged via Meta Ad: ${adReferral.headline}`, timestamp: new Date() } } });
             }
             
             // 🚀 NEW: Auto-Sync New WhatsApp Leads to Google Sheets
             googleSheetsController.appendLeadToSheet(user._id, savedLead).catch(e => console.log('Sheets sync error:', e.message));
             console.log(`✅ [Webhook Debug] Lead saved/verified in CRM (ID: ${savedLead._id})`);
-            
-            // 🚀 MAGIC: If lead is an 'interested' customer, extend their TTL (or make Lifetime for Premium)
-            const type = ['interested', 'negotiating', 'converted'].includes(savedLead.status) ? 'lead' : 'junk';
-            const newExpiry = getExpiry(type);
-            
-            if (newExpiry) {
-               await Lead.updateOne({ _id: savedLead._id }, { $set: { expiresAt: newExpiry } });
-            } else {
-               await Lead.updateOne({ _id: savedLead._id }, { $unset: { expiresAt: 1 } }); // Remove expiry entirely
-            }
             
           } catch (leadErr) {
             console.error("❌ [Webhook] Error auto-saving Lead to CRM:", leadErr.message);
@@ -218,7 +186,7 @@ exports.handleWhatsApp = async (req, res) => {
             const responseMessage = `🛍️ *Order Received!*\nThank you for placing an order from our catalog! Your Order ID is *#${newOrderId}*.\n\nCould you please reply with your complete *Delivery Address* and Pincode so we can dispatch it?`;
             
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+            await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
             continue;
           }
 
@@ -231,7 +199,7 @@ exports.handleWhatsApp = async (req, res) => {
               const extractedData = await ocrService.extractTextFromImage(buffer, mimeType || 'image/jpeg', user._id);
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `*Here is what I read from your list:*\n\n${extractedData}\n\nWould you like me to create an order or quotation for these items?`);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai' });
+              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
             } catch (err) {
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "Sorry, I couldn't read the image properly right now. Could you please type it out?");
             }
@@ -296,7 +264,7 @@ exports.handleWhatsApp = async (req, res) => {
             }
 
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+            await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
             continue;
             }
           }
@@ -306,7 +274,10 @@ exports.handleWhatsApp = async (req, res) => {
             let responseMessage = null;
             let repliedBy = 'ai';
 
-            const isOwnerOrStaff = (user.ownerPhone && user.ownerPhone.replace(/\D/g,'') === fromNumber) || (user.staff && user.staff.some(s => s.phone.replace(/\D/g,'') === fromNumber));
+            // 🛠️ BUG FIX: guard s.phone before calling .replace — a staff entry saved without
+            // a phone number would throw "Cannot read properties of undefined" and crash this
+            // whole webhook request (no reply would ever be sent to the customer).
+            const isOwnerOrStaff = (user.ownerPhone && user.ownerPhone.replace(/\D/g,'') === fromNumber) || (user.staff && user.staff.some(s => s.phone && s.phone.replace(/\D/g,'') === fromNumber));
             
             // ==========================================================
             // 🚀 NEW: AUTO-MARKETER APPROVAL LOGIC (For Business Owner)
@@ -358,7 +329,7 @@ exports.handleWhatsApp = async (req, res) => {
               continue; 
             }
 
-            await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer' });
+            await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
             
             // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
             const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
@@ -433,8 +404,8 @@ exports.handleWhatsApp = async (req, res) => {
                     ]
                   }
                 };
-                await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
-                await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+              await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj); 
+              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue; 
             }
 
@@ -460,7 +431,7 @@ exports.handleWhatsApp = async (req, res) => {
                 }
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMsg);
-                await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system' });
+                await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue; // 🚀 Skip AI completely to save tokens!
               } else {
                 // Not a rating, just turn off the flag and process normally via AI
@@ -497,7 +468,7 @@ exports.handleWhatsApp = async (req, res) => {
               let responseMessage = `Thank you, ${finalName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
               
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system' });
+              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; // 🚀 Skip AI completely to save tokens!
             }
 
@@ -600,15 +571,15 @@ exports.handleWhatsApp = async (req, res) => {
 
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
@@ -623,7 +594,7 @@ exports.handleWhatsApp = async (req, res) => {
                          }));
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
-                         await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                        await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
@@ -698,15 +669,15 @@ exports.handleWhatsApp = async (req, res) => {
 
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText);
-                       await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
@@ -721,7 +692,7 @@ exports.handleWhatsApp = async (req, res) => {
                          }));
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
-                         await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+                        await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
@@ -824,7 +795,7 @@ exports.handleWhatsApp = async (req, res) => {
                 action: { button: "Select Business", sections: [{ title: "Our Divisions", rows: menuRows }] }
               };
               await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply' });
+              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
 
@@ -853,7 +824,7 @@ exports.handleWhatsApp = async (req, res) => {
               }
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system' });
+              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
 
@@ -1102,7 +1073,10 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "update_lead_status") {
                       const statusData = JSON.parse(toolCall.function.arguments);
-                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: statusData.status, userId: user._id }, { returnDocument: 'after', upsert: true });
+                      // 🛠️ BUG FIX (critical, multi-tenant leak): the filter did not include userId,
+                      // only the $set did. Mongo would find ANY lead across ALL businesses with this
+                      // phoneNumber and re-assign its userId to the current business, hijacking it.
+                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { status: statusData.status, userId: user._id }, { returnDocument: 'after', upsert: true });
                       
                       // 🎯 META CONVERSIONS API SYNC
                       if ((statusData.status.toLowerCase() === 'converted' || statusData.status.toLowerCase() === 'won') && user.metaAdsConfig?.pixelId && user.metaAdsConfig?.accessToken) {
@@ -1147,7 +1121,9 @@ exports.handleWhatsApp = async (req, res) => {
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "mark_lead_as_lost_and_share") {
                       const data = JSON.parse(toolCall.function.arguments);
-                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber }, { status: 'lost', notes: `Lost reason: ${data.reason}` });
+                      // 🛠️ BUG FIX: added userId scope — previously this matched by phoneNumber alone
+                      // and could mark another business's lead as 'lost'.
+                      await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { status: 'lost', notes: `Lost reason: ${data.reason}` });
                       const query = { _id: { $ne: user._id }, optInForSharedLeads: true, productCategories: { $regex: new RegExp(data.productCategory, 'i') } };
                       if (data.customerPinCode) query.servedPinCodes = data.customerPinCode;
                       const otherSellers = await User.find(query).limit(2);
@@ -1193,7 +1169,7 @@ exports.handleWhatsApp = async (req, res) => {
                       
                       responseMessage = null; // Prevent sending duplicate text
                       repliedBy = 'ai';
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: `[Interactive AI Question]: ${menuText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai' });
+                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Interactive AI Question]: ${menuText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
                     } else if (toolCall.function.name === "search_real_estate_properties") {
                       const searchData = JSON.parse(toolCall.function.arguments);
                       const propertiesEndpoint = activeSearchUrl || (activeApiUrl ? `${activeApiUrl.replace(/\/$/, '')}/api/properties` : 'https://newpropertyhub.in/api/properties');
@@ -1296,7 +1272,7 @@ exports.handleWhatsApp = async (req, res) => {
                 }
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-                await Message.create({ userId: user._id, customerPhone: fromNumber, messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy });
+                await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy, expiresAt: getMessageExpiry(user, 'whatsapp') });
                 
                 // 🚀 SMART DELAYED FEEDBACK: Only trigger if AI actually replied!
                 if (repliedBy === 'ai') {

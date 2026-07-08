@@ -7,7 +7,7 @@ exports.saveFlow = async (req, res) => {
     console.log("\n➡️ [DEBUG] POST /api/whatsapp/flows called!");
     console.log("➡️ [DEBUG] Request Body:", JSON.stringify(req.body).substring(0, 150) + "...");
     
-    let { name, flowData, workspaceId } = req.body;
+    let { name, flowData, workspaceId, platform } = req.body; // 🚀 NEW: Get platform from request
     const userId = req.user?._id || req.user?.id;
 
     console.log(`➡️ [DEBUG] User ID from Auth: ${userId}`);
@@ -29,12 +29,12 @@ exports.saveFlow = async (req, res) => {
 
     // Safe check to prevent MongoDB CastError for "main" string
     const isMainWorkspace = !workspaceId || workspaceId === 'main';
-    let query = { userId, name };
+    let query = { userId, name, platform: platform || 'whatsapp' }; // 🚀 NEW: Use platform in query
     if (!isMainWorkspace) query.workspaceId = workspaceId;
 
     // 🚀 STRICT BYPASS: Use findOneAndUpdate to force save workspaceId and flowData even if Model is outdated
-    const updatePayload = { flowData };
-    if (!isMainWorkspace) updatePayload.workspaceId = workspaceId;
+    const updatePayload = { flowData, platform: platform || 'whatsapp' }; // 🚀 NEW: Add platform to payload
+    if (!isMainWorkspace) updatePayload.workspaceId = workspaceId; 
 
     console.log("➡️ [DEBUG] MongoDB Query:", query);
 

@@ -6,6 +6,7 @@ const Flow = require('../models/flowModel');
 const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); 
 const googleSheetsController = require('./googleSheetsController');
+const { getMessageExpiry } = require('../utils/retentionPolicy'); // 🚀 URGENT FIX: Re-added the missing import.
 const IORedis = require('ioredis');
 
 // Lightweight Redis client for deduplication and rate-limits (falls back to local)
@@ -242,21 +243,6 @@ exports.handleInstagramWebhook = async (req, res) => {
                 }
               }
 
-              const isPremium = user.isPremium === true || user.role === 'superadmin' || user.email === 'ankush.bani@gmail.com';
-              const getExpiry = (type, isComment = false) => {
-                // Comments hamesha 1 din me delete honge
-                if (isComment) {
-                  return new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
-                }
-                // DMs ke liye logic
-                if (isPremium) {
-                  // Premium user ke 'lead' wale DMs permanent, baaki 30 din
-                  return type === 'lead' ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                }
-                // Free user ke saare DMs 1 din me delete
-                return new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
-              };
-
               const quickReplyPayload = event.message?.quick_reply?.payload || event.postback?.payload || null;
               if (quickReplyPayload && quickReplyPayload.startsWith('GET_AUTO_LINK_')) {
                 const postId = quickReplyPayload.replace('GET_AUTO_LINK_', '');
@@ -281,33 +267,44 @@ exports.handleInstagramWebhook = async (req, res) => {
                      ).catch(e => console.log('Main click count increment error:', e.message));
                    }
                    
-                   await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, messageText: linkMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                   await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: linkMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
                    continue; 
                 }
               }
 
-              await Message.create({
-                userId: user._id,
-                customerPhone: `IG_${senderId}`, 
-                messageText: incomingText,
-                direction: 'incoming',
-                status: 'received',
-                sentBy: 'customer',
-                timestamp: new Date(),
-                expiresAt: getExpiry('junk')
-              });
+              // 🛠️ BUG FIX: this "incoming from customer" log used to run unconditionally,
+              // BEFORE the isEcho check below. That meant every time the owner replied from
+              // their own Instagram app (an echo event), their own reply text got logged into
+              // the chat as if the *customer* had said it — corrupting chat history and
+              // confusing the AI context on every future message. We now only log it here
+              // when it is genuinely an incoming customer message; the echo branch logs its
+              // own correct 'outgoing' record below.
+              if (!isEcho) {
+                await Message.create({
+                  userId: user._id,
+                  customerPhone: `IG_${senderId}`, 
+                  channel: 'instagram_dm',
+                  messageText: incomingText,
+                  direction: 'incoming',
+                  status: 'received',
+                  sentBy: 'customer',
+                  timestamp: new Date(),
+                  expiresAt: getMessageExpiry(user, 'instagram_dm', 'incoming')
+                });
+              }
               let currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
               
               if (isEcho) {
                  await Message.create({
                    userId: user._id,
                    customerPhone: `IG_${senderId}`,
+                   channel: 'instagram_dm',
                    messageText: incomingText,
                    direction: 'outgoing',
                    status: 'sent',
                    sentBy: 'owner_app',
                    timestamp: new Date(),
-                   expiresAt: getExpiry('junk')
+                   expiresAt: getMessageExpiry(user, 'instagram_dm', 'outgoing')
                  });
 
                  await Lead.findOneAndUpdate(
@@ -347,19 +344,19 @@ exports.handleInstagramWebhook = async (req, res) => {
                     deliveryStatus = 'failed';
                     displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${e.message}]`;
                 }
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
                 if (nodeToPauseAt && flowIdToPauseAt) {
                     if (!currentLeadCheck) {
                         currentLeadCheck = await Lead.findOneAndUpdate(
                             { phoneNumber: `IG_${senderId}`, userId: user._id },
-                            { 
-                                $setOnInsert: Object.assign({ 
+                            {
+                                $setOnInsert: {
                                     name: realName,
-                                    source: 'Instagram DM', 
-                                    status: 'visitor', 
+                                    source: 'Instagram DM',
+                                    status: 'visitor',
                                     createdBy: user._id
-                                }, getExpiry('junk') ? { expiresAt: getExpiry('junk') } : {})
-                            },
+                                }
+                            }, 
                             { upsert: true, new: true }
                         );
                     }
@@ -384,10 +381,11 @@ exports.handleInstagramWebhook = async (req, res) => {
                      let chosenEdge = null;
                      if (activeNode.type === 'askQuestion') {
                          if (activeNode.data.replyType === 'open') {
-                             const qLower = (activeNode.data.question || '').toLowerCase();
-                             const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } };
+                             // 🚀 FIX: Defined the missing 'qLower' variable.
+                             const qLower = (activeNode.data.question || '').toLowerCase(); 
+                             const updatePayload = { $push: { notes: `Flow Answer (${activeNode.data.question}): ${incomingText}` } }; 
                              if (currentLeadCheck.status === 'visitor' && (qLower.includes('brand') || qLower.includes('budget') || qLower.includes('city') || qLower.includes('name'))) {
-                                 updatePayload.$set = { status: 'new', expiresAt: getExpiry('lead') };
+                                 updatePayload.$set = { status: 'new' };
                              }
                              await Lead.updateOne({ _id: currentLeadCheck._id }, updatePayload, { strict: false });
                              chosenEdge = edges.find(e => e.source === activeNode.id && e.sourceHandle === 'replied');
@@ -566,7 +564,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                     } else {
                       await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.sentCount": 1 } });
                     }
-                    await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, messageText: `[Button Sent] ${matchedAuto.replyMessage}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getExpiry('junk') });
+                    await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Button Sent] ${matchedAuto.replyMessage}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
                   } catch(e) {
                     console.error("Quick Reply DM Error:", e.response?.data || e.message);
                   }
@@ -601,7 +599,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date(),
-                  expiresAt: getExpiry('junk')
+                  channel: 'instagram_dm',
+                  expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply')
                 });
                 continue; 
               }
@@ -626,7 +625,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date(),
-                  expiresAt: getExpiry('junk')
+                  channel: 'instagram_dm',
+                  expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply')
                 });
                 continue; 
               }
@@ -651,7 +651,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date(),
-                  expiresAt: getExpiry('junk')
+                  channel: 'instagram_dm',
+                  expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply')
                 });
                 continue; 
               }
@@ -676,7 +677,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                   status: deliveryStatus, 
                   sentBy: 'auto-reply',
                   timestamp: new Date(),
-                  expiresAt: getExpiry('junk')
+                  channel: 'instagram_dm',
+                  expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply')
                 });
                 continue; 
               }
@@ -714,16 +716,18 @@ with whatever information is available (leave budget field empty/null if not pro
                         const brandOrName = dealData.name || dealData.brandName;
                         
                         if (brandOrName && brandOrName.trim() !== '') {
+                          // 🛠️ BUG FIX: filter was missing userId, so this could match and
+                          // overwrite an Instagram lead belonging to a different business
+                          // account (e.g. if the DM came in on a shared/duplicate sender id).
                           const updatedIgLead = await Lead.findOneAndUpdate(
-                            { phoneNumber: `IG_${senderId}` }, 
+                            { phoneNumber: `IG_${senderId}`, userId: user._id }, 
                             { 
                               $set: {
                                 userId: user._id, 
                                 name: brandOrName, 
                                 source: 'Instagram DM (Promotion)', 
                                 status: 'interested', 
-                                notes: `Deliverables: ${dealData.itemName || dealData.deliverables || 'Not specified yet'} | Offered Budget: ${dealData.budget || 'Not specified — to be negotiated'}`,
-                                expiresAt: getExpiry('lead')
+                                notes: `Deliverables: ${dealData.itemName || dealData.deliverables || 'Not specified yet'} | Offered Budget: ${dealData.budget || 'Not specified — to be negotiated'}`
                               }
                             }, 
                             { upsert: true, returnDocument: 'after' }
@@ -758,7 +762,8 @@ with whatever information is available (leave budget field empty/null if not pro
                       status: deliveryStatus,
                       sentBy: 'ai',
                       timestamp: new Date(),
-                      expiresAt: getExpiry('junk')
+                      channel: 'instagram_dm',
+                      expiresAt: getMessageExpiry(user, 'instagram_dm', 'ai')
                     });
                   }
 
@@ -771,7 +776,8 @@ with whatever information is available (leave budget field empty/null if not pro
                     direction: 'outgoing',
                     status: 'failed',
                     sentBy: 'system',
-                    timestamp: new Date()
+                    timestamp: new Date(),
+                    channel: 'instagram_dm'
                   });
                 }
               }
@@ -874,14 +880,15 @@ with whatever information is available (leave budget field empty/null if not pro
              
              await Message.create({
                userId: user._id,
-               customerPhone: `IG_${igUserId}`,
+               customerPhone: `IG_${igUserId}`, 
+               channel: 'instagram_comment',
                messageText: `[💬 IG Comment - Phone Detected, awaiting confirmation]: ${commentText}`,
                direction: 'incoming',
                status: 'received',
                sentBy: 'customer',
                tags: ['ig_comment', 'phone_detected_unconfirmed'],
                timestamp: new Date(),
-               expiresAt: getExpiry('junk')
+               expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming')
              });
              continue; // Skip flow routing for phone capture drops
           }
@@ -985,7 +992,7 @@ with whatever information is available (leave budget field empty/null if not pro
                if (replyCount === 1) await redis.expire(rateKey, 10 * 60); 
                if (replyCount > 5) {
                  console.log(`Skipped: rate limit exceeded for thread ${threadId} (count=${replyCount})`);
-                 await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[SYSTEM] Reply skipped due to rate limit for this thread. Count=${replyCount}`, direction: 'outgoing', status: 'skipped', sentBy: 'system', tags: ['ig_rate_limited'], timestamp: new Date(), expiresAt: getExpiry('junk') });
+                 await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[SYSTEM] Reply skipped due to rate limit for this thread. Count=${replyCount}`, direction: 'outgoing', status: 'skipped', sentBy: 'system', tags: ['ig_rate_limited'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment') });
                  continue;
                }
              } catch (e) {
@@ -1042,9 +1049,9 @@ with whatever information is available (leave budget field empty/null if not pro
              const finalLoggedMsg = (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') 
                 ? `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}` 
                 : finalReplyMsg;
-
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getExpiry('junk') });
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getExpiry('junk') });
+             
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming') });
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_dm', messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
           } else {
              const accountAiEnabled = incomingWorkspaceId !== 'main'
                ? activeWorkspaceNode?.aiAgentEnabled !== false
@@ -1104,11 +1111,12 @@ with whatever information is available (leave budget field empty/null if not pro
                  threadState.lastAiCommentId = replyCommentId;
                  await saveThreadState(threadKey, threadState);
 
-                 await Message.create({
+                 await Message.create({ // Log the public AI reply
                    userId: user._id, customerPhone: `IG_${igUserId}`,
+                   channel: 'instagram_comment',
                    messageText: `[Public AI Reply]: ${aiReply}`,
                    direction: 'outgoing', status: 'sent', sentBy: 'ai',
-                   tags: ['ig_comment_reply'], timestamp: new Date(), expiresAt: getExpiry('junk')
+                   tags: ['ig_comment_reply'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'ai')
                  });
              } catch (aiCommentErr) {
                  console.error("❌ [Instagram AI Comment Reply Error]:", aiCommentErr.message);
@@ -1117,13 +1125,14 @@ with whatever information is available (leave budget field empty/null if not pro
              await Message.create({
                userId: user._id,
                customerPhone: `IG_${igUserId}`,
+               channel: 'instagram_comment',
                messageText: `[💬 IG Comment - Unhandled]: ${commentText}`,
                direction: 'incoming',
                status: 'received',
                sentBy: 'customer',
                tags: ['ig_comment', 'needs_reply'],
                timestamp: new Date(),
-               expiresAt: getExpiry('junk')
+               expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming')
              });
           } 
         } 

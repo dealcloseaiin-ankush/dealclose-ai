@@ -145,15 +145,15 @@ exports.sendManualMessage = async (req, res) => {
       let igToken = null;
       if (user && user.workspaces && wsIdIg !== 'main') {
          const ws = user.workspaces.find(w => w && w._id && w._id.toString() === wsIdIg);
-          const workspaceInstagram = ws?.instagramConfig || ws?.igConfig;
+          const workspaceInstagram = ws?.instagramConfig || ws?.instagramConfig;
           if (workspaceInstagram?.accessToken) igToken = workspaceInstagram.accessToken;
       }
-      if (!igToken && user && (user.instagramConfig || user.igConfig)?.accessToken) {
-         igToken = (user.instagramConfig || user.igConfig).accessToken;
+      if (!igToken && user && (user.instagramConfig || user.instagramConfig)?.accessToken) {
+         igToken = (user.instagramConfig || user.instagramConfig).accessToken;
       }
       if (!igToken && user && user.workspaces) {
-          const wsWithToken = user.workspaces.find(w => (w?.instagramConfig || w?.igConfig)?.accessToken);
-          if (wsWithToken) igToken = (wsWithToken.instagramConfig || wsWithToken.igConfig).accessToken;
+          const wsWithToken = user.workspaces.find(w => (w?.instagramConfig || w?.instagramConfig)?.accessToken);
+          if (wsWithToken) igToken = (wsWithToken.instagramConfig || wsWithToken.instagramConfig).accessToken;
       }
 
       if (!user || !igToken) {
@@ -297,6 +297,24 @@ exports.sendManualMessage = async (req, res) => {
   } catch (error) {
     console.error("🚨 [Chat] CRITICAL BACKEND ERROR (Before reaching Meta):", error);
     res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
+// @desc    Delete a single message
+// @route   DELETE /api/chats/:messageId
+exports.deleteMessage = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { messageId } = req.params;
+
+    const message = await Message.findOne({ _id: messageId, userId });
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found or you do not have permission to delete it.' });
+    }
+    await message.deleteOne(); // Using deleteOne instance method
+    res.status(200).json({ success: true, message: 'Message deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

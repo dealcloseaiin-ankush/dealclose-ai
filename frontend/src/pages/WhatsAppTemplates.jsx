@@ -1,6 +1,6 @@
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api'; // Assuming api service is set up
 import { useAuth } from '../hooks/useAuth';
 
@@ -12,10 +12,44 @@ export default function WhatsAppTemplates() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isBuilding, setIsBuilding] = useState(false);
-  const [form, setForm] = useState({ name: '', category: 'MARKETING', language: 'en_US', headerType: 'NONE', headerText: '', headerMediaUrl: '', body: '', footerText: '' });
+  
+  // 🚀 NEW: State for filtering templates by status
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [filterStatus, setFilterStatus] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('status')?.toUpperCase() || 'ALL';
+  });
+
+  const [form, setForm] = useState({ 
+    name: '', 
+    category: 'MARKETING', 
+    language: 'en_US', 
+    headerType: 'NONE', 
+    headerText: '', 
+    headerMediaUrl: '', 
+    body: '', 
+    footerText: '',
+    // 🚀 NEW: State for buttons
+    buttons: [] 
+  });
   const [submitting, setSubmitting] = useState(false);
   const [headerMediaFile, setHeaderMediaFile] = useState(null);
   const [headerMediaPreview, setHeaderMediaPreview] = useState('');
+  
+  // 🚀 NEW: State and keywords for marketing content warning
+  const [showMarketingWarning, setShowMarketingWarning] = useState(false);
+  const MARKETING_KEYWORDS = useMemo(() => [
+    'sale', 'discount', 'offer', 'promo', 'buy now', 'shop now', 'free', 
+    'limited time', '% off', 'deal', 'save', 'coupon', 'voucher', 'win',
+    'contest', 'giveaway', 'exclusive', 'new arrival', 'bogo', 'hurry'
+  ], []);
+
+  useEffect(() => {
+    const bodyText = form.body.toLowerCase();
+    const hasMarketingKeyword = MARKETING_KEYWORDS.some(keyword => bodyText.includes(keyword));
+    setShowMarketingWarning(form.category !== 'MARKETING' && hasMarketingKeyword);
+  }, [form.body, form.category, MARKETING_KEYWORDS]);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -34,8 +68,18 @@ export default function WhatsAppTemplates() {
   }, [activeWorkspace]);
 
   useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
+    // Reset form when switching workspaces or exiting builder
+    const params = new URLSearchParams(location.search);
+    const statusFromUrl = params.get('status')?.toUpperCase() || 'ALL';
+    setFilterStatus(statusFromUrl);
+    setForm({ 
+      name: '', category: 'MARKETING', language: 'en_US', headerType: 'NONE', 
+      headerText: '', headerMediaUrl: '', body: '', footerText: '', buttons: [] 
+    });
+    setHeaderMediaFile(null);
+    setHeaderMediaPreview('');
+    fetchTemplates(); // Fetch templates for the newly selected workspace
+  }, [fetchTemplates, activeWorkspace, location.search]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -74,12 +118,21 @@ export default function WhatsAppTemplates() {
       const components = [];
       if(form.headerType === 'TEXT' && form.headerText) {
         components.push({ type: "HEADER", format: "TEXT", text: form.headerText });
-      } else if (form.headerType === 'IMAGE') {
+      } else if (form.headerType === 'IMAGE' && finalMediaUrl) {
         components.push({ type: "HEADER", format: "IMAGE", example: { header_handle: [finalMediaUrl || "https://example.com/image.jpg"] } });
+      } else if (form.headerType === 'VIDEO' && finalMediaUrl) {
+        components.push({ type: "HEADER", format: "VIDEO", example: { header_handle: [finalMediaUrl || "https://example.com/video.mp4"] } });
+      } else if (form.headerType === 'DOCUMENT' && finalMediaUrl) {
+        components.push({ type: "HEADER", format: "DOCUMENT", example: { header_handle: [finalMediaUrl || "https://example.com/document.pdf"] } });
       }
 
       components.push({ type: "BODY", text: form.body });
       if(form.footerText) components.push({ type: "FOOTER", text: form.footerText });
+      
+      // 🚀 NEW: Add Buttons component if any exist
+      if(form.buttons && form.buttons.length > 0) {
+        components.push({ type: "BUTTONS", buttons: form.buttons.map(btn => ({ type: "QUICK_REPLY", text: btn.text })) });
+      }
 
       const payload = {
         templateData: { name: form.name, category: form.category, language: form.language, components },
@@ -101,7 +154,7 @@ export default function WhatsAppTemplates() {
 
   const handleDelete = async (templateName) => {
     if (!window.confirm(`Are you sure you want to delete '${templateName}'?`)) return;
-    try {
+    try { // 🚀 FIX: This route was missing in the backend, so it's better to add a proper API route for it.
       await api.delete(`/whatsapp/templates/${templateName}`, { params: { workspaceId: activeWorkspace } });
       fetchTemplates();
       alert("Template deleted successfully!");
@@ -126,7 +179,44 @@ export default function WhatsAppTemplates() {
     );
   };
 
+  // 🚀 NEW: Memoized calculation for status counts and filtered templates
+  const { filteredTemplates, statusCounts } = useMemo(() => {
+    const counts = { ALL: templates.length, APPROVED: 0, PENDING: 0, REJECTED: 0 };
+    const filtered = templates.filter(t => {
+      const status = t.status || 'PENDING'; // Default to PENDING if status is null/undefined
+      if (status === 'APPROVED') counts.APPROVED++;
+      else if (status === 'REJECTED') counts.REJECTED++;
+      else counts.PENDING++; // Includes PENDING, IN_APPEAL, etc.
+
+      if (filterStatus === 'ALL') return true;
+      return status === filterStatus;
+    });
+
+    return { filteredTemplates: filtered, statusCounts: counts };
+  }, [templates, filterStatus]);
+
+  // 🚀 NEW: Function to handle actions from the AI Assistant
+  const handleAiAction = (action, payload) => {
+    if (action === 'template_drafted' && payload) {
+      console.log("🤖 AI has drafted a template:", payload);
+      // Update the form state with the data received from the AI
+      setForm(prevForm => ({
+        ...prevForm, // Keep existing values like category, language
+        ...payload    // Overwrite with AI-generated values (name, body, headerText, buttons etc.)
+      }));
+
+      // 🚀 NEW: Handle AI-generated images
+      if (payload.headerType === 'IMAGE' && payload.headerMediaUrl) {
+        setHeaderMediaPreview(payload.headerMediaUrl);
+        setHeaderMediaFile(null); // Clear any manually selected file
+      }
+    }
+  };
   if (isBuilding) {
+    if (showMarketingWarning) {
+      alert("Warning: Your message seems promotional. Submitting it under the '" + form.category + "' category might lead to rejection by Meta. We recommend using the 'Marketing' category.");
+      setShowMarketingWarning(false); // Reset warning after showing it once
+    }
     return (
       <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans flex flex-col lg:flex-row gap-8">
         {/* LEFT SIDE: BUILDER FORM */}
@@ -163,7 +253,7 @@ export default function WhatsAppTemplates() {
                 ))}
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                {form.category === 'MARKETING' && "Promotions, offers, informative updates, or invitations."}
+                {form.category === 'MARKETING' && "Promotions, offers, or invitations to respond."}
                 {form.category === 'UTILITY' && "Order updates, account alerts, or post-purchase notifications."}
                 {form.category === 'AUTHENTICATION' && "One-time passwords (OTP) or security codes."}
               </p>
@@ -174,16 +264,18 @@ export default function WhatsAppTemplates() {
               <label className="block text-sm text-gray-400 mb-2">Header Type</label>
               <select value={form.headerType} onChange={e => setForm({...form, headerType: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none mb-3">
                 <option value="NONE">None</option>
-                <option value="TEXT">Text</option>
-                <option value="IMAGE">Image / Media</option>
+                <option value="TEXT">Text (Bold Title)</option>
+                <option value="IMAGE">Image</option>
+                <option value="VIDEO">Video</option>
+                <option value="DOCUMENT">Document (PDF)</option>
               </select>
 
               {form.headerType === 'TEXT' && (
                 <input type="text" value={form.headerText} onChange={e => setForm({...form, headerText: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none" placeholder="Bold short title (e.g. MEGA SALE!)" maxLength={60}/>
               )}
-              {form.headerType === 'IMAGE' && (
+              {(form.headerType === 'IMAGE' || form.headerType === 'VIDEO' || form.headerType === 'DOCUMENT') && (
               <div className="mt-2">
-                <input type="file" accept="image/*" onChange={handleImageChange} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-500/10 file:text-green-400 hover:file:bg-green-500/20" />
+                <input type="file" accept="image/*,video/*,application/pdf" onChange={handleImageChange} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-500/10 file:text-green-400 hover:file:bg-green-500/20" />
                 {headerMediaPreview && (
                   <div className="mt-3">
                     <p className="text-xs text-gray-500 mb-1">Selected Image Preview:</p>
@@ -210,6 +302,31 @@ export default function WhatsAppTemplates() {
               <input type="text" value={form.footerText} onChange={e => setForm({...form, footerText: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none" placeholder="Short grey text at the bottom" maxLength={60}/>
             </div>
 
+            {/* 🚀 NEW: Buttons Section */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Quick Reply Buttons (Optional)</label>
+              <div className="space-y-2">
+                {form.buttons.map((button, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      value={button.text}
+                      onChange={e => {
+                        const newButtons = [...form.buttons];
+                        newButtons[index].text = e.target.value;
+                        setForm({...form, buttons: newButtons});
+                      }}
+                      className="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg p-2 text-white focus:border-green-500 outline-none"
+                      placeholder={`Button ${index + 1} Text`}
+                      maxLength={25}
+                    />
+                    <button onClick={() => setForm({...form, buttons: form.buttons.filter((_, i) => i !== index)})} className="text-red-400 hover:text-red-300 text-xs font-bold bg-red-500/10 px-2 py-1 rounded">Remove</button>
+                  </div>
+                ))}
+              </div>
+              {form.buttons.length < 3 && <button onClick={() => setForm({...form, buttons: [...form.buttons, { text: '' }]})} className="text-xs mt-2 bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-green-400">+ Add Button</button>}
+            </div>
+
             <button onClick={handleSubmitToMeta} disabled={submitting} className="w-full py-4 mt-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold shadow-lg shadow-green-500/30 transition-all disabled:opacity-50">
               {submitting ? 'Submitting to Meta...' : 'Submit Template for Approval'}
             </button>
@@ -232,30 +349,46 @@ export default function WhatsAppTemplates() {
             <div className="flex-1 p-4 overflow-y-auto bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-cover">
               
               {/* The Message Bubble */}
-              <div className="bg-white text-gray-800 p-3 rounded-lg rounded-tl-none shadow-sm max-w-[90%] break-words">
+              <div className="bg-white text-gray-800 rounded-lg rounded-tl-none shadow-sm max-w-[90%] break-words">
                 {form.headerType === 'IMAGE' && (
-                <img src={headerMediaPreview || "https://developers.facebook.com/docs/whatsapp/images/thumb.png"} alt="Header" className="w-full h-32 object-cover rounded-t-md mb-2 bg-gray-200" />
+                  <img src={headerMediaPreview || "https://developers.facebook.com/docs/whatsapp/images/thumb.png"} alt="Header" className="w-full h-32 object-cover rounded-t-md mb-2 bg-gray-200" />
+                )}
+                {form.headerType === 'VIDEO' && (
+                  <div className="w-full h-32 bg-gray-800 rounded-t-md flex items-center justify-center text-white">VIDEO PREVIEW</div>
+                )}
+                {form.headerType === 'DOCUMENT' && (
+                  <div className="w-full h-32 bg-red-800 rounded-t-md flex items-center justify-center text-white">PDF/DOCUMENT PREVIEW</div>
                 )}
                 {form.headerType === 'TEXT' && form.headerText && (
                   <div className="font-bold text-[15px] mb-1">{form.headerText}</div>
                 )}
                 
-                <div className="text-[14.2px] whitespace-pre-wrap leading-snug">
+                <div className="text-[14.2px] whitespace-pre-wrap leading-snug p-3 pb-1">
                   {form.body ? formatPreviewText(form.body) : <span className="text-gray-400 italic">Start typing your message...</span>}
                 </div>
                 
                 {form.footerText && (
-                  <div className="text-[11px] text-gray-500 mt-2 uppercase tracking-wide">{form.footerText}</div>
+                  <div className="text-[11px] text-gray-500 mt-2 uppercase tracking-wide px-3">{form.footerText}</div>
                 )}
-                <div className="text-[10px] text-gray-400 text-right mt-1">12:00 PM</div>
+                <div className="text-[10px] text-gray-400 text-right mt-1 px-3 pb-1">12:00 PM</div>
               </div>
 
+              {/* 🚀 NEW: Buttons Preview */}
+              {form.buttons && form.buttons.length > 0 && (
+                <div className="mt-1 flex flex-col gap-1">
+                  {form.buttons.map((btn, i) => (
+                    <div key={i} className="bg-gray-100 text-center text-blue-600 font-medium py-2.5 rounded-lg shadow-sm w-[90%]">
+                      {btn.text || `Button ${i+1}`}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
       
       {/* 👇 AI Chatbot Widget (Naya Template Banate Time) 👇 */}
-      <DashboardAIAssistant />
+      <DashboardAIAssistant onAiAction={handleAiAction} />
       </div>
     );
   }
@@ -297,39 +430,70 @@ export default function WhatsAppTemplates() {
         </div>
       </div>
 
+      {/* 🚀 NEW: Status Filter Buttons */}
+      <div className="flex flex-wrap items-center gap-3 mb-6 border-b border-gray-800 pb-4">
+        {['ALL', 'APPROVED', 'PENDING', 'REJECTED'].map(status => {
+          const count = statusCounts[status] || 0;
+          const isActive = filterStatus === status;
+          let activeClasses = '';
+          if (isActive) {
+            if (status === 'APPROVED') activeClasses = 'bg-green-500/10 text-green-400 border-green-500/30';
+            else if (status === 'PENDING') activeClasses = 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+            else if (status === 'REJECTED') activeClasses = 'bg-red-500/10 text-red-400 border-red-500/30';
+            else activeClasses = 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+          }
+
+          return (
+            <button 
+              key={status} 
+              onClick={() => {
+                setFilterStatus(status);
+                navigate(`?status=${status.toLowerCase()}`); // Update URL on click
+              }} 
+              className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 border ${isActive ? activeClasses : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900 hover:border-gray-700'}`}>
+              <span>{status.charAt(0) + status.slice(1).toLowerCase()}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${isActive ? 'bg-black/20' : 'bg-gray-800'}`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Table Section */}
       <div className="bg-[#111111] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
         <table className="w-full text-left border-collapse whitespace-nowrap">
           <thead>
             <tr className="bg-[#1a1a1a] text-gray-400 border-b border-gray-800 text-sm uppercase tracking-wider">
-              <th className="p-5 font-semibold">Template Name</th>
-              <th className="p-5 font-semibold">Category</th>
-              <th className="p-5 font-semibold">Language</th>
-              <th className="p-5 font-semibold">Status</th>
-              <th className="p-5 font-semibold text-right">Actions</th>
+              <th className="p-4 font-semibold">Template Name</th>
+              <th className="p-4 font-semibold">Category</th>
+              <th className="p-4 font-semibold">Language</th>
+              <th className="p-4 font-semibold">Status</th>
+              <th className="p-4 font-semibold text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
             {loading ? (
-              <tr><td colSpan="4" className="text-center p-8 text-gray-500">Loading templates...</td></tr>
+              <tr><td colSpan="5" className="text-center p-8 text-gray-500">Loading templates...</td></tr>
             ) : (
-              templates.map(tpl => (
+              filteredTemplates.map(tpl => (
                 <tr key={tpl.id} className="hover:bg-gray-900/50 transition-colors">
-                  <td className="p-5 font-medium text-gray-200">{tpl.name}</td>
-                  <td className="p-5 text-gray-400">{tpl.category || 'MARKETING'}</td>
-                  <td className="p-5 text-gray-400">{tpl.language}</td>
-                  <td className="p-5">
+                  <td className="p-4 font-medium text-gray-200">{tpl.name}</td>
+                  <td className="p-4 text-gray-400">{tpl.category || 'MARKETING'}</td>
+                  <td className="p-4 text-gray-400">{tpl.language}</td>
+                  <td className="p-4">
                     <span className={`px-3 py-1 rounded-md text-xs font-bold tracking-wide ${getStatusBadge(tpl.status)}`}>
                       {tpl.status}
                     </span>
                   </td>
-                <td className="p-5 text-right">
+                <td className="p-4 text-right">
                   <button onClick={() => handleDelete(tpl.name)} className="text-red-400 hover:text-red-300 text-sm font-bold bg-red-500/10 px-3 py-1 rounded transition-colors">
                     Delete
                   </button>
                 </td>
                 </tr>
               ))
+            )}
+            {!loading && filteredTemplates.length === 0 && (
+              <tr><td colSpan="5" className="text-center p-8 text-gray-500">No templates found for this filter.</td></tr>
             )}
           </tbody>
         </table>

@@ -4,7 +4,7 @@ import { Bot, Send, ChevronDown, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Draggable from 'react-draggable'; // 🚀 NEW: Draggable component import
 
-const DashboardAIAssistant = () => {
+const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction prop
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'ai', content: "Hi! Main aapka DealClose AI Onboarding Assistant hu. Main aapka pura business setup, auto-replies, aur WhatsApp templates configure kar sakta hu. Kaha se shuru karein?" }
@@ -40,12 +40,18 @@ const DashboardAIAssistant = () => {
       if (data.success) {
         setMessages((prev) => [...prev, { role: 'ai', content: data.reply }]);
         // 🚀 NEW: Agar AI ne koi action liya hai, toh user ko batao
-        if (data.actionTaken) {
+        if (data.actionTaken && data.payload) {
           let toastMessage = 'AI has updated your settings!';
           if (data.actionTaken === 'profile_updated') toastMessage = 'AI has updated your business profile!';
           if (data.actionTaken === 'rules_updated') toastMessage = 'AI has learned your new rules!';
           if (data.actionTaken === 'flow_created') toastMessage = 'AI has built a new automation flow!';
+          if (data.actionTaken === 'template_drafted') toastMessage = 'AI has drafted the template for you!';
           
+          // 🚀 NEW: Call the callback function with the action and payload
+          if (onAiAction) {
+            onAiAction(data.actionTaken, data.payload);
+          }
+
           toast.success(toastMessage, { icon: '🤖' });
         }
       } else {

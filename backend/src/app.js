@@ -33,6 +33,7 @@ const inboundWebhookRoutes = require('./routes/inboundWebhookRoutes');
 const automarketerRoutes = require('./routes/automarketerRoutes'); // 🚀 NEW: Auto-Marketer
 const metaAdsRoutes = require('./routes/metaAdsRoutes'); // 🚀 NEW: Meta Ads
 
+const backupRoutes = require('./routes/backupRoutes'); // 🚀 NEW: Google Drive Backup
 const billingRoutes = require('./routes/billingRoutes'); // 🚀 NEW: Billing & Costing
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
@@ -88,6 +89,7 @@ app.use('/api/automarketer', automarketerRoutes); // 🚀 NEW: Auto-Marketer
 
 app.use('/api/meta-ads', metaAdsRoutes); // 🚀 NEW: Meta Ads
 app.use('/api/billing', billingRoutes); // 🚀 NEW: Billing & Costing
+app.use('/api/backup', backupRoutes); // 🚀 NEW: Google Drive Backup
 // 👇 YAHAN PAR HAI AAPKA IMAGE UPLOAD ROUTE 👇
 app.use('/api/upload', uploadRoutes);
 

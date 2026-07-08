@@ -9,11 +9,11 @@ import ReactFlow, {
   MarkerType,
   Handle,
   Position,
-  MiniMap,
+  MiniMap, 
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -56,7 +56,7 @@ const TriggerNode = ({ id, data }) => {
   );
 };
 
-const MessageNode = ({ id, data }) => {
+const MessageNode = ({ id, data, ...props }) => {
   const { setNodes, setEdges } = useReactFlow();
   const [templates, setTemplates] = useState([]);
   
@@ -67,29 +67,37 @@ const MessageNode = ({ id, data }) => {
     }).catch(e => console.error("Template fetch error:", e));
   }, []);
 
+  // 🚀 NEW: Check the platform from the node's data (passed down from the main component)
+  const isInstagram = props.data?.platform === 'instagram';
+
   return (
-    <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-blue-500 min-w-[280px] text-white relative group">
+    <div className={`bg-[#111] p-4 rounded-xl shadow-2xl border min-w-[280px] text-white relative group ${isInstagram ? 'border-pink-500' : 'border-blue-500'}`}>
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
       }} className="absolute top-2 right-2 text-gray-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
-      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-blue-500 border-none" />
-      <div className="font-bold mb-3 flex items-center gap-2 text-blue-400">💬 Send Message</div>
+      <Handle type="target" position={Position.Top} className={`w-3 h-3 border-none ${isInstagram ? 'bg-pink-500' : 'bg-blue-500'}`} />
+      <div className={`font-bold mb-3 flex items-center gap-2 ${isInstagram ? 'text-pink-400' : 'text-blue-400'}`}>
+        {isInstagram ? <Camera size={16}/> : <MessageSquare size={16}/>} Send Message
+      </div>
       <div className="space-y-3">
-        <div>
+        {/* 🚀 NEW: Show Template selector only for WhatsApp */}
+        {!isInstagram && (
+          <div>
           <p className="text-xs text-gray-400 mb-1">Select Meta Template</p>
-          <select defaultValue={data?.template || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, template: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500">
+            <select defaultValue={data?.template || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, template: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500">
             <option value="">-- Choose Template --</option>
             {templates.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
             <option value="custom">Create Custom Reply...</option>
           </select>
-        </div>
+          </div>
+        )}
         <div>
-          <p className="text-xs text-gray-400 mb-1">Or Type Custom Text</p>
-          <textarea defaultValue={data?.message || data?.label || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, message: e.target.value } } : n)))} className="nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white focus:border-blue-500 placeholder-gray-600" rows="2" placeholder="Hi there! How can we help?"></textarea>
+          <p className="text-xs text-gray-400 mb-1">{isInstagram ? 'Message Text' : 'Or Type Custom Text'}</p>
+          <textarea defaultValue={data?.message || data?.label || ""} onChange={(e) => setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, message: e.target.value } } : n)))} className={`nodrag nopan w-full bg-[#1a1a1a] border border-gray-700 rounded p-2 text-sm outline-none text-white placeholder-gray-600 ${isInstagram ? 'focus:border-pink-500' : 'focus:border-blue-500'}`} rows="2" placeholder="Hi there! How can we help?"></textarea>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-blue-500 border-none" />
+      <Handle type="source" position={Position.Bottom} className={`w-3 h-3 border-none ${isInstagram ? 'bg-pink-500' : 'bg-blue-500'}`} />
     </div>
   );
 };
@@ -297,6 +305,7 @@ export default function FlowBuilder() {
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('main');
   const [mainBusinessName, setMainBusinessName] = useState('DealClose AI (Main)');
+  const [platform, setPlatform] = useState('whatsapp'); // 🚀 NEW: State for platform
   const [flowName, setFlowName] = useState('');
   
   // 🚀 NEW: Flow List Modal States
@@ -390,12 +399,12 @@ export default function FlowBuilder() {
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowWrapper.current.getBoundingClientRect().left,
         y: event.clientY - reactFlowWrapper.current.getBoundingClientRect().top,
-      });
+      }); 
       
       const newNode = {
         id: getId(),
         type,
-        position,
+        position, 
         data: { label },
       };
 
@@ -416,11 +425,11 @@ export default function FlowBuilder() {
     const newNode = {
       id: getId(),
       type,
-      position: { x: 300 + Math.random() * 50, y: 150 + Math.random() * 50 },
+      position: { x: 300 + Math.random() * 50, y: 150 + Math.random() * 50 }, 
       data: { label },
     };
     setNodes((nds) => nds.concat(newNode));
-  }, [setNodes]);
+  }, [setNodes]); 
 
   // 🚀 NEW: Handle AI Prompt to Auto-Generate Flow
   const handleAiSubmit = async (e) => {
@@ -434,7 +443,7 @@ export default function FlowBuilder() {
 
     try {
       // 🚀 NEW: Add canvas state and chat history to the prompt so AI remembers context
-      const simplifyNodes = nodes.map(n => ({ id: n.id, type: n.type, data: n.data, position: n.position }));
+      const simplifyNodes = nodes.map(n => ({ id: n.id, type: n.type, data: { ...n.data, platform }, position: n.position }));
       const simplifyEdges = edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle }));
       const recentChat = aiMessages.slice(-6).map(m => `${m.role === 'ai' ? 'AI' : 'User'}: ${m.content}`).join('\n');
       
@@ -442,7 +451,7 @@ export default function FlowBuilder() {
 
       // Pass the selected business name to the backend explicitly
       const activeBizName = selectedWorkspace === 'main' ? mainBusinessName : workspaces.find(w => w._id === selectedWorkspace)?.name || mainBusinessName;
-      const res = await api.post('/ai/generate-flow', { prompt: enrichedPrompt, businessName: activeBizName });
+      const res = await api.post('/ai/generate-flow', { prompt: enrichedPrompt, businessName: activeBizName, platform });
       if (res.data.nodes && res.data.edges) {
         if (res.data.nodes.length > 0) {
           setNodes(res.data.nodes);
@@ -473,8 +482,8 @@ export default function FlowBuilder() {
       const flowData = reactFlowInstance.toObject();
         console.log("➡️ [DEBUG] Extracted Flow Data:", flowData);
         const finalName = flowName.trim() === '' ? `Flow-${Math.floor(Math.random() * 1000)}` : flowName;
-        console.log(`➡️ [DEBUG] Sending POST request to /whatsapp/flows...`);
-        const response = await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace });
+        console.log(`➡️ [DEBUG] Sending POST request to /whatsapp/flows... with platform: ${platform}`);
+        const response = await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace, platform });
         console.log("✅ [DEBUG] Save Response from Server:", response.data);
       toast.success(`🎉 Success! Flow "${finalName}" has been created & saved. You can find it inside the 'My Flows' 📂 folder.`, { duration: 6000 });
       } catch (error) {
@@ -489,8 +498,9 @@ export default function FlowBuilder() {
   // 🚀 NEW: Fetch and Load Flows Logic
   const fetchSavedFlows = async () => {
     try {
-      const res = await api.get('/whatsapp/flows');
-      setSavedFlows(res.data.data || []);
+      // Fetch all flows and filter on the frontend by platform
+      const res = await api.get('/whatsapp/flows'); 
+      setSavedFlows((res.data.data || []).filter(f => f.platform === platform));
     } catch (err) {
       console.error("Fetch flows error:", err);
       toast.error("Failed to fetch flows.");
@@ -502,6 +512,7 @@ export default function FlowBuilder() {
       setNodes(flow.flowData.nodes || []);
       setEdges(flow.flowData.edges || []);
       setFlowName(flow.name);
+      setPlatform(flow.platform || 'whatsapp');
       setSelectedWorkspace(flow.workspaceId || 'main');
       setIsFlowListOpen(false);
       toast.success(`Loaded Flow: ${flow.name}`);
@@ -607,6 +618,10 @@ export default function FlowBuilder() {
                   <div>
                     <h3 className="font-bold text-white text-lg">{flow.name}</h3>
                     <p className="text-xs text-gray-400">Workspace: {flow.workspaceId === 'main' ? 'Main Business' : workspaces.find(w => w._id === flow.workspaceId)?.name || flow.workspaceId}</p>
+                    {/* 🚀 NEW: Show platform badge */}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded mt-2 inline-block ${flow.platform === 'instagram' ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
+                      {flow.platform === 'instagram' ? 'Instagram' : 'WhatsApp'}
+                    </span>
                   </div>
                   <button onClick={() => loadFlow(flow)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors">
                     Load Flow
@@ -693,6 +708,12 @@ export default function FlowBuilder() {
               <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
             ))}
           </select>
+
+          {/* 🚀 NEW: Platform Selector */}
+          <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 cursor-pointer shadow-lg font-bold">
+            <option value="whatsapp">🟩 WhatsApp</option>
+            <option value="instagram">🟪 Instagram</option>
+          </select>
           
           {/* 🚀 NEW: My Flows Button */}
           <button onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
@@ -762,7 +783,7 @@ export default function FlowBuilder() {
             onInit={setReactFlowInstance} 
             onDrop={onDrop} 
             onDragOver={onDragOver} 
-            nodeTypes={nodeTypes}
+            nodeTypes={nodeTypes} 
             fitView 
           >
             <Background color="#333" gap={16} size={1} />

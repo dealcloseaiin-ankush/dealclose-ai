@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const flowSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  platform: { type: String, enum: ['whatsapp', 'instagram'], default: 'whatsapp' }, // 🚀 NEW: Platform field
   workspaceId: { type: String, default: 'main' },
   name: { type: String, required: true },
   flowData: { type: Object, required: true }, // Contains nodes and edges from ReactFlow
