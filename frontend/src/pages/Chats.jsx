@@ -28,9 +28,13 @@ export default function Chats() {
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef(null);
 
+  // 🚀 FIX: Real useRef (persists across renders, doesn't retrigger effects)
+  const allMessagesRef = useRef([]);
+
   useEffect(() => {
     let isFirstLoad = true;
-    
+    let isMounted = true;
+
     const playNotificationSound = () => {
       try {
         const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
@@ -44,15 +48,17 @@ export default function Chats() {
       if (isFirstLoad) setLoading(true);
       try {
         if (isFirstLoad) {
-          const profileRes = await api.get('/users/profile').catch(() => null);
+          const profileRes = await api.get('/users/profile').catch(() => null); // 🚀 NEW: Fetch profile to get workspaces
           const u = profileRes?.data?.user || profileRes?.data;
-          if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
+          if (u && isMounted) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
         }
 
         const { data } = await api.get('/chats');
         const messages = Array.isArray(data) ? data : data.data || [];
-        
-        // 🚀 FIX: Real-time update logic
+
+        if (!isMounted) return;
+
+        // 🚀 FIX: Compare against ref (always fresh, never stale, never causes re-run)
         const currentMessages = allMessagesRef.current;
         if (!isFirstLoad && messages.length > currentMessages.length) {
           const existingIds = new Set(currentMessages.map(m => m._id));
@@ -61,9 +67,9 @@ export default function Chats() {
             playNotificationSound();
           }
         }
-        
+
         setAllMessages(messages);
-        allMessagesRef.current = messages; // Update ref for next comparison
+        allMessagesRef.current = messages; // keep ref in sync with latest fetched data
 
       } catch (error) {
         console.error("Failed to fetch chats", error);
@@ -76,12 +82,13 @@ export default function Chats() {
     };
     
     fetchChats();
-    const intervalId = setInterval(fetchChats, 4000); // 🚀 Auto-refresh data every 4 seconds silently
-    
-    // 🚀 FIX: Use a ref to store messages for comparison inside interval
-    const allMessagesRef = { current: allMessages };
-    return () => clearInterval(intervalId);
-  }, [allMessages]);
+    const intervalId = setInterval(fetchChats, 4000); // 🚀 Auto-refresh silently every 4 seconds
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []); // 🚀 FIX: empty deps — runs once on mount. No more restart/blink on every message change
 
   // 🔥 Filter messages by selected Workspace
   const filteredMessages = useMemo(() => {
@@ -92,7 +99,6 @@ export default function Chats() {
       const matchesPlatform = platformFilter === 'all' || msg.platform === platformFilter;
       return matchesWorkspace && matchesPlatform;
     });
-    console.log(`➡️ [Chats Debug] Messages after Workspace/Platform Filter: ${filtered.length}`);
     return filtered;
   }, [allMessages, activeWorkspace, platformFilter]);
 
@@ -147,7 +153,7 @@ export default function Chats() {
            }
         }
       }
-      // 🚀 FIX: Show blue dot for all unreplied messages permanently, regardless of 24h window
+      // Show blue dot for all unreplied messages permanently, regardless of 24h window
       return { ...data, windowOpen, timeLeft, needsReply: data.lastMessage.direction === 'incoming' };
     }).sort((a, b) => {
        // SAFE NUMERIC SORTING (Ignores NaNs)
@@ -155,8 +161,6 @@ export default function Chats() {
        const dateB = new Date(b.lastMessage.timestamp || b.lastMessage.createdAt || 0).getTime();
        return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
     });
-    
-    console.log(`➡️ [Chats Debug] Sidebar Final Customers Built: ${finalDetails.length}`);
     
     // Search Filter Logic
     if (searchTerm.trim()) {
@@ -177,14 +181,14 @@ export default function Chats() {
     }
   }, [customerDetails, activeCustomer]);
 
-  // 🚀 FIX #3: CHAT SORTING ASCENDING
+  // Chat sorting ascending (oldest to newest)
   const activeChatMessages = useMemo(() => {
     return filteredMessages
       .filter(m => m.customerPhone === activeCustomer)
       .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
   }, [filteredMessages, activeCustomer]);
 
-  // 🚀 FIX #4: AUTO SCROLL ON NEW MESSAGE
+  // Auto scroll on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChatMessages]);
@@ -200,7 +204,11 @@ export default function Chats() {
     const isExisting = allMessages.some(m => m.customerPhone === validPhone);
     if (!isExisting) {
       const initMsg = { _id: Date.now(), customerPhone: validPhone, direction: 'system', messageText: `Chat started with ${newChatName || validPhone} (Source: ${newChatSource})`, sentBy: 'system', timestamp: new Date().toISOString() };
-      setAllMessages(prev => [initMsg, ...prev]);
+      setAllMessages(prev => {
+        const updated = [initMsg, ...prev];
+        allMessagesRef.current = updated; // 🚀 keep ref in sync
+        return updated;
+      });
     }
     
     setIsModalOpen(false);
@@ -228,13 +236,15 @@ export default function Chats() {
     };
 
     // Optimistic UI update
-    setAllMessages(prev => [...prev, newMessage]);
-    // 🚀 NEW: Clear reply-to and input box
+    setAllMessages(prev => {
+      const updated = [...prev, newMessage];
+      allMessagesRef.current = updated; // 🚀 keep ref in sync so next poll doesn't think this is "new"
+      return updated;
+    });
     setReplyText("");
     setReplyingTo(null);
 
     try {
-      // 🚀 NEW: Add repliedToMessageId to payload if it exists
       const payload = { 
         customerPhone: activeCustomer, 
         messageText: replyText,
@@ -244,22 +254,34 @@ export default function Chats() {
       
       // Update optimistic message with real DB ID from backend
       if (res.data?.message) {
-        setAllMessages(prev => prev.map(m => m._id === newMessage._id ? res.data.message : m));
+        setAllMessages(prev => {
+          const updated = prev.map(m => m._id === newMessage._id ? res.data.message : m);
+          allMessagesRef.current = updated; // 🚀 keep ref in sync
+          return updated;
+        });
       }
     } catch (error) {
       console.error("Failed to send message", error);
       toast.error(error.response?.data?.message || "Failed to send message");
       // Remove the optimistic message if API fails
-      setAllMessages(prev => prev.filter(m => m._id !== newMessage._id));
+      setAllMessages(prev => {
+        const updated = prev.filter(m => m._id !== newMessage._id);
+        allMessagesRef.current = updated; // 🚀 keep ref in sync
+        return updated;
+      });
     }
   };
 
-  // 🚀 NEW: Function to delete a single message
+  // Delete a single message
   const deleteMessage = async (messageId) => {
     if (!window.confirm("Are you sure you want to delete this message? This cannot be undone.")) return;
 
     // Optimistic UI update
-    setAllMessages(prev => prev.filter(m => m._id !== messageId));
+    setAllMessages(prev => {
+      const updated = prev.filter(m => m._id !== messageId);
+      allMessagesRef.current = updated; // 🚀 keep ref in sync
+      return updated;
+    });
 
     try {
       await api.delete(`/chats/${messageId}`);
@@ -268,11 +290,13 @@ export default function Chats() {
       toast.error("Failed to delete message.");
       // Re-fetch to revert UI state on failure
       const { data } = await api.get('/chats');
-      setAllMessages(Array.isArray(data) ? data : data.data || []);
+      const messages = Array.isArray(data) ? data : data.data || [];
+      setAllMessages(messages);
+      allMessagesRef.current = messages; // 🚀 keep ref in sync
     }
   };
 
-  // 🚀 NEW: Function to send current location
+  // Send current location
   const sendLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(pos => {
@@ -281,14 +305,14 @@ export default function Chats() {
     } else { toast.error("Geolocation is not supported by this browser."); }
   };
 
-  // 🚀 Helper to format Time (e.g., 10:30 AM)
+  // Format Time (e.g., 10:30 AM)
   const formatTime = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // 🚀 Helper to format Date Badge (e.g., Today, Yesterday, 12 Oct 2023)
+  // Format Date Badge (e.g., Today, Yesterday, 12 Oct 2023)
   const formatDateBadge = (isoString) => {
     if (!isoString) return '';
     const date = new Date(isoString);
@@ -300,7 +324,7 @@ export default function Chats() {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  // 🚀 Helper to format Sender Badges
+  // Format Sender Badges
   const formatSender = (sentBy, direction) => {
     if (sentBy === 'ai') return '🤖 AI Agent';
     if (sentBy === 'auto-reply') return '⚡ Bot / Flow';
@@ -311,7 +335,7 @@ export default function Chats() {
     return sentBy || 'Unknown';
   };
   
-  // 🚀 NEW: WHATSAPP STYLE MESSAGE STATUS
+  // WhatsApp style message status
   const getMessageStatusIcon = (status) => {
     switch(status) {
       case 'sent': return <Check size={12} className="text-gray-400" />;
@@ -322,7 +346,6 @@ export default function Chats() {
     }
   };
 
-  // 🚀 CLEAN CODE: Moving logic out of JSX to prevent Vercel/Rollup Build Crashes
   const activeCustomerData = customerDetails?.find(c => c.phone === activeCustomer) || null;
   const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
 
