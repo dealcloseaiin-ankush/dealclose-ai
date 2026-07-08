@@ -270,17 +270,16 @@ exports.handleWhatsApp = async (req, res) => {
             let responseMessage = null;
             let repliedBy = 'ai';
 
+            // 🛠️ BUG FIX: guard s.phone before calling .replace — a staff entry saved without
+            // a phone number would throw "Cannot read properties of undefined" and crash this
+            // whole webhook request (no reply would ever be sent to the customer).
             const isOwnerOrStaff = (user.ownerPhone && user.ownerPhone.replace(/\D/g,'') === fromNumber) || (user.staff && user.staff.some(s => s.phone && s.phone.replace(/\D/g,'') === fromNumber));
             
             // ==========================================================
             // 🚀 NEW: AUTO-MARKETER APPROVAL LOGIC (For Business Owner)
             // ==========================================================
             const incomingTextUpper = incomingText.toUpperCase();
-            if (isOwnerOrStaff) {
-              // 🚀 FIX: Save owner's message first, then process special commands or AI reply, then STOP.
-              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'staff', expiresAt: getMessageExpiry(user, 'whatsapp') });
-
-              if (incomingTextUpper.startsWith('APPROVE ')) {
+            if (isOwnerOrStaff && incomingTextUpper.startsWith('APPROVE ')) {
               const postIdShort = incomingTextUpper.split(' ')[1];
               
               if (postIdShort && postIdShort.length === 6) {
@@ -291,6 +290,7 @@ exports.handleWhatsApp = async (req, res) => {
 
                 if (postToApprove) {
                   try {
+                    // Handle Model naming variations (instagramConfig vs 
                     const igSettings = user.instagramConfig || user.igConfig || {};
                     const igAccountId = igSettings.instagramAccountId || igSettings.accountId;
                     
@@ -317,15 +317,17 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               }
             }
+
+            if (isOwnerOrStaff) {
               const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
               console.log(`✅ [DEBUG] Owner/Staff message detected. Sending AI Admin reply.`);
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Admin:*\n\n${aiAdminResponse}`);
-              continue; // 🚀 FIX: Stop processing here to prevent owner messages from triggering customer flows.
+              // 🐛 FIX: Removed 'continue' to allow owner messages to be saved in the chat history.
+              // The 'continue' was preventing the Message.create() call below from running for owner/staff.
             }
 
             console.log(`💾 [DEBUG] Saving incoming message to database...`);
-            // 🚀 FIX: This now only runs for customers, as owner/staff messages are handled above.
             const incomingMsg = await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
             console.log(`✅ [DEBUG] Message saved with ID: ${incomingMsg._id}`);
 

@@ -554,8 +554,11 @@ export default function Chats() {
                     )}
                     <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`group p-4 max-w-sm rounded-2xl relative ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
-                        {/* 🚀 NEW: Reply and Delete buttons on hover */}
-                        <div className="absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/20 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity -left-20">
+                        {/* 🚀 FIX: Reply and Delete buttons on hover */}
+                        <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/20 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${
+                          msg.direction === 'outgoing' ? '-left-20' : '-right-20'
+                        }`}
+                        >
                           <button onClick={() => setReplyingTo(msg)} className="text-gray-300 hover:text-white p-1.5 rounded hover:bg-gray-700" title="Reply"><CornerDownLeft size={14}/></button>
                           <button onClick={() => deleteMessage(msg._id)} className="text-gray-300 hover:text-rose-400 p-1.5 rounded hover:bg-gray-700" title="Delete"><Trash2 size={14}/></button>
                         </div>
