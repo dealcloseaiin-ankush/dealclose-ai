@@ -1,20 +1,8 @@
 {
-  "dependencies": {
-    "@deepgram/sdk": "3.9.0",
-    "@google/generative-ai": "^0.24.1",
-    "apify-client": "^2.23.1",
-    "axios": "^1.15.2",
-    "bullmq": "^5.76.1",
-    "canvas": "^3.2.3",
-    "node-cron": "^3.0.3",
-    "express-rate-limit": "^7.5.1",
-    "ioredis": "^5.10.1",
-    "openai": "^6.34.0",
-    "razorpay": "^2.9.6",
-    "tesseract.js": "^7.0.0",
-    "twilio": "^6.0.0"
-  },
   "scripts": {
     "start": "node backend/src/server.js"
+  },
+  "dependencies": {
+    "node-cron": "^3.0.3"
   }
 }
