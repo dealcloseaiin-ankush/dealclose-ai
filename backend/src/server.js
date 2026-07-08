@@ -8,9 +8,10 @@ if (!process.env.OPENAI_API_KEY) {
 // Firebase ko temporarily comment kar diya hai taaki server bina error start ho sake
 // require('./config/firebase'); 
 const mongoose = require('mongoose');
+const path = require('path');
 
 // 🚀 NEW: Schedule background jobs like trash cleanup
-require('../../jobs/trashCleanup'); // Cron job ko start karne ke liye
+require(path.join(__dirname, '..', '..', 'jobs', 'trashCleanup.js')); // Cron job ko start karne ke liye
 const app = require('./app');
 const http = require('http');
 const WebSocket = require('ws');
