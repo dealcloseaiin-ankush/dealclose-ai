@@ -64,7 +64,13 @@ exports.handleWhatsApp = async (req, res) => {
         }
 
         const phoneNumberId = value.metadata.phone_number_id;
-        const user = await User.findOne({ "whatsappConfig.phoneNumberId": phoneNumberId });
+        // 🚀 FIX: Search for user in both the main config and inside workspaces
+        const user = await User.findOne({
+          $or: [
+            { "whatsappConfig.phoneNumberId": phoneNumberId },
+            { "workspaces.whatsappConfig.phoneNumberId": phoneNumberId }
+          ]
+        });
         
         if (!user) {
           console.error(`❌ [Webhook Error] No user found with phoneNumberId: ${phoneNumberId}`);
