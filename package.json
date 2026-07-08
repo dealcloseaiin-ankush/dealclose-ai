@@ -6,6 +6,7 @@
     "axios": "^1.15.2",
     "bullmq": "^5.76.1",
     "canvas": "^3.2.3",
+    "node-cron": "^3.0.3",
     "express-rate-limit": "^7.5.1",
     "ioredis": "^5.10.1",
     "openai": "^6.34.0",
