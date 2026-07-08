@@ -1,7 +1,6 @@
 const cron = require('node-cron');
-const path = require('path');
 // 🚀 FIX: Corrected the relative path to the leadModel file from the root jobs folder. This now correctly points to the backend source.
-const Lead = require(path.join(__dirname, '..', 'src', 'models', 'leadModel.js'));
+const Lead = require('../src/models/leadModel');
 
 const cleanupOldTrash = async () => {
   // Find leads that were soft-deleted more than 90 days ago
