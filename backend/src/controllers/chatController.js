@@ -195,6 +195,16 @@ exports.sendManualMessage = async (req, res) => {
         console.error(`❌ [DEBUG Chat Flow] Error sending IG DM:`, igError.response?.data || igError.message);
       }
 
+      // 🚀 NEW: Broadcast the new message to all connected chat dashboards
+      const wssChat = req.app.get('wssChat');
+      if (wssChat) {
+        wssChat.clients.forEach(client => {
+          if (client.readyState === require('ws').OPEN) {
+            client.send(JSON.stringify({ type: 'NEW_MESSAGE', payload: newMsg }));
+          }
+        });
+      }
+
       return res.status(201).json({ message: newMsg });
     }
 
@@ -280,6 +290,15 @@ exports.sendManualMessage = async (req, res) => {
       
       console.log(`✅ [DEBUG Chat Flow] 7. SUCCESS! Meta API accepted the message for ${formattedPhone}`);
       
+      // 🚀 NEW: Broadcast the new message to all connected chat dashboards
+      const wssChat = req.app.get('wssChat');
+      if (wssChat) {
+        wssChat.clients.forEach(client => {
+          if (client.readyState === require('ws').OPEN) {
+            client.send(JSON.stringify({ type: 'NEW_MESSAGE', payload: newMsg }));
+          }
+        });
+      }
       return res.status(201).json({ message: newMsg });
     } catch (metaError) {
       // Agar Meta ne reject kiya, toh exact error chat me likh do aur status 'failed' kardo
@@ -290,6 +309,16 @@ exports.sendManualMessage = async (req, res) => {
       console.error(`❌ [DEBUG Chat Flow] 7. ERROR: Meta API Rejected the message. Reason: ${exactError}`);
       if (exactError.includes('24 hours') || exactError.includes('131047')) {
         console.error(`🚨 [CRITICAL]: Meta blocked the message! The customer ${formattedPhone} MUST message you first to open the 24-hour session. Sending a message from Dashboard does NOT open the window!`);
+      }
+
+      // 🚀 NEW: Broadcast the FAILED message to all connected chat dashboards
+      const wssChat = req.app.get('wssChat');
+      if (wssChat) {
+        wssChat.clients.forEach(client => {
+          if (client.readyState === require('ws').OPEN) {
+            client.send(JSON.stringify({ type: 'NEW_MESSAGE', payload: newMsg }));
+          }
+        });
       }
       // Return 201 instead of 500 so the frontend adds the "failed" message to the UI seamlessly
       return res.status(201).json({ message: newMsg });

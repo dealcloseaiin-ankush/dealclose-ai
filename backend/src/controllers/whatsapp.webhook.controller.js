@@ -325,11 +325,26 @@ exports.handleWhatsApp = async (req, res) => {
             if (isOwnerOrStaff) {
               const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
+              console.log(`✅ [DEBUG] Owner/Staff message detected. Sending AI Admin reply.`);
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Admin:*\n\n${aiAdminResponse}`);
-              continue; 
+              // 🐛 FIX: Removed 'continue' to allow owner messages to be saved in the chat history.
+              // The 'continue' was preventing the Message.create() call below from running for owner/staff.
             }
 
-            await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            console.log(`💾 [DEBUG] Saving incoming message to database...`);
+            const incomingMsg = await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            console.log(`✅ [DEBUG] Message saved with ID: ${incomingMsg._id}`);
+
+            // 🚀 NEW: Broadcast the incoming message to all connected chat dashboards
+            const wssChat = req.app.get('wssChat');
+            if (wssChat) {
+              wssChat.clients.forEach(client => {
+                if (client.readyState === require('ws').OPEN) {
+                  client.send(JSON.stringify({ type: 'NEW_MESSAGE', payload: incomingMsg }));
+                  console.log(`📡 [DEBUG] Broadcasting new message via WebSocket to a connected client.`);
+                }
+              });
+            }
             
             // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
             const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });

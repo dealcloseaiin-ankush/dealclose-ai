@@ -35,6 +35,7 @@ const server = http.createServer(app);
 // 🚀 MULTI-WEBSOCKET SETUP: Twilio Calling & Mobile/Web App Calling
 const wssTwilio = new WebSocket.Server({ noServer: true });
 const wssMobile = new WebSocket.Server({ noServer: true });
+const wssChat = new WebSocket.Server({ noServer: true }); // 🚀 NEW: For Live Chat Updates
 
 wssTwilio.on('connection', (ws) => {
   console.log('🔗 [WebSocket] Twilio Stream Connection established');
@@ -51,6 +52,13 @@ wssMobile.on('connection', (ws) => {
   }
 });
 
+wssChat.on('connection', (ws) => {
+  console.log('💬 [WebSocket] Chat Dashboard Connection established');
+  // Is connection ko zinda rakho taaki server isse message bhej sake
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+});
+
 server.on('upgrade', (request, socket, head) => {
   // Safely parse URL to ignore query parameters that might break routing
   let pathname = request.url.split('?')[0];
@@ -62,11 +70,24 @@ server.on('upgrade', (request, socket, head) => {
     wssTwilio.handleUpgrade(request, socket, head, (ws) => wssTwilio.emit('connection', ws, request));
   } else if (pathname === '/api/webhooks/mobile/stream') {
     wssMobile.handleUpgrade(request, socket, head, (ws) => wssMobile.emit('connection', ws, request));
+  } else if (pathname === '/api/chat/stream') { // 🚀 NEW: Chat WebSocket Route
+    wssChat.handleUpgrade(request, socket, head, (ws) => wssChat.emit('connection', ws, request));
   } else {
     console.log(`❌ [WebSocket] Route not found, destroying socket: ${pathname}`);
     socket.destroy();
   }
 });
+
+// 🚀 NEW: WebSocket Health Check (Connection ko zinda rakhne ke liye)
+setInterval(() => {
+  wssChat.clients.forEach((ws) => {
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping(null, false, true);
+  });
+}, 30000);
+
+app.set('wssChat', wssChat); // 🚀 NEW: Make wssChat available in controllers
 
 // Pehle server start kar dete hain taaki Render "No open ports" ka error na de
 server.listen(port, '0.0.0.0', () => {
