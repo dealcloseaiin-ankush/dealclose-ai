@@ -13,5 +13,8 @@
     "razorpay": "^2.9.6",
     "tesseract.js": "^7.0.0",
     "twilio": "^6.0.0"
+  },
+  "scripts": {
+    "start": "node backend/src/server.js"
   }
 }
