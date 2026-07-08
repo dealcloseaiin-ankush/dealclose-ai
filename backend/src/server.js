@@ -10,7 +10,7 @@ if (!process.env.OPENAI_API_KEY) {
 const mongoose = require('mongoose');
 
 // 🚀 NEW: Schedule background jobs like trash cleanup
-require('../jobs/trashCleanup'); // Cron job ko start karne ke liye
+require('../../jobs/trashCleanup'); // Cron job ko start karne ke liye
 const app = require('./app');
 const http = require('http');
 const WebSocket = require('ws');
