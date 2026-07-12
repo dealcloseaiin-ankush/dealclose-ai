@@ -32,7 +32,7 @@ const PricingSection = () => {
       priceAnnual: "₹399",
       features: [
         "1000 AI Chat Replies included",
-        "GPT-4o Mini & Gemini 2.5 Pro",
+        "GPT-4o Mini & Gemini 3.1 / 2.5 Light", // 🚀 NEW: Updated to current cost-effective models
         "Auto-Menu & Fast Reply Mode",
         "Fair Usage Cost Protection",
         "Smart Lead Extraction",

@@ -3,7 +3,7 @@ const visionService = require('../modules/scaniq/vision.service');
 // In-memory DB for polling endpoints (screenshot uploads)
 const activeScans = {};
 
-// @desc    Search live Google/Meta ads and compare using Gemini AI
+// @desc    Search live Google/Meta ads and compare using low-cost AI chain
 // @route   POST /api/scaniq/search
 exports.searchAndCompare = async (req, res) => {
   console.log(`\n======================================================`);
@@ -16,11 +16,15 @@ exports.searchAndCompare = async (req, res) => {
     console.log(`🔗 Competitor/User URL: "${userAdUrl || 'Not provided'}"`);
     
     console.log(`\n🛠️  [DEBUG] Checking API Keys...`);
-    if (!process.env.GEMINI_API_KEY) {
-      console.log(`❌ GEMINI_API_KEY is MISSING in backend .env!`);
-      return res.status(400).json({ success: false, message: "GEMINI_API_KEY missing in .env" });
+    
+    const hasGemini = !!process.env.GEMINI_API_KEY;
+    const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
+
+    if (!hasGemini && !hasOpenAI) {
+      console.log(`❌ AI API Keys are MISSING in backend .env!`);
+      return res.status(400).json({ success: false, message: "AI API Keys missing in .env" });
     } else {
-      console.log(`✅ GEMINI_API_KEY is Present!`);
+      console.log(`✅ AI Engine Keys verified!`);
     }
 
     if (!process.env.SERP_API_KEY) {
@@ -30,12 +34,12 @@ exports.searchAndCompare = async (req, res) => {
       console.log(`✅ SERP_API_KEY is Present!`);
     }
 
-    console.log(`\n⏳ [DEBUG] Fetching Live Data (Google) & Passing to Gemini AI...`);
+    console.log(`\n⏳ [DEBUG] Fetching Live Data (Google) & Passing to High-Availability AI...`);
     
-    // Ye function aapke 'vision.service.js' ko call karega jahan Gemini aur SerpApi ka logic hai
+    // This calls your updated 'vision.service.js' with the multi-model fallback engine
     const analysis = await visionService.searchAndCompareAd(query, userAdUrl);
     
-    console.log(`✅ [DEBUG] Gemini AI successfully analyzed the data!`);
+    console.log(`✅ [DEBUG] AI successfully analyzed the data!`);
     console.log(`📊 AI Viral Score Generated: ${analysis.viralScore}`);
     
     res.status(200).json({ success: true, analysis });

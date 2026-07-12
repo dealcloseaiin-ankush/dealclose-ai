@@ -227,7 +227,6 @@ exports.instagramDisconnect = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to disconnect Instagram' });
   }
 };
-
 // @desc    Disconnect WhatsApp from Settings
 // @route   POST /api/settings/whatsapp-disconnect
 exports.whatsappDisconnect = async (req, res) => {
@@ -237,6 +236,31 @@ exports.whatsappDisconnect = async (req, res) => {
 
     const { workspaceId } = req.body || {};
 
+    // 🚀 STEP 1: Meta ko batao ki is number ki messaging band kar do (before local cleanup)
+    const userDoc = await User.findById(userId).lean();
+    let targetConfig = null;
+
+    if (workspaceId && workspaceId !== 'main') {
+      const ws = userDoc.workspaces?.find(w => w._id.toString() === workspaceId);
+      targetConfig = ws?.whatsappConfig;
+    } else {
+      targetConfig = userDoc.whatsappConfig;
+    }
+
+    if (targetConfig?.accessToken && targetConfig?.phoneNumberId) {
+      try {
+        await axios.post(
+          `https://graph.facebook.com/v19.0/${targetConfig.phoneNumberId}/deregister`,
+          {},
+          { headers: { Authorization: `Bearer ${targetConfig.accessToken}` } }
+        );
+        console.log(`✅ [Meta Deregister] Success for Phone ID: ${targetConfig.phoneNumberId}`);
+      } catch (deregErr) {
+        console.log('⚠️ [Meta Deregister] Warning (continuing with local cleanup):', deregErr.response?.data || deregErr.message);
+      }
+    }
+
+    // 🚀 STEP 2: Local DB cleanup (jo pehle se tha)
     if (workspaceId && workspaceId !== 'main') {
       await User.updateOne(
         { _id: userId, "workspaces._id": workspaceId },
