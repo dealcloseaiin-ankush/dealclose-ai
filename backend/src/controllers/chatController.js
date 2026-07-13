@@ -313,7 +313,7 @@ exports.sendManualMessage = async (req, res) => {
       
       console.error(`❌ [DEBUG Chat Flow] 7. ERROR: Meta API Rejected the message. Reason: ${exactError}`);
       if (exactError.includes('24 hours') || exactError.includes('131047')) {
-        console.error(`🚨 [CRITICAL]: Meta blocked the message! The customer ${formattedPhone} MUST message you first to open the 24-hour session. Sending a message from Dashboard does NOT open the window!`);
+        console.error(`🚨 [CRITICAL 24-HOUR RULE]: Meta ne message block kar diya! Customer (${formattedPhone}) ko pehle aapko message karna hoga. Dashboard se message bhejkar 24-ghante ki window shuru nahi hoti hai.`);
       }
 
       // Broadcast the FAILED message to all connected chat dashboards

@@ -54,6 +54,10 @@ exports.handleWhatsApp = async (req, res) => {
       for (let entry of body.entry) {
         const changes = entry.changes[0];
         const value = changes.value;
+
+        // 🚀 MEGA DEBUG: Log the exact type of event received from Meta
+        const eventField = changes.field;
+        console.log(`[Mega Debug] Received a webhook event for field: "${eventField}"`);
         
         // 🚀 SAFEGUARD: Meta sends Account Update events (like MM_LITE_TERMS_SIGNED) without metadata
         if (!value.metadata || !value.metadata.phone_number_id) {

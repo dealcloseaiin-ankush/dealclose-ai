@@ -286,6 +286,19 @@ exports.whatsappConnect = async (req, res) => {
       console.log('⚠️ [Meta Register] Warning (continuing anyway):', regErr.response?.data || regErr.message);
     }
 
+    // 🚀 NEW STEP: Subscribe app to this WABA for message/status webhooks
+    try {
+      await axios.post(
+        `https://graph.facebook.com/v19.0/${targetWaba}/subscribed_apps`,
+        {},
+        { headers: { Authorization: `Bearer ${clientAccessToken}` } }
+      );
+      console.log(`✅ 7. [WABA Subscribe] App subscribed to WABA ${targetWaba} for webhooks.`);
+    } catch (subErr) {
+      console.log('⚠️ [WABA Subscribe] Warning:', subErr.response?.data || subErr.message);
+    }
+
+
     // 4. Mongoose Model strict-mode Bypass: Using updateOne to force save
     if (workspaceId && workspaceId !== 'main') {
       await User.updateOne(
