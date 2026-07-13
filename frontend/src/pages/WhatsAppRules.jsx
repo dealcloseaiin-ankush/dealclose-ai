@@ -133,31 +133,28 @@ export default function WhatsAppRules() {
               </div>
 
               {/* Estimated Cost Calculator */}
-              <div className="mt-8 bg-[#0a0a0a] border border-gray-700 rounded-xl p-5 shadow-inner">
+              <div className="mt-8 bg-gradient-to-br from-[#1a1525] to-[#111] border border-purple-500/30 rounded-2xl p-6 shadow-inner">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <Calculator className="text-emerald-400" size={20} /> Estimated Template Cost (Outgoing Only)
+                  <Calculator className="text-purple-400" size={20} /> Estimated Monthly Meta Cost
                 </h3>
                 {loading ? (
                   <p className="text-gray-500 text-sm">Calculating...</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-[#111] p-4 rounded-lg border border-gray-800 text-center">
-                      <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">Est. Outgoing Templates</p>
-                      <p className="text-2xl font-bold text-white">{Math.floor(stats.sent * 0.15)}</p>
-                      <p className="text-[10px] text-gray-500 mt-1">~15% of total sent</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-[#111] p-4 rounded-lg border border-gray-800 text-center shadow-md">
+                      <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">Est. Marketing/Service Cost</p>
+                      <p className="text-2xl font-bold text-white">₹{((stats.sent * 0.15 * 0.80) + (stats.sent * 0.85 * 0.29)).toFixed(2)}</p>
+                      <p className="text-[10px] text-gray-500 mt-1">Based on total messages sent</p>
                     </div>
-                    <div className="bg-[#111] p-4 rounded-lg border border-emerald-500/20 text-center">
-                      <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">Est. Marketing Cost</p>
-                      <p className="text-2xl font-bold text-emerald-400">₹{(Math.floor(stats.sent * 0.15) * 0.80).toFixed(2)}</p>
-                    </div>
-                    <div className="bg-[#111] p-4 rounded-lg border border-blue-500/20 text-center">
-                      <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">Est. Utility Cost</p>
-                      <p className="text-2xl font-bold text-blue-400">₹{(Math.floor(stats.sent * 0.15) * 0.30).toFixed(2)}</p>
+                    <div className="bg-gradient-to-br from-purple-600 to-indigo-600 p-4 rounded-lg text-center shadow-lg shadow-purple-500/20">
+                      <p className="text-purple-200 text-xs uppercase tracking-wider mb-1">Total (incl. 18% GST)</p>
+                      <p className="text-2xl font-bold text-white">₹{(((stats.sent * 0.15 * 0.80) + (stats.sent * 0.85 * 0.29)) * 1.18).toFixed(2)}</p>
+                      <p className="text-[10px] text-purple-300 mt-1">Approximate Monthly Bill</p>
                     </div>
                   </div>
                 )}
-                <p className="text-[10px] text-gray-500 mt-4 text-center">
-                  * Incoming messages and AI replies sent within 24-hours are FREE (Service conversations incur a small 24hr session fee). This calculator estimates costs based on assumed outbound template usage. Check Meta Business Manager for exact billing.
+                <p className="text-[10px] text-gray-500 mt-4 text-center p-3 bg-black/20 rounded-md border border-gray-800">
+                  <strong className="text-yellow-400">Disclaimer:</strong> This is an <strong className="text-white">ESTIMATE ONLY</strong>, assuming 15% of your outgoing messages are Marketing templates and 85% are Service replies. Your actual bill from Meta may vary.
                 </p>
               </div>
             </div>

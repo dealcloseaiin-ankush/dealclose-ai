@@ -7,6 +7,7 @@ const messageSchema = new Schema({
   messageText: { type: String },
   direction: { type: String, enum: ['incoming', 'outgoing'], required: true }, // Chat aayi ya gayi
   status: { type: String, enum: ['sent', 'delivered', 'read', 'received', 'failed'], default: 'sent' },
+  wamid: { type: String, index: true }, // Meta's WhatsApp Message ID for status tracking
   // 🚀 FIX: Added the 'channel' field to distinguish between message sources.
   // This was a critical missing field. Without it, the retention policy couldn't
   // apply different TTLs for WhatsApp vs. Instagram, and the data was inconsistent.
@@ -17,6 +18,11 @@ const messageSchema = new Schema({
   timestamp: { type: Date, default: Date.now },
   tags: [{ type: String }], // For CRM categorization like 'inquiry', 'complaint'
   isResolved: { type: Boolean, default: false },
+  // --- Soft Delete Fields ---
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  deletedAt: { type: Date },
+  deleteScope: { type: String, enum: ['message', 'chat'] },
   // 🚀 UPGRADE: TTL Index for Automatic Data Deletion.
   // Yeh MongoDB ko batata hai ki is field mein di gayi date ke 0 seconds baad
   // is document ko automatically permanent delete kar do. Isse database ka size

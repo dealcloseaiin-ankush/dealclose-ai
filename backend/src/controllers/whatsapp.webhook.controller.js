@@ -90,12 +90,11 @@ exports.handleWhatsApp = async (req, res) => {
           
           // 🚀 NEW: Update Message Status for Ticks (Sent, Delivered, Read)
           if (['sent', 'delivered', 'read'].includes(statusStr)) {
-            // 🛠️ BUG FIX: added userId scope — without it, this could match & silently
-            // overwrite another business's message status for a customer with the same phone number.
+            // Update message status using wamid for accuracy
             await Message.findOneAndUpdate(
-              { userId: user._id, customerPhone: value.statuses[0].recipient_id, direction: 'outgoing' },
+              { wamid: value.statuses[0].id, userId: user._id },
               { $set: { status: statusStr } },
-              { sort: { _id: -1 } } // Sabse latest message ko update karega
+              { sort: { timestamp: -1 } }
             );
           }
 
@@ -104,11 +103,10 @@ exports.handleWhatsApp = async (req, res) => {
              const failReason = value.statuses[0].errors?.[0]?.error_data?.details || 'Unknown';
              console.error(`❌ [Webhook] Message Failed to send. Reason: ${failReason}`);
              if (failReason.includes('24 hours')) console.error(`🔍 [DEBUG RULE]: Remember, the customer must message your number first to start the 24-hour clock.`);
-             // Aap message ka status database me update kar sakte hain
-             // 🛠️ BUG FIX: added userId scope for the same cross-tenant reason as above.
+             // Update message status using wamid for accuracy
              await Message.findOneAndUpdate(
-               { userId: user._id, customerPhone: value.statuses[0].recipient_id, status: 'sent' },
-               { $set: { status: 'failed', messageText: `[⚠️ Failed: 24-Hour Window Closed]` } },
+               { wamid: value.statuses[0].id, userId: user._id },
+               { $set: { status: 'failed' } },
                { sort: { timestamp: -1 } } // Update the latest message
              );
           }

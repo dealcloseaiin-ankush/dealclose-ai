@@ -240,31 +240,31 @@ export default function LandingPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Feature 1 */}
-            <div className="bg-[#111] border border-gray-800 p-8 rounded-3xl hover:border-purple-500/50 transition-colors group">
-              <div className="w-14 h-14 bg-green-500/10 text-green-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">💬</div>
-              <h3 className="text-xl font-bold mb-3">WhatsApp AI CRM</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">Let AI talk to your leads naturally on WhatsApp, answer FAQs, and push them towards checkout automatically.</p>
+            <div className="bg-gradient-to-br from-[#0a1a10] to-[#111] border border-green-500/30 rounded-3xl p-8 shadow-2xl group hover:border-green-500/60 transition-all">
+              <div className="w-14 h-14 bg-green-500/20 text-green-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">💬</div>
+              <h3 className="text-xl font-bold mb-3 text-white">WhatsApp AI CRM</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">Multi-staff shared inbox, drag & drop flow builder, and an AI that answers FAQs from your knowledge base.</p>
             </div>
             {/* Feature 2 */}
-            <div className="bg-[#111] border border-gray-800 p-8 rounded-3xl hover:border-blue-500/50 transition-colors group">
-              <div className="w-14 h-14 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">🛒</div>
-              <h3 className="text-xl font-bold mb-3">Abandoned Cart Rescue</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">Universal tracking pixel detects when users drop off and sends them an automated WhatsApp Meta Template after 15 mins.</p>
+            <div className="bg-gradient-to-br from-[#1a0a10] to-[#111] border border-pink-500/30 rounded-3xl p-8 shadow-2xl group hover:border-pink-500/60 transition-all">
+              <div className="w-14 h-14 bg-pink-500/20 text-pink-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">📸</div>
+              <h3 className="text-xl font-bold mb-3 text-white">Instagram Automation</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">Auto-reply to comments, send DMs with PDF/links, and let AI extract phone numbers from chats to convert followers into leads.</p>
             </div>
             {/* Feature 3 */}
-            <div className="bg-[#111] border border-gray-800 p-8 rounded-3xl hover:border-orange-500/50 transition-colors group">
-              <div className="w-14 h-14 bg-orange-500/10 text-orange-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">📞</div>
-              <h3 className="text-xl font-bold mb-3">AI Voice Calling</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">Initiate human-like phone calls to high-ticket leads. Our AI can negotiate, qualify, and book appointments for you.</p>
+            <div className="bg-gradient-to-br from-[#1a1525] to-[#111] border border-purple-500/30 rounded-3xl p-8 shadow-2xl group hover:border-purple-500/60 transition-all">
+              <div className="w-14 h-14 bg-purple-500/20 text-purple-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">📞</div>
+              <h3 className="text-xl font-bold mb-3 text-white">AI Voice Calling</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">Make automated outbound calls to your CRM leads. The AI can qualify leads, book appointments, and even take orders over the phone.</p>
             </div>
           </div>
 
           {/* Platform Specific Deep Dive */}
-          <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch">
             {/* WhatsApp Automation Showcase */}
-            <div className="bg-gradient-to-br from-[#0a1a10] to-[#111] border border-green-500/30 rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-2xl group hover:border-green-500/60 transition-all">
+            <div className="bg-gradient-to-br from-[#0a1a10] to-[#111] border border-green-500/30 rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-2xl group hover:border-green-500/60 transition-all flex flex-col">
               <div className="absolute top-0 right-0 w-48 h-48 bg-green-500/10 rounded-full blur-3xl"></div>
-              <div className="relative z-10">
+              <div className="relative z-10 flex-1 flex flex-col">
                 <div className="flex items-center gap-3 mb-6">
                   <span className="text-4xl">💬</span>
                   <h3 className="text-2xl md:text-3xl font-bold text-white">WhatsApp Automation</h3>
@@ -283,14 +283,14 @@ export default function LandingPage() {
                     <div><strong className="text-gray-200">Meta Template Manager:</strong> <span className="text-gray-400 text-sm block mt-1">Create, edit, and get WhatsApp message templates approved by Meta directly from your dashboard.</span></div>
                   </li>
                 </ul>
-                <Link to="/register" className="inline-block mt-8 text-green-400 font-bold hover:text-green-300 transition-colors">Explore WhatsApp Tools →</Link>
+                <Link to="/register" className="inline-block mt-auto pt-4 text-green-400 font-bold hover:text-green-300 transition-colors">Explore WhatsApp Tools →</Link>
               </div>
             </div>
 
             {/* Instagram Automation Showcase */}
-            <div className="bg-gradient-to-br from-[#1a0a10] to-[#111] border border-pink-500/30 rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-2xl group hover:border-pink-500/60 transition-all">
+            <div className="bg-gradient-to-br from-[#1a0a10] to-[#111] border border-pink-500/30 rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-2xl group hover:border-pink-500/60 transition-all flex flex-col">
               <div className="absolute top-0 right-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl"></div>
-              <div className="relative z-10">
+              <div className="relative z-10 flex-1 flex flex-col">
                 <div className="flex items-center gap-3 mb-6">
                   <span className="text-4xl">📸</span>
                   <h3 className="text-2xl md:text-3xl font-bold text-white">Instagram Automation</h3>
@@ -309,7 +309,7 @@ export default function LandingPage() {
                     <div><strong className="text-gray-200">Per-Post AI Settings:</strong> <span className="text-gray-400 text-sm block mt-1">Toggle between exact-keyword matching or full AI-driven Smart Chatbots for specific posts and reels.</span></div>
                   </li>
                 </ul>
-                <Link to="/register" className="inline-block mt-8 text-pink-400 font-bold hover:text-pink-300 transition-colors">Explore Instagram Tools →</Link>
+                <Link to="/register" className="inline-block mt-auto pt-4 text-pink-400 font-bold hover:text-pink-300 transition-colors">Explore Instagram Tools →</Link>
               </div>
             </div>
           </div>

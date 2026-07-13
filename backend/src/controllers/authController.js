@@ -249,11 +249,28 @@ exports.whatsappConnect = async (req, res) => {
     console.log(`✅ 4. TARGET PHONE SELECTED:`, targetPhone.display_phone_number);
     console.log(`===========================================================\n`);
 
+    // Business ID nikalne ke liye (payment page ka deep-link banane ke kaam aayega)
+    let ownerBusinessId = null;
+    try {
+      const wabaInfoRes = await axios.get(
+        `https://graph.facebook.com/v19.0/${targetWaba}`,
+        {
+          params: { fields: 'owner_business_info' },
+          headers: { Authorization: `Bearer ${clientAccessToken}` }
+        }
+      );
+      ownerBusinessId = wabaInfoRes.data?.owner_business_info?.id || null;
+      console.log(`✅ 6. [Business ID] Owner Business ID fetched:`, ownerBusinessId);
+    } catch (bizErr) {
+      console.log('⚠️ [Business ID] Warning:', bizErr.response?.data || bizErr.message);
+    }
+
     const waConfigObj = {
       accessToken: clientAccessToken,
       wabaId: targetWaba,
       phoneNumberId: targetPhone.id,
-      connectedPhone: targetPhone.display_phone_number
+      connectedPhone: targetPhone.display_phone_number,
+      ownerBusinessId: ownerBusinessId
     };
 
     // 🚀 NEW STEP: Register phone number on Cloud API (activates messaging)

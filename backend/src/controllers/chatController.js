@@ -10,9 +10,9 @@ exports.getChats = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized. Please login again.' });
     
-    const { search, platform } = req.query; // Search query and platform filter from frontend
+    const { search, platform } = req.query;
 
-    const messages = await Message.find({ userId }).lean().sort({ timestamp: 1 });
+    const messages = await Message.find({ userId, isDeleted: { $ne: true } }).lean().sort({ timestamp: 1 });
 
     const leads = await Lead.find({ userId }).lean();
     const leadDataMap = {};
@@ -187,10 +187,12 @@ exports.sendManualMessage = async (req, res) => {
           console.log(`✅ META RETURNED SUCCESS (200 OK)! Response:`, JSON.stringify(response.data));
           console.log(`⚠️ IF THIS IS INVISIBLE IN IG APP, CHECK MESSAGE REQUESTS FOLDER OR META APP MODE.`);
           console.log(`===============================================================\n`);
+          newMsg.wamid = response.data.message_id;
+          await newMsg.save();
       } catch (igError) {
         console.error(`❌ META REJECTED MANUAL REPLY:`, igError.response?.data || igError.message);
         newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
-        newMsg.status = 'failed';
+        newMsg.status = 'failed'; // Update status to failed
         await newMsg.save();
         console.error(`❌ [DEBUG Chat Flow] Error sending IG DM:`, igError.response?.data || igError.message);
       }
@@ -281,16 +283,18 @@ exports.sendManualMessage = async (req, res) => {
     // 3. TRY SENDING VIA META API
     console.log(`➡️ [DEBUG Chat Flow] 6. Calling Meta WhatsApp API now for ${formattedPhone}...`);
     try {
-      await whatsappService.sendTextMessage(
+      const metaResponse = await whatsappService.sendTextMessage(
         waToken,
         waPhoneId,
         formattedPhone,
         messageText
       );
       
+      newMsg.wamid = metaResponse.messages[0].id;
+      await newMsg.save();
       console.log(`✅ [DEBUG Chat Flow] 7. SUCCESS! Meta API accepted the message for ${formattedPhone}`);
       
-      // 🚀 NEW: Broadcast the new message to all connected chat dashboards
+      // Broadcast the new message to all connected chat dashboards
       const wssChat = req.app.get('wssChat');
       if (wssChat) {
         wssChat.clients.forEach(client => {
@@ -304,6 +308,7 @@ exports.sendManualMessage = async (req, res) => {
       // Agar Meta ne reject kiya, toh exact error chat me likh do aur status 'failed' kardo
       const exactError = metaError.response?.data?.error?.message || metaError.message;
       newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send: ${exactError}]`;
+      newMsg.status = 'failed';
       await newMsg.save();
       
       console.error(`❌ [DEBUG Chat Flow] 7. ERROR: Meta API Rejected the message. Reason: ${exactError}`);
@@ -311,7 +316,7 @@ exports.sendManualMessage = async (req, res) => {
         console.error(`🚨 [CRITICAL]: Meta blocked the message! The customer ${formattedPhone} MUST message you first to open the 24-hour session. Sending a message from Dashboard does NOT open the window!`);
       }
 
-      // 🚀 NEW: Broadcast the FAILED message to all connected chat dashboards
+      // Broadcast the FAILED message to all connected chat dashboards
       const wssChat = req.app.get('wssChat');
       if (wssChat) {
         wssChat.clients.forEach(client => {
@@ -334,14 +339,56 @@ exports.sendManualMessage = async (req, res) => {
 exports.deleteMessage = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
+    const userRole = req.user?.role;
     const { messageId } = req.params;
+
+    if (userRole !== 'owner') {
+      return res.status(403).json({ success: false, message: 'Only account owner can delete messages.' });
+    }
 
     const message = await Message.findOne({ _id: messageId, userId });
     if (!message) {
       return res.status(404).json({ success: false, message: 'Message not found or you do not have permission to delete it.' });
     }
-    await message.deleteOne(); // Using deleteOne instance method
+
+    // Soft delete logic
+    message.isDeleted = true;
+    message.deletedBy = userId;
+    message.deletedAt = new Date();
+    message.deleteScope = 'message';
+    message.messageText = 'This message was deleted.'; // Placeholder text
+    await message.save();
+
     res.status(200).json({ success: true, message: 'Message deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete a whole conversation (soft delete)
+// @route   DELETE /api/chats/conversation/:customerPhone
+exports.deleteConversation = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const userRole = req.user?.role;
+    const { customerPhone } = req.params;
+
+    if (userRole !== 'owner') {
+      return res.status(403).json({ success: false, message: 'Only account owner can delete conversations.' });
+    }
+
+    await Message.updateMany(
+      { userId, customerPhone },
+      {
+        $set: {
+          isDeleted: true,
+          deletedBy: userId,
+          deletedAt: new Date(),
+          deleteScope: 'chat'
+        }
+      }
+    );
+    res.status(200).json({ success: true, message: 'Conversation deleted successfully.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

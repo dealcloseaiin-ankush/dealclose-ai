@@ -21,6 +21,7 @@ export default function CrmPage() {
   const [leadFilter, setLeadFilter] = useState('me'); // 'me' or 'all'
   const [activeWorkspace, setActiveWorkspace] = useState('main'); // Workspace filter
   const [searchTerm, setSearchTerm] = useState(''); // Global Search
+  const [dateFilter, setDateFilter] = useState('all'); // Date range filter
   const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'whatsapp', 'instagram'
   const [statusFilter, setStatusFilter] = useState(() => {
     const params = new URLSearchParams(location.search);
@@ -160,16 +161,27 @@ export default function CrmPage() {
           matchLeadFilter = !lead.createdBy || lead.createdBy === user._id || lead.userId === user._id;
         }
 
+        // Date Filter Logic
+        let matchDate = true;
+        if (dateFilter !== 'all') {
+          const leadDate = new Date(lead.createdAt);
+          const today = new Date();
+          const daysAgo = parseInt(dateFilter);
+          const filterDate = new Date(today.setDate(today.getDate() - daysAgo));
+          matchDate = leadDate >= filterDate;
+        }
+
         const term = searchTerm.toLowerCase();
-        const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
+        // Search by DD/MM/YYYY format
+        const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-IN').toLowerCase() : '';
         const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
         const matchPlatform = platformFilter === 'all' || lead.platform === platformFilter;
         const matchStatus = statusFilter === 'all' || lead.status === statusFilter;
-        return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus;
+        return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus && matchDate;
       });
     });
     return filtered;
-  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter]);
+  }, [pipelineData, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter, dateFilter]);
 
   // 🚀 PERFORMANCE FIX: Memoized the flat contacts array to prevent lagging when typing in Search with 10k+ leads
   const filteredFlatContacts = React.useMemo(() => {
@@ -182,14 +194,26 @@ export default function CrmPage() {
       matchLeadFilter = !lead.createdBy || lead.createdBy === user._id || lead.userId === user._id;
     }
 
+    // Date Filter Logic
+    let matchDate = true;
+    if (dateFilter !== 'all') {
+      const leadDate = new Date(lead.createdAt);
+      const today = new Date();
+      const daysAgo = parseInt(dateFilter);
+      const filterDate = new Date();
+      filterDate.setDate(today.getDate() - daysAgo);
+      matchDate = leadDate >= filterDate;
+    }
+
     const term = searchTerm.toLowerCase();
-    const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString().toLowerCase() : '';
+    // Search by DD/MM/YYYY format
+    const dateStr = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-IN').toLowerCase() : '';
     const matchSearch = searchTerm === '' || (lead.name || '').toLowerCase().includes(term) || (lead.phoneNumber || lead.phone || '').includes(term) || (lead.city || '').toLowerCase().includes(term) || dateStr.includes(term);
     const matchPlatform = platformFilter === 'all' || lead.platform === platformFilter;
     const matchStatus = statusFilter === 'all' || lead.status === statusFilter;
-    return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus;
+    return matchWs && matchSearch && matchLeadFilter && matchPlatform && matchStatus && matchDate;
   });
-  }, [flatContacts, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter]);
+  }, [flatContacts, activeWorkspace, leadFilter, searchTerm, isOwner, user, platformFilter, statusFilter, dateFilter]);
 
   // Logic for the Expiry Warning Banner
   const expiringLeadsCount = flatContacts.filter(l => {
@@ -254,6 +278,19 @@ export default function CrmPage() {
               <option value="existing">💼 Existing</option>
               <option value="vip">👑 VIP</option>
             </select>
+
+            {/* 🚀 NEW: Date Range Quick Filters */}
+            <div className="flex bg-[#111] p-1 rounded-lg border border-gray-800 text-xs font-bold">
+              <button onClick={() => setDateFilter('all')} className={`px-3 py-1 rounded transition-colors ${dateFilter === 'all' ? 'bg-indigo-500 text-white' : 'text-gray-500 hover:text-white'}`}>
+                All Time
+              </button>
+              <button onClick={() => setDateFilter('7')} className={`px-3 py-1 rounded transition-colors ${dateFilter === '7' ? 'bg-indigo-500 text-white' : 'text-gray-500 hover:text-white'}`}>
+                Last 7 Days
+              </button>
+              <button onClick={() => setDateFilter('30')} className={`px-3 py-1 rounded transition-colors ${dateFilter === '30' ? 'bg-indigo-500 text-white' : 'text-gray-500 hover:text-white'}`}>
+                Last 30 Days
+              </button>
+            </div>
 
             {/* Team vs My Leads Filter (Only for Owners/Managers) */}
             {isOwner && (

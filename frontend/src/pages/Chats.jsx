@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { useAuth } from '../hooks/useAuth'; 
+import { useAuth } from '../hooks/useAuth';
 import { Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck, Trash2, MapPin, CornerDownLeft, X } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
@@ -10,18 +10,24 @@ export default function Chats() {
   const [activeCustomer, setActiveCustomer] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open on desktop
   
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
   const [platformFilter, setPlatformFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all'); // Date range filter
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
   const [newChatName, setNewChatName] = useState('');
   const [newChatSource, setNewChatSource] = useState('Manual Entry');
   const [sendAutoOffer, setSendAutoOffer] = useState(false);
+  // Template Modal State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateVars, setTemplateVars] = useState({});
   // 🚀 NEW: State for replying to a specific message
   const [replyingTo, setReplyingTo] = useState(null);
 
@@ -83,30 +89,33 @@ export default function Chats() {
     
     fetchChats();
     const intervalId = setInterval(fetchChats, 4000); // 🚀 Auto-refresh silently every 4 seconds
-
+    
     return () => {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, []); // 🚀 FIX: empty deps — runs once on mount. No more restart/blink on every message change
+  }, [activeWorkspace, platformFilter]);
 
   // 🔥 Filter messages by selected Workspace
   const filteredMessages = useMemo(() => {
     const filtered = allMessages.filter(msg => {
+      if (msg.isDeleted) return false; // Hide soft-deleted messages
       const ws = msg.workspaceId || 'main';
-      // Bring back older messages that were saved as 'default'
       const matchesWorkspace = activeWorkspace === 'main' ? (ws === 'main' || ws === 'default') : ws === activeWorkspace;
-      const matchesPlatform = platformFilter === 'all' || msg.platform === platformFilter;
-      return matchesWorkspace && matchesPlatform;
+      return matchesWorkspace;
     });
     return filtered;
-  }, [allMessages, activeWorkspace, platformFilter]);
+  }, [allMessages, activeWorkspace]);
 
   // Advanced logic to calculate 24-Hour Window, Needs Reply status, and Name/City
   const customerDetails = useMemo(() => {
     const map = new Map();
 
-    filteredMessages.forEach(msg => {
+    const messagesToProcess = allMessages.filter(msg => {
+        const matchesPlatform = platformFilter === 'all' || msg.platform === platformFilter || (platformFilter === 'instagram' && msg.platform?.startsWith('instagram'));
+        return matchesPlatform;
+    });
+    messagesToProcess.forEach(msg => {
       const phone = msg.customerPhone;
       if (!phone) return; // Prevent crashes on corrupt data
       
@@ -162,17 +171,30 @@ export default function Chats() {
        return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
     });
     
+    // Date Filter Logic
+    if (dateFilter !== 'all') {
+      finalDetails = finalDetails.filter(c => {
+        const msgDate = new Date(c.lastMessage.timestamp || c.lastMessage.createdAt || 0);
+        const today = new Date();
+        const daysAgo = parseInt(dateFilter);
+        const filterDate = new Date();
+        filterDate.setDate(today.getDate() - daysAgo);
+        return msgDate >= filterDate;
+      });
+    }
+
     // Search Filter Logic
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       finalDetails = finalDetails.filter(c => 
         (c.name && c.name.toLowerCase().includes(term)) || 
-        (c.phone && c.phone.includes(term)) || 
+        (c.phone && c.phone.includes(term)) ||
+        (c.lastMessage?.timestamp && new Date(c.lastMessage.timestamp).toLocaleDateString('en-IN').includes(term)) ||
         (c.city && c.city.toLowerCase().includes(term))
       );
     }
-    return finalDetails;
-  }, [filteredMessages, searchTerm]);
+    return finalDetails.filter(c => c.lastMessage.workspaceId === activeWorkspace || (activeWorkspace === 'main' && (c.lastMessage.workspaceId === 'main' || !c.lastMessage.workspaceId || c.lastMessage.workspaceId === 'default')));
+  }, [allMessages, platformFilter, searchTerm, activeWorkspace, dateFilter]);
 
   // 🔥 Auto-select the first chat if none is active
   useEffect(() => {
@@ -248,6 +270,7 @@ export default function Chats() {
       const payload = { 
         customerPhone: activeCustomer, 
         messageText: replyText,
+        // 🚀 NEW: Include repliedToMessageId if it exists
         repliedToMessageId: replyingTo?._id 
       };
       const res = await api.post('/chats/send', payload);
@@ -274,11 +297,11 @@ export default function Chats() {
 
   // Delete a single message
   const deleteMessage = async (messageId) => {
-    if (!window.confirm("Are you sure you want to delete this message? This cannot be undone.")) return;
+    if (!window.confirm("This will only hide the message from your dashboard, not from the customer's WhatsApp. Are you sure?")) return;
 
     // Optimistic UI update
     setAllMessages(prev => {
-      const updated = prev.filter(m => m._id !== messageId);
+      const updated = prev.map(m => m._id === messageId ? { ...m, isDeleted: true } : m);
       allMessagesRef.current = updated; // 🚀 keep ref in sync
       return updated;
     });
@@ -286,13 +309,44 @@ export default function Chats() {
     try {
       await api.delete(`/chats/${messageId}`);
       toast.success("Message deleted.");
-    } catch {
-      toast.error("Failed to delete message.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete message.");
       // Re-fetch to revert UI state on failure
       const { data } = await api.get('/chats');
       const messages = Array.isArray(data) ? data : data.data || [];
       setAllMessages(messages);
       allMessagesRef.current = messages; // 🚀 keep ref in sync
+    }
+  };
+  
+  // Fetch templates when modal opens
+  const openTemplateModal = async () => {
+    try {
+      // NOTE: This route needs to be created in the backend
+      const { data } = await api.get('/whatsapp/templates'); 
+      setTemplates(Array.isArray(data) ? data : []);
+      setIsTemplateModalOpen(true);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Could not fetch templates.");
+    }
+  };
+
+  // Send Template Message
+  const handleSendTemplate = async () => {
+    if (!selectedTemplate) return toast.error("Please select a template.");
+    try {
+      const payload = {
+        customerPhone: activeCustomer,
+        templateName: selectedTemplate.name,
+        variables: Object.values(templateVars)
+      };
+      await api.post('/chats/send-template', payload); // NOTE: This route needs to be created
+      toast.success("Template message sent!");
+      setIsTemplateModalOpen(false);
+      setSelectedTemplate(null);
+      setTemplateVars({});
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to send template.");
     }
   };
 
@@ -349,6 +403,7 @@ export default function Chats() {
   const activeCustomerData = customerDetails?.find(c => c.phone === activeCustomer) || null;
   const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
 
+
   return (
     <main className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#050505] p-0 text-gray-200 md:p-6">
       
@@ -392,6 +447,43 @@ export default function Chats() {
         </div>
       )}
 
+      {/* Template Sender Modal */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+          <section role="dialog" aria-modal="true" className="relative w-full max-w-lg rounded-2xl border border-gray-800 bg-[#111] p-7 shadow-2xl">
+            <header className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Send Template Message</h2>
+              <button onClick={() => setIsTemplateModalOpen(false)} aria-label="Close dialog" className="text-gray-400 hover:text-white transition-colors p-1">✕</button>
+            </header>
+            <div className="space-y-4">
+              <select onChange={(e) => {
+                const template = templates.find(t => t.name === e.target.value);
+                setSelectedTemplate(template);
+                setTemplateVars({});
+              }} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none">
+                <option value="">-- Select a Template --</option>
+                {templates.map(t => <option key={t.id} value={t.name}>{t.name} ({t.category})</option>)}
+              </select>
+
+              {selectedTemplate && (
+                <div className="bg-[#0a0a0a] p-4 rounded-lg border border-gray-700 text-sm text-gray-400 italic">
+                  {selectedTemplate.components.find(c => c.type === 'BODY')?.text}
+                </div>
+              )}
+
+              {selectedTemplate?.components.find(c => c.type === 'BODY')?.text.match(/\{\{\d+\}\}/g)?.map((v, i) => (
+                <div key={i}>
+                  <label className="block text-sm text-gray-400 mb-1">Variable {"{{"}{i+1}{"}}"}</label>
+                  <input type="text" onChange={e => setTemplateVars({...templateVars, [i]: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none" placeholder={`Value for variable ${i+1}`} />
+                </div>
+              ))}
+
+              <button onClick={handleSendTemplate} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-colors">Send Template</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {/* Backdrop for Mobile Sidebar */}
       {isSidebarOpen && (
         <span
@@ -402,7 +494,7 @@ export default function Chats() {
       )}
 
       {/* Sidebar for Customers */}
-      <div className={`absolute md:relative z-40 w-4/5 md:w-1/3 h-full bg-[#111] border-r border-gray-800 md:rounded-l-2xl p-4 overflow-y-auto transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
+      <div className={`absolute md:relative z-40 w-4/5 md:w-1/3 h-full bg-[#111] border-r border-gray-800 md:rounded-l-2xl p-4 overflow-y-auto transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 custom-scrollbar`}>
         <div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-4 mt-2">
           <h2 className="text-xl font-bold">Active Chats</h2>
           <button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-500 text-white text-sm px-3 py-1.5 rounded-lg font-bold transition-colors">+ New Chat</button>
@@ -423,11 +515,24 @@ export default function Chats() {
           onChange={(e) => { setPlatformFilter(e.target.value); setActiveCustomer(null); }} 
           className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-2.5 outline-none focus:border-green-500 cursor-pointer mb-4"
         >
-          <option value="all">💬 All Platforms</option>
+          <option value="all">🌐 All Platforms</option>
           <option value="whatsapp">🟩 WhatsApp Messages</option>
           <option value="instagram_dm">🟪 Instagram DMs</option>
           <option value="instagram_comment">📸 Instagram Comments</option>
         </select>
+
+        {/* 🚀 NEW: Date Range Quick Filters */}
+        <div className="flex bg-[#1a1a1a] p-1 rounded-lg border border-gray-700 text-xs font-bold mb-4">
+          <button onClick={() => setDateFilter('all')} className={`flex-1 py-1.5 rounded transition-colors ${dateFilter === 'all' ? 'bg-green-600/20 text-green-400' : 'text-gray-500 hover:text-white'}`}>
+            All Time
+          </button>
+          <button onClick={() => setDateFilter('7')} className={`flex-1 py-1.5 rounded transition-colors ${dateFilter === '7' ? 'bg-green-600/20 text-green-400' : 'text-gray-500 hover:text-white'}`}>
+            Last 7 Days
+          </button>
+          <button onClick={() => setDateFilter('30')} className={`flex-1 py-1.5 rounded transition-colors ${dateFilter === '30' ? 'bg-green-600/20 text-green-400' : 'text-gray-500 hover:text-white'}`}>
+            Last 30 Days
+          </button>
+        </div>
 
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
@@ -558,11 +663,13 @@ export default function Chats() {
                         <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/20 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${
                           msg.direction === 'outgoing' ? '-left-20' : '-right-20'
                         }`}
-                        >
+                        > 
                           <button onClick={() => setReplyingTo(msg)} className="text-gray-300 hover:text-white p-1.5 rounded hover:bg-gray-700" title="Reply"><CornerDownLeft size={14}/></button>
-                          <button onClick={() => deleteMessage(msg._id)} className="text-gray-300 hover:text-rose-400 p-1.5 rounded hover:bg-gray-700" title="Delete"><Trash2 size={14}/></button>
+                          {user?.role === 'owner' && (
+                            <button onClick={() => deleteMessage(msg._id)} className="text-gray-300 hover:text-rose-400 p-1.5 rounded hover:bg-gray-700" title="Delete"><Trash2 size={14}/></button>
+                          )}
                         </div>
-                        <p className="whitespace-pre-wrap">{msg.messageText || "📎 [Attachment / Shared Post]"}</p>
+                        <p className="whitespace-pre-wrap">{msg.isDeleted ? <span className="italic text-gray-400">This message was deleted</span> : (msg.messageText || "📎 [Attachment / Shared Post]")}</p>
                         <div className="flex justify-between items-center gap-4 mt-2">
                           <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
                           <span className="text-[10px] opacity-70 flex items-center gap-1">
@@ -581,7 +688,7 @@ export default function Chats() {
             {/* Active Customer Status Warning */}
             {activeCustomerData && !activeCustomerData.windowOpen && (
                <div className="px-4 py-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-xs font-semibold text-center">
-                 ⚠️ 24-Hour window closed. Normal messages might fail. Please use Meta Templates to initiate contact.
+                 ⚠️ 24-Hour window closed. Normal messages might fail. <button onClick={openTemplateModal} className="font-bold underline hover:text-rose-200">Use a Template</button> to re-initiate.
                </div>
             )}
 
@@ -608,9 +715,16 @@ export default function Chats() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Send Approved Template">📄</button>
+                <button onClick={openTemplateModal} disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Send Approved Template">📄</button>
                 <button onClick={sendLocation} disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Share Location"><MapPin size={16}/></button>
-                <button disabled={!activeCustomer} className="p-3 text-gray-400 hover:text-white bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Attach Image or Document">📎</button>
+                <label className={`p-3 text-gray-400 bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors ${!activeCustomer ? 'opacity-50 cursor-not-allowed' : 'hover:text-white cursor-pointer'}`} title="Attach Image or Document">
+                  📎
+                  <input type="file" className="hidden" disabled={!activeCustomer} onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    // TODO: Implement file upload logic here
+                  }} />
+                </label>
                 <button onClick={() => setReplyText("Thank you for your visit! 🙏\n\n⭐ Please leave us a 5-star review: [Review Link]\n📸 Follow us on Instagram: [Instagram Link]\n\n🎁 *Special Offer:* Use code *WELCOME10* on your next visit to get 10% OFF!")} disabled={!activeCustomer} className="p-3 text-yellow-500 hover:text-yellow-400 bg-[#0a0a0a] border border-gray-700 rounded-xl transition-colors disabled:opacity-50" title="Load Rating & Discount Offer">⭐</button>
                 
                 <textarea 

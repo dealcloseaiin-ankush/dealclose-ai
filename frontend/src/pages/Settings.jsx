@@ -38,6 +38,7 @@ export default function Settings() {
     igAccessToken: '',
     igAccountId: '',
     fbPageId: ''
+    // ownerBusinessId will be part of whatsappConfig or workspace.whatsappConfig
   });
   
   const [devApiKey, setDevApiKey] = useState('');
@@ -128,6 +129,7 @@ export default function Settings() {
           whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || '',
           phoneNumberId: savedData.phoneNumberId || savedData.whatsappConfig?.phoneNumberId || '',
           wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || '',
+          ownerBusinessId: savedData.whatsappConfig?.ownerBusinessId || '', // 🆕 Load Business ID
           twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || '',
           twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || '',
           twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || '',
@@ -243,7 +245,8 @@ export default function Settings() {
         whatsappConfig: {
           accessToken: config.whatsappToken,
           phoneNumberId: config.phoneNumberId,
-          wabaId: config.wabaId
+          wabaId: config.wabaId,
+          ownerBusinessId: config.ownerBusinessId // 🆕 Save Business ID
         },
         twilioConfig: {
           sid: config.twilioSid,
@@ -552,6 +555,15 @@ export default function Settings() {
                         <button type="button" onClick={() => disconnectWhatsApp('main')} className="px-4 py-2 bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded-xl border border-rose-500/20 text-sm font-semibold transition-all">
                           Logout WhatsApp
                         </button>
+                      )}
+                      {/* 🆕 Payment Method Button */}
+                      {config.ownerBusinessId && (
+                        <a
+                          href={`https://business.facebook.com/latest/settings/whatsapp_account/?business_id=${config.ownerBusinessId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-blue-600/20 text-blue-300 hover:bg-blue-600 hover:text-white rounded-xl border border-blue-500/20 text-sm font-semibold transition-all">
+                          💳 Add/Manage Payment Method</a>
                       )}
                     </div>
                   </div>
