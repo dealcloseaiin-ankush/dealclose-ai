@@ -246,7 +246,6 @@ exports.whatsappConnect = async (req, res) => {
         return res.status(400).json({ success: false, message: `No new WhatsApp numbers found! The numbers Meta returned are already in use by your other branches. Please click 'Edit Settings' in the Meta popup and tick your NEW number.` });
       }
     }
-
     console.log(`✅ 4. TARGET PHONE SELECTED:`, targetPhone.display_phone_number);
     console.log(`===========================================================\n`);
 
@@ -256,6 +255,19 @@ exports.whatsappConnect = async (req, res) => {
       phoneNumberId: targetPhone.id,
       connectedPhone: targetPhone.display_phone_number
     };
+
+    // 🚀 NEW STEP: Register phone number on Cloud API (activates messaging)
+    // Isके bina number sirf "verified" रहेगा, messages send/receive नहीं करेगा
+    try {
+      await axios.post(
+        `https://graph.facebook.com/v19.0/${targetPhone.id}/register`,
+        { messaging_product: 'whatsapp', pin: '123456' },
+        { headers: { Authorization: `Bearer ${clientAccessToken}` } }
+      );
+      console.log(`✅ 5. [Meta Register] Phone ${targetPhone.id} registered for messaging.`);
+    } catch (regErr) {
+      console.log('⚠️ [Meta Register] Warning (continuing anyway):', regErr.response?.data || regErr.message);
+    }
 
     // 4. Mongoose Model strict-mode Bypass: Using updateOne to force save
     if (workspaceId && workspaceId !== 'main') {
@@ -278,7 +290,6 @@ exports.whatsappConnect = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to connect Meta account. Check server logs.' });
   }
 };
-
 // @desc    Connect Selected Instagram via Meta Login
 // @route   POST /api/users/settings/instagram-connect-selected
 exports.instagramConnectSelected = async (req, res) => {
