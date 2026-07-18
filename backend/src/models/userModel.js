@@ -204,21 +204,18 @@ const userSchema = new Schema({
   },
 });
 
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
   // 🚀 PERMANENT FIX: This is the most critical guard.
   // It ensures that the password hashing logic ONLY runs if the password field
   // was actually modified in this 'save' operation. This prevents accidental
   // re-hashing of an already-hashed password when other fields (like 'role') are updated.
   if (!this.isModified('password')) {
-    return next();
+    return;
   }
-  try {
-    // Hash the new password before saving
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-  } catch (error) {
-    next(error);
-  }
+
+  // Hash the new password before saving. Any error is rejected from this async
+  // middleware and Mongoose propagates it to the save operation.
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 const User = mongoose.model('User', userSchema);
