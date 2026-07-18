@@ -223,7 +223,8 @@ exports.handleWhatsApp = async (req, res) => {
             let responseMessage = null;
             let repliedBy = 'ai';
 
-            const isOwnerOrStaff = (user.ownerPhone && user.ownerPhone.replace(/\D/g,'') === fromNumber) || (user.staff && user.staff.some(s => s.phone.replace(/\D/g,'') === fromNumber));
+            const normalizePhone = (phone) => (phone || '').replace(/\D/g, '').slice(-10);
+            const isOwnerOrStaff = (user.ownerPhone && normalizePhone(user.ownerPhone) === normalizePhone(fromNumber)) || (user.staff && user.staff.some(s => s.phone && normalizePhone(s.phone) === normalizePhone(fromNumber)));
             if (isOwnerOrStaff) {
               const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);

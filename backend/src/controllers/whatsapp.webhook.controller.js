@@ -43,6 +43,9 @@ exports.verifyWhatsAppWebhook = async (req, res) => {
 // @route   POST /api/webhooks/whatsapp 
 exports.handleWhatsApp = async (req, res) => {
   // 1. IMMEDIATE RESPONSE TO META: Prevents Meta from retrying and sending double messages!
+  // 🚀 NEW HELPER: For robust phone number comparison (handles country codes)
+  const normalizePhone = (phone) => (phone || '').replace(/\D/g, '').slice(-10);
+
   res.status(200).send('EVENT_RECEIVED');
 
   console.log("\n================ [META WEBHOOK INCOMING] ================");
@@ -272,10 +275,9 @@ exports.handleWhatsApp = async (req, res) => {
             let responseMessage = null;
             let repliedBy = 'ai';
 
-            // 🛠️ BUG FIX: guard s.phone before calling .replace — a staff entry saved without
-            // a phone number would throw "Cannot read properties of undefined" and crash this
-            // whole webhook request (no reply would ever be sent to the customer).
-            const isOwnerOrStaff = (user.ownerPhone && user.ownerPhone.replace(/\D/g,'') === fromNumber) || (user.staff && user.staff.some(s => s.phone && s.phone.replace(/\D/g,'') === fromNumber));
+            // 🛠️ BUG FIX & ROBUSTNESS: Compare the last 10 digits so owner/staff numbers
+            // work whether they are sent with or without country code.
+            const isOwnerOrStaff = (user.ownerPhone && normalizePhone(user.ownerPhone) === normalizePhone(fromNumber)) || (user.staff && user.staff.some(s => s.phone && normalizePhone(s.phone) === normalizePhone(fromNumber)));
             
             // ==========================================================
             // 🚀 NEW: AUTO-MARKETER APPROVAL LOGIC (For Business Owner)
@@ -625,6 +627,7 @@ exports.handleWhatsApp = async (req, res) => {
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'human_handover' || nextNode.type === 'assign_staff') {
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }, { strict: false });
+                       await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }, { strict: false }); // Pause AI for 24h
                        if (user.ownerPhone) await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, user.ownerPhone, `🚨 *Human Handover Request*\nCustomer ${fromNumber} requested staff assistance from the automated flow.`);
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;

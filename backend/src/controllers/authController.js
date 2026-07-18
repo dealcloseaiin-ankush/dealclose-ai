@@ -249,6 +249,23 @@ exports.whatsappConnect = async (req, res) => {
     console.log(`✅ 4. TARGET PHONE SELECTED:`, targetPhone.display_phone_number);
     console.log(`===========================================================\n`);
 
+    // 🚀 SAFETY CHECK: Prevent same WhatsApp number connecting to two different app accounts
+    const conflictUser = await User.findOne({
+      _id: { $ne: userId },
+      $or: [
+        { 'whatsappConfig.phoneNumberId': targetPhone.id },
+        { 'workspaces.whatsappConfig.phoneNumberId': targetPhone.id }
+      ]
+    });
+
+    if (conflictUser) {
+      console.log(`❌ [Conflict Check] Phone ${targetPhone.id} already connected to another account: ${conflictUser.email}`);
+      return res.status(409).json({
+        success: false,
+        message: `Yeh WhatsApp number pehle se kisi aur account (${conflictUser.email}) se connected hai. Agar yeh aapka hi doosra account hai, pehle wahan se disconnect karein, ya support se contact karein.`
+      });
+    }
+
     // Business ID nikalne ke liye (payment page ka deep-link banane ke kaam aayega)
     let ownerBusinessId = null;
     try {
