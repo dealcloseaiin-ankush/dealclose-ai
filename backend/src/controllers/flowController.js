@@ -105,6 +105,9 @@ async function getFlows(req, res) {
       .sort({ createdAt: -1 })
       .lean();
 
+    // 🚀 DEBUG LOG: Aapke liye special debug log
+    console.log(`[Flow Debug] Found ${flows.length} flows for query:`, JSON.stringify(query));
+
     res.status(200).json({ success: true, data: flows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
