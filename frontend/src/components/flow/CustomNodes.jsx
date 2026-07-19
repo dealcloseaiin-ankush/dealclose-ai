@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position, useReactFlow } from 'reactflow';
 import { MessageSquare, Zap, Clock, GitBranch, ListPlus, Camera, X } from 'lucide-react';
+import { NodeResizer } from '@reactflow/node-resizer';
 
 // --- Custom Nodes Definitions ---
 export const TriggerNode = ({ id, data }) => {
@@ -41,7 +42,7 @@ export const TriggerNode = ({ id, data }) => {
   );
 };
 
-export const MessageNode = ({ id, data, templates = [], ...props }) => {
+export const MessageNode = ({ id, data, selected, templates = [], ...props }) => {
   const { setNodes, setEdges } = useReactFlow();
 
   // 🚀 NEW: Check the platform from the node's data (passed down from the main component)
@@ -49,6 +50,7 @@ export const MessageNode = ({ id, data, templates = [], ...props }) => {
 
   return (
     <div className={`bg-[#111] p-4 rounded-xl shadow-2xl border min-w-[280px] text-white relative group ${isInstagram ? 'border-pink-500' : 'border-blue-500'}`}>
+      <NodeResizer color="#ff0071" isVisible={selected} minWidth={280} minHeight={150} />
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
@@ -79,7 +81,7 @@ export const MessageNode = ({ id, data, templates = [], ...props }) => {
   );
 };
 
-export const AskQuestionNode = ({ id, data }) => {
+export const AskQuestionNode = ({ id, data, selected }) => {
   const { setNodes, setEdges } = useReactFlow();
   const [replyType, setReplyType] = useState(data?.replyType || 'yes_no');
 
@@ -91,6 +93,7 @@ export const AskQuestionNode = ({ id, data }) => {
 
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-purple-500 min-w-[280px] text-white relative group">
+      <NodeResizer color="#ff0071" isVisible={selected} minWidth={280} minHeight={200} />
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
@@ -143,10 +146,11 @@ export const AskQuestionNode = ({ id, data }) => {
   );
 };
 
-export const DelayNode = ({ id, data }) => {
+export const DelayNode = ({ id, data, selected }) => {
   const { setNodes, setEdges } = useReactFlow();
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-gray-500 min-w-[220px] text-white relative group">
+      <NodeResizer color="#ff0071" isVisible={selected} minWidth={220} minHeight={100} />
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
@@ -166,10 +170,11 @@ export const DelayNode = ({ id, data }) => {
   );
 };
 
-export const ConditionNode = ({ id, data }) => {
+export const ConditionNode = ({ id, data, selected }) => {
   const { setNodes, setEdges } = useReactFlow();
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-orange-500 min-w-[250px] text-white relative group">
+      <NodeResizer color="#ff0071" isVisible={selected} minWidth={250} minHeight={120} />
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
@@ -191,10 +196,11 @@ export const ConditionNode = ({ id, data }) => {
   );
 };
 
-export const MenuNode = ({ id, data }) => {
+export const MenuNode = ({ id, data, selected }) => {
   const { setNodes, setEdges } = useReactFlow();
   return (
     <div className="bg-[#111] p-4 rounded-xl shadow-2xl border border-teal-500 min-w-[280px] text-white relative group">
+      <NodeResizer color="#ff0071" isVisible={selected} minWidth={280} minHeight={280} />
       <button onClick={() => {
         setNodes(nds => nds.filter(n => n.id !== id));
         setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { saveFlow, getFlows, deleteFlow, renameFlow } = require('../controllers/flowController');
+const { saveFlow, getFlows, deleteFlow, renameFlow, reassignFlow } = require('../controllers/flowController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Flow Builder Routes
@@ -13,5 +13,8 @@ router.route('/flows/:flowId')
 
 router.route('/flows/:flowId/rename')
   .patch(protect, renameFlow);
+
+router.route('/flows/:flowId/reassign')
+  .patch(protect, reassignFlow);
 
 module.exports = router;

@@ -139,13 +139,12 @@ function FlowBuilder() {
   // 🚀 FIX: When workspace or platform changes, reset the canvas to a clean state.
   // This prevents saving a flow from one workspace into another by mistake.
   useEffect(() => {
-    if (reactFlowInstance) { // Ensure instance is ready before resetting
-      setNodes(initialNodes);
-      setEdges([]);
-      setFlowName('');
-      setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
-    }
-  }, [selectedWorkspace, platform, reactFlowInstance, setNodes, setEdges, fitView]);
+    setNodes(initialNodes);
+    setEdges([]);
+    setFlowName('');
+    // Use the hook's fitView function which is always available
+    setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
+  }, [selectedWorkspace, platform, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     api.get('/whatsapp/templates')
@@ -423,6 +422,24 @@ function FlowBuilder() {
       toast.error(error.response?.data?.message || "Failed to rename flow.");
     }
   };
+
+  // 🚀 NEW: Re-assign an orphaned flow to a new workspace
+  const handleReassignFlow = async (flowId, flowName) => {
+    const targetWorkspaceId = prompt(`This flow belongs to an old/deleted branch. Which branch do you want to move "${flowName}" to?\n\nEnter 'main' for Main Business, or the ID of another branch.`);
+    if (!targetWorkspaceId || targetWorkspaceId.trim() === "") return;
+
+    try {
+      await api.patch(`/whatsapp/flows/${flowId}/reassign`, { newWorkspaceId: targetWorkspaceId.trim() });
+      toast.success(`Flow moved successfully! It will now appear in the selected branch.`);
+      // Refresh the list to reflect the change
+      setSavedFlows(prev => prev.filter(f => f._id !== flowId));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to re-assign flow.");
+    }
+  };
+
+  const workspaceExists = (id) => id === 'main' || workspaces.some(ws => ws._id === id);
+
   return (
     <>
     {/* Help Guide Modal */}
@@ -472,13 +489,21 @@ function FlowBuilder() {
             ) : (
               savedFlows.map(flow => (
                 <div key={flow._id} className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl flex justify-between items-center hover:border-indigo-500 transition-colors">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-bold text-white text-lg">{flow.name}</h3>
-                    <p className="text-xs text-gray-400">Workspace: {flow.workspaceId === 'main' ? 'Main Business' : workspaces.find(w => w._id === flow.workspaceId)?.name || flow.workspaceId}</p>
+                    <p className="text-xs text-gray-400">
+                      Workspace: {flow.workspaceId === 'main' ? mainBusinessName : workspaces.find(w => w._id === flow.workspaceId)?.name || <span className="text-rose-400 font-bold">Unknown/Deleted Branch</span>}
+                    </p>
                     {/* 🚀 NEW: Show platform badge */}
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded mt-2 inline-block ${flow.platform === 'instagram' ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
                       {flow.platform === 'instagram' ? 'Instagram' : 'WhatsApp'}
                     </span>
+                    {/* 🚀 NEW: Show Re-assign button for orphaned flows */}
+                    {!workspaceExists(flow.workspaceId || 'main') && (
+                      <button onClick={() => handleReassignFlow(flow._id, flow.name)} className="mt-2 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-lg font-bold hover:bg-amber-600 hover:text-white">
+                        Re-assign to another Branch
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => handleRenameFlow(flow._id, flow.name)} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors" title="Rename Flow"><Edit size={16} /></button>

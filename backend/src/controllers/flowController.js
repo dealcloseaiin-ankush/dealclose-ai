@@ -169,11 +169,31 @@ async function renameFlow(req, res) {
   }
 }
 
+// @desc    Re-assign a Flow to a different workspace
+// @route   PATCH /api/whatsapp/flows/:flowId/reassign
+async function reassignFlow(req, res) {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { flowId } = req.params;
+    const { newWorkspaceId } = req.body;
+
+    if (!newWorkspaceId) {
+      return res.status(400).json({ success: false, message: 'New workspace ID is required.' });
+    }
+
+    const updatedFlow = await Flow.findOneAndUpdate({ _id: flowId, userId }, { $set: { workspaceId: newWorkspaceId } }, { new: true });
+    if (!updatedFlow) return res.status(404).json({ success: false, message: 'Flow not found.' });
+    res.status(200).json({ success: true, message: 'Flow re-assigned successfully.', flow: updatedFlow });
+  } catch (error) {
+    console.error('❌ [DEBUG] Re-assign Flow Error:', error);
+    res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
+  }
+}
+
 module.exports = {
   saveFlow,
   getFlows,
   deleteFlow,
   renameFlow,
-  buildFlowSaveQuery,
-  buildFlowListQuery
+  reassignFlow
 };
