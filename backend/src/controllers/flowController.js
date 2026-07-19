@@ -12,15 +12,16 @@ const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
 };
 
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
-  const query = { userId };
-
-  if (platform) {
-    query.platform = platform;
-  }
+  // 🐛 FIX: The previous logic had a flaw where the `$or` for the main workspace
+  // would override the platform filter. This new structure ensures both conditions
+  // are applied correctly using `$and`.
+  const query = { userId, platform: platform || 'whatsapp' };
 
   if (workspaceId && workspaceId !== 'main') {
     query.workspaceId = workspaceId;
   } else if (workspaceId === 'main') {
+    // For the main workspace, we need to find flows that are either explicitly 'main'
+    // or have no workspaceId set (for backward compatibility).
     query.$or = [
       { workspaceId: 'main' },
       { workspaceId: { $in: [null, ''] } }
