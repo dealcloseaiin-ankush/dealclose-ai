@@ -318,6 +318,29 @@ export default function Chats() {
       allMessagesRef.current = messages; // 🚀 keep ref in sync
     }
   };
+
+  // 🚀 NEW: Delete an entire conversation
+  const deleteConversation = async (customerPhone) => {
+    if (!window.confirm(`Are you sure you want to delete the entire chat history with ${customerPhone}? This will hide it from your dashboard.`)) return;
+
+    // Optimistic UI update
+    setAllMessages(prev => {
+      const updated = prev.map(m => m.customerPhone === customerPhone ? { ...m, isDeleted: true } : m);
+      allMessagesRef.current = updated; // keep ref in sync
+      return updated;
+    });
+    // If the active chat is the one being deleted, clear the view
+    if (activeCustomer === customerPhone) {
+      setActiveCustomer(null);
+    }
+
+    try {
+      await api.delete(`/chats/conversation/${customerPhone}`);
+      toast.success("Conversation deleted.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete conversation.");
+    }
+  };
   
   // Fetch templates when modal opens
   const openTemplateModal = async () => {
@@ -640,6 +663,12 @@ export default function Chats() {
               }} className="ml-auto text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors font-bold flex items-center gap-1.5 shadow-sm">
                 🔗 Share 
               </button>
+              {/* 🚀 NEW: Delete Conversation Button */}
+              {user?.role === 'owner' && (
+                <button onClick={() => deleteConversation(activeCustomer)} className="text-xs bg-rose-800/50 hover:bg-rose-700/80 text-rose-300 px-3 py-1.5 rounded-lg transition-colors font-bold flex items-center gap-1.5 shadow-sm" title="Delete Entire Conversation">
+                  <Trash2 size={12} /> Delete
+                </button>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
