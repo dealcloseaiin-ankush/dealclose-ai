@@ -8,7 +8,8 @@ import ReactFlow, {
   Background,
   MarkerType,
   Handle,
-  MiniMap
+  MiniMap,
+  Position
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus, Camera, Edit, Trash2 } from 'lucide-react';
@@ -133,6 +134,17 @@ function FlowBuilder() {
     }).catch(console.error);
   }, []);
 
+  // 🚀 FIX: When workspace or platform changes, reset the canvas to a clean state.
+  // This prevents saving a flow from one workspace into another by mistake.
+  useEffect(() => {
+    if (reactFlowInstance) {
+      setNodes(initialNodes);
+      setEdges([]);
+      setFlowName('');
+      setTimeout(() => reactFlowInstance.fitView({ padding: 0.2, duration: 200 }), 50);
+    }
+  }, [selectedWorkspace, platform, reactFlowInstance, setNodes, setEdges]);
+
   useEffect(() => {
     api.get('/whatsapp/templates')
       .then(res => {
@@ -229,6 +241,9 @@ function FlowBuilder() {
       } else {
         setAiMessages(prev => [...prev, { role: 'ai', content: res.data.reply || "I couldn't generate the flow." }]);
       }
+      if (res.data.nodes && res.data.nodes.length > 0) {
+        setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2, duration: 400 }), 50);
+      }
       setIsAiTyping(false);
     } catch (err) {
       console.error("AI Flow Generation API failed or not ready:", err);
@@ -312,6 +327,7 @@ function FlowBuilder() {
       setSelectedWorkspace(fullFlow.workspaceId || 'main');
       setIsFlowListOpen(false);
       toast.success(`Loaded Flow: ${fullFlow.name}`);
+      setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2, duration: 400 }), 50);
     } catch {
       toast.error("Failed to load flow data.");
     }
@@ -362,6 +378,7 @@ function FlowBuilder() {
     setNodes(newNodes);
     setEdges(newEdges);
     toast.success("Template Loaded! You can now customize or save it.");
+    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2, duration: 400 }), 50);
   };
 
   // 🚀 NEW: Delete a saved flow
@@ -614,6 +631,11 @@ function FlowBuilder() {
             onDragOver={onDragOver} 
             nodeTypes={nodeTypes} 
             fitView 
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            panOnScroll={false}
+            minZoom={0.1}
+            maxZoom={2}
           >
             <Background color="#333" gap={16} size={1} />
             <Controls className="bg-[#111] border border-gray-800 text-white fill-white" />
