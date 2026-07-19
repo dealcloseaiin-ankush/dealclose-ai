@@ -58,7 +58,21 @@ exports.saveFlow = async (req, res) => {
 exports.getFlows = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const flows = await Flow.find({ userId }).sort({ createdAt: -1 });
+    const { workspaceId, platform } = req.query;
+
+    let query = { userId };
+
+    if (platform) {
+      query.platform = platform;
+    }
+
+    if (workspaceId && workspaceId !== 'main') {
+      query.workspaceId = workspaceId;
+    } else if (workspaceId === 'main') {
+      query.$or = [{ workspaceId: 'main' }, { workspaceId: { $exists: false } }];
+    }
+
+    const flows = await Flow.find(query).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: flows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

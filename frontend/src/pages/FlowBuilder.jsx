@@ -498,9 +498,12 @@ export default function FlowBuilder() {
   // 🚀 NEW: Fetch and Load Flows Logic
   const fetchSavedFlows = async () => {
     try {
-      // Fetch all flows and filter on the frontend by platform
-      const res = await api.get('/whatsapp/flows'); 
-      setSavedFlows((res.data.data || []).filter(f => f.platform === platform));
+      // 🚀 FIX: Pass platform and workspace to backend for correct filtering
+      const res = await api.get('/whatsapp/flows', {
+        params: { platform, workspaceId: selectedWorkspace }
+      });
+      // Backend now returns pre-filtered flows
+      setSavedFlows(res.data.data || []);
     } catch (err) {
       console.error("Fetch flows error:", err);
       toast.error("Failed to fetch flows.");
