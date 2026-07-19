@@ -394,35 +394,6 @@ exports.deleteConversation = async (req, res) => {
   }
 };
 
-// @desc    Delete a whole conversation (soft delete)
-// @route   DELETE /api/chats/conversation/:customerPhone
-exports.deleteConversation = async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    const userRole = req.user?.role;
-    const { customerPhone } = req.params;
-
-    if (userRole !== 'owner') {
-      return res.status(403).json({ success: false, message: 'Only account owner can delete conversations.' });
-    }
-
-    await Message.updateMany(
-      { userId, customerPhone },
-      {
-        $set: {
-          isDeleted: true,
-          deletedBy: userId,
-          deletedAt: new Date(),
-          deleteScope: 'chat'
-        }
-      }
-    );
-    res.status(200).json({ success: true, message: 'Conversation deleted successfully.' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 // @desc    Update Chat Tags or Resolve Status
 // @route   PATCH /api/chats/:customerPhone/status
 exports.updateChatStatus = async (req, res) => {
