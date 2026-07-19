@@ -9,8 +9,8 @@ import ReactFlow, {
   MarkerType,
   Handle,
   MiniMap,
-  Position
-} from 'reactflow';
+  Position,
+  useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus, Camera, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -51,6 +51,7 @@ const loadChatHistory = () => {
 };
 
 function FlowBuilder() {
+  const { fitView } = useReactFlow();
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -137,13 +138,12 @@ function FlowBuilder() {
   // 🚀 FIX: When workspace or platform changes, reset the canvas to a clean state.
   // This prevents saving a flow from one workspace into another by mistake.
   useEffect(() => {
-    if (reactFlowInstance) {
-      setNodes(initialNodes);
-      setEdges([]);
-      setFlowName('');
-      setTimeout(() => reactFlowInstance.fitView({ padding: 0.2, duration: 200 }), 50);
-    }
-  }, [selectedWorkspace, platform, reactFlowInstance, setNodes, setEdges]);
+    setNodes(initialNodes);
+    setEdges([]);
+    setFlowName('');
+    // Use the hook's fitView function which is always available
+    setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
+  }, [selectedWorkspace, platform, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     api.get('/whatsapp/templates')
@@ -154,6 +154,18 @@ function FlowBuilder() {
       })
       .catch((e) => console.error('Template fetch error:', e));
   }, []);
+
+  // 🚀 FIX: When the sidebar palette is toggled, resize the canvas to fit the new container size.
+  useEffect(() => {
+    if (!reactFlowInstance) return;
+    // Give the sidebar CSS transition time to complete before refitting the view
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize')); // Triggers ReactFlow's internal resize observer
+      reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+    }, 300); // Match this with your sidebar's transition duration
+
+    return () => clearTimeout(timer);
+  }, [isPaletteOpen, reactFlowInstance]);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#9ca3af' }, style: { stroke: '#9ca3af', strokeWidth: 2 } }, eds)), [setEdges]);
 
@@ -242,7 +254,7 @@ function FlowBuilder() {
         setAiMessages(prev => [...prev, { role: 'ai', content: res.data.reply || "I couldn't generate the flow." }]);
       }
       if (res.data.nodes && res.data.nodes.length > 0) {
-        setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2, duration: 400 }), 50);
+        setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50);
       }
       setIsAiTyping(false);
     } catch (err) {
@@ -327,7 +339,7 @@ function FlowBuilder() {
       setSelectedWorkspace(fullFlow.workspaceId || 'main');
       setIsFlowListOpen(false);
       toast.success(`Loaded Flow: ${fullFlow.name}`);
-      setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2, duration: 400 }), 50);
+      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50);
     } catch {
       toast.error("Failed to load flow data.");
     }
@@ -378,7 +390,7 @@ function FlowBuilder() {
     setNodes(newNodes);
     setEdges(newEdges);
     toast.success("Template Loaded! You can now customize or save it.");
-    setTimeout(() => reactFlowInstance?.fitView({ padding: 0.2, duration: 400 }), 50);
+    setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50);
   };
 
   // 🚀 NEW: Delete a saved flow

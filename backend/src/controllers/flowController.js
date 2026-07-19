@@ -12,27 +12,28 @@ const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
 };
 
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
-  // 🚀 FINAL FIX v3: This is the most robust and simple query logic.
+  // 🚀 FINAL FIX v4: Simplest and most robust query logic.
   // It correctly combines platform and workspace filters using an explicit $and.
-  const query = {
-    $and: [
-      { userId: userId }
-    ]
-  };
+  const query = { userId: userId };
 
   // Platform filter: For WhatsApp, include old flows where 'platform' field doesn't exist.
   if (platform === 'whatsapp') {
-    query.$and.push({ $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
+    query.$or = [{ platform: 'whatsapp' }, { platform: { $exists: false } }];
   } else if (platform) {
-    query.$and.push({ platform: platform });
+    query.platform = platform;
   }
 
   // Workspace filter
   if (workspaceId && workspaceId !== 'main') {
-    query.$and.push({ workspaceId: workspaceId });
+    query.workspaceId = workspaceId;
   } else if (workspaceId === 'main') {
     // For main, find flows with workspaceId 'main', null, or not existing.
-    query.$and.push({ $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }] });
+    const mainWsOr = query.$or || [];
+    query.$and = [
+      { $or: mainWsOr.length > 0 ? mainWsOr : [{}] }, // Platform condition
+      { $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }] } // Workspace condition
+    ];
+    delete query.$or;
   }
 
   return query;
