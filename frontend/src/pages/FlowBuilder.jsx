@@ -625,10 +625,10 @@ function FlowBuilder() {
   );
 }
 
-const FlowBuilderWithProvider = () => (
+export default function FlowBuilderWithProvider() {
+  return (
   <ReactFlowProvider>
     <FlowBuilder />
   </ReactFlowProvider>
-);
-
-export default FlowBuilderWithProvider;
+  );
+}

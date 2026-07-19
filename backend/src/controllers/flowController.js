@@ -12,15 +12,15 @@ const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
 };
 
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
-  // 🚀 FINAL FIX: This is the most robust and simple query logic.
-  // It correctly combines platform and workspace filters using $and.
+  // 🚀 FINAL FIX v2: Simplest and most robust query logic.
+  // It correctly combines platform and workspace filters using an explicit $and.
   const query = {
     $and: [
       { userId: userId }
     ]
   };
 
-  // Platform filter: For WhatsApp, include old flows where platform wasn't set.
+  // Platform filter: For WhatsApp, include old flows where 'platform' field doesn't exist.
   if (platform === 'whatsapp') {
     query.$and.push({ $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
   } else if (platform) {
