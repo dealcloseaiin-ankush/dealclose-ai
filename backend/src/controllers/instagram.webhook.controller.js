@@ -364,12 +364,15 @@ exports.handleInstagramWebhook = async (req, res) => {
                 }
               };
 
-              let flowQuery = { userId: user._id };
+              // 🚀 FIX: Stricter flow filtering by platform and workspace
+              let flowQuery = { userId: user._id, platform: 'instagram' };
               if (incomingWorkspaceId !== 'main') {
-                  flowQuery = { userId: user._id, workspaceId: { $in: [incomingWorkspaceId, 'main'] } };
+                  // Only fetch flows for this specific workspace
+                  flowQuery.workspaceId = incomingWorkspaceId;
               }
               const userFlows = await Flow.find(flowQuery);
 
+              // Check if the lead is in the middle of a flow
               if (currentLeadCheck && currentLeadCheck.activeFlowState && currentLeadCheck.activeFlowState.flowId) {
                 const activeFlow = userFlows.find(f => f._id.toString() === currentLeadCheck.activeFlowState.flowId);
                 if (activeFlow && activeFlow.flowData) {

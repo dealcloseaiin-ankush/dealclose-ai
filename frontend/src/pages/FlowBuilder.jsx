@@ -13,7 +13,7 @@ import ReactFlow, {
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus, Camera } from 'lucide-react';
+import { MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, FolderOpen, ChevronLeft, Menu, ListPlus, Camera, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -566,6 +566,34 @@ export default function FlowBuilder() {
     toast.success("Template Loaded! You can now customize or save it.");
   };
 
+  // 🚀 NEW: Delete a saved flow
+  const handleDeleteFlow = async (flowId, flowName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the flow "${flowName}"? This action cannot be undone.`)) return;
+
+    try {
+      await api.delete(`/whatsapp/flows/${flowId}`);
+      toast.success(`Flow "${flowName}" deleted.`);
+      // Refresh the list
+      setSavedFlows(prev => prev.filter(f => f._id !== flowId));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete flow.");
+    }
+  };
+
+  // 🚀 NEW: Rename a saved flow
+  const handleRenameFlow = async (flowId, currentName) => {
+    const newName = prompt("Enter the new name for the flow:", currentName);
+    if (!newName || newName.trim() === "" || newName.trim() === currentName) return;
+
+    try {
+      const res = await api.patch(`/whatsapp/flows/${flowId}/rename`, { newName: newName.trim() });
+      toast.success("Flow renamed successfully!");
+      // Update the name in the UI
+      setSavedFlows(prev => prev.map(f => f._id === flowId ? res.data.flow : f));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to rename flow.");
+    }
+  };
   return (
     <>
     {/* Help Guide Modal */}
@@ -623,9 +651,13 @@ export default function FlowBuilder() {
                       {flow.platform === 'instagram' ? 'Instagram' : 'WhatsApp'}
                     </span>
                   </div>
-                  <button onClick={() => loadFlow(flow)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors">
-                    Load Flow
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleRenameFlow(flow._id, flow.name)} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors" title="Rename Flow"><Edit size={16} /></button>
+                    <button onClick={() => handleDeleteFlow(flow._id, flow.name)} className="p-2 text-gray-400 hover:text-rose-400 hover:bg-gray-700 rounded-lg transition-colors" title="Delete Flow"><Trash2 size={16} /></button>
+                    <button onClick={() => loadFlow(flow)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors">
+                      Load
+                    </button>
+                  </div>
                 </div>
               ))
             )}

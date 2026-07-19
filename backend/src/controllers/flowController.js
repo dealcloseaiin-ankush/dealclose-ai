@@ -29,11 +29,11 @@ exports.saveFlow = async (req, res) => {
 
     // Safe check to prevent MongoDB CastError for "main" string
     const isMainWorkspace = !workspaceId || workspaceId === 'main';
-    let query = { userId, name, platform: platform || 'whatsapp' }; // 🚀 NEW: Use platform in query
+    let query = { userId, name, platform: platform || 'whatsapp' };
     if (!isMainWorkspace) query.workspaceId = workspaceId;
 
     // 🚀 STRICT BYPASS: Use findOneAndUpdate to force save workspaceId and flowData even if Model is outdated
-    const updatePayload = { flowData, platform: platform || 'whatsapp' }; // 🚀 NEW: Add platform to payload
+    const updatePayload = { flowData, platform: platform || 'whatsapp' };
     if (!isMainWorkspace) updatePayload.workspaceId = workspaceId; 
 
     console.log("➡️ [DEBUG] MongoDB Query:", query);
@@ -62,5 +62,46 @@ exports.getFlows = async (req, res) => {
     res.status(200).json({ success: true, data: flows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete a Flow
+// @route   DELETE /api/whatsapp/flows/:flowId
+exports.deleteFlow = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { flowId } = req.params;
+
+    const deletedFlow = await Flow.findOneAndDelete({ _id: flowId, userId });
+
+    if (!deletedFlow) {
+      return res.status(404).json({ success: false, message: 'Flow not found or you do not have permission to delete it.' });
+    }
+
+    res.status(200).json({ success: true, message: 'Flow deleted successfully.' });
+  } catch (error) {
+    console.error('❌ [DEBUG] Delete Flow Error:', error);
+    res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
+  }
+};
+
+// @desc    Rename a Flow
+// @route   PATCH /api/whatsapp/flows/:flowId/rename
+exports.renameFlow = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { flowId } = req.params;
+    const { newName } = req.body;
+
+    if (!newName || newName.trim() === '') {
+      return res.status(400).json({ success: false, message: 'New name is required.' });
+    }
+
+    const updatedFlow = await Flow.findOneAndUpdate({ _id: flowId, userId }, { $set: { name: newName } }, { new: true });
+    if (!updatedFlow) return res.status(404).json({ success: false, message: 'Flow not found.' });
+    res.status(200).json({ success: true, message: 'Flow renamed successfully.', flow: updatedFlow });
+  } catch (error) {
+    console.error('❌ [DEBUG] Rename Flow Error:', error);
+    res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
 };
