@@ -783,7 +783,6 @@ export default function FlowBuilder() {
           <Save size={18} /> {isSaving ? 'Saving...' : 'Save & Publish'}
           </button>
         </div>
-        <ReactFlowProvider>
           
           {/* 🚀 NEW: AI Flow Assistant Widget Floating */}
           <div 
@@ -846,9 +845,14 @@ export default function FlowBuilder() {
             <Controls className="bg-[#111] border border-gray-800 text-white fill-white" />
             <MiniMap style={{ backgroundColor: '#111', border: '1px solid #333' }} nodeColor="#4B5563" maskColor="rgba(0,0,0,0.7)" />
           </ReactFlow>
-        </ReactFlowProvider>
       </div>
     </div>
     </>
   );
 }
+
+export default () => (
+  <ReactFlowProvider>
+    <FlowBuilder />
+  </ReactFlowProvider>
+);
