@@ -51,6 +51,7 @@ const loadChatHistory = () => {
 };
 
 function FlowBuilder() {
+  // 🚀 FIX: useReactFlow hook ko yahan call karna zaroori hai taaki fitView jaisi cheezein kaam karein.
   const { fitView } = useReactFlow();
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -138,12 +139,13 @@ function FlowBuilder() {
   // 🚀 FIX: When workspace or platform changes, reset the canvas to a clean state.
   // This prevents saving a flow from one workspace into another by mistake.
   useEffect(() => {
-    setNodes(initialNodes);
-    setEdges([]);
-    setFlowName('');
-    // Use the hook's fitView function which is always available
-    setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
-  }, [selectedWorkspace, platform, setNodes, setEdges, fitView]);
+    if (reactFlowInstance) { // Ensure instance is ready before resetting
+      setNodes(initialNodes);
+      setEdges([]);
+      setFlowName('');
+      setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
+    }
+  }, [selectedWorkspace, platform, reactFlowInstance, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     api.get('/whatsapp/templates')

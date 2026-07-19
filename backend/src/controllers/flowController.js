@@ -12,28 +12,25 @@ const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
 };
 
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
-  // 🚀 FINAL FIX v4: Simplest and most robust query logic.
+  // 🚀 FINAL FIX v5: This is the most robust and simple query logic.
   // It correctly combines platform and workspace filters using an explicit $and.
-  const query = { userId: userId };
+  const query = { $and: [{ userId }] };
 
   // Platform filter: For WhatsApp, include old flows where 'platform' field doesn't exist.
   if (platform === 'whatsapp') {
-    query.$or = [{ platform: 'whatsapp' }, { platform: { $exists: false } }];
+    query.$and.push({ $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
   } else if (platform) {
-    query.platform = platform;
+    query.$and.push({ platform });
   }
 
   // Workspace filter
   if (workspaceId && workspaceId !== 'main') {
-    query.workspaceId = workspaceId;
+    query.$and.push({ workspaceId });
   } else if (workspaceId === 'main') {
     // For main, find flows with workspaceId 'main', null, or not existing.
-    const mainWsOr = query.$or || [];
-    query.$and = [
-      { $or: mainWsOr.length > 0 ? mainWsOr : [{}] }, // Platform condition
-      { $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }] } // Workspace condition
-    ];
-    delete query.$or;
+    query.$and.push({
+      $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }]
+    });
   }
 
   return query;
@@ -103,6 +100,15 @@ async function getFlows(req, res) {
       const flow = await Flow.findOne({ _id: flowId, userId }).lean();
       return res.json({ success: true, data: flow ? [flow] : [] });
     }
+
+    // 🚀 NEW DEBUG LOG: Fetch all flows for the user to see the total count before filtering.
+    const allUserFlows = await Flow.find({ userId }).select('name platform workspaceId').lean();
+    console.log(`[Flow Master Debug] User ${userId} has a total of ${allUserFlows.length} flows in the database.`);
+    console.log('[Flow Master Debug] All Flows List:', allUserFlows.map(f => ({ 
+      name: f.name, 
+      platform: f.platform || 'whatsapp (old)', 
+      workspace: f.workspaceId || 'main' 
+    })));
 
     const query = buildFlowListQuery({ userId, workspaceId, platform });
 
