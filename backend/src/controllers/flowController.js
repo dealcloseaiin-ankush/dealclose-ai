@@ -12,20 +12,30 @@ const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
 };
 
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
-  // 🐛 FIX: The previous logic had a flaw where the `$or` for the main workspace
-  // would override the platform filter. This new structure ensures both conditions
-  // are applied correctly using `$and`.
-  const query = { userId, platform: platform || 'whatsapp' };
+  const query = { userId };
+
+  // 🐛 FINAL FIX: This is the most robust query. It handles all cases:
+  // 1. If platform is 'whatsapp', it finds docs where platform is 'whatsapp' OR where the platform field doesn't exist at all (for old data).
+  // 2. If platform is 'instagram', it ONLY finds docs where platform is 'instagram'.
+  if (platform === 'whatsapp') {
+    query.$or = [{ platform: 'whatsapp' }, { platform: { $exists: false } }];
+  } else if (platform) {
+    query.platform = platform;
+  }
 
   if (workspaceId && workspaceId !== 'main') {
     query.workspaceId = workspaceId;
   } else if (workspaceId === 'main') {
     // For the main workspace, we need to find flows that are either explicitly 'main'
     // or have no workspaceId set (for backward compatibility).
-    query.$or = [
-      { workspaceId: 'main' },
-      { workspaceId: { $in: [null, ''] } }
-    ];
+    const mainWsQuery = { $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }] };
+    // Combine with existing platform query if it exists
+    if (query.$or) {
+      query.$and = [ { $or: query.$or }, mainWsQuery ];
+      delete query.$or;
+    } else {
+      query.$or = mainWsQuery.$or;
+    }
   }
 
   return query;
