@@ -69,7 +69,12 @@ exports.getFlows = async (req, res) => {
     if (workspaceId && workspaceId !== 'main') {
       query.workspaceId = workspaceId;
     } else if (workspaceId === 'main') {
-      query.$or = [{ workspaceId: 'main' }, { workspaceId: { $exists: false } }];
+      // 🚀 FIX: Optimized query to correctly fetch flows for the main workspace.
+      // This now correctly includes flows where workspaceId is 'main', null, undefined, or an empty string.
+      query.$or = [
+        { workspaceId: 'main' },
+        { workspaceId: { $in: [null, ''] } }
+      ];
     }
 
     const flows = await Flow.find(query).sort({ createdAt: -1 });
