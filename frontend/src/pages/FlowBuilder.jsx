@@ -516,21 +516,30 @@ export default function FlowBuilder() {
     fetchSavedFlows();
   }, [isFlowListOpen, fetchSavedFlows]);
 
-  const loadFlow = (flow) => {
-    if (flow.flowData) {
-      const flowPlatform = flow.platform || platform;
-      const normalizedNodes = (flow.flowData.nodes || []).map((node) => ({
+  const loadFlow = async (flow) => {
+    try {
+      // 🚀 PERFORMANCE FIX: Fetch the full flow data only when the user clicks 'Load'.
+      // The initial list fetch no longer includes the heavy 'flowData'.
+      const res = await api.get(`/whatsapp/flows?flowId=${flow._id}`);
+      const fullFlow = res.data.data[0]; // Assuming the API returns an array
+
+      if (!fullFlow || !fullFlow.flowData) return toast.error("Could not load flow details.");
+
+      const flowPlatform = fullFlow.platform || platform;
+      const normalizedNodes = (fullFlow.flowData.nodes || []).map((node) => ({
         ...node,
         data: { ...(node.data || {}), platform: flowPlatform },
       }));
 
       setNodes(normalizedNodes);
-      setEdges(flow.flowData.edges || []);
-      setFlowName(flow.name || '');
+      setEdges(fullFlow.flowData.edges || []);
+      setFlowName(fullFlow.name || '');
       setPlatform(flowPlatform);
-      setSelectedWorkspace(flow.workspaceId || 'main');
+      setSelectedWorkspace(fullFlow.workspaceId || 'main');
       setIsFlowListOpen(false);
-      toast.success(`Loaded Flow: ${flow.name}`);
+      toast.success(`Loaded Flow: ${fullFlow.name}`);
+    } catch {
+      toast.error("Failed to load flow data.");
     }
   };
 

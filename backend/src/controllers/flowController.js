@@ -91,8 +91,10 @@ async function getFlows(req, res) {
 
     const query = buildFlowListQuery({ userId, workspaceId, platform });
 
+    // 🚀 PERFORMANCE FIX: Exclude the heavy 'flowData' field when just listing flows.
+    // This reduces the payload size from MBs to KBs, making the 'My Flows' modal load instantly.
     const flows = await Flow.find(query)
-      .select({ _id: 1, name: 1, workspaceId: 1, platform: 1, flowData: 1, createdAt: 1, updatedAt: 1, isActive: 1 })
+      .select({ flowData: 0 }) // Exclude flowData
       .sort({ createdAt: -1 })
       .lean();
 
