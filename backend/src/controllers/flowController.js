@@ -87,7 +87,13 @@ async function saveFlow(req, res) {
 async function getFlows(req, res) {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { workspaceId, platform } = req.query;
+    const { workspaceId, platform, flowId } = req.query;
+
+    // 🚀 FIX: Handle single flow fetch for the 'Load' button correctly.
+    if (flowId) {
+      const flow = await Flow.findOne({ _id: flowId, userId }).lean();
+      return res.json({ success: true, data: flow ? [flow] : [] });
+    }
 
     const query = buildFlowListQuery({ userId, workspaceId, platform });
 
