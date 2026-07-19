@@ -1,8 +1,38 @@
 const Flow = require('../models/flowModel');
 
+const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
+  const isMainWorkspace = !workspaceId || workspaceId === 'main';
+  const query = { userId, name, platform: platform || 'whatsapp' };
+
+  if (!isMainWorkspace) {
+    query.workspaceId = workspaceId;
+  }
+
+  return query;
+};
+
+const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
+  const query = { userId };
+
+  if (platform) {
+    query.platform = platform;
+  }
+
+  if (workspaceId && workspaceId !== 'main') {
+    query.workspaceId = workspaceId;
+  } else if (workspaceId === 'main') {
+    query.$or = [
+      { workspaceId: 'main' },
+      { workspaceId: { $in: [null, ''] } }
+    ];
+  }
+
+  return query;
+};
+
 // @desc    Save or Update a Flow
 // @route   POST /api/whatsapp/flows
-exports.saveFlow = async (req, res) => {
+async function saveFlow(req, res) {
   try {
     console.log("\n➡️ [DEBUG] POST /api/whatsapp/flows called!");
     console.log("➡️ [DEBUG] Request Body:", JSON.stringify(req.body).substring(0, 150) + "...");
@@ -29,12 +59,11 @@ exports.saveFlow = async (req, res) => {
 
     // Safe check to prevent MongoDB CastError for "main" string
     const isMainWorkspace = !workspaceId || workspaceId === 'main';
-    let query = { userId, name, platform: platform || 'whatsapp' };
-    if (!isMainWorkspace) query.workspaceId = workspaceId;
+    const query = buildFlowSaveQuery({ userId, name, workspaceId, platform });
 
     // 🚀 STRICT BYPASS: Use findOneAndUpdate to force save workspaceId and flowData even if Model is outdated
     const updatePayload = { flowData, platform: platform || 'whatsapp' };
-    if (!isMainWorkspace) updatePayload.workspaceId = workspaceId; 
+    if (!isMainWorkspace) updatePayload.workspaceId = workspaceId;
 
     console.log("➡️ [DEBUG] MongoDB Query:", query);
 
@@ -51,42 +80,31 @@ exports.saveFlow = async (req, res) => {
     console.error('❌ [DEBUG] Save Flow Error details:', error);
     res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
-};
+}
 
 // @desc    Get all Flows for User
 // @route   GET /api/whatsapp/flows
-exports.getFlows = async (req, res) => {
+async function getFlows(req, res) {
   try {
     const userId = req.user?._id || req.user?.id;
     const { workspaceId, platform } = req.query;
 
-    let query = { userId };
+    const query = buildFlowListQuery({ userId, workspaceId, platform });
 
-    if (platform) {
-      query.platform = platform;
-    }
+    const flows = await Flow.find(query)
+      .select({ _id: 1, name: 1, workspaceId: 1, platform: 1, flowData: 1, createdAt: 1, updatedAt: 1, isActive: 1 })
+      .sort({ createdAt: -1 })
+      .lean();
 
-    if (workspaceId && workspaceId !== 'main') {
-      query.workspaceId = workspaceId;
-    } else if (workspaceId === 'main') {
-      // 🚀 FIX: Optimized query to correctly fetch flows for the main workspace.
-      // This now correctly includes flows where workspaceId is 'main', null, undefined, or an empty string.
-      query.$or = [
-        { workspaceId: 'main' },
-        { workspaceId: { $in: [null, ''] } }
-      ];
-    }
-
-    const flows = await Flow.find(query).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: flows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
-};
+}
 
 // @desc    Delete a Flow
 // @route   DELETE /api/whatsapp/flows/:flowId
-exports.deleteFlow = async (req, res) => {
+async function deleteFlow(req, res) {
   try {
     const userId = req.user?._id || req.user?.id;
     const { flowId } = req.params;
@@ -102,11 +120,11 @@ exports.deleteFlow = async (req, res) => {
     console.error('❌ [DEBUG] Delete Flow Error:', error);
     res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
-};
+}
 
 // @desc    Rename a Flow
 // @route   PATCH /api/whatsapp/flows/:flowId/rename
-exports.renameFlow = async (req, res) => {
+async function renameFlow(req, res) {
   try {
     const userId = req.user?._id || req.user?.id;
     const { flowId } = req.params;
@@ -123,4 +141,13 @@ exports.renameFlow = async (req, res) => {
     console.error('❌ [DEBUG] Rename Flow Error:', error);
     res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
+}
+
+module.exports = {
+  saveFlow,
+  getFlows,
+  deleteFlow,
+  renameFlow,
+  buildFlowSaveQuery,
+  buildFlowListQuery
 };

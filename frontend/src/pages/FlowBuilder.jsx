@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -56,16 +56,8 @@ const TriggerNode = ({ id, data }) => {
   );
 };
 
-const MessageNode = ({ id, data, ...props }) => {
+const MessageNode = ({ id, data, templates = [], ...props }) => {
   const { setNodes, setEdges } = useReactFlow();
-  const [templates, setTemplates] = useState([]);
-  
-  useEffect(() => {
-    // Fetch real templates from Meta via our backend
-    api.get('/whatsapp/templates').then(res => {
-      if (Array.isArray(res.data)) setTemplates(res.data);
-    }).catch(e => console.error("Template fetch error:", e));
-  }, []);
 
   // 🚀 NEW: Check the platform from the node's data (passed down from the main component)
   const isInstagram = props.data?.platform === 'instagram';
@@ -250,15 +242,6 @@ const MenuNode = ({ id, data }) => {
   );
 };
 
-const nodeTypes = {
-  trigger: TriggerNode,
-  message: MessageNode,
-  delay: DelayNode,
-  condition: ConditionNode,
-  askQuestion: AskQuestionNode,
-  menu: MenuNode
-};
-
 const initialNodes = [
   {
     id: '1',
@@ -307,6 +290,7 @@ export default function FlowBuilder() {
   const [mainBusinessName, setMainBusinessName] = useState('DealClose AI (Main)');
   const [platform, setPlatform] = useState('whatsapp'); // 🚀 NEW: State for platform
   const [flowName, setFlowName] = useState('');
+  const [templates, setTemplates] = useState([]);
   
   // 🚀 NEW: Flow List Modal States
   const [isFlowListOpen, setIsFlowListOpen] = useState(false);
@@ -373,7 +357,17 @@ export default function FlowBuilder() {
         setMainBusinessName(bName);
       }
     }).catch(console.error);
-  }, [setNodes]);
+  }, []);
+
+  useEffect(() => {
+    api.get('/whatsapp/templates')
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setTemplates(res.data);
+        }
+      })
+      .catch((e) => console.error('Template fetch error:', e));
+  }, []);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed, color: '#9ca3af' }, style: { stroke: '#9ca3af', strokeWidth: 2 } }, eds)), [setEdges]);
 
@@ -404,13 +398,13 @@ export default function FlowBuilder() {
       const newNode = {
         id: getId(),
         type,
-        position, 
-        data: { label },
+        position,
+        data: { label, platform },
       };
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, platform, setNodes]
   );
 
   // 🚀 NEW: Handle Click-to-add for Sidebar Buttons (Taki bina drag kiye bhi add ho sakein)
@@ -425,11 +419,11 @@ export default function FlowBuilder() {
     const newNode = {
       id: getId(),
       type,
-      position: { x: 300 + Math.random() * 50, y: 150 + Math.random() * 50 }, 
-      data: { label },
+      position: { x: 300 + Math.random() * 50, y: 150 + Math.random() * 50 },
+      data: { label, platform },
     };
     setNodes((nds) => nds.concat(newNode));
-  }, [setNodes]); 
+  }, [platform, setNodes]); 
 
   // 🚀 NEW: Handle AI Prompt to Auto-Generate Flow
   const handleAiSubmit = async (e) => {
@@ -471,6 +465,15 @@ export default function FlowBuilder() {
     }
   };
 
+  const nodeTypes = useMemo(() => ({
+    trigger: TriggerNode,
+    message: (props) => <MessageNode {...props} templates={templates} />,
+    delay: DelayNode,
+    condition: ConditionNode,
+    askQuestion: AskQuestionNode,
+    menu: MenuNode
+  }), [templates]);
+
   const handleSave = async () => {
     console.log("➡️ [DEBUG] Save button clicked!");
     if (!reactFlowInstance) {
@@ -496,26 +499,35 @@ export default function FlowBuilder() {
   };
 
   // 🚀 NEW: Fetch and Load Flows Logic
-  const fetchSavedFlows = async () => {
+  const fetchSavedFlows = useCallback(async () => {
     try {
-      // 🚀 FIX: Pass platform and workspace to backend for correct filtering
       const res = await api.get('/whatsapp/flows', {
         params: { platform, workspaceId: selectedWorkspace }
       });
-      // Backend now returns pre-filtered flows
       setSavedFlows(res.data.data || []);
     } catch (err) {
       console.error("Fetch flows error:", err);
       toast.error("Failed to fetch flows.");
     }
-  };
+  }, [platform, selectedWorkspace]);
+
+  useEffect(() => {
+    if (!isFlowListOpen) return;
+    fetchSavedFlows();
+  }, [isFlowListOpen, fetchSavedFlows]);
 
   const loadFlow = (flow) => {
     if (flow.flowData) {
-      setNodes(flow.flowData.nodes || []);
+      const flowPlatform = flow.platform || platform;
+      const normalizedNodes = (flow.flowData.nodes || []).map((node) => ({
+        ...node,
+        data: { ...(node.data || {}), platform: flowPlatform },
+      }));
+
+      setNodes(normalizedNodes);
       setEdges(flow.flowData.edges || []);
-      setFlowName(flow.name);
-      setPlatform(flow.platform || 'whatsapp');
+      setFlowName(flow.name || '');
+      setPlatform(flowPlatform);
       setSelectedWorkspace(flow.workspaceId || 'main');
       setIsFlowListOpen(false);
       toast.success(`Loaded Flow: ${flow.name}`);

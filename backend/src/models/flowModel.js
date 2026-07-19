@@ -9,7 +9,8 @@ const flowSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
-// Ensure one main flow per user for now
-flowSchema.index({ userId: 1, name: 1 }, { unique: true });
+// Allow the same flow name across different workspaces/platforms, but prevent duplicates in the same scope.
+flowSchema.index({ userId: 1, platform: 1, workspaceId: 1, name: 1 }, { unique: true });
+flowSchema.index({ userId: 1, platform: 1, workspaceId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Flow', flowSchema);
