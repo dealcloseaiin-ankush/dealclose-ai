@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { useAuth } from '../hooks/useAuth';
-import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import more icons for the new UI
+import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus, Calendar, Clock, Repeat, Instagram, Facebook } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
 
 import CanvasRenderer from '../components/editor/CanvasRenderer'; // 🚀 NEW
@@ -26,6 +26,11 @@ export default function PublishPost() {
   const [caption, setCaption] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState('');
+
+  // 🚀 NEW: State for advanced publishing options
+  const [publishMode, setPublishMode] = useState('now'); // now, schedule
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [platforms, setPlatforms] = useState({ instagram: true, facebook: false });
 
   // 🚀 UPGRADED: Canvas logic is now managed by the useFabric hook
   const canvasRef = useRef(null);
@@ -95,6 +100,10 @@ export default function PublishPost() {
     formData.append('image', imageFileFromCanvas);
     formData.append('caption', caption);
     formData.append('workspaceId', activeWorkspace);
+    // 🚀 NEW: Send publishing options to backend
+    formData.append('publishMode', publishMode);
+    if (publishMode === 'schedule') formData.append('scheduledAt', scheduleDate);
+    formData.append('platforms', JSON.stringify(Object.keys(platforms).filter(p => platforms[p])));
 
     try {
       const { data } = await api.post('/instagram/publish', formData, {
@@ -102,7 +111,11 @@ export default function PublishPost() {
       });
 
       if (data.success) {
-        toast.success('Post published successfully!', { id: toastId });
+        if (publishMode === 'schedule') {
+          toast.success('Post scheduled successfully!', { id: toastId });
+        } else {
+          toast.success('Post published successfully!', { id: toastId });
+        }
         setPublishedUrl(data.postUrl);
       } else {
         throw new Error(data.message || 'An unknown error occurred.');
@@ -126,14 +139,19 @@ export default function PublishPost() {
     setIsAiWorking(true);
 
     try {
+      // 🚀 NEW: Check if there's a design on the canvas to edit.
+      const currentDesignJson = exportToJson();
+      const isEditing = currentDesignJson && currentDesignJson.layers.length > 0;
+
       // 🚀 REAL API CALL to the new backend endpoint
       const { data } = await api.post('/instagram/ai-generate-post', {
         prompt: chatInput,
-        workspaceId: activeWorkspace
+        workspaceId: activeWorkspace,
+        existingDesign: isEditing ? currentDesignJson : null // Pass existing design for edits
       });
 
       if (data.success) {
-        setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply }]);
+        setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply || (isEditing ? "I've updated the design for you!" : "Here's a new design!") }]);
         // 🚀 Render the generated design on the canvas
         if (renderDesign) renderDesign(data.designJson);
         toast.success('AI has generated a new design!');
@@ -154,6 +172,11 @@ export default function PublishPost() {
     }
     console.log("Saving draft:", { designData, caption });
     toast.success("Draft saved successfully! (Backend to be implemented)");
+  };
+
+  // 🚀 NEW: Handler for platform selection
+  const togglePlatform = (platform) => {
+    setPlatforms(prev => ({ ...prev, [platform]: !prev[platform] }));
   };
 
   // 🚀 NEW: Toolbar action handler
@@ -197,23 +220,56 @@ export default function PublishPost() {
           <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-xl">
             <form onSubmit={(e) => { e.preventDefault(); handlePublish(); }} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">2. Write Caption</label>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Write Caption</label>
                 <textarea
                   rows="8"
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   required
                   placeholder="Write your engaging caption here..."
-                  className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-pink-500 outline-none"
+                  className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-pink-500 outline-none transition-colors"
                 ></textarea>
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={handleSaveDraft} className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2">
+
+              {/* 🚀 NEW: Platform Selector */}
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Publish to</label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => togglePlatform('instagram')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${platforms.instagram ? 'bg-pink-500/20 border-pink-500 text-white' : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+                    <Instagram size={18} /> Instagram
+                  </button>
+                  <button type="button" onClick={() => togglePlatform('facebook')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${platforms.facebook ? 'bg-blue-500/20 border-blue-500 text-white' : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+                    <Facebook size={18} /> Facebook
+                  </button>
+                </div>
+              </div>
+
+              {/* 🚀 NEW: Scheduling Options */}
+              <div>
+                <div className="flex bg-[#0a0a0a] p-1 rounded-lg border border-gray-700">
+                  <button type="button" onClick={() => setPublishMode('now')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${publishMode === 'now' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Publish Now</button>
+                  <button type="button" onClick={() => setPublishMode('schedule')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${publishMode === 'schedule' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Schedule</button>
+                </div>
+                {publishMode === 'schedule' && (
+                  <div className="mt-3">
+                    <input 
+                      type="datetime-local"
+                      value={scheduleDate}
+                      onChange={(e) => setScheduleDate(e.target.value)}
+                      className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-gray-800">
+                <button type="button" onClick={handleSaveDraft} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2">
                   <Save size={18} /> {editingDraft ? 'Update Draft' : 'Save Draft'}
                 </button>
                 <button type="submit" disabled={isPublishing} className="flex-1 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-pink-600/20 disabled:opacity-50 flex justify-center items-center gap-2">
-                  {isPublishing ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-                  Publish Now
+                  {isPublishing ? <Loader2 className="animate-spin" /> : (publishMode === 'schedule' ? <Calendar size={18} /> : <Send size={18} />)}
+                  {publishMode === 'schedule' ? 'Schedule Post' : 'Publish Now'}
                 </button>
               </div>
 

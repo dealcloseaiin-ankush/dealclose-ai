@@ -6,7 +6,7 @@ const DraftPost = require('../models/DraftPostModel'); // 🚀 NEW: Draft model
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
-const aiDesignService = require('../services/aiDesignService'); // 🚀 Use the new design service
+const aiTemplateService = require('../services/aiTemplateService'); // 🚀 Use the new TEMPLATE service
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 
@@ -377,10 +377,15 @@ exports.generateAiPost = async (req, res) => {
     const businessName = selectedWorkspace ? selectedWorkspace.name : user.businessName;
     const businessDescription = selectedWorkspace ? selectedWorkspace.businessDescription : user.businessDescription;
 
-    const businessContext = `Business Name: ${businessName}. Details: ${businessDescription || 'Not provided'}.`;
+    const businessContext = {
+      name: businessName,
+      description: businessDescription,
+      phone: user.ownerPhone || '',
+      brandKit: user.brandKit // Pass the entire brand kit
+    };
 
-    // 🚀 Generate the full design JSON
-    const designJson = await aiDesignService.generateDesignJson(prompt, businessContext);
+    // 🚀 UPGRADED: Call the new template filling service
+    const designJson = await aiTemplateService.fillTemplateWithAI(prompt, businessContext);
 
     // The AI now provides the conversational reply within the JSON
     const aiReply = "I've created a new design for you! You can now edit it on the canvas.";

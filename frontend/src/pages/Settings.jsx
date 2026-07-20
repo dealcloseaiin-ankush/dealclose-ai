@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api'; // Import our Axios instance
-import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database } from 'lucide-react';
+import { Eye, EyeOff, Shield, Plus, Trash2, Briefcase, CheckCircle, Edit, Zap, Database, Upload, Palette, Type } from 'lucide-react';
 import MetaConnectButton from '../components/MetaConnectButton';
 
 export default function Settings() {
@@ -37,10 +37,20 @@ export default function Settings() {
     customWebhooks: [],
     igAccessToken: '',
     igAccountId: '',
-    fbPageId: ''
-    // ownerBusinessId will be part of whatsappConfig or workspace.whatsappConfig
+    fbPageId: '',
+    // 🚀 NEW: Brand Kit state
+    brandKit: {
+      logoUrl: '',
+      businessName: '',
+      primaryColor: '#000000',
+      secondaryColor: '#FFFFFF',
+      font: 'Arial',
+    },
   });
   
+  // 🚀 NEW: State for logo upload
+  const [logoFile, setLogoFile] = useState(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [devApiKey, setDevApiKey] = useState('');
   
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -125,22 +135,23 @@ export default function Settings() {
       console.log("➡️ [Settings Debug] Data fetched from DB:", savedData);
       
       if (savedData) {
-        setConfig({
-          whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || '',
-          phoneNumberId: savedData.phoneNumberId || savedData.whatsappConfig?.phoneNumberId || '',
-          wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || '',
-          ownerBusinessId: savedData.whatsappConfig?.ownerBusinessId || '', // 🆕 Load Business ID
-          twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || '',
-          twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || '',
-          twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || '',
-          instagramLink: savedData.digitalCardConfig?.instagram || '',
-          facebookLink: savedData.digitalCardConfig?.facebook || '',
-          youtubeLink: savedData.digitalCardConfig?.youtube || '',
-          googleReviewLink: savedData.digitalCardConfig?.googleReview || '',
-          websiteLink: savedData.digitalCardConfig?.website || '',
-          discountPercentage: savedData.discountConfig?.percentage || '',
-          discountCode: savedData.discountConfig?.code || '',
-          validityDays: savedData.discountConfig?.validityDays || '30',
+        setConfig(prevConfig => ({
+          ...prevConfig,
+          whatsappToken: savedData.whatsappToken || savedData.whatsappConfig?.accessToken || prevConfig.whatsappToken,
+          phoneNumberId: savedData.phoneNumberId || savedData.whatsappConfig?.phoneNumberId || prevConfig.phoneNumberId,
+          wabaId: savedData.wabaId || savedData.whatsappConfig?.wabaId || prevConfig.wabaId,
+          ownerBusinessId: savedData.whatsappConfig?.ownerBusinessId || prevConfig.ownerBusinessId,
+          twilioSid: savedData.twilioSid || savedData.twilioConfig?.sid || prevConfig.twilioSid,
+          twilioAuthToken: savedData.twilioAuthToken || savedData.twilioConfig?.authToken || prevConfig.twilioAuthToken,
+          twilioPhone: savedData.twilioPhone || savedData.twilioConfig?.phone || prevConfig.twilioPhone,
+          instagramLink: savedData.digitalCardConfig?.instagram || prevConfig.instagramLink,
+          facebookLink: savedData.digitalCardConfig?.facebook || prevConfig.facebookLink,
+          youtubeLink: savedData.digitalCardConfig?.youtube || prevConfig.youtubeLink,
+          googleReviewLink: savedData.digitalCardConfig?.googleReview || prevConfig.googleReviewLink,
+          websiteLink: savedData.digitalCardConfig?.website || prevConfig.websiteLink,
+          discountPercentage: savedData.discountConfig?.percentage || prevConfig.discountPercentage,
+          discountCode: savedData.discountConfig?.code || prevConfig.discountCode,
+          validityDays: savedData.discountConfig?.validityDays || prevConfig.validityDays,
           workspaces: (savedData.workspaces || []).map((ws) => ({
             ...ws,
             instagramConfig: ws.instagramConfig || {},
@@ -148,22 +159,23 @@ export default function Settings() {
           aiAgentEnabled: savedData.aiAgentEnabled !== false,
           acceptCollabs: savedData.acceptCollabs || false,
           businessDescription: savedData.businessDescription || '',
-          businessName: savedData.businessName || '',
           aiRules: savedData.aiRules || '',
-          ownerPhone: savedData.ownerPhone || '',
-          metaPixelId: savedData.metaAdsConfig?.pixelId || '',
-          metaAccessToken: savedData.metaAdsConfig?.accessToken || '',
-          externalApiUrl: savedData.externalApiUrl || '',
-          externalApiToken: savedData.externalApiToken || '',
-          externalApiSearchUrl: savedData.externalApiSearchUrl || '',
-          externalApiPostUrl: savedData.externalApiPostUrl || '',
-          externalApiBlogUrl: savedData.externalApiBlogUrl || '',
-          externalApiVisitUrl: savedData.externalApiVisitUrl || '',
-          customWebhooks: savedData.customWebhooks || [],
-          igAccessToken: savedData.instagramConfig?.accessToken || '',
-          igAccountId: savedData.instagramConfig?.instagramAccountId || '',
-          fbPageId: savedData.instagramConfig?.facebookPageId || ''
-        });
+          metaPixelId: savedData.metaAdsConfig?.pixelId || prevConfig.metaPixelId,
+          metaAccessToken: savedData.metaAdsConfig?.accessToken || prevConfig.metaAccessToken,
+          externalApiUrl: savedData.externalApiUrl || prevConfig.externalApiUrl,
+          externalApiToken: savedData.externalApiToken || prevConfig.externalApiToken,
+          externalApiSearchUrl: savedData.externalApiSearchUrl || prevConfig.externalApiSearchUrl,
+          externalApiPostUrl: savedData.externalApiPostUrl || prevConfig.externalApiPostUrl,
+          externalApiBlogUrl: savedData.externalApiBlogUrl || prevConfig.externalApiBlogUrl,
+          externalApiVisitUrl: savedData.externalApiVisitUrl || prevConfig.externalApiVisitUrl,
+          customWebhooks: savedData.customWebhooks || prevConfig.customWebhooks,
+          igAccessToken: savedData.instagramConfig?.accessToken || prevConfig.igAccessToken,
+          igAccountId: savedData.instagramConfig?.instagramAccountId || prevConfig.igAccountId,
+          fbPageId: savedData.instagramConfig?.facebookPageId || prevConfig.fbPageId,
+          brandKit: savedData.brandKit || prevConfig.brandKit || {},
+          businessName: savedData.brandKit?.businessName || savedData.businessName || '',
+          ownerPhone: savedData.brandKit?.phone || savedData.ownerPhone || ''
+        }));
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
         setGoogleConnected(!!(savedData.googleSheetsConfig && savedData.googleSheetsConfig.accessToken));
@@ -182,6 +194,12 @@ export default function Settings() {
 
   const handleChange = (e) => {
     setConfig({ ...config, [e.target.name]: e.target.value });
+  };
+
+  // 🚀 NEW: Handler for Brand Kit changes
+  const handleBrandKitChange = (e) => {
+    const { name, value } = e.target;
+    setConfig(prev => ({ ...prev, brandKit: { ...prev.brandKit, [name]: value } }));
   };
 
   const handleWorkspaceChange = (index, field, value) => {
@@ -235,6 +253,26 @@ export default function Settings() {
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     try {
+      let finalLogoUrl = config.brandKit.logoUrl;
+      if (logoFile) {
+        setIsUploadingLogo(true);
+        const formData = new FormData();
+        formData.append('file', logoFile);
+        try {
+          const uploadRes = await api.post('/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          finalLogoUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+        } catch (uploadErr) {
+          console.error("Logo upload failed:", uploadErr);
+          setIsUploadingLogo(false);
+          return;
+        } finally {
+          setIsUploadingLogo(false);
+        }
+      }
+
+
       const payload = {
         aiAgentEnabled: config.aiAgentEnabled,
         acceptCollabs: config.acceptCollabs,
@@ -275,7 +313,12 @@ export default function Settings() {
           facebookPageId: config.fbPageId
         },
         externalApiUrl: config.externalApiUrl,
-        externalApiToken: config.externalApiToken,
+        externalApiToken: config.externalApiToken, // ... other fields
+        brandKit: {
+          ...config.brandKit,
+          logoUrl: finalLogoUrl,
+          businessName: config.businessName // Also save business name into brandkit
+        },
         externalApiSearchUrl: config.externalApiSearchUrl,
         externalApiPostUrl: config.externalApiPostUrl,
         externalApiBlogUrl: config.externalApiBlogUrl,
@@ -474,6 +517,54 @@ export default function Settings() {
             {/* VIEW 1: MAIN BUSINESS (GLOBAL SETTINGS) */}
             {isMain && (
               <form onSubmit={handleSave} className="space-y-8 animate-fade-in">
+
+                {/* 🚀 NEW: Brand Kit Section */}
+                <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-purple-500/30">
+                  <h2 className="text-lg font-semibold text-purple-400 flex items-center gap-2 mb-6">
+                    <Palette size={20} /> Brand Kit
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    {/* Logo Upload */}
+                    <div className="flex flex-col items-center gap-3">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Brand Logo</label>
+                      <div className="w-32 h-32 bg-[#0a0a0a] border-2 border-dashed border-gray-700 rounded-full flex items-center justify-center overflow-hidden">
+                        {logoFile ? (
+                          <img src={URL.createObjectURL(logoFile)} alt="Logo Preview" className="w-full h-full object-cover" />
+                        ) : config.brandKit.logoUrl ? (
+                          <img src={config.brandKit.logoUrl} alt="Brand Logo" className="w-full h-full object-cover" />
+                        ) : (
+                          <Upload size={32} className="text-gray-500" />
+                        )}
+                      </div>
+                      <label className="text-xs bg-gray-800 hover:bg-gray-700 text-white font-bold px-4 py-2 rounded-lg cursor-pointer transition-colors">
+                        {isUploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                        <input type="file" accept="image/png, image/jpeg" className="hidden" onChange={(e) => setLogoFile(e.target.files[0])} disabled={isUploadingLogo} />
+                      </label>
+                    </div>
+
+                    {/* Colors & Font */}
+                    <div className="md:col-span-2 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Brand Colors</label>
+                        <div className="flex gap-4">
+                          <div className="flex-1 flex items-center gap-2 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3">
+                            <input type="color" name="primaryColor" value={config.brandKit.primaryColor} onChange={handleBrandKitChange} className="w-8 h-8 bg-transparent border-none cursor-pointer" />
+                            <span className="text-sm text-gray-400">Primary</span>
+                          </div>
+                          <div className="flex-1 flex items-center gap-2 bg-[#0a0a0a] border border-gray-700 rounded-xl p-3">
+                            <input type="color" name="secondaryColor" value={config.brandKit.secondaryColor} onChange={handleBrandKitChange} className="w-8 h-8 bg-transparent border-none cursor-pointer" />
+                            <span className="text-sm text-gray-400">Secondary</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Brand Font</label>
+                        <input type="text" name="font" value={config.brandKit.font} onChange={handleBrandKitChange} placeholder="e.g. Montserrat" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* AI Agent Configuration (Main) */}
                 <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-gray-800">
                   <div className="bg-gradient-to-r from-purple-900/10 to-[#111] p-5 rounded-xl border border-purple-500/30 mb-8 relative overflow-hidden">
