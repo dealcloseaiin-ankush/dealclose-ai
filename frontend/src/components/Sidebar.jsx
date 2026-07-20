@@ -47,7 +47,8 @@ export default function Sidebar() {
         { name: 'Automations', path: '/automations', icon: '🔁' },
         { name: 'Instagram', path: '/instagram-automation', icon: '📸' },
         { name: 'Auto-Marketer', path: '/auto-marketer', icon: '🚀' },
-        { name: 'Publish Post', path: '/publish-post', icon: '✍️' } // 🚀 NEW: Publish Post Link
+        { name: 'Publish Post', path: '/publish-post', icon: '✍️' },
+        { name: 'Publisher', path: '/publisher', icon: '🗓️' } // 🚀 NEW: Publisher Link
       ]
     },
     {
@@ -67,6 +68,14 @@ export default function Sidebar() {
         { name: 'Forms', path: '/forms', icon: '📋' },
         { name: 'Wallet', path: '/wallet', icon: '💰', requireOwner: true },
         { name: 'Settings', path: '/settings', icon: '⚙️' }
+      ]
+    },
+    // 🚀 NEW: Admin-only section
+    {
+      title: 'ADMIN',
+      requireSuperAdmin: true,
+      items: [
+        { name: 'Template Manager', path: '/admin/templates', icon: '📚' }
       ]
     }
   ];
@@ -107,6 +116,7 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-6 overflow-x-hidden">
         {navCategories.map((category, idx) => (
           <div key={idx} className="mb-6">
+            {category.requireSuperAdmin && user?.role !== 'superadmin' ? null : ( <>
             {!isCollapsed ? (
               <p className="px-8 mb-2 text-xs font-extrabold text-gray-500 tracking-wider whitespace-nowrap">{category.title}</p>
             ) : (
@@ -153,6 +163,7 @@ export default function Sidebar() {
                 );
               })}
             </ul>
+            </>)}
           </div>
         ))}
       </nav>

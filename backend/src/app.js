@@ -33,6 +33,7 @@ const inboundWebhookRoutes = require('./routes/inboundWebhookRoutes');
 const designRoutes = require('./routes/designRoutes'); // 🚀 NEW: Design Studio routes
 const templateRoutes = require('./routes/templateRoutes'); // 🚀 NEW: Template Engine routes
 const automarketerRoutes = require('./routes/automarketerRoutes'); // 🚀 NEW: Auto-Marketer
+const socialPostRoutes = require('./routes/socialPostRoutes'); // 🚀 NEW: Social Publisher routes
 const metaAdsRoutes = require('./routes/metaAdsRoutes'); // 🚀 NEW: Meta Ads
 
 const backupRoutes = require('./routes/backupRoutes'); // 🚀 NEW: Google Drive Backup
@@ -90,6 +91,7 @@ app.use('/api/webhooks/inbound', inboundWebhookRoutes); // Developer API
 app.use('/api/designs', designRoutes); // 🚀 NEW: Design Studio routes
 app.use('/api/templates', templateRoutes); // 🚀 NEW: Template Engine routes
 app.use('/api/automarketer', automarketerRoutes); // 🚀 NEW: Auto-Marketer
+app.use('/api/posts', socialPostRoutes); // 🚀 NEW: Social Publisher routes
 
 app.use('/api/meta-ads', metaAdsRoutes); // 🚀 NEW: Meta Ads
 app.use('/api/billing', billingRoutes); // 🚀 NEW: Billing & Costing

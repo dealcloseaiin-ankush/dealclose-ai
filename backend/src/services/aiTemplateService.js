@@ -1,4 +1,4 @@
-const Template = require('../models/TemplateModel');
+const Template = require('../models/templateModel');
 const aiService = require('./aiService');
 
 /**

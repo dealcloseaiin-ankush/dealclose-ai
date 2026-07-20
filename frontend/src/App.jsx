@@ -42,6 +42,8 @@ import WhatsAppRules from './pages/WhatsAppRules';
 import SuperAdmin from './pages/SuperAdmin';
 import PublishPost from './pages/PublishPost'; // 🚀 NEW: Publish Post Page
 import SolutionRecommender from './pages/SolutionRecommender';
+import Publisher from './pages/Publisher'; // 🚀 NEW: Publisher Page
+import AdminTemplates from './pages/AdminTemplates'; // 🚀 NEW: Admin Page
 import AutoMarketerDashboard from './pages/AutoMarketerDashboard'; // 🚀 NEW
 import MetaAdsManager from './pages/MetaAdsManager'; // 🚀 NEW: Meta Ads Page
 import BillingPage from './pages/BillingPage'; // 🚀 NEW: Billing Page
@@ -219,6 +221,8 @@ export default function App() {
             <Route path="super-admin" element={<SuperAdmin />} />
             <Route path="publish-post" element={<PublishPost />} /> {/* 🚀 NEW: Publish Post Route */}
             <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
+            <Route path="publisher" element={<Publisher />} /> {/* 🚀 NEW: Publisher Route */}
+            <Route path="/admin/templates" element={<AdminTemplates />} /> {/* 🚀 NEW: Admin Route */}
             <Route path="meta-ads" element={<MetaAdsManager />} /> {/* 🚀 NEW: Meta Ads Route */}
             <Route path="billing" element={<BillingPage />} /> {/* 🚀 NEW: Billing Page Route */}
           </Route>
