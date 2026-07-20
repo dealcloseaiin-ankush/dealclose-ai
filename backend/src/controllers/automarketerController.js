@@ -3,6 +3,7 @@ const GeneratedPost = require('../models/GeneratedPostModel.js');
 const User = require('../models/userModel');
 const instagramService = require('../services/instagramService');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Replicate = require('replicate'); // 🚀 NEW: For AI Image Generation
 const OpenAI = require('openai');
 
 // 🌊 ULTRA COST-EFFECTIVE MODELS FOR AUTOMARKETER
@@ -11,6 +12,11 @@ const MODELS = {
   GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
   OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
 };
+
+// 🚀 NEW: Replicate client for image generation
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
 
 // @desc    Get all pending & approved posts
 // @route   GET /api/automarketer/posts
@@ -35,11 +41,20 @@ exports.generatePost = async (req, res) => {
     const user = await User.findById(req.user._id).lean();
     const businessContext = user?.businessDescription ? `My business is about: ${user.businessDescription}.` : '';
 
-    const systemPrompt = `You are a professional social media marketing assistant for small businesses. 
-    Write a highly engaging, creative Instagram post caption based on the user's topic. 
-    Include attractive emojis, a clear call-to-action (e.g., "Tap the link in bio to shop!"), and relevant hashtags.
-    Keep your language friendly, clean, and modern. Do not use Devanagari script for captions; use clean Hinglish or English.
-    ${businessContext}`;
+    // 🚀 UPGRADED: AI prompt now supports carousel generation for long content.
+    const systemPrompt = `You are a viral social media post creator. Your task is to generate a complete Instagram post based on the user's topic.
+    ${businessContext}
+    
+    RULES:
+    1.  If the content is short, generate a single post.
+    2.  If the content is long (e.g., a list, a story, multiple points), split it into a carousel post with 2-4 pages.
+    3.  The output MUST be a single, valid JSON object.
+    
+    JSON Structure:
+    - "caption": A main, engaging caption for the entire post with a clear call-to-action and hashtags.
+    - "pages": An array of objects, where each object represents one image/page of the post. Each object must have:
+        - "imagePrompt": A detailed, descriptive prompt for an AI image generator (like DALL-E) to create a visually stunning image for this page.
+        - "textOverlay": A short, punchy text (max 15 words) to be displayed on the image. This is for carousel pages. For single posts, this can be an empty string.`;
 
     const apiKey = process.env.GEMINI_API_KEY;
     const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
@@ -47,6 +62,7 @@ exports.generatePost = async (req, res) => {
     let generatedCaption = "";
     let aiSuccess = false;
 
+    let rawAiResponse = "";
     // 🚀 MULTI-MODEL DYNAMIC CHAIN FOR CONTENT SCRIPT GENERATION
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
@@ -57,7 +73,7 @@ exports.generatePost = async (req, res) => {
         const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
         const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
         console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
-        generatedCaption = result.response.text();
+        rawAiResponse = result.response.text();
         aiSuccess = true;
       } catch (gemini3Err) {
         console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_3_1_LITE} busy/failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
@@ -70,7 +86,7 @@ exports.generatePost = async (req, res) => {
           const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
           const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
           console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.GEMINI_2_5_LITE}`);
-          generatedCaption = result.response.text();
+          rawAiResponse = result.response.text();
           aiSuccess = true;
         } catch (gemini2Err) {
           console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_2_5_LITE} failed, falling back to OpenAI...`);
@@ -90,22 +106,47 @@ exports.generatePost = async (req, res) => {
         ],
       });
       console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.OPENAI_MINI}`);
-      generatedCaption = chatCompletion.choices[0].message.content;
+      rawAiResponse = chatCompletion.choices[0].message.content;
       aiSuccess = true;
     }
 
     // Fallback static caption structure if all AI keys are offline
     if (!aiSuccess) {
-      generatedCaption = `[AI Draft for]: ${prompt}\n\n✨ Tap the link in bio to shop!\n#Automarketer #DealCloseAI`;
+      rawAiResponse = JSON.stringify({
+        caption: `[AI Draft for]: ${prompt}\n\n✨ Tap the link in bio to shop!\n#Automarketer #DealCloseAI`,
+        pages: [{ imagePrompt: prompt, textOverlay: prompt.substring(0, 50) }]
+      });
     }
 
-    generatedCaption = generatedCaption.replace(/\*/g, '').trim();
+    const postContent = JSON.parse(rawAiResponse.replace(/```json|```/g, '').trim());
+
+    // 🚀 NEW: Generate images for each page using Replicate
+    const mediaPromises = postContent.pages.map(page => {
+      console.log(`[Auto-Marketer] 🖼️ Generating image for prompt: "${page.imagePrompt}"`);
+      return replicate.run(
+        "bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637",
+        { input: { prompt: page.imagePrompt } }
+      ).then(output => ({
+        type: 'image',
+        url: Array.isArray(output) ? output[0] : output,
+        textOverlay: page.textOverlay || ''
+      })).catch(err => {
+        console.error(`[Auto-Marketer] Image generation failed for a page:`, err.message);
+        return { // Fallback image
+          type: 'image',
+          url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
+          textOverlay: page.textOverlay || ''
+        };
+      });
+    });
+
+    const generatedMedia = await Promise.all(mediaPromises);
 
     // Create entry in Database with final structured layout
     const newPost = await GeneratedPost.create({
       userId: req.user._id,
-      caption: generatedCaption,
-      imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80", // Linked placeholder until Replicate image layer execution
+      caption: postContent.caption.replace(/\*/g, '').trim(),
+      media: generatedMedia,
       status: 'pending_approval'
     });
 
@@ -137,8 +178,20 @@ exports.approvePost = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram account is not connected properly. Please go to Settings and connect your page.' });
     }
 
-    // Call existing Instagram Service to publish
-    await instagramService.publishInstagramPost(igAccountId, igSettings.accessToken, post.imageUrl, post.caption);
+    // 🚀 UPGRADE: Check if it's a carousel or single post
+    if (post.media.length > 1) {
+      // This is a carousel post. We need a new service function for this.
+      // For now, we'll just post the first image as a single post to prevent errors.
+      // In a future step, we will implement `publishCarouselPost`.
+      console.warn(`[Auto-Marketer] Carousel post detected, but only single image publishing is supported for now. Publishing first image.`);
+      if (post.media[0]?.url) {
+        await instagramService.publishImagePost(igAccountId, igSettings.accessToken, post.media[0].url, post.caption);
+      } else {
+        throw new Error("Carousel media is missing a valid URL for the first image.");
+      }
+    } else {
+      await instagramService.publishImagePost(igAccountId, igSettings.accessToken, post.media[0].url, post.caption);
+    }
 
     post.status = 'posted';
     post.postedAt = new Date();

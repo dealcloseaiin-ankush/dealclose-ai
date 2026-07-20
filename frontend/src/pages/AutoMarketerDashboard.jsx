@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Image, CheckCircle, XCircle, RefreshCw, Send, Loader2, Sparkles, Heart, MessageCircle, Bookmark, MoreHorizontal } from 'lucide-react';
+import { Image, CheckCircle, XCircle, RefreshCw, Send, Loader2, Sparkles, Heart, MessageCircle, Bookmark, MoreHorizontal, ChevronLeft, ChevronRight, Dot } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
@@ -12,6 +12,18 @@ export default function AutoMarketerDashboard() {
   const [publishingId, setPublishingId] = useState(null);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  // 🚀 NEW: Carousel State for each post
+  const [carouselIndexes, setCarouselIndexes] = useState({});
+
+  const handleCarouselNav = (postId, direction) => {
+    setCarouselIndexes(prev => {
+      const post = posts.find(p => p._id === postId);
+      if (!post || !post.media || post.media.length === 0) return prev;
+      const currentIndex = prev[postId] || 0;
+      const newIndex = direction === 'next' ? (currentIndex + 1) % post.media.length : (currentIndex - 1 + post.media.length) % post.media.length;
+      return { ...prev, [postId]: newIndex };
+    });
+  };
 
   useEffect(() => {
     fetchPosts();
@@ -30,8 +42,11 @@ export default function AutoMarketerDashboard() {
       setPosts([
         {
           _id: "65f1a2b3c4d5e6f7g8h9i0j1",
-          caption: "Elevate your everyday style with our premium collection! ✨ Tap the link in bio to shop now. \n\n#Fashion #Style #Trending #DealClose",
-          imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
+          caption: "Elevate your everyday style with our premium collection! ✨ Tap the link in bio to shop now. \n\n#Fashion #Style #Trending #DealClose",          
+          media: [
+            { type: 'image', url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80", textOverlay: "Our Best Seller!" },
+            { type: 'image', url: "https://images.unsplash.com/photo-1525966222134-fcfa99b83778?w=800&q=80", textOverlay: "New Arrivals" }
+          ],
           status: "pending_approval",
           createdAt: new Date().toISOString()
         }
@@ -144,11 +159,15 @@ export default function AutoMarketerDashboard() {
 
               {/* Image Content */}
               <div className="w-full aspect-square relative bg-[#111] overflow-hidden">
-                <img 
-                  src={post.imageUrl} 
-                  alt="AI Generated" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {/* 🚀 UPGRADE: Carousel Image Display */}
+                {post.media && post.media.length > 0 ? post.media.map((mediaItem, index) => (
+                  <div key={index} className={`absolute inset-0 transition-opacity duration-500 ${ (carouselIndexes[post._id] || 0) === index ? 'opacity-100' : 'opacity-0' }`}>
+                    <img src={mediaItem.url} alt={`AI Generated ${index + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    {mediaItem.textOverlay && <div className="absolute bottom-4 left-4 right-4 bg-black/50 text-white text-center p-2 rounded-lg text-sm font-bold backdrop-blur-sm">{mediaItem.textOverlay}</div>}
+                  </div>
+                )) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-900"><Image className="text-gray-700" size={48}/></div>
+                )}
                 
                 {post.status === 'posted' && (
                   <div className="absolute inset-0 bg-green-900/40 flex items-center justify-center backdrop-blur-sm z-20">
@@ -156,6 +175,32 @@ export default function AutoMarketerDashboard() {
                       <CheckCircle size={20} /> Published to Meta
                     </div>
                   </div>
+                )}
+
+                {/* 🚀 UPGRADE: Carousel Navigation */}
+                {post.media && post.media.length > 1 && (
+                  <>
+                    <button onClick={() => handleCarouselNav(post._id, 'prev')} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-1 rounded-full z-10 hover:bg-black/60"><ChevronLeft size={20}/></button>
+                    <button onClick={() => handleCarouselNav(post._id, 'next')} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-1 rounded-full z-10 hover:bg-black/60"><ChevronRight size={20}/></button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+                      {post.media.map((_, index) => (
+                        <Dot key={index} className={`transition-colors ${(carouselIndexes[post._id] || 0) === index ? 'text-white' : 'text-white/40'}`} />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* 🚀 UPGRADE: Carousel Navigation */}
+                {post.media.length > 1 && (
+                  <>
+                    <button onClick={() => handleCarouselNav(post._id, 'prev')} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-1 rounded-full z-10 hover:bg-black/60"><ChevronLeft size={20}/></button>
+                    <button onClick={() => handleCarouselNav(post._id, 'next')} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white p-1 rounded-full z-10 hover:bg-black/60"><ChevronRight size={20}/></button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+                      {post.media.map((_, index) => (
+                        <Dot key={index} className={`transition-colors ${(carouselIndexes[post._id] || 0) === index ? 'text-white' : 'text-white/40'}`} />
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
 
