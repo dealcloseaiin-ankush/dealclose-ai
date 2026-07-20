@@ -1,5 +1,5 @@
 const SocialPost = require('../models/SocialPostModel');
-const { uploadToCloudinary } = require('../services/cloudinaryService');
+const { uploadToCloudinary } = require('../services/cloudinaryService'); // This path seems correct, but let's ensure the file exists.
 const { automationQueue } = require('../workers/automationWorker');
 const instagramService = require('../services/instagramService');
 
