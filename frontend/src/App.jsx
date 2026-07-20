@@ -40,6 +40,7 @@ import ScanIQ from './pages/ScanIQ';
 import AIVideoDashboard from './pages/AIVideoDashboard';
 import WhatsAppRules from './pages/WhatsAppRules';
 import SuperAdmin from './pages/SuperAdmin';
+import PublishPost from './pages/PublishPost'; // 🚀 NEW: Publish Post Page
 import SolutionRecommender from './pages/SolutionRecommender';
 import AutoMarketerDashboard from './pages/AutoMarketerDashboard'; // 🚀 NEW
 import MetaAdsManager from './pages/MetaAdsManager'; // 🚀 NEW: Meta Ads Page
