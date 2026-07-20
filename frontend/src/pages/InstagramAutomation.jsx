@@ -11,15 +11,16 @@ export default function InstagramAutomation() {
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
-  const [activeTab, setActiveTab] = useState('general'); 
+  const [activeTab, setActiveTab] = useState('posts'); 
 
-  const [stats, setStats] = useState({
-    totalCommentsAnalyzed: 0,
-    totalDMsReceived: 0,
-    leadsExtracted: 0,
-    dmsSent: 0,
-    whatsappConversationsStarted: 0,
-    conversionRate: '0%'
+  const [insights, setInsights] = useState({
+    follower_count: 0,
+    reach: 0,
+    impressions: 0,
+    profile_views: 0,
+    website_clicks: 0,
+    accounts_engaged_count: 0,
+    last_updated: null,
   });
 
   const [config, setConfig] = useState({
@@ -233,10 +234,10 @@ export default function InstagramAutomation() {
         if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
 
         const { data } = await api.get('/instagram/dashboard', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: {} }));
-        if (data.stats) setStats(data.stats);
         if (data.config) setConfig(data.config);
         if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
         if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
+        api.get('/instagram/business/insights', { params: { workspaceId: activeWorkspace } }).then(res => setInsights(res.data.insights)).catch(err => console.error("Failed to fetch business insights", err));
 
         const [postsRes, automationsRes] = await Promise.all([
           api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } }),
@@ -433,27 +434,29 @@ export default function InstagramAutomation() {
 
       {/* Analytics Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
-        <div className="bg-[#111111] border border-gray-800 p-5 rounded-2xl shadow-md">
-          <p className="text-gray-500 text-xs font-bold uppercase tracking-wide">Total DMs Handled</p>
-          <p className="text-3xl font-bold text-white mt-2">{stats.totalDMsReceived}</p>
+        <div className="bg-[#111111] border border-pink-500/20 p-5 rounded-2xl shadow-lg">
+          <p className="text-pink-400 text-xs font-bold uppercase tracking-wide">Total Followers</p>
+          <p className="text-3xl font-bold text-white mt-2">{insights.follower_count?.toLocaleString() || '...'}</p>
         </div>
-        <div className="bg-[#111111] border border-pink-500/20 p-5 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-pink-500/5 rounded-bl-full"></div>
-          <p className="text-pink-400 text-xs font-bold uppercase tracking-wide">Leads Captured</p>
-          <p className="text-3xl font-bold text-white mt-2">{stats.leadsExtracted}</p>
-          <div className="flex justify-between items-end mt-2 pt-2 border-t border-gray-800/50">
-            <p className="text-[10px] text-gray-500">Auto-saved to pipeline</p>
-            <Link to="/crm" className="text-xs font-bold text-pink-400 hover:underline">View CRM ↗</Link>
-          </div>
+        <div className="bg-[#111111] border border-blue-500/20 p-5 rounded-2xl shadow-lg">
+          <p className="text-blue-400 text-xs font-bold uppercase tracking-wide">Account Reach (Last Day)</p>
+          <p className="text-3xl font-bold text-white mt-2">{insights.reach?.toLocaleString() || '...'}</p>
         </div>
         <div className="bg-[#111111] border border-green-500/20 p-5 rounded-2xl shadow-lg">
-          <p className="text-green-400 text-xs font-bold uppercase tracking-wide">Automations Triggered</p>
-          <p className="text-3xl font-bold text-white mt-2">{stats.dmsSent}</p>
-          <p className="text-[10px] text-gray-500 mt-1">Instant bot replies delivered</p>
+          <p className="text-green-400 text-xs font-bold uppercase tracking-wide">Impressions (Last Day)</p>
+          <p className="text-3xl font-bold text-white mt-2">{insights.impressions?.toLocaleString() || '...'}</p>
         </div>
-        <div className="bg-gradient-to-br from-pink-600 to-purple-700 p-5 rounded-2xl shadow-lg text-white">
-          <p className="text-white/80 text-xs font-bold uppercase tracking-wide">Conversion Rate</p>
-          <p className="text-4xl font-extrabold mt-1">{stats.conversionRate}</p>
+        <div className="bg-[#111111] border border-purple-500/20 p-5 rounded-2xl shadow-lg">
+          <p className="text-purple-400 text-xs font-bold uppercase tracking-wide">Profile Visits (Last Day)</p>
+          <p className="text-3xl font-bold text-white mt-2">{insights.profile_views?.toLocaleString() || '...'}</p>
+        </div>
+        <div className="bg-[#111111] border border-yellow-500/20 p-5 rounded-2xl shadow-lg">
+          <p className="text-yellow-400 text-xs font-bold uppercase tracking-wide">Website Clicks (Last Day)</p>
+          <p className="text-3xl font-bold text-white mt-2">{insights.website_clicks?.toLocaleString() || '...'}</p>
+        </div>
+        <div className="bg-[#111111] border border-gray-700 p-5 rounded-2xl shadow-lg">
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Accounts Engaged (Last Day)</p>
+          <p className="text-3xl font-bold text-white mt-2">{insights.accounts_engaged_count?.toLocaleString() || '...'}</p>
         </div>
       </div>
 

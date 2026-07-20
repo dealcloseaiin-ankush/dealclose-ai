@@ -166,3 +166,99 @@ exports.getPostInsights = async (mediaId, accessToken) => {
     throw new Error(error.response?.data?.error?.message || error.message);
   }
 };
+
+/**
+ * 🚀 NEW: Fetches key business insights for an Instagram account.
+ * @param {string} igAccountId - The user's Instagram Business Account ID.
+ * @param {string} accessToken - The user's Instagram access token.
+ * @returns {Promise<object>} - An object containing the insights data.
+ */
+exports.getBusinessInsights = async (igAccountId, accessToken) => {
+  try {
+    // Metrics we want for the last day
+    const dailyMetrics = 'reach,impressions,profile_views,website_clicks,accounts_engaged_count';
+    const lifetimeMetrics = 'follower_count';
+
+    const insightsUrl = `https://graph.facebook.com/v19.0/${igAccountId}/insights`;
+
+    // Make two parallel API calls for efficiency
+    const [dailyResponse, lifetimeResponse] = await Promise.all([
+      axios.get(insightsUrl, {
+        params: { metric: dailyMetrics, period: 'day', access_token: accessToken },
+      }),
+      axios.get(insightsUrl, {
+        params: { metric: lifetimeMetrics, period: 'lifetime', access_token: accessToken },
+      }),
+    ]);
+
+    const insights = {
+      last_updated: new Date().toISOString(),
+    };
+
+    // Process and format the results from both calls
+    const allMetrics = [...dailyResponse.data.data, ...lifetimeResponse.data.data];
+
+    allMetrics.forEach(metric => {
+      // Use the last value in the values array
+      insights[metric.name] = metric.values.slice(-1)[0].value;
+    });
+
+    return insights;
+  } catch (error) {
+    console.error("❌ Meta Graph API Business Insights Fetch Error:", error.response?.data?.error?.message || error.message);
+    throw new Error(error.response?.data?.error?.message || 'Failed to fetch Instagram Insights.');
+  }
+};
+
+/**
+ * 🚀 NEW & ROBUST: Publishes a single image post with container status check.
+ * @param {string} igAccountId - The user's Instagram Business Account ID.
+ * @param {string} accessToken - The user's Instagram access token.
+ * @param {string} imageUrl - The public URL of the image to post.
+ * @param {string} caption - The caption for the post.
+ * @returns {Promise<object>} - An object containing the success status and post ID.
+ */
+exports.publishImagePost = async (igAccountId, accessToken, imageUrl, caption) => {
+  try {
+    console.log(`[IG Publish] Step 1: Creating media container for image.`);
+    const containerResponse = await axios.post(
+      `https://graph.facebook.com/v19.0/${igAccountId}/media`,
+      { image_url: imageUrl, caption: caption, access_token: accessToken }
+    );
+
+    const creationId = containerResponse.data.id;
+    if (!creationId) throw new Error('Failed to create media container.');
+    console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
+
+    // 🚀 CRITICAL: Check container processing status before publishing.
+    console.log(`⏳ [IG Publish] Checking container processing status...`);
+    let isReady = false;
+    for (let i = 0; i < 10; i++) { // Retry up to 10 times (50 seconds)
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      const statusCheck = await axios.get(`https://graph.facebook.com/v19.0/${creationId}`, {
+        params: { fields: 'status_code', access_token: accessToken }
+      });
+      const status = statusCheck.data?.status_code;
+      console.log(`   👉 Container ${creationId} Status: ${status}`);
+      if (status === 'FINISHED') {
+        isReady = true;
+        break;
+      }
+      if (status === 'ERROR') throw new Error("Meta failed to process the image container.");
+    }
+
+    if (!isReady) throw new Error("Media container processing timed out.");
+
+    console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
+    const publishResponse = await axios.post(
+      `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`,
+      { creation_id: creationId, access_token: accessToken }
+    );
+    
+    return { success: true, postId: publishResponse.data.id };
+  } catch (error) {
+    const errorMessage = error.response?.data?.error?.message || error.message;
+    console.error(`[IG Publish] Error publishing to Instagram:`, errorMessage);
+    throw new Error(errorMessage);
+  }
+};

@@ -5,6 +5,7 @@ const PostAnalysis = require('../models/PostAnalysisModel'); // Naya model impor
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
+const { uploadToCloudinary } = require('../services/uploadService'); // Assuming you have this service
 
 const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
 const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
@@ -90,6 +91,51 @@ exports.getDashboardData = async (req, res) => {
   } catch (error) {
     console.error("IG Dashboard Error:", error);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Get Instagram Business Insights
+// @route   GET /api/instagram/business/insights
+exports.getBusinessInsights = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const user = await User.findById(userId).lean();
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const workspaceId = req.query.workspaceId || 'main';
+    let selectedWorkspace = workspaceId !== 'main'
+      ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
+      : null;
+    let selectedInstagram = selectedWorkspace
+      ? selectedWorkspace.instagramConfig
+      : user.instagramConfig;
+    let accessToken = selectedInstagram?.accessToken;
+    let accountId = selectedInstagram?.instagramAccountId || selectedInstagram?.accountId;
+
+    if (workspaceId === 'main' && !accessToken && user?.workspaces) {
+      const ws = user.workspaces.find(w => w.instagramConfig?.accessToken);
+      if (ws) {
+        const workspaceInstagram = ws.instagramConfig;
+        accessToken = workspaceInstagram.accessToken;
+        accountId = workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
+      }
+    }
+
+    if (!accessToken || !accountId) {
+      return res.status(400).json({ success: false, message: 'Instagram is not properly connected. Please reconnect in Settings.' });
+    }
+
+    const insights = await instagramService.getBusinessInsights(accountId, accessToken);
+
+    res.status(200).json({ success: true, insights });
+
+  } catch (error) {
+    const status = error.response?.status || 500;
+    const metaMsg = error.response?.data?.error?.message || error.message;
+    res.status(status).json({ success: false, message: `Failed to fetch insights: ${metaMsg}` });
   }
 };
 
@@ -240,6 +286,56 @@ exports.getPostAutomations = async (req, res) => {
     res.status(200).json({ success: true, automations: user.postAutomations || [] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Publish a post to Instagram
+// @route   POST /api/instagram/publish
+exports.publishPost = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { caption, workspaceId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Image file is required.' });
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Get credentials for the correct workspace
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+    const igAccountId = igConfig?.instagramAccountId || igConfig?.accountId;
+
+    if (!accessToken || !igAccountId) {
+      return res.status(400).json({ success: false, message: 'Instagram is not connected for this workspace.' });
+    }
+
+    // 1. Upload image to get a public URL
+    const imageUrl = await uploadToCloudinary(req.file.path);
+    if (!imageUrl) {
+      return res.status(500).json({ success: false, message: 'Failed to upload image to cloud storage.' });
+    }
+
+    // 2. Publish using the new robust service
+    const result = await instagramService.publishImagePost(igAccountId, accessToken, imageUrl, caption);
+
+    // 3. Get the permalink for the new post
+    const permalinkResponse = await axios.get(`https://graph.facebook.com/v19.0/${result.postId}`, {
+      params: { fields: 'permalink', access_token: accessToken }
+    });
+
+    res.status(201).json({ success: true, message: 'Post published successfully!', postUrl: permalinkResponse.data.permalink });
+
+  } catch (error) {
+    console.error('Instagram Publish Controller Error:', error.message);
+    res.status(500).json({ success: false, message: error.message || 'Failed to publish post.' });
   }
 };
 

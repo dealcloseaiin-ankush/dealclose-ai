@@ -46,7 +46,8 @@ export default function Sidebar() {
         { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
         { name: 'Automations', path: '/automations', icon: '🔁' },
         { name: 'Instagram', path: '/instagram-automation', icon: '📸' },
-        { name: 'Auto-Marketer', path: '/auto-marketer', icon: '🚀' }
+        { name: 'Auto-Marketer', path: '/auto-marketer', icon: '🚀' },
+        { name: 'Publish Post', path: '/publish-post', icon: '✍️' } // 🚀 NEW: Publish Post Link
       ]
     },
     {

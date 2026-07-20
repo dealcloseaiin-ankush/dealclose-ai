@@ -216,6 +216,7 @@ export default function App() {
             <Route path="whatsapp-rules" element={<WhatsAppRules />} />
             <Route path="scaniq" element={<ScanIQ />} />
             <Route path="super-admin" element={<SuperAdmin />} />
+            <Route path="publish-post" element={<PublishPost />} /> {/* 🚀 NEW: Publish Post Route */}
             <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
             <Route path="meta-ads" element={<MetaAdsManager />} /> {/* 🚀 NEW: Meta Ads Route */}
             <Route path="billing" element={<BillingPage />} /> {/* 🚀 NEW: Billing Page Route */}
