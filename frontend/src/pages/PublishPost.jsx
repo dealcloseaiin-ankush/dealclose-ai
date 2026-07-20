@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import more icons for the new UI
-import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus, Calendar, Clock, Repeat, Facebook } from 'lucide-react';
-import Instagram from 'lucide-react/dist/esm/icons/instagram'; // 🚀 FIX: Direct import to resolve build error
+import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus, Calendar, Clock, Repeat, Instagram, Facebook } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
 
 import CanvasRenderer from '../components/editor/CanvasRenderer'; // 🚀 NEW
