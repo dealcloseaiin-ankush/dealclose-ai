@@ -5,7 +5,11 @@ const PostAnalysis = require('../models/PostAnalysisModel'); // Naya model impor
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
-const { uploadToCloudinary } = require('../services/uploadService'); // Assuming you have this service
+const cloudinary = require('cloudinary').v2;
+const fs = require('fs');
+
+// Configure Cloudinary directly here
+cloudinary.config({ cloud_name: process.env.CLOUDINARY_CLOUD_NAME, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET });
 
 const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
 const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
@@ -318,7 +322,15 @@ exports.publishPost = async (req, res) => {
     }
 
     // 1. Upload image to get a public URL
-    const imageUrl = await uploadToCloudinary(req.file.path);
+    let imageUrl = null;
+    try {
+      const result = await cloudinary.uploader.upload(req.file.path, { resource_type: 'auto' });
+      imageUrl = result.secure_url;
+      fs.unlinkSync(req.file.path); // Delete local file after upload
+    } catch (uploadError) {
+      console.error('Cloudinary Upload Error:', uploadError);
+      return res.status(500).json({ success: false, message: 'Failed to upload image to cloud storage.' });
+    }
     if (!imageUrl) {
       return res.status(500).json({ success: false, message: 'Failed to upload image to cloud storage.' });
     }
