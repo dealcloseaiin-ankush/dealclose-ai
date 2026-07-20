@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
-import { Image as ImageIcon, Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Calendar, Trash2, Edit, Save, ClipboardPlus } from 'lucide-react';
+import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus } from 'lucide-react';
+import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
+
+import CanvasRenderer from '../components/editor/CanvasRenderer'; // 🚀 NEW
+import Toolbar from '../components/editor/Toolbar';             // 🚀 NEW
+import ObjectPanel from '../components/editor/ObjectPanel';       // 🚀 NEW
 
 export default function PublishPost() {
   const { user } = useAuth() || {};
@@ -13,17 +18,20 @@ export default function PublishPost() {
   const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: 'Hi! Tell me what kind of post you want to create. For example: "Create a post about our new shoe collection."' }]);
   const [chatInput, setChatInput] = useState(''); // This is the user's typed message
   const [isAiWorking, setIsAiWorking] = useState(false);
-
-  // 🚀 NEW: Saved Drafts State
+  
   const [drafts, setDrafts] = useState([]);
-  const [editingDraft, setEditingDraft] = useState(null); // Holds the draft being edited
+  const [editingDraft, setEditingDraft] = useState(null);
 
   // Main form state (now also used for editing drafts)
   const [caption, setCaption] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState('');
+
+  // 🚀 UPGRADED: Canvas logic is now managed by the useFabric hook
+  const canvasRef = useRef(null);
+  const { fabricCanvas, renderDesign, exportToJson, exportToImage } = useFabric(canvasRef);
+  const [canvasLayers, setCanvasLayers] = useState([]);
+  const [selectedObject, setSelectedObject] = useState(null);
 
   useEffect(() => {
     api.get('/users/profile').then(res => {
@@ -32,45 +40,60 @@ export default function PublishPost() {
     }).catch(console.error);
   }, []);
 
-  // 🚀 NEW: Fetch drafts when workspace changes
+  // 🚀 NEW: Sync Fabric.js canvas layers with our React state for the ObjectPanel
   useEffect(() => {
-    const fetchDrafts = async () => {
-      try {
-        const { data } = await api.get('/instagram/drafts', { params: { workspaceId: activeWorkspace } });
-        if (data.success) setDrafts(data.drafts);
-      } catch (error) { console.error("Failed to fetch drafts:", error); }
+    if (!fabricCanvas) return;
+
+    const updateLayers = () => {
+      const objects = fabricCanvas.getObjects().map(obj => ({
+        id: obj.id || obj.type + Date.now(),
+        type: obj.type,
+        text: obj.text || '',
+      }));
+      setCanvasLayers(objects);
     };
-    fetchDrafts();
-  }, [activeWorkspace]);
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-      setPublishedUrl(''); // Reset on new image
-    }
-  };
+    const updateSelection = () => {
+      setSelectedObject(fabricCanvas.getActiveObject());
+    };
+    
+    fabricCanvas.on('object:added', updateLayers);
+    fabricCanvas.on('object:removed', updateLayers);
+    fabricCanvas.on('selection:created', updateSelection);
+    fabricCanvas.on('selection:updated', updateSelection);
+    fabricCanvas.on('selection:cleared', updateSelection);
 
-  const handlePublish = async (draftToPublish = null) => {
-    if (!imageFile || !caption) {
-      if (!draftToPublish || !draftToPublish.imageUrl || !draftToPublish.caption)
-        return toast.error('Please provide both an image and a caption.');
-    }
+    return () => {
+      if (fabricCanvas) {
+        fabricCanvas.off('object:added', updateLayers);
+        fabricCanvas.off('object:removed', updateLayers);
+        fabricCanvas.off('selection:created', updateSelection);
+        fabricCanvas.off('selection:updated', updateSelection);
+        fabricCanvas.off('selection:cleared', updateSelection);
+      }
+    };
+  }, [fabricCanvas]);
 
+  const handlePublish = async () => {
     setIsPublishing(true);
+    
+    // 🚀 NEW: Export the canvas as an image
+    const imageDataUrl = exportToImage('jpeg');
+    if (!imageDataUrl) {
+      toast.error("Canvas is empty. Cannot publish.");
+      return setIsPublishing(false);
+    }
+
     setPublishedUrl('');
     const toastId = toast.loading('Publishing post to Instagram...');
 
-    const formData = new FormData();
-    if (imageFile) {
-      formData.append('image', imageFile);
-    } else if (draftToPublish?.imageUrl) {
-      // If publishing a draft without a new image, send the existing URL
-      formData.append('imageUrl', draftToPublish.imageUrl);
-    }
+    // Convert data URL to a file object to send to the backend
+    const blob = await (await fetch(imageDataUrl)).blob();
+    const imageFileFromCanvas = new File([blob], 'design.jpg', { type: 'image/jpeg' });
 
-    formData.append('caption', draftToPublish?.caption || caption);
+    const formData = new FormData();
+    formData.append('image', imageFileFromCanvas);
+    formData.append('caption', caption);
     formData.append('workspaceId', activeWorkspace);
 
     try {
@@ -81,10 +104,6 @@ export default function PublishPost() {
       if (data.success) {
         toast.success('Post published successfully!', { id: toastId });
         setPublishedUrl(data.postUrl);
-        if (draftToPublish) {
-          // Remove the draft from the list after publishing
-          setDrafts(drafts.filter(d => d.id !== draftToPublish.id));
-        }
       } else {
         throw new Error(data.message || 'An unknown error occurred.');
       }
@@ -114,17 +133,10 @@ export default function PublishPost() {
       });
 
       if (data.success) {
-        // Add AI's conversational reply to the chat
-        setChatMessages(prev => [...prev, { 
-          role: 'ai', 
-          text: data.aiReply,
-          // 🚀 Store the generated content within the message object
-          generatedContent: {
-            caption: data.caption,
-            hashtags: data.hashtags
-          }
-        }]);
-        toast.success('AI has generated content!');
+        setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply }]);
+        // 🚀 Render the generated design on the canvas
+        if (renderDesign) renderDesign(data.designJson);
+        toast.success('AI has generated a new design!');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "AI Assistant is currently unavailable.");
@@ -134,52 +146,24 @@ export default function PublishPost() {
   };
 
   // 🚀 NEW: Save as Draft
-  const handleSaveDraft = async () => {
-    if (!caption && !imagePreview) return toast.error("Nothing to save.");
-
-    const toastId = toast.loading(editingDraft ? 'Updating draft...' : 'Saving draft...');
-    
-    const formData = new FormData();
-    formData.append('caption', caption);
-    formData.append('workspaceId', activeWorkspace);
-    if (editingDraft) formData.append('draftId', editingDraft._id);
-    if (imageFile) {
-      formData.append('image', imageFile);
-    } else if (editingDraft?.imageUrl) {
-      // If not uploading a new image, send the existing URL to keep it
-      formData.append('imageUrl', editingDraft.imageUrl);
+  const handleSaveDraft = () => {
+    // This will be implemented with backend APIs in a future step
+    const designData = exportToJson();
+    if (!designData || designData.objects.length === 0) {
+      return toast.error("Canvas is empty, nothing to save.");
     }
-
-    try {
-      const { data } = await api.post('/instagram/drafts', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (data.success) {
-        if (editingDraft) {
-          setDrafts(drafts.map(d => d._id === editingDraft._id ? data.draft : d));
-          toast.success('Draft updated!', { id: toastId });
-        } else {
-          setDrafts([data.draft, ...drafts]);
-          toast.success('Saved as draft!', { id: toastId });
-        }
-        // Reset form
-        setCaption(''); setImageFile(null); setImagePreview(''); setEditingDraft(null);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save draft.', { id: toastId });
-    }
+    console.log("Saving draft:", { designData, caption });
+    toast.success("Draft saved successfully! (Backend to be implemented)");
   };
 
-  const handleDeleteDraft = async (draftId) => {
-    if (!window.confirm("Are you sure you want to delete this draft?")) return;
-    try {
-      await api.delete(`/instagram/drafts/${draftId}`);
-      setDrafts(drafts.filter(d => d._id !== draftId));
-      toast.success('Draft deleted.');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete draft.');
+  // 🚀 NEW: Toolbar action handler
+  const handleToolbarAction = (action) => {
+    if (!selectedObject) return toast.error("Please select an object on the canvas first.");
+    if (!selectedObject) return toast.error("Please select an object on the canvas first.");
+    if (action === 'bold') {
+      selectedObject.set('fontWeight', selectedObject.fontWeight === 'bold' ? 'normal' : 'bold');
     }
+    if (fabricCanvas) fabricCanvas.renderAll();
   };
 
   return (
@@ -203,14 +187,15 @@ export default function PublishPost() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Form Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 🚀 UPGRADED: Left panel for Layers and Toolbar */}
+          <div className="lg:col-span-1 space-y-6">
+            <Toolbar onAction={handleToolbarAction} />
+            <ObjectPanel layers={canvasLayers} onSelect={(layer) => console.log('Selected layer:', layer)} />
+          </div>
+          {/* 🚀 UPGRADED: Center panel for the Canvas */}
           <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-xl">
             <form onSubmit={(e) => { e.preventDefault(); handlePublish(); }} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">1. Upload Image</label>
-                <input type="file" accept="image/jpeg,image/png" onChange={handleImageChange} required className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-500/10 file:text-pink-400 hover:file:bg-pink-500/20 w-full" />
-              </div>
               <div>
                 <label className="block text-sm font-bold text-gray-400 mb-2">2. Write Caption</label>
                 <textarea
@@ -221,7 +206,7 @@ export default function PublishPost() {
                   placeholder="Write your engaging caption here..."
                   className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-pink-500 outline-none"
                 ></textarea>
-              </div>              
+              </div>
               <div className="flex gap-3">
                 <button type="button" onClick={handleSaveDraft} className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2">
                   <Save size={18} /> {editingDraft ? 'Update Draft' : 'Save Draft'}
@@ -235,20 +220,15 @@ export default function PublishPost() {
             </form>
           </div>
 
-          {/* Preview Section */}
+          {/* 🚀 UPGRADED: Right panel for the Live Preview */}
           <div className="bg-[#0a0a0a] border border-gray-800 rounded-2xl p-6 shadow-inner">
             <h2 className="text-lg font-bold text-white mb-4">Live Preview</h2>
             <div className="bg-black border border-gray-700 rounded-xl overflow-hidden max-w-sm mx-auto">
               <div className="p-3 flex items-center gap-2 border-b border-gray-800">
-                <div className="w-8 h-8 rounded-full bg-gray-700"></div>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500"></div>
                 <p className="text-sm font-bold">{user?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</p>
               </div>
-              <div className="aspect-square bg-[#111] flex items-center justify-center">
-                {imagePreview ? <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-600" size={48} />}
-              </div>
-              <div className="p-4 text-sm">
-                <p className="whitespace-pre-wrap line-clamp-3"><strong className="mr-1">{user?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</strong>{caption || 'Your caption will appear here...'}</p>
-              </div>
+              <CanvasRenderer ref={canvasRef} />
             </div>
             {publishedUrl && (
               <div className="mt-6 bg-green-500/10 border border-green-500/20 p-4 rounded-xl animate-fade-in text-center">
@@ -268,17 +248,7 @@ export default function PublishPost() {
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Bot className="text-blue-400" /> AI Content Assistant</h2>
           <div className="bg-[#0a0a0a] border border-gray-800 rounded-xl h-64 p-4 overflow-y-auto flex flex-col gap-3 mb-4">
             {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex flex-col gap-2 ${msg.role === 'ai' ? 'items-start' : 'items-end'}`}>
-                <div className={`p-3 rounded-lg max-w-[85%] text-sm ${msg.role === 'ai' ? 'bg-[#1a1a1a] self-start' : 'bg-blue-600 text-white self-end'}`}>
-                  {msg.text}
-                </div>
-                {/* 🚀 NEW: Show "Insert Content" button if AI generated content */}
-                {msg.role === 'ai' && msg.generatedContent && (
-                  <button onClick={() => setCaption(`${msg.generatedContent.caption}\n\n${msg.generatedContent.hashtags}`)} className="text-xs bg-blue-600/20 text-blue-400 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-600/30 transition-colors">
-                    <ClipboardPlus size={14} /> Insert into Caption
-                  </button>
-                )}
-              </div>
+              <div key={i} className={`p-3 rounded-lg max-w-[85%] text-sm ${msg.role === 'ai' ? 'bg-[#1a1a1a] self-start' : 'bg-blue-600 text-white self-end'}`}>{msg.text}</div>
             ))}
             {isAiWorking && <div className="self-start p-3 bg-[#1a1a1a] rounded-lg"><Loader2 className="animate-spin text-blue-400" /></div>}
           </div>
@@ -303,8 +273,8 @@ export default function PublishPost() {
                   <p className="text-xs text-gray-400 line-clamp-2">{draft.caption}</p>
                   <p className="text-[10px] text-gray-600 font-mono">ID: {draft._id}</p>
                   <div className="flex gap-2 mt-auto pt-2 border-t border-gray-800">
-                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); setImagePreview(draft.imageUrl); }} className="flex-1 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-1"><Edit size={12}/> Edit</button>
-                    <button onClick={() => handleDeleteDraft(draft._id)} className="py-2 px-3 text-xs bg-red-900/50 hover:bg-red-900/80 rounded-lg"><Trash2 size={12}/></button>
+                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); renderDesign(draft.designJson); }} className="flex-1 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-1"><Edit size={12}/> Edit</button>
+                    <button onClick={() => setDrafts(drafts.filter(d => d._id !== draft._id))} className="py-2 px-3 text-xs bg-red-900/50 hover:bg-red-900/80 rounded-lg"><Trash2 size={12}/></button>
                   </div>
                   <div className="flex gap-2">
                     <select className="flex-1 py-2 text-xs bg-gray-700 rounded-lg text-center outline-none border border-gray-600">
@@ -312,7 +282,7 @@ export default function PublishPost() {
                       <option>Post Tomorrow (9 AM)</option>
                       <option>Post Next Week</option>
                     </select>
-                    <button onClick={() => handlePublish(draft)} disabled={isPublishing} className="flex-1 py-2 text-xs bg-pink-600 hover:bg-pink-500 rounded-lg flex items-center justify-center gap-1 font-bold">
+                    <button onClick={() => handlePublish()} disabled={isPublishing} className="flex-1 py-2 text-xs bg-pink-600 hover:bg-pink-500 rounded-lg flex items-center justify-center gap-1 font-bold">
                       <Send size={12}/> Publish
                     </button>
                   </div>

@@ -30,6 +30,7 @@ const scraperRoutes = require('./routes/scraperRoutes');
 const instagramRoutes = require('./routes/instagramRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const inboundWebhookRoutes = require('./routes/inboundWebhookRoutes');
+const designRoutes = require('./routes/designRoutes'); // 🚀 NEW: Design Studio routes
 const automarketerRoutes = require('./routes/automarketerRoutes'); // 🚀 NEW: Auto-Marketer
 const metaAdsRoutes = require('./routes/metaAdsRoutes'); // 🚀 NEW: Meta Ads
 
@@ -85,6 +86,7 @@ app.use('/api/scraper', scraperRoutes);
 app.use('/api/instagram', instagramRoutes);
 app.use('/api/admin', adminRoutes); // Super Admin Routes
 app.use('/api/webhooks/inbound', inboundWebhookRoutes); // Developer API
+app.use('/api/designs', designRoutes); // 🚀 NEW: Design Studio routes
 app.use('/api/automarketer', automarketerRoutes); // 🚀 NEW: Auto-Marketer
 
 app.use('/api/meta-ads', metaAdsRoutes); // 🚀 NEW: Meta Ads

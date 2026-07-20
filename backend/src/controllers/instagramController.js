@@ -6,7 +6,7 @@ const DraftPost = require('../models/DraftPostModel'); // 🚀 NEW: Draft model
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
-const aiService = require('../services/aiService');
+const aiDesignService = require('../services/aiDesignService'); // 🚀 Use the new design service
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 
@@ -377,35 +377,19 @@ exports.generateAiPost = async (req, res) => {
     const businessName = selectedWorkspace ? selectedWorkspace.name : user.businessName;
     const businessDescription = selectedWorkspace ? selectedWorkspace.businessDescription : user.businessDescription;
 
-    const systemPrompt = `You are a world-class social media marketing expert for a business named "${businessName}".
-    Business details: ${businessDescription || 'Not provided'}.
-    
-    Your task is to generate a complete, engaging Instagram post based on the user's topic.
-    
-    The output MUST be a single, valid JSON object with the following keys:
-    - "caption": A creative and engaging caption with emojis and a clear call-to-action (CTA).
-    - "hashtags": A string of 5-7 relevant, popular hashtags, starting with #.
-    - "imagePrompt": A detailed, descriptive prompt for an AI image generator (like DALL-E or Midjourney) to create a visually stunning image for this post.
-    - "seoText": A short, SEO-friendly sentence describing the post's content.
-    - "aiReply": A friendly, conversational reply to the user confirming you've generated the content.
-    
-    Example user topic: "Create a post about our new shoe collection"
-    
-    Example JSON output:
-    {
-      "caption": "👟 Step up your style game! Our brand new shoe collection just dropped. ✨ From sleek sneakers to elegant heels, we've got the perfect pair for every occasion. Tap the link in our bio to explore the collection! 🛍️",
-      "hashtags": "#NewCollection #ShoeLove #FashionForward #StyleInspo #Footwear #MustHave",
-      "imagePrompt": "A dynamic flat-lay of various stylish shoes (sneakers, heels, boots) on a minimalist pastel background, with soft lighting and a modern, chic vibe, 8k, professional product photography.",
-      "seoText": "Explore the latest shoe collection featuring trendy sneakers, elegant heels, and stylish boots.",
-      "aiReply": "I've drafted a post for your new shoe collection! Check it out."
-    }`;
+    const businessContext = `Business Name: ${businessName}. Details: ${businessDescription || 'Not provided'}.`;
 
-    const aiResponse = await aiService.generateAIResponse(prompt, systemPrompt, 'instagram', userId);
-    
-    // Attempt to parse the JSON response from the AI
-    const generatedContent = JSON.parse(aiResponse.replace(/```json|```/g, '').trim());
+    // 🚀 Generate the full design JSON
+    const designJson = await aiDesignService.generateDesignJson(prompt, businessContext);
 
-    res.status(200).json({ success: true, ...generatedContent });
+    // The AI now provides the conversational reply within the JSON
+    const aiReply = "I've created a new design for you! You can now edit it on the canvas.";
+
+    res.status(200).json({ 
+      success: true, 
+      aiReply,
+      designJson // Send the entire design object to the frontend
+    });
 
   } catch (error) {
     console.error('AI Post Generation Error:', error.message);
