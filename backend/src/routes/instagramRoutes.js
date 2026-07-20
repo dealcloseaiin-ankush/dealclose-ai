@@ -23,4 +23,12 @@ router.post('/posts/:id/analyze', protect, instagramController.analyzePostPerfor
 // --- NEW CONTENT PUBLISH ROUTE ---
 router.post('/publish', protect, upload.single('image'), instagramController.publishPost);
 
+// --- NEW AI CONTENT GENERATION ROUTE ---
+router.post('/ai-generate-post', protect, instagramController.generateAiPost);
+
+// --- NEW DRAFT SYSTEM ROUTES ---
+router.get('/drafts', protect, instagramController.getDrafts);
+router.post('/drafts', protect, upload.single('image'), instagramController.saveDraft);
+router.delete('/drafts/:id', protect, instagramController.deleteDraft);
+
 module.exports = router;

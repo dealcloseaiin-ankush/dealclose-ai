@@ -2,9 +2,11 @@ const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel');
 const PostAnalysis = require('../models/PostAnalysisModel'); // Naya model import karein
+const DraftPost = require('../models/DraftPostModel'); // 🚀 NEW: Draft model
 const axios = require('axios');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
+const aiService = require('../services/aiService');
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 
@@ -348,6 +350,165 @@ exports.publishPost = async (req, res) => {
   } catch (error) {
     console.error('Instagram Publish Controller Error:', error.message);
     res.status(500).json({ success: false, message: error.message || 'Failed to publish post.' });
+  }
+};
+
+// @desc    Generate Post Content with AI
+// @route   POST /api/instagram/ai-generate-post
+exports.generateAiPost = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { prompt, workspaceId } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ success: false, message: 'Prompt is required.' });
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Get business context for the correct workspace
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    
+    const businessName = selectedWorkspace ? selectedWorkspace.name : user.businessName;
+    const businessDescription = selectedWorkspace ? selectedWorkspace.businessDescription : user.businessDescription;
+
+    const systemPrompt = `You are a world-class social media marketing expert for a business named "${businessName}".
+    Business details: ${businessDescription || 'Not provided'}.
+    
+    Your task is to generate a complete, engaging Instagram post based on the user's topic.
+    
+    The output MUST be a single, valid JSON object with the following keys:
+    - "caption": A creative and engaging caption with emojis and a clear call-to-action (CTA).
+    - "hashtags": A string of 5-7 relevant, popular hashtags, starting with #.
+    - "imagePrompt": A detailed, descriptive prompt for an AI image generator (like DALL-E or Midjourney) to create a visually stunning image for this post.
+    - "seoText": A short, SEO-friendly sentence describing the post's content.
+    - "aiReply": A friendly, conversational reply to the user confirming you've generated the content.
+    
+    Example user topic: "Create a post about our new shoe collection"
+    
+    Example JSON output:
+    {
+      "caption": "👟 Step up your style game! Our brand new shoe collection just dropped. ✨ From sleek sneakers to elegant heels, we've got the perfect pair for every occasion. Tap the link in our bio to explore the collection! 🛍️",
+      "hashtags": "#NewCollection #ShoeLove #FashionForward #StyleInspo #Footwear #MustHave",
+      "imagePrompt": "A dynamic flat-lay of various stylish shoes (sneakers, heels, boots) on a minimalist pastel background, with soft lighting and a modern, chic vibe, 8k, professional product photography.",
+      "seoText": "Explore the latest shoe collection featuring trendy sneakers, elegant heels, and stylish boots.",
+      "aiReply": "I've drafted a post for your new shoe collection! Check it out."
+    }`;
+
+    const aiResponse = await aiService.generateAIResponse(prompt, systemPrompt, 'instagram', userId);
+    
+    // Attempt to parse the JSON response from the AI
+    const generatedContent = JSON.parse(aiResponse.replace(/```json|```/g, '').trim());
+
+    res.status(200).json({ success: true, ...generatedContent });
+
+  } catch (error) {
+    console.error('AI Post Generation Error:', error.message);
+    res.status(500).json({ success: false, message: 'AI failed to generate content. Please try a different prompt.' });
+  }
+};
+
+// @desc    Get all saved drafts for a workspace
+// @route   GET /api/instagram/drafts
+exports.getDrafts = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { workspaceId = 'main' } = req.query;
+    const drafts = await DraftPost.find({ userId, workspaceId }).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, drafts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch drafts.' });
+  }
+};
+
+// @desc    Save or update a draft post
+// @route   POST /api/instagram/drafts
+exports.saveDraft = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { draftId, caption, workspaceId = 'main' } = req.body;
+
+    let imageUrl = req.body.imageUrl || ''; // Use existing image URL if provided
+
+    // If a new file is uploaded, upload it to Cloudinary
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, { resource_type: 'auto' });
+        imageUrl = result.secure_url;
+        fs.unlinkSync(req.file.path); // Clean up local file
+      } catch (uploadError) {
+        return res.status(500).json({ success: false, message: 'Image upload failed.' });
+      }
+    }
+
+    if (!caption && !imageUrl) {
+      return res.status(400).json({ success: false, message: 'Cannot save an empty draft.' });
+    }
+
+    const draftData = {
+      userId,
+      workspaceId,
+      caption,
+      imageUrl,
+      platform: 'instagram',
+      status: 'draft'
+    };
+
+    let savedDraft;
+    if (draftId) {
+      // Update existing draft
+      savedDraft = await DraftPost.findOneAndUpdate(
+        { _id: draftId, userId },
+        draftData,
+        { new: true }
+      );
+      if (!savedDraft) return res.status(404).json({ success: false, message: 'Draft not found.' });
+    } else {
+      // Create new draft
+      savedDraft = await DraftPost.create(draftData);
+    }
+
+    res.status(201).json({ success: true, draft: savedDraft });
+
+  } catch (error) {
+    console.error('Save Draft Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to save draft.' });
+  }
+};
+
+// @desc    Delete a draft post
+// @route   DELETE /api/instagram/drafts/:id
+exports.deleteDraft = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id } = req.params;
+
+    const draft = await DraftPost.findOneAndDelete({ _id: id, userId });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, message: 'Draft not found or you do not have permission to delete it.' });
+    }
+
+    // Optional: Delete image from Cloudinary if it's not used elsewhere
+    if (draft.imageUrl) {
+      try {
+        const publicId = draft.imageUrl.split('/').pop().split('.')[0];
+        await cloudinary.uploader.destroy(publicId);
+      } catch (cloudinaryError) {
+        console.warn('Could not delete image from Cloudinary:', cloudinaryError.message);
+      }
+    }
+
+    res.status(200).json({ success: true, message: 'Draft deleted successfully.' });
+
+  } catch (error) {
+    console.error('Delete Draft Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete draft.' });
   }
 };
 
