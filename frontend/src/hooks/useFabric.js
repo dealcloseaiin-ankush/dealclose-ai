@@ -1,6 +1,57 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fabric } from 'fabric';
 
+const normalizeDesignForFabric = (designJson) => {
+  if (!designJson || typeof designJson !== 'object') return null;
+
+  const canvasWidth = Number(designJson.canvas?.width || designJson.width || 1080);
+  const canvasHeight = Number(designJson.canvas?.height || designJson.height || 1080);
+  const backgroundColor = designJson.canvas?.backgroundColor || designJson.backgroundColor || '#ffffff';
+
+  const rawLayers = Array.isArray(designJson.layers)
+    ? designJson.layers
+    : Array.isArray(designJson.objects)
+      ? designJson.objects
+      : [];
+
+  const objects = rawLayers.map((layer) => {
+    if (!layer || typeof layer !== 'object') return null;
+
+    const normalizedLayer = { ...layer };
+
+    if (normalizedLayer.type === 'text') {
+      normalizedLayer.type = 'textbox';
+      normalizedLayer.fontFamily = normalizedLayer.fontFamily || 'Poppins';
+      normalizedLayer.fontSize = normalizedLayer.fontSize || 60;
+      normalizedLayer.fontWeight = normalizedLayer.fontWeight || 'normal';
+      normalizedLayer.fill = normalizedLayer.fill || '#ffffff';
+      normalizedLayer.originX = normalizedLayer.originX || 'center';
+      normalizedLayer.originY = normalizedLayer.originY || 'center';
+      normalizedLayer.width = normalizedLayer.width || canvasWidth * 0.8;
+      normalizedLayer.left = typeof normalizedLayer.left === 'number' ? normalizedLayer.left : canvasWidth / 2;
+      normalizedLayer.top = typeof normalizedLayer.top === 'number' ? normalizedLayer.top : canvasHeight / 2;
+    }
+
+    if (typeof normalizedLayer.fill === 'string' && normalizedLayer.fill.includes('[')) {
+      normalizedLayer.fill = '#ffffff';
+    }
+
+    if (normalizedLayer.type === 'image' && typeof normalizedLayer.src === 'string' && normalizedLayer.src.startsWith('AI_IMAGE_PROMPT:')) {
+      normalizedLayer.crossOrigin = 'anonymous';
+    }
+
+    return normalizedLayer;
+  }).filter(Boolean);
+
+  return {
+    version: '5.3.0',
+    width: canvasWidth,
+    height: canvasHeight,
+    backgroundColor,
+    objects,
+  };
+};
+
 export const useFabric = (canvasRef) => {
   const [fabricCanvas, setFabricCanvas] = useState(null);
   
@@ -49,30 +100,45 @@ export const useFabric = (canvasRef) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasRef]); // This effect should only run once to initialize the canvas. The functions inside create closures, which is intended.
 
-  const renderDesign = useCallback((designJson) => {
+  // ✅ FIX: Completely rewritten renderDesign to be robust and use Fabric's native JSON loader.
+  const renderDesign = useCallback((designJson, callback) => {
     if (!fabricCanvas || !designJson) return;
-    
-    fabricCanvas.loadFromJSON(designJson, () => {
+
+    const normalizedDesign = normalizeDesignForFabric(designJson);
+    if (!normalizedDesign) return;
+
+    console.log(`\n================== [FABRIC.JS RENDER START] ==================`);
+    console.log(`🎨 [Debug] 1. Received Design JSON to render.`);
+    console.log(`   - Background:`, normalizedDesign.backgroundColor);
+    console.log(`   - Layer Count:`, normalizedDesign.objects?.length || 0);
+
+    fabricCanvas.clear();
+    fabricCanvas.setBackgroundColor(normalizedDesign.backgroundColor || '#ffffff');
+    fabricCanvas.loadFromJSON(normalizedDesign, () => {
+      fabricCanvas.setDimensions({
+        width: normalizedDesign.width,
+        height: normalizedDesign.height,
+      });
+      fabricCanvas.setWidth(normalizedDesign.width);
+      fabricCanvas.setHeight(normalizedDesign.height);
+      fabricCanvas.setZoom(1);
+      fabricCanvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+      fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
-      // After loading, fit the canvas to the screen
-      // ✅ NEW: Reset history after loading a new design
+
+      // ✅ NEW: Reset history after loading a new design to prevent undoing into the old state.
       const json = fabricCanvas.toJSON();
       setHistory([json]);
       setHistoryIndex(0);
       setIsProcessing(false);
+      console.log(`🔄 [Debug] 3. Undo/Redo history has been reset for the new design.`);
 
-      const container = canvasRef.current.parentElement.parentElement;
-      if (container) {
-        const containerWidth = container.offsetWidth - 80;
-        const containerHeight = container.offsetHeight - 100;
-        const scale = Math.min(containerWidth / 1080, containerHeight / 1080);
-        fabricCanvas.setZoom(scale);
-        fabricCanvas.setWidth(1080 * scale);
-        fabricCanvas.setHeight(1080 * scale);
-        fabricCanvas.renderAll();
-      }
+      // Optional callback for when rendering is complete
+      if (callback) callback();
+      console.log(`✅ [Debug] 4. Canvas rendering complete.`);
+      console.log(`================== [FABRIC.JS RENDER END] ==================\n`);
     });
-  }, [fabricCanvas, canvasRef]);
+  }, [fabricCanvas]);
   
   const exportToJson = useCallback(() => {
     if (!fabricCanvas) return null;

@@ -286,11 +286,24 @@ export default function PublishPost() {
 
       if (data.success) {
         setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply || (isEditing ? "I've updated the design for you!" : "Here's a new design!") }]);
-        // 🚀 Render the generated design on the canvas
-        if (renderDesign) renderDesign(data.designJson);
-        if (data.designJson?.caption) {
-          setCaption([data.designJson.caption, data.designJson.hashtags].filter(Boolean).join('\n\n'));
+        const designToRender = data.designJson || null;
+
+        if (renderDesign && designToRender) {
+          renderDesign(designToRender, () => {
+            setTimeout(() => {
+              const nextImage = exportToImage('jpeg');
+              setPreviewImageUrl(nextImage || '');
+              if (designToRender?.caption) {
+                setCaption([designToRender.caption, designToRender.hashtags].filter(Boolean).join('\n\n'));
+              }
+            }, 150);
+          });
         }
+
+        if (designToRender?.caption) {
+          setCaption([designToRender.caption, designToRender.hashtags].filter(Boolean).join('\n\n'));
+        }
+
         toast.success('AI has generated a new design!');
       }
     } catch (error) {
