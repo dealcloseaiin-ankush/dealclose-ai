@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import more icons for the new UI
-import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus, Calendar, Clock, Repeat, Instagram, Facebook } from 'lucide-react';
+import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus, Calendar, Clock, Repeat, InstagramIcon, Facebook } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
 
 import CanvasRenderer from '../components/editor/CanvasRenderer'; // 🚀 NEW
@@ -234,9 +234,9 @@ export default function PublishPost() {
               {/* 🚀 NEW: Platform Selector */}
               <div>
                 <label className="block text-sm font-bold text-gray-400 mb-2">Publish to</label>
-                <div className="flex gap-3">
+                <div className="flex gap-3"> 
                   <button type="button" onClick={() => togglePlatform('instagram')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${platforms.instagram ? 'bg-pink-500/20 border-pink-500 text-white' : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                    <Instagram size={18} /> Instagram
+                    <InstagramIcon size={18} /> Instagram
                   </button>
                   <button type="button" onClick={() => togglePlatform('facebook')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${platforms.facebook ? 'bg-blue-500/20 border-blue-500 text-white' : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'}`}>
                     <Facebook size={18} /> Facebook
