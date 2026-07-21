@@ -419,15 +419,14 @@ exports.generateAiPost = async (req, res) => {
     console.log("🚀 [DEBUG] 6. Logging AI token usage...");
     // ✅ FIX: Await the tracking call to prevent unhandled promise rejections and server crashes.
     if (usage) {
-      await aiUsageTracker.logUsage({
+      // ✅ FIX: Use the correct function name 'trackUsage' and pass the raw 'usage' object.
+      await aiUsageTracker.trackUsage({
         userId,
         workspaceId: workspaceId || 'main',
         feature: 'ai-social-post-generator',
         provider: usage.provider,
         model: usage.model,
-        promptTokens: usage.promptTokens,
-        completionTokens: usage.completionTokens,
-        totalTokens: usage.totalTokens,
+        usage: usage, // Pass the whole usage object as expected by the tracker
       });
     }
     console.log("✅ [DEBUG] 7. AI usage logged successfully.");
