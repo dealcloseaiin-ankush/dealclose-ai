@@ -1,5 +1,8 @@
 const Template = require('../models/templateModel');
 const aiService = require('./aiService');
+const aiDesignService = require('./aiDesignService'); // ✅ NEW: Import the from-scratch design service
+const templateProvider = require('../providers/templateProvider'); // ✅ FIX: Correct path to the new providers directory
+const aiValidationService = require('./aiValidationService'); // ✅ NEW: Import the validation service
 const Replicate = require('replicate');
 
 const IMAGE_MODEL = 'bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637';
@@ -27,7 +30,6 @@ const generateDesignImages = async (design) => {
 
   return design;
 };
-const aiDesignService = require('./aiDesignService'); // ✅ NEW: Import the from-scratch design service
 
 /**
  * Intelligently finds a template, fills it, or edits an existing design using AI.
@@ -64,28 +66,22 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
     let template = await Template.findOne({
       $or: [{ name: { $regex: keywords.join('|'), $options: 'i' } }, { tags: { $in: keywords } }]
     }).sort({ usageCount: -1 }).lean();
-
-    // ✅ FIX: If no specific template is found, use the most popular generic one as a fallback.
+    
     if (!template) {
       console.log(`[AI Designer] No specific template found for "${prompt}". Using a popular fallback template.`);
       template = await Template.findOne({}).sort({ usageCount: -1 }).lean();
     }
 
-    // ✅ FIX: If still no template, generate a design from scratch.
+    // ✅ ARCHITECTURE FIX: If NO template is found in the DB, call the dedicated from-scratch generator.
     if (!template) {
-      console.log(`[AI Designer] No templates found in DB. Generating a new design from scratch.`);
-      // This service asks the AI to create a full design, not just fill one.
-      // ✅ FIX: The generateDesignJson service returns an object { designJson, usage }.
-      // We need to extract the 'designJson' part before passing it to the image generator.
-      const { designJson: generatedDesignSpec, usage: designUsage } = await aiDesignService.generateDesignJson(prompt, businessContext);
-      const finalDesignWithImages = await generateDesignImages(generatedDesignSpec);
-      console.log(`✅ [AI Designer] Generated a new design from scratch with a background color and AI image.`);
-      return { designJson: finalDesignWithImages, usage: designUsage };
+      console.log(`[AI Designer] No templates in DB. Generating a new design from scratch.`);
+      return aiDesignService.generateDesignJson(prompt, businessContext);
     }
 
-    designJsonForPrompt = template.designJson;
+    designJsonForPrompt = template.designJson; // This will be the base for the AI to fill
     console.log(`[AI Designer] Using template "${template.name}" to generate design.`);
 
+    // ✅ FIX: Improved prompt to ensure AI acts as a copywriter and replaces placeholders.
     systemPrompt = `
       You are an expert copywriter and graphic designer. Your task is to populate a given JSON design template with new content based on a user's prompt and their business details.
       - Business Context: Name: ${businessContext.brandKit?.businessName || 'Our Business'}, Description: ${businessContext.description}, Logo: ${businessContext.brandKit?.logoUrl}, Colors: ${businessContext.brandKit?.primaryColor}, ${businessContext.brandKit?.secondaryColor}.
@@ -93,10 +89,14 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
       - Original Template JSON: ${JSON.stringify(designJsonForPrompt, null, 2)}
 
       **Your Task:**
-      1.  Intelligently modify ONLY the 'text', 'fill' (color), and 'src' (for logo/images) properties.
-      2.  DO NOT change the layout (left, top, width, height).
-      3.  Update the main 'caption' and 'hashtags' to be relevant.
-      4.  Return ONLY the modified, complete, and valid JSON object. No markdown.
+      1.  Analyze the user's request and business context.
+      2.  Replace placeholder text like '[HEADLINE]', '[CTA]', '[businessName]', '[website]' with compelling, relevant content.
+      3.  Replace placeholder colors like '[primaryColor]' with the actual brand color from the business context.
+      4.  Replace placeholder image sources like '[logoUrl]' with the actual logo URL.
+      5.  For image layers with "AI_IMAGE_PROMPT:", update the prompt inside to be specific to the user's request.
+      6.  DO NOT change the layout (left, top, width, height, etc.).
+      7.  Update the main 'caption' and 'hashtags' to be relevant.
+      8.  Return ONLY the modified, complete, and valid JSON object. No markdown.
     `;
     // Increment usage count for the template
     await Template.updateOne({ _id: template._id }, { $inc: { usageCount: 1 } });
@@ -110,74 +110,29 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
     const cleanedJson = rawJsonResponse.replace(/```json|```/g, '').trim();
     const filledDesignJson = JSON.parse(cleanedJson);
 
-    // Final check: Ensure the core structure is intact
-    if (!filledDesignJson.canvas || !filledDesignJson.layers) {
-      throw new Error("AI returned an invalid JSON structure.");
+    // ✅ NEW: Validate and repair the AI-filled template.
+    const { valid, repairedDesign, errors } = aiValidationService.validateAndRepair(filledDesignJson, businessContext);
+
+    if (!valid) {
+      console.warn('[AI Validation] AI-filled template failed validation. Using fallback.', { errors });
+      // If validation fails, use the robust fallback template but try to inject the AI's generated text content.
+      const fallbackTemplate = templateProvider.getBestTemplate(prompt, businessContext);
+      const fallbackWithContent = { ...fallbackTemplate.designJson };
+      fallbackWithContent.caption = filledDesignJson.caption || fallbackWithContent.caption;
+      fallbackWithContent.layers[1].text = (filledDesignJson.layers?.find(l => l.text?.length > 5)?.text || 'Your Headline Here');
+      
+      // Return the fallback, but with the original usage data for accurate cost tracking.
+      return { designJson: await generateDesignImages(fallbackWithContent), usage };
     }
 
     return {
-      designJson: await generateDesignImages(filledDesignJson),
+      designJson: await generateDesignImages(repairedDesign), // Use the repaired design
       usage // Pass usage data back to the controller
     };
 
   } catch (error) {
     console.error("AI Template Filler Service Error:", error);
     throw new Error("AI failed to process the design. Please try again.");
-  }
-};
-
-/**
- * Generates a complete design from scratch using AI.
- * @param {string} prompt The user's prompt.
- * @param {object} businessContext Business context.
- * @returns {Promise<{designJson: object, usage: object}>} The generated design and usage data.
- */
-aiDesignService.generateDesignJson = async (prompt, businessContext) => {
-  // ... (existing system prompt)
-  const systemPrompt = `
-    You are a world-class graphic designer and social media expert, similar to Canva's Magic Design AI.
-    Your task is to generate a complete, professional Instagram post design based on a user's prompt and their business context.
-    The output MUST be a single, valid JSON object representing the design specification for a 1080x1080 canvas.
-
-    BUSINESS CONTEXT: ${businessContext || 'A generic local business.'}
-
-    JSON STRUCTURE:
-    {
-      "canvas": { "width": 1080, "height": 1080, "backgroundColor": "#ffffff" },
-      "caption": "A creative and engaging caption for the post, including a CTA.",
-      "hashtags": "#relevant #hashtags #for #the #post",
-      "layers": [
-        {
-          "type": "text", "text": "Headline Text", "fontFamily": "Poppins", "fontSize": 120, "fontWeight": "bold", "fill": "#000000",
-          "left": 540, "top": 200, "originX": "center", "originY": "center", "textAlign": "center"
-        },
-        {
-          "type": "image", "src": "AI_IMAGE_PROMPT: A high-quality, professional product shot of [product] on a clean background.",
-          "left": 540, "top": 550, "originX": "center", "originY": "center", "width": 600, "height": 400, "scaleX": 1, "scaleY": 1
-        }
-      ]
-    }
-
-    DESIGN RULES:
-    1.  Analyze the user's prompt (e.g., "Rakshabandhan offer") and business context.
-    2.  Choose a suitable color palette. Set the 'backgroundColor'.
-    3.  Create a compelling Headline and Subheading.
-    4.  If it's an offer, create an offer badge or a CTA button using 'rect' and 'text' layers.
-    5.  For images, DO NOT provide a URL. Instead, for the "src" property, provide a detailed AI image generation prompt starting with "AI_IMAGE_PROMPT:". The backend will generate the image.
-    6.  Position elements logically using 'left' and 'top' coordinates. Use 'originX': 'center' for easy centering.
-    7.  Choose professional and readable fonts from Google Fonts (e.g., Poppins, Montserrat, Roboto, Lato).
-    8.  Generate a relevant 'caption' and 'hashtags' for the Instagram post itself.
-    9.  The final output must be ONLY the JSON object, with no extra text or markdown.
-  `;
-
-  try {
-    const { content: rawJsonResponse, usage } = await aiService.generateAIResponse(prompt, systemPrompt, 'instagram-design');
-    const cleanedJson = rawJsonResponse.replace(/```json|```/g, '').trim();
-    const designSpec = JSON.parse(cleanedJson);
-    return { designJson: designSpec, usage }; // Return both design and usage
-  } catch (error) {
-    console.error("AI Design Service Error:", error);
-    throw new Error("AI failed to generate a valid design. Please try a different prompt.");
   }
 };
 
