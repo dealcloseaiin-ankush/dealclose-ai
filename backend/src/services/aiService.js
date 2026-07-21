@@ -21,10 +21,10 @@ const MODELS = {
  * @param {string} prompt The user's message.
  * @param {string} [systemContext="You are a helpful AI assistant."] The system message to set the AI's behavior.
  * @param {string} [platform="whatsapp"] The platform where the reply will be sent (whatsapp or instagram).
- * @param {string} [userId] The ID of the user to associate the usage with.
- * @returns {Promise<string>} The AI-generated response text.
+ * @param {string} [userId] The ID of the user to associate the usage with. // This parameter is no longer used here, but kept for compatibility.
+ * @returns {Promise<{content: string, usage: object}>} The AI-generated response text and usage data.
  */
-exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp", userId = null) => {
+exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp") => {
   try {
     let finalContext = systemContext;
     
@@ -38,6 +38,7 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
 
     let rawResponse = "";
     let aiSuccess = false;
+    let usageData = null;
 
     // 🚀 Priority 1: Try Gemini 1.5 Flash (Global Base Model to bypass billing blocks)
     if (genAI) {
@@ -47,14 +48,10 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
         const result = await model.generateContent([finalContext, prompt]);
         const response = await result.response;
         
-        if (userId) {
-          aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'gemini', model: MODELS.GEMINI_1_5_FLASH, usage: response.usageMetadata });
-        }
-
         console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_1_5_FLASH}`);
         rawResponse = response.text();
         aiSuccess = true;
-        return rawResponse;
+        usageData = { ...response.usageMetadata, provider: 'gemini', model: MODELS.GEMINI_1_5_FLASH };
       } catch (geminiError) {
         console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_1_5_FLASH} failed/busy: ${geminiError.message}. Trying ${MODELS.GEMINI_3_1_LITE}...`);
       }
@@ -67,14 +64,10 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
           const result = await model.generateContent([finalContext, prompt]);
           const response = await result.response;
 
-          if (userId) {
-            aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'gemini', model: MODELS.GEMINI_3_1_LITE, usage: response.usageMetadata });
-          }
-
           console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
           rawResponse = response.text();
           aiSuccess = true;
-          return rawResponse;
+          usageData = { ...response.usageMetadata, provider: 'gemini', model: MODELS.GEMINI_3_1_LITE };
         } catch (gemini3Error) {
           console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_3_1_LITE} failed/busy: ${gemini3Error.message}. Trying ${MODELS.GEMINI_2_5_LITE}...`);
         }
@@ -88,14 +81,10 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
           const result = await model.generateContent([finalContext, prompt]);
           const response = await result.response;
 
-          if (userId) {
-            aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'gemini', model: MODELS.GEMINI_2_5_LITE, usage: response.usageMetadata });
-          }
-
           console.log(`✅ [AI Service] Responded using model: ${MODELS.GEMINI_2_5_LITE}`);
           rawResponse = response.text();
           aiSuccess = true;
-          return rawResponse;
+          usageData = { ...response.usageMetadata, provider: 'gemini', model: MODELS.GEMINI_2_5_LITE };
         } catch (gemini2Error) {
           console.warn(`⚠️ [AI Service] ${MODELS.GEMINI_2_5_LITE} failed/busy: ${gemini2Error.message}. Falling back to OpenAI...`);
         }
@@ -103,7 +92,7 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     }
 
     // 🚀 Priority 4: Fallback to OpenAI gpt-4o-mini
-    if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy')) {
+    if (!aiSuccess && process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy')) {
       try { 
         console.log(`[AI Service] 🤖 Requesting fallback model: ${MODELS.OPENAI_MINI}`);
         const completion = await openai.chat.completions.create({
@@ -114,19 +103,19 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
             model: MODELS.OPENAI_MINI,
         });
 
-        if (userId) {
-          aiUsageTracker.trackUsage({ userId, feature: `generate-response-${platform}`, provider: 'openai', model: MODELS.OPENAI_MINI, usage: completion.usage });
-        }
-
         console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
-        return completion.choices[0].message.content;
+        rawResponse = completion.choices[0].message.content;
+        aiSuccess = true;
+        usageData = { ...completion.usage, provider: 'openai', model: MODELS.OPENAI_MINI };
       } catch (openaiError) {
         console.error(`❌ [AI Service] OpenAI fallback also failed: ${openaiError.message}`);
         throw openaiError;
       }
     } 
 
-    throw new Error('All AI models failed to respond. Please check API keys in the .env file.');
+    if (!aiSuccess) throw new Error('All AI models failed to respond. Please check API keys in the .env file.');
+
+    return { content: rawResponse, usage: usageData };
   } catch (error) {
     console.error('AI Service Error:', error);
     throw new Error(`Failed to generate AI response: ${error.message}`);

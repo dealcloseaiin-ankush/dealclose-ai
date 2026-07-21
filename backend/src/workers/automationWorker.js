@@ -43,10 +43,13 @@ automationQueue.on('error', (err) => {
 const automationWorker = new Worker('automationQueue', async job => {
 
   if (job.name === 'publish_scheduled_post') {
+    console.log("\n================== [WORKER: PUBLISH POST START] ==================");
+    console.log(`🚀 [WORKER DEBUG] 1. Processing job 'publish_scheduled_post' for Post ID: ${job.data.postId}`);
     const post = await SocialPost.findById(job.data.postId);
     if (!post || ['published', 'failed'].includes(post.status)) return;
 
     try {
+      console.log(`🚀 [WORKER DEBUG] 2. Post status is valid. Setting to 'publishing'.`);
       post.status = 'publishing';
       await post.save();
       const user = await User.findById(post.userId).lean();
@@ -56,29 +59,39 @@ const automationWorker = new Worker('automationQueue', async job => {
         : null;
       const config = workspace ? workspace.instagramConfig : user.instagramConfig;
       const imageUrl = post.mediaUrls?.find(media => media.type === 'image')?.url;
+      console.log(`🚀 [WORKER DEBUG] 3. Found User: ${user.email}, Image URL: ${imageUrl ? 'Yes' : 'No'}`);
       if (!imageUrl) throw new Error('A publishable image is required.');
       if (!config?.accessToken) throw new Error('Instagram/Facebook connection is missing for this workspace.');
 
       const platformPostIds = {};
       if (post.platforms.includes('instagram')) {
+        console.log(`🚀 [WORKER DEBUG] 4a. Publishing to Instagram...`);
         if (!config.instagramAccountId) throw new Error('Instagram account is not connected for this workspace.');
         const result = await instagramService.publishImagePost(config.instagramAccountId, config.accessToken, imageUrl, post.caption);
         platformPostIds.instagram = result.postId;
+        console.log(`✅ [WORKER DEBUG] 4b. Instagram publish success. Post ID: ${result.postId}`);
       }
       if (post.platforms.includes('facebook')) {
+        console.log(`🚀 [WORKER DEBUG] 5a. Publishing to Facebook...`);
         if (!config.facebookPageId) throw new Error('Facebook Page is not connected for this workspace.');
         const result = await instagramService.publishFacebookPhoto(config.facebookPageId, config.accessToken, imageUrl, post.caption);
         platformPostIds.facebook = result.postId;
+        console.log(`✅ [WORKER DEBUG] 5b. Facebook publish success. Post ID: ${result.postId}`);
       }
 
+      console.log(`🚀 [WORKER DEBUG] 6. All platforms published. Updating post status to 'published'.`);
       post.status = 'published';
       post.publishedAt = new Date();
       post.platformPostIds = platformPostIds;
       await post.save();
+      console.log(`✅ [WORKER DEBUG] 7. Job complete.`);
+      console.log("================== [WORKER: PUBLISH POST END] ==================\n");
     } catch (error) {
+      console.error(`❌ [WORKER CRITICAL ERROR] Failed to publish Post ID ${post._id}:`, error);
       post.status = 'failed';
       post.failureReason = error.message;
       await post.save();
+      console.log("================== [WORKER: PUBLISH POST END] ==================\n");
       throw error;
     }
     return;

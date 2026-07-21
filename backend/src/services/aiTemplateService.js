@@ -33,7 +33,7 @@ const aiDesignService = require('./aiDesignService'); // ✅ NEW: Import the fro
  * @param {string} prompt - The user's request, e.g., "Create a Diwali Sale".
  * @param {object} businessContext - Context about the user's business.
  * @param {object} [existingDesignJson=null] - The current design JSON, if the user is editing.
- * @returns {Promise<object>} The filled and updated Design JSON.
+ * @returns {Promise<{designJson: object, usage: object}>} The filled design and AI usage data.
  */
 exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJson = null) => {
   let designJsonForPrompt;
@@ -75,7 +75,8 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
       console.log(`[AI Designer] No templates found in DB. Generating a new design from scratch.`);
       // This service asks the AI to create a full design, not just fill one.
       const generatedDesign = await aiDesignService.generateDesignJson(prompt, businessContext);
-      return generateDesignImages(generatedDesign);
+      // 🐛 FIX: Return usage data for tracking
+      return { designJson: await generateDesignImages(generatedDesign), usage: generatedDesign.usage };
     }
 
     designJsonForPrompt = template.designJson;
@@ -99,8 +100,8 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
 
   try {
     // We send an empty user message because all context is in the system prompt
-    const rawJsonResponse = await aiService.generateAIResponse("", systemPrompt, 'template-filler');
-    
+    const { content: rawJsonResponse, usage } = await aiService.generateAIResponse("", systemPrompt, 'template-filler');
+
     // Clean the response to ensure it's valid JSON
     const cleanedJson = rawJsonResponse.replace(/```json|```/g, '').trim();
     const filledDesignJson = JSON.parse(cleanedJson);
@@ -110,11 +111,69 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
       throw new Error("AI returned an invalid JSON structure.");
     }
 
-    return generateDesignImages(filledDesignJson);
+    return {
+      designJson: await generateDesignImages(filledDesignJson),
+      usage // Pass usage data back to the controller
+    };
 
   } catch (error) {
     console.error("AI Template Filler Service Error:", error);
     throw new Error("AI failed to process the design. Please try again.");
+  }
+};
+
+/**
+ * Generates a complete design from scratch using AI.
+ * @param {string} prompt The user's prompt.
+ * @param {object} businessContext Business context.
+ * @returns {Promise<{designJson: object, usage: object}>} The generated design and usage data.
+ */
+aiDesignService.generateDesignJson = async (prompt, businessContext) => {
+  // ... (existing system prompt)
+  const systemPrompt = `
+    You are a world-class graphic designer and social media expert, similar to Canva's Magic Design AI.
+    Your task is to generate a complete, professional Instagram post design based on a user's prompt and their business context.
+    The output MUST be a single, valid JSON object representing the design specification for a 1080x1080 canvas.
+
+    BUSINESS CONTEXT: ${businessContext || 'A generic local business.'}
+
+    JSON STRUCTURE:
+    {
+      "canvas": { "width": 1080, "height": 1080, "backgroundColor": "#ffffff" },
+      "caption": "A creative and engaging caption for the post, including a CTA.",
+      "hashtags": "#relevant #hashtags #for #the #post",
+      "layers": [
+        {
+          "type": "text", "text": "Headline Text", "fontFamily": "Poppins", "fontSize": 120, "fontWeight": "bold", "fill": "#000000",
+          "left": 540, "top": 200, "originX": "center", "originY": "center", "textAlign": "center"
+        },
+        {
+          "type": "image", "src": "AI_IMAGE_PROMPT: A high-quality, professional product shot of [product] on a clean background.",
+          "left": 540, "top": 550, "originX": "center", "originY": "center", "width": 600, "height": 400, "scaleX": 1, "scaleY": 1
+        }
+      ]
+    }
+
+    DESIGN RULES:
+    1.  Analyze the user's prompt (e.g., "Rakshabandhan offer") and business context.
+    2.  Choose a suitable color palette. Set the 'backgroundColor'.
+    3.  Create a compelling Headline and Subheading.
+    4.  If it's an offer, create an offer badge or a CTA button using 'rect' and 'text' layers.
+    5.  For images, DO NOT provide a URL. Instead, for the "src" property, provide a detailed AI image generation prompt starting with "AI_IMAGE_PROMPT:". The backend will generate the image.
+    6.  Position elements logically using 'left' and 'top' coordinates. Use 'originX': 'center' for easy centering.
+    7.  Choose professional and readable fonts from Google Fonts (e.g., Poppins, Montserrat, Roboto, Lato).
+    8.  Generate a relevant 'caption' and 'hashtags' for the Instagram post itself.
+    9.  The final output must be ONLY the JSON object, with no extra text or markdown.
+  `;
+
+  try {
+    const { content: rawJsonResponse, usage } = await aiService.generateAIResponse(prompt, systemPrompt, 'instagram-design');
+    const cleanedJson = rawJsonResponse.replace(/```json|```/g, '').trim();
+    const designSpec = JSON.parse(cleanedJson);
+    return { designJson: designSpec, usage }; // Return both design and usage
+  } catch (error) {
+    console.error("AI Design Service Error:", error);
+    throw new Error("AI failed to generate a valid design. Please try a different prompt.");
   }
 };
 

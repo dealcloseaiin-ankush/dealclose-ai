@@ -147,7 +147,8 @@ export default function PublishPost() {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    const userMessage = { role: 'user', text: chatInput };
+    const currentPrompt = chatInput.trim(); // 🐛 FIX: Store prompt before clearing input
+    const userMessage = { role: 'user', text: currentPrompt };
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
     setIsAiWorking(true);
@@ -163,7 +164,7 @@ export default function PublishPost() {
 
       // 🚀 REAL API CALL to the new backend endpoint
       const { data } = await api.post('/instagram/ai-generate-post', {
-        prompt: chatInput,
+        prompt: currentPrompt, // Use the stored prompt
         workspaceId: activeWorkspace,
         existingDesign: isEditing ? currentDesignJson : null // Pass existing design for edits
       });
@@ -198,6 +199,10 @@ export default function PublishPost() {
       formData.append('caption', caption);
       formData.append('workspaceId', activeWorkspace);
       formData.append('designJson', JSON.stringify(designData));
+      // 🚀 NEW: Save platform and schedule info with the draft
+      formData.append('platforms', JSON.stringify(platforms));
+      formData.append('publishMode', publishMode);
+      if (publishMode === 'schedule') formData.append('scheduleDate', scheduleDate);
       if (editingDraft?._id) formData.append('draftId', editingDraft._id);
       const { data } = await api.post('/instagram/drafts', formData);
       setDrafts(prev => [data.draft, ...prev.filter(d => d._id !== data.draft._id)]);
@@ -371,7 +376,16 @@ export default function PublishPost() {
                   <p className="text-xs text-gray-400 line-clamp-2">{draft.caption}</p>
                   <p className="text-[10px] text-gray-600 font-mono">ID: {draft._id}</p>
                   <div className="flex gap-2 mt-auto pt-2 border-t border-gray-800">
-                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); renderDesign(draft.designJson); }} className="flex-1 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-1"><Edit size={12}/> Edit</button>
+                    {/* ✅ FIX: Restore all draft info on edit, not just caption/design */}
+                    <button onClick={() => { 
+                      setEditingDraft(draft); 
+                      setCaption(draft.caption); 
+                      renderDesign(draft.designJson);
+                      // 🚀 NEW: Restore platforms and schedule info
+                      if (draft.platforms) setPlatforms(draft.platforms);
+                      if (draft.publishMode) setPublishMode(draft.publishMode);
+                      if (draft.scheduleDate) setScheduleDate(draft.scheduleDate);
+                     }} className="flex-1 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-1"><Edit size={12}/> Edit</button>
                     <button onClick={async () => {
                       try {
                         await api.delete(`/instagram/drafts/${draft._id}`);

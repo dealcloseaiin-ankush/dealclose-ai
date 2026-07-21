@@ -21,12 +21,14 @@ export default function Login() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      // 🚀 SMART ERROR HANDLING: Ab network errors (jaise server ka so jaana) ke liye
-      // user ko ek behtar aur saaf message dikhega.
-      if (err.code === 'ERR_NETWORK') {
+      // 🚀 SMART ERROR HANDLING: Ab network errors (jaise server ka so jaana) ke liye user ko ek behtar aur saaf message dikhega.
+      // Also handles Supabase-specific auth errors more gracefully.
+      if (err.code === 'ERR_NETWORK' || err.message.includes('network error')) {
         setError('Network error. The server might be starting up. Please wait a moment and try again.');
+      } else if (err.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please check your credentials.');
       } else {
-        // Baaki errors (jaise galat password) ke liye backend se aaya message dikhao
+        // Baaki errors ke liye backend se aaya message dikhao
         setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
       }
       console.error(err);

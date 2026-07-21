@@ -9,6 +9,8 @@ const instagramService = require('../services/instagramService');
  * @access  Private
  */
 exports.createPost = async (req, res) => {
+  console.log("\n================== [SOCIAL POST START] ==================");
+  console.log("🚀 [DEBUG] 1. /api/posts endpoint hit for create/schedule.");
   try {
     const { caption, platforms, status, scheduledAt, workspaceId } = req.body;
     const userId = req.user._id;
@@ -16,6 +18,7 @@ exports.createPost = async (req, res) => {
     if (!caption || !platforms) {
       return res.status(400).json({ success: false, message: 'Caption and platforms are required.' });
     }
+    console.log(`🚀 [DEBUG] 2. User: ${userId}, Status: ${status}, Platforms: ${platforms}`);
     const requestedPlatforms = JSON.parse(platforms);
     if (!Array.isArray(requestedPlatforms) || requestedPlatforms.length === 0) {
       return res.status(400).json({ success: false, message: 'Select at least one platform.' });
@@ -27,12 +30,14 @@ exports.createPost = async (req, res) => {
     let mediaUrls = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
+        console.log(`🚀 [DEBUG] 3. Uploading media file to Cloudinary...`);
         const result = await uploadToCloudinary(file.path, 'social_posts');
         mediaUrls.push({
           type: file.mimetype.startsWith('video') ? 'video' : 'image',
           url: result.secure_url,
         });
       }
+      console.log(`✅ [DEBUG] 4. Media uploaded successfully.`);
     }
 
     const post = new SocialPost({
@@ -45,12 +50,16 @@ exports.createPost = async (req, res) => {
       mediaUrls,
     });
 
+    console.log(`🚀 [DEBUG] 5. Saving post to database with status: '${post.status}'`);
     await post.save();
+    console.log(`✅ [DEBUG] 6. Post saved with ID: ${post._id}`);
 
     if (status === 'scheduled') {
       const delay = new Date(scheduledAt).getTime() - Date.now();
       if (delay > 0) {
+        console.log(`🚀 [DEBUG] 7. Adding post to BullMQ worker queue for scheduling (delay: ${delay}ms).`);
         await automationQueue.add('publish_scheduled_post', { postId: post._id }, { delay });
+        console.log("================== [SOCIAL POST END] ==================\n");
         return res.status(201).json({ success: true, message: 'Post scheduled successfully!', post });
       }
     }
@@ -58,15 +67,19 @@ exports.createPost = async (req, res) => {
     if (status === 'now') {
       post.status = 'publishing';
       await post.save();
+      console.log(`🚀 [DEBUG] 7. Adding post to BullMQ worker queue for immediate publishing.`);
       // Immediately add to queue for publishing
       await automationQueue.add('publish_scheduled_post', { postId: post._id });
+      console.log("================== [SOCIAL POST END] ==================\n");
       return res.status(201).json({ success: true, message: 'Post is being published now!', post });
     }
 
+    console.log(`✅ [DEBUG] 7. Post saved as draft.`);
+    console.log("================== [SOCIAL POST END] ==================\n");
     res.status(201).json({ success: true, message: 'Draft saved successfully!', post });
 
   } catch (error) {
-    console.error('Error creating post:', error);
+    console.error('❌ [CRITICAL ERROR] Post creation failed:', error);
     res.status(500).json({ success: false, message: 'Server error while creating post.' });
   }
 };

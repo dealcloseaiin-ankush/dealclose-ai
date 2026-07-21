@@ -356,6 +356,9 @@ exports.publishPost = async (req, res) => {
 // @desc    Generate Post Content with AI
 // @route   POST /api/instagram/ai-generate-post
 exports.generateAiPost = async (req, res) => {
+  const aiUsageTracker = require('../services/aiUsageTracker'); // 🚀 NEW: Import tracker
+  console.log("\n================== [AI POST GENERATION START] ==================");
+  console.log("🚀 [DEBUG] 1. /api/instagram/ai-generate-post endpoint hit!");
   try {
     const userId = req.user?._id || req.user?.id;
     const { prompt, workspaceId, existingDesign } = req.body;
@@ -364,6 +367,7 @@ exports.generateAiPost = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Prompt is required.' });
     }
 
+    console.log(`🚀 [DEBUG] 2. User: ${userId}, Workspace: ${workspaceId}, Prompt: "${prompt}"`);
     const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
@@ -383,6 +387,7 @@ exports.generateAiPost = async (req, res) => {
       phone: user.ownerPhone || '',
       brandKit: user.brandKit // Pass the entire brand kit
     };
+    console.log("🚀 [DEBUG] 3. Constructed Business Context for AI.");
 
     // 🚀 UPGRADED: Call the new template filling service
     // Fabric exports `objects`; the AI design contract uses `layers`. Normalise
@@ -400,23 +405,43 @@ exports.generateAiPost = async (req, res) => {
         }
       : null;
 
-    const designJson = await aiTemplateService.generateOrEditDesign(
+    console.log("🚀 [DEBUG] 4. Calling aiTemplateService to generate/edit design...");
+    const { designJson, usage } = await aiTemplateService.generateOrEditDesign(
       prompt,
       businessContext,
       normalizedExistingDesign
     );
+    console.log("✅ [DEBUG] 5. Received design JSON and usage data from service.");
 
     // The AI now provides the conversational reply within the JSON
     const aiReply = "I've created a new design for you! You can now edit it on the canvas.";
 
+    console.log("🚀 [DEBUG] 6. Logging AI token usage...");
+    // ✅ FIX: Await the tracking call to prevent unhandled promise rejections and server crashes.
+    if (usage) {
+      await aiUsageTracker.logUsage({
+        userId,
+        workspaceId: workspaceId || 'main',
+        feature: 'ai-social-post-generator',
+        provider: usage.provider,
+        model: usage.model,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+      });
+    }
+    console.log("✅ [DEBUG] 7. AI usage logged successfully.");
+
+    console.log("🚀 [DEBUG] 8. Sending final response to frontend.");
     res.status(200).json({ 
       success: true, 
       aiReply,
       designJson // Send the entire design object to the frontend
     });
-
+    console.log("✅ [DEBUG] 9. Response sent. AI Post Generation complete.");
+    console.log("================== [AI POST GENERATION END] ==================\n");
   } catch (error) {
-    console.error('AI Post Generation Error:', error.message);
+    console.error('❌ [CRITICAL ERROR] AI Post Generation Failed:', error);
     res.status(500).json({ success: false, message: 'AI failed to generate content. Please try a different prompt.' });
   }
 };
