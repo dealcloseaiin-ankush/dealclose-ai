@@ -74,7 +74,7 @@ export default function Publisher() {
             <p className="text-gray-400">Plan, schedule, and analyze your social media content from one place.</p>
           </div>
           <Link
-            to="/publish"
+            to="/publish-post"
             className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
           >
             <Plus size={18} /> Create New Post

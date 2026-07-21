@@ -220,6 +220,7 @@ export default function App() {
             <Route path="scaniq" element={<ScanIQ />} />
             <Route path="super-admin" element={<SuperAdmin />} />
             <Route path="publish-post" element={<PublishPost />} /> {/* 🚀 NEW: Publish Post Route */}
+            <Route path="publish" element={<PublishPost />} /> {/* Compatibility alias for older links */}
             <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
             <Route path="publisher" element={<Publisher />} /> {/* 🚀 NEW: Publisher Route */}
             <Route path="/admin/templates" element={<AdminTemplates />} /> {/* 🚀 NEW: Admin Route */}

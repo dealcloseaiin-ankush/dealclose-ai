@@ -1,5 +1,31 @@
 const Template = require('../models/templateModel');
 const aiService = require('./aiService');
+const Replicate = require('replicate');
+
+const IMAGE_MODEL = 'bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637';
+
+const generateDesignImages = async (design) => {
+  if (!process.env.REPLICATE_API_TOKEN || !Array.isArray(design.layers)) return design;
+  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+
+  await Promise.all(design.layers.map(async layer => {
+    if (layer.type !== 'image' || typeof layer.src !== 'string' || !layer.src.startsWith('AI_IMAGE_PROMPT:')) return;
+    try {
+      const output = await replicate.run(IMAGE_MODEL, {
+        input: { prompt: `${layer.src.replace('AI_IMAGE_PROMPT:', '').trim()}, professional social-media design, high quality` }
+      });
+      const imageUrl = Array.isArray(output) ? output[0] : output;
+      if (imageUrl) {
+        layer.src = imageUrl;
+        layer.crossOrigin = 'anonymous';
+      }
+    } catch (error) {
+      console.warn('[AI Designer] Background image generation failed:', error.message);
+    }
+  }));
+
+  return design;
+};
 const aiDesignService = require('./aiDesignService'); // ✅ NEW: Import the from-scratch design service
 
 /**
@@ -48,7 +74,8 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
     if (!template) {
       console.log(`[AI Designer] No templates found in DB. Generating a new design from scratch.`);
       // This service asks the AI to create a full design, not just fill one.
-      return aiDesignService.generateDesignJson(prompt, businessContext);
+      const generatedDesign = await aiDesignService.generateDesignJson(prompt, businessContext);
+      return generateDesignImages(generatedDesign);
     }
 
     designJsonForPrompt = template.designJson;
@@ -83,7 +110,7 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
       throw new Error("AI returned an invalid JSON structure.");
     }
 
-    return filledDesignJson;
+    return generateDesignImages(filledDesignJson);
 
   } catch (error) {
     console.error("AI Template Filler Service Error:", error);

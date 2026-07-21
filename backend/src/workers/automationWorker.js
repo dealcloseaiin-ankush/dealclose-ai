@@ -9,6 +9,8 @@ const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 FIX: Case
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/aiService');
+const SocialPost = require('../models/SocialPostModel');
+const instagramService = require('../services/instagramService');
 
 // Redis connection (Supports Upstash Cloud Redis & Local)
 if (!process.env.REDIS_URL) {
@@ -39,6 +41,48 @@ automationQueue.on('error', (err) => {
 
 // Create the Worker that processes jobs
 const automationWorker = new Worker('automationQueue', async job => {
+
+  if (job.name === 'publish_scheduled_post') {
+    const post = await SocialPost.findById(job.data.postId);
+    if (!post || ['published', 'failed'].includes(post.status)) return;
+
+    try {
+      post.status = 'publishing';
+      await post.save();
+      const user = await User.findById(post.userId).lean();
+      if (!user) throw new Error('Post owner was not found.');
+      const workspace = post.workspaceId !== 'main'
+        ? user.workspaces?.find(w => String(w._id) === String(post.workspaceId))
+        : null;
+      const config = workspace ? workspace.instagramConfig : user.instagramConfig;
+      const imageUrl = post.mediaUrls?.find(media => media.type === 'image')?.url;
+      if (!imageUrl) throw new Error('A publishable image is required.');
+      if (!config?.accessToken) throw new Error('Instagram/Facebook connection is missing for this workspace.');
+
+      const platformPostIds = {};
+      if (post.platforms.includes('instagram')) {
+        if (!config.instagramAccountId) throw new Error('Instagram account is not connected for this workspace.');
+        const result = await instagramService.publishImagePost(config.instagramAccountId, config.accessToken, imageUrl, post.caption);
+        platformPostIds.instagram = result.postId;
+      }
+      if (post.platforms.includes('facebook')) {
+        if (!config.facebookPageId) throw new Error('Facebook Page is not connected for this workspace.');
+        const result = await instagramService.publishFacebookPhoto(config.facebookPageId, config.accessToken, imageUrl, post.caption);
+        platformPostIds.facebook = result.postId;
+      }
+
+      post.status = 'published';
+      post.publishedAt = new Date();
+      post.platformPostIds = platformPostIds;
+      await post.save();
+    } catch (error) {
+      post.status = 'failed';
+      post.failureReason = error.message;
+      await post.save();
+      throw error;
+    }
+    return;
+  }
   
   // ==========================================
   // 1. ABANDONED CART REMINDER

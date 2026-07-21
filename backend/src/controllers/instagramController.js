@@ -358,7 +358,7 @@ exports.publishPost = async (req, res) => {
 exports.generateAiPost = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { prompt, workspaceId } = req.body;
+    const { prompt, workspaceId, existingDesign } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ success: false, message: 'Prompt is required.' });
@@ -385,7 +385,26 @@ exports.generateAiPost = async (req, res) => {
     };
 
     // 🚀 UPGRADED: Call the new template filling service
-    const designJson = await aiTemplateService.fillTemplateWithAI(prompt, businessContext);
+    // Fabric exports `objects`; the AI design contract uses `layers`. Normalise
+    // the editor payload so a follow-up request can edit the current design.
+    const normalizedExistingDesign = existingDesign
+      ? {
+          canvas: existingDesign.canvas || {
+            width: existingDesign.width || 1080,
+            height: existingDesign.height || 1080,
+            backgroundColor: existingDesign.backgroundColor || '#ffffff'
+          },
+          caption: existingDesign.caption || '',
+          hashtags: existingDesign.hashtags || '',
+          layers: existingDesign.layers || existingDesign.objects || []
+        }
+      : null;
+
+    const designJson = await aiTemplateService.generateOrEditDesign(
+      prompt,
+      businessContext,
+      normalizedExistingDesign
+    );
 
     // The AI now provides the conversational reply within the JSON
     const aiReply = "I've created a new design for you! You can now edit it on the canvas.";
@@ -421,6 +440,14 @@ exports.saveDraft = async (req, res) => {
   try {
     const userId = req.user?._id;
     const { draftId, caption, workspaceId = 'main' } = req.body;
+    let designJson = null;
+    if (req.body.designJson) {
+      try {
+        designJson = JSON.parse(req.body.designJson);
+      } catch (error) {
+        return res.status(400).json({ success: false, message: 'Draft design data is invalid.' });
+      }
+    }
 
     let imageUrl = req.body.imageUrl || ''; // Use existing image URL if provided
 
@@ -435,7 +462,7 @@ exports.saveDraft = async (req, res) => {
       }
     }
 
-    if (!caption && !imageUrl) {
+    if (!caption && !imageUrl && !designJson) {
       return res.status(400).json({ success: false, message: 'Cannot save an empty draft.' });
     }
 
@@ -444,6 +471,7 @@ exports.saveDraft = async (req, res) => {
       workspaceId,
       caption,
       imageUrl,
+      designJson,
       platform: 'instagram',
       status: 'draft'
     };

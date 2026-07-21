@@ -262,3 +262,19 @@ exports.publishImagePost = async (igAccountId, accessToken, imageUrl, caption) =
     throw new Error(errorMessage);
   }
 };
+
+/** Publishes a photo to the connected Facebook Page using its Page access token. */
+exports.publishFacebookPhoto = async (pageId, accessToken, imageUrl, caption) => {
+  try {
+    const response = await axios.post(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+      url: imageUrl,
+      caption,
+      access_token: accessToken,
+    });
+    const postId = response.data?.post_id || response.data?.id;
+    if (!postId) throw new Error('Facebook did not return a post ID.');
+    return { success: true, postId };
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};

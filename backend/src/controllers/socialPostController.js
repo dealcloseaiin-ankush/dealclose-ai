@@ -16,6 +16,13 @@ exports.createPost = async (req, res) => {
     if (!caption || !platforms) {
       return res.status(400).json({ success: false, message: 'Caption and platforms are required.' });
     }
+    const requestedPlatforms = JSON.parse(platforms);
+    if (!Array.isArray(requestedPlatforms) || requestedPlatforms.length === 0) {
+      return res.status(400).json({ success: false, message: 'Select at least one platform.' });
+    }
+    if (status === 'scheduled' && (!scheduledAt || Number.isNaN(new Date(scheduledAt).getTime()) || new Date(scheduledAt) <= new Date())) {
+      return res.status(400).json({ success: false, message: 'Choose a future date and time for scheduling.' });
+    }
 
     let mediaUrls = [];
     if (req.files && req.files.length > 0) {
@@ -32,7 +39,7 @@ exports.createPost = async (req, res) => {
       userId,
       workspaceId: workspaceId || 'main',
       caption,
-      platforms: JSON.parse(platforms),
+      platforms: requestedPlatforms,
       status,
       scheduledAt: status === 'scheduled' ? new Date(scheduledAt) : null,
       mediaUrls,

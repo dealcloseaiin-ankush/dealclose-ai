@@ -46,13 +46,20 @@ export default function PublishPost() {
     }).catch(console.error);
   }, []);
 
+  useEffect(() => {
+    api.get('/instagram/drafts', { params: { workspaceId: activeWorkspace } })
+      .then(({ data }) => setDrafts(data.drafts || []))
+      .catch(() => toast.error('Could not load saved drafts.'));
+  }, [activeWorkspace]);
+
   // 🚀 NEW: Sync Fabric.js canvas layers with our React state for the ObjectPanel
   useEffect(() => {
     if (!fabricCanvas) return;
 
     const updateLayers = () => {
-      const objects = fabricCanvas.getObjects().map(obj => ({
-        id: obj.id || obj.type + Date.now(),
+      const objects = fabricCanvas.getObjects().map((obj, index) => ({
+        id: obj.id || `${obj.type}-${index}`,
+        index,
         type: obj.type,
         text: obj.text || '',
       }));
@@ -97,17 +104,23 @@ export default function PublishPost() {
     const blob = await (await fetch(imageDataUrl)).blob();
     const imageFileFromCanvas = new File([blob], 'design.jpg', { type: 'image/jpeg' });
 
+    const selectedPlatforms = Object.keys(platforms).filter(p => platforms[p]);
+    if (selectedPlatforms.length === 0) {
+      toast.error('Select at least one platform.');
+      return setIsPublishing(false);
+    }
+
     const formData = new FormData();
-    formData.append('image', imageFileFromCanvas);
+    formData.append('media', imageFileFromCanvas);
     formData.append('caption', caption);
     formData.append('workspaceId', activeWorkspace);
     // 🚀 NEW: Send publishing options to backend
-    formData.append('publishMode', publishMode);
+    formData.append('status', publishMode === 'schedule' ? 'scheduled' : 'now');
     if (publishMode === 'schedule') formData.append('scheduledAt', scheduleDate);
-    formData.append('platforms', JSON.stringify(Object.keys(platforms).filter(p => platforms[p])));
+    formData.append('platforms', JSON.stringify(selectedPlatforms));
 
     try {
-      const { data } = await api.post('/instagram/publish', formData, {
+      const { data } = await api.post('/posts', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -117,7 +130,7 @@ export default function PublishPost() {
         } else {
           toast.success('Post published successfully!', { id: toastId });
         }
-        setPublishedUrl(data.postUrl);
+        setPublishedUrl(data.post?.postUrl || '');
       } else {
         throw new Error(data.message || 'An unknown error occurred.');
       }
@@ -142,7 +155,11 @@ export default function PublishPost() {
     try {
       // 🚀 NEW: Check if there's a design on the canvas to edit.
       const currentDesignJson = exportToJson();
-      const isEditing = currentDesignJson && currentDesignJson.layers.length > 0;
+      const isEditing = Boolean(
+        currentDesignJson &&
+        ((Array.isArray(currentDesignJson.objects) && currentDesignJson.objects.length > 0) ||
+          (Array.isArray(currentDesignJson.layers) && currentDesignJson.layers.length > 0))
+      );
 
       // 🚀 REAL API CALL to the new backend endpoint
       const { data } = await api.post('/instagram/ai-generate-post', {
@@ -155,6 +172,9 @@ export default function PublishPost() {
         setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply || (isEditing ? "I've updated the design for you!" : "Here's a new design!") }]);
         // 🚀 Render the generated design on the canvas
         if (renderDesign) renderDesign(data.designJson);
+        if (data.designJson?.caption) {
+          setCaption([data.designJson.caption, data.designJson.hashtags].filter(Boolean).join('\n\n'));
+        }
         toast.success('AI has generated a new design!');
       }
     } catch (error) {
@@ -165,14 +185,27 @@ export default function PublishPost() {
   };
 
   // 🚀 NEW: Save as Draft
-  const handleSaveDraft = () => {
-    // This will be implemented with backend APIs in a future step
+  const handleSaveDraft = async () => {
     const designData = exportToJson();
-    if (!designData || designData.objects.length === 0) {
+    if (!designData || !designData.layers?.length) {
       return toast.error("Canvas is empty, nothing to save.");
     }
-    console.log("Saving draft:", { designData, caption });
-    toast.success("Draft saved successfully! (Backend to be implemented)");
+    try {
+      const imageDataUrl = exportToImage('jpeg');
+      const blob = await (await fetch(imageDataUrl)).blob();
+      const formData = new FormData();
+      formData.append('image', new File([blob], 'draft-preview.jpg', { type: 'image/jpeg' }));
+      formData.append('caption', caption);
+      formData.append('workspaceId', activeWorkspace);
+      formData.append('designJson', JSON.stringify(designData));
+      if (editingDraft?._id) formData.append('draftId', editingDraft._id);
+      const { data } = await api.post('/instagram/drafts', formData);
+      setDrafts(prev => [data.draft, ...prev.filter(d => d._id !== data.draft._id)]);
+      setEditingDraft(data.draft);
+      toast.success('Draft saved successfully!');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not save draft.');
+    }
   };
 
   // 🚀 NEW: Handler for platform selection
@@ -186,6 +219,8 @@ export default function PublishPost() {
     if (action === 'bold') {
       selectedObject.set('fontWeight', selectedObject.fontWeight === 'bold' ? 'normal' : 'bold');
     }
+    if (action === 'italic') selectedObject.set('fontStyle', selectedObject.fontStyle === 'italic' ? 'normal' : 'italic');
+    if (action === 'underline') selectedObject.set('underline', !selectedObject.underline);
     if (fabricCanvas) fabricCanvas.renderAll();
   };
 
@@ -214,7 +249,14 @@ export default function PublishPost() {
           {/* 🚀 UPGRADED: Left panel for Layers and Toolbar */}
           <div className="lg:col-span-1 space-y-6">
             <Toolbar onAction={handleToolbarAction} />
-            <ObjectPanel layers={canvasLayers} onSelect={(layer) => console.log('Selected layer:', layer)} />
+            <ObjectPanel layers={canvasLayers} onSelect={(layer) => {
+              const object = fabricCanvas?.getObjects()[layer.index];
+              if (object && fabricCanvas) {
+                fabricCanvas.setActiveObject(object);
+                fabricCanvas.renderAll();
+                setSelectedObject(object);
+              }
+            }} />
           </div>
           {/* 🚀 UPGRADED: Center panel for the Canvas */}
           <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-xl">
@@ -330,18 +372,18 @@ export default function PublishPost() {
                   <p className="text-[10px] text-gray-600 font-mono">ID: {draft._id}</p>
                   <div className="flex gap-2 mt-auto pt-2 border-t border-gray-800">
                     <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); renderDesign(draft.designJson); }} className="flex-1 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-1"><Edit size={12}/> Edit</button>
-                    <button onClick={() => setDrafts(drafts.filter(d => d._id !== draft._id))} className="py-2 px-3 text-xs bg-red-900/50 hover:bg-red-900/80 rounded-lg"><Trash2 size={12}/></button>
+                    <button onClick={async () => {
+                      try {
+                        await api.delete(`/instagram/drafts/${draft._id}`);
+                        setDrafts(prev => prev.filter(d => d._id !== draft._id));
+                        if (editingDraft?._id === draft._id) setEditingDraft(null);
+                        toast.success('Draft deleted.');
+                      } catch (error) {
+                        toast.error(error.response?.data?.message || 'Could not delete draft.');
+                      }
+                    }} className="py-2 px-3 text-xs bg-red-900/50 hover:bg-red-900/80 rounded-lg"><Trash2 size={12}/></button>
                   </div>
-                  <div className="flex gap-2">
-                    <select className="flex-1 py-2 text-xs bg-gray-700 rounded-lg text-center outline-none border border-gray-600">
-                      <option>Schedule...</option>
-                      <option>Post Tomorrow (9 AM)</option>
-                      <option>Post Next Week</option>
-                    </select>
-                    <button onClick={() => handlePublish()} disabled={isPublishing} className="flex-1 py-2 text-xs bg-pink-600 hover:bg-pink-500 rounded-lg flex items-center justify-center gap-1 font-bold">
-                      <Send size={12}/> Publish
-                    </button>
-                  </div>
+                  <p className="text-xs text-gray-500">Open this draft to choose platforms and a publish time.</p>
                 </div>
               ))}
             </div>

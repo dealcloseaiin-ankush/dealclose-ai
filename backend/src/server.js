@@ -1,4 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+// The repository keeps .env at its root, while this server is normally started
+// from /backend. Load it explicitly so AI credentials are available in both
+// local development and production (existing environment variables still win).
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 // Fallback/Dummy key add kar rahe hain taaki agar real key na ho, toh server crash na ho
 if (!process.env.OPENAI_API_KEY) {

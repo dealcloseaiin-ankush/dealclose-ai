@@ -6,6 +6,8 @@ const DraftPostSchema = new mongoose.Schema({
   platform: { type: String, default: 'instagram' },
   caption: { type: String, default: '' },
   imageUrl: { type: String, default: '' },
+  // The editable Fabric/AI design. `imageUrl` is only the preview/publish image.
+  designJson: { type: Object, default: null },
   status: { type: String, default: 'draft' }, // draft, scheduled, posted
   // For future scheduling feature
   scheduledAt: { type: Date, default: null },
