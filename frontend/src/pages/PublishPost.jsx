@@ -323,7 +323,7 @@ export default function PublishPost() {
       const imageDataUrl = exportToImage('jpeg');
       const blob = await (await fetch(imageDataUrl)).blob();
       const formData = new FormData();
-      formData.append('image', new File([blob], 'draft-preview.jpg', { type: 'image/jpeg' }));
+      formData.append('media', new File([blob], 'draft-preview.jpg', { type: 'image/jpeg' }));
       formData.append('caption', caption);
       formData.append('workspaceId', activeWorkspace);
       formData.append('designJson', JSON.stringify(designData));

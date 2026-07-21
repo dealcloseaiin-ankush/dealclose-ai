@@ -466,7 +466,7 @@ exports.saveDraft = async (req, res) => {
     const { draftId, caption, workspaceId = 'main', platforms, publishMode, scheduleDate } = req.body;
     let designJson = null;
     if (req.body.designJson) {
-      try {
+      try { // ✅ FIX: Use DraftPostModel instead of SocialPostModel
         designJson = JSON.parse(req.body.designJson);
       } catch (error) {
         return res.status(400).json({ success: false, message: 'Draft design data is invalid.' });
@@ -476,11 +476,12 @@ exports.saveDraft = async (req, res) => {
     let imageUrl = req.body.imageUrl || ''; // Use existing image URL if provided
 
     // If a new file is uploaded, upload it to Cloudinary
-    if (req.file) {
+    if (req.file || req.files?.media) {
+      const fileToUpload = req.file || req.files.media[0];
       try {
-        const result = await cloudinary.uploader.upload(req.file.path, { resource_type: 'auto' });
+        const result = await cloudinary.uploader.upload(fileToUpload.path, { resource_type: 'auto' });
         imageUrl = result.secure_url;
-        fs.unlinkSync(req.file.path); // Clean up local file
+        fs.unlinkSync(fileToUpload.path); // Clean up local file
       } catch (uploadError) {
         return res.status(500).json({ success: false, message: 'Image upload failed.' });
       }
@@ -496,7 +497,6 @@ exports.saveDraft = async (req, res) => {
       caption,
       imageUrl,
       designJson,
-      platform: 'instagram',
       status: 'draft',
       // ✅ FIX: Save platform and schedule info with the draft
       platforms: platforms ? JSON.parse(platforms) : { instagram: true, facebook: false },
