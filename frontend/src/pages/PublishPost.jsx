@@ -3,7 +3,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { fabric } from 'fabric'; // ✅ FIX: Import fabric
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: More icons for the new professional UI
-import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu } from 'lucide-react';
+import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu, Undo, Redo } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
 import { FaInstagram, FaFacebook, FaThreads } from "react-icons/fa6"; // ✅ FIX: Use react-icons for brand logos
 import { Heart, MessageCircle, Send as SendIcon, Bookmark } from 'lucide-react'; // For realistic preview
@@ -34,8 +34,8 @@ export default function PublishPost() {
   const [platforms, setPlatforms] = useState({ instagram: true, facebook: false });
 
   // 🚀 UPGRADED: Canvas logic is now managed by the useFabric hook
-  const canvasRef = useRef(null); // ✅ FIX: Add fabric instance to handleToolbarAction
-  const { fabricCanvas, renderDesign, exportToJson, exportToImage } = useFabric(canvasRef);
+  const canvasRef = useRef(null);
+  const { fabricCanvas, renderDesign, exportToJson, exportToImage, undo, redo, canUndo, canRedo } = useFabric(canvasRef);
   const [canvasLayers, setCanvasLayers] = useState([]);
   const [selectedObject, setSelectedObject] = useState(null);
   
@@ -46,6 +46,8 @@ export default function PublishPost() {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
+  // ✅ FIX: State for live preview image
+  const [previewImageUrl, setPreviewImageUrl] = useState('');
 
   const lastPanPoint = useRef({ x: 0, y: 0 });
 
@@ -56,6 +58,26 @@ export default function PublishPost() {
     }).catch(console.error);
   }, []);
 
+  // ✅ FIX: Moved zoom handlers before the useEffect that depends on them to fix crash.
+  const handleZoom = useCallback((newZoom) => {
+    if (!fabricCanvas) return; // Safety check
+    const clampedZoom = Math.max(0.1, Math.min(newZoom, 3)); // Clamp zoom between 10% and 300%
+    setZoom(clampedZoom);
+    fabricCanvas.setZoom(clampedZoom);
+    fabricCanvas.setWidth(1080 * clampedZoom);
+    fabricCanvas.setHeight(1080 * clampedZoom);
+    fabricCanvas.renderAll();
+  }, [fabricCanvas]);
+
+  const fitToScreen = useCallback(() => {
+    if (!fabricCanvas || !canvasContainerRef.current) return;
+    const container = canvasContainerRef.current;
+    const containerWidth = container.offsetWidth - 80;
+    const containerHeight = container.offsetHeight - 100;
+    const scale = Math.min(containerWidth / 1080, containerHeight / 1080);
+    handleZoom(scale);
+  }, [fabricCanvas, handleZoom]);
+
   useEffect(() => {
     api.get('/instagram/drafts', { params: { workspaceId: activeWorkspace } })
       .then(({ data }) => setDrafts(data.drafts || []))
@@ -64,48 +86,15 @@ export default function PublishPost() {
 
   // 🚀 NEW: Fit canvas to screen on initial load and on window resize
   useEffect(() => {
-    const fitCanvasToScreen = () => {
-      if (!fabricCanvas || !canvasContainerRef.current) return; // Exit if canvas or container isn't ready
-      const container = canvasContainerRef.current;
-      const containerWidth = container.offsetWidth - 80; // Add more horizontal padding for a spacious feel
-      const containerHeight = container.offsetHeight - 100; // Add vertical padding and space for zoom controls
-      const canvasWidth = 1080; // Always scale based on the base 1080x1080 size
-      const canvasHeight = fabricCanvas.height;
+    // Initial fit
+    fitToScreen();
 
-      const scale = Math.min(containerWidth / canvasWidth, containerHeight / canvasHeight);
-      setZoom(scale);
-      fabricCanvas.setZoom(scale);
-      fabricCanvas.setWidth(canvasWidth * scale);
-      fabricCanvas.setHeight(canvasHeight * scale);
-      fabricCanvas.renderAll();
-    };
-
-    fitCanvasToScreen();
     // 🚀 FIX: Also refit when panels are collapsed/expanded for a truly responsive feel
-    const resizeObserver = new ResizeObserver(fitCanvasToScreen);
+    const resizeObserver = new ResizeObserver(fitToScreen);
     if (canvasContainerRef.current) resizeObserver.observe(canvasContainerRef.current);
 
     return () => resizeObserver.disconnect();
-  }, [fabricCanvas, isLeftPanelCollapsed, isRightPanelCollapsed, handleZoom]);
-
-  // 🚀 NEW: Handlers for Zoom controls
-  const handleZoom = useCallback((newZoom) => {
-    if (!fabricCanvas) return;
-    const clampedZoom = Math.max(0.1, Math.min(newZoom, 3)); // Clamp zoom between 10% and 300%
-    setZoom(clampedZoom);
-    fabricCanvas.setZoom(clampedZoom);
-    fabricCanvas.setWidth(fabricCanvas.width * (clampedZoom / zoom));
-    fabricCanvas.setHeight(fabricCanvas.height * (clampedZoom / zoom));
-    fabricCanvas.renderAll();
-  }, [fabricCanvas, zoom]);
-
-  const fitToScreen = () => {
-    if (!fabricCanvas || !canvasContainerRef.current) return;
-    const containerWidth = canvasContainerRef.current.offsetWidth - 40;
-    const scale = containerWidth / 1080; // Assuming base canvas width is 1080
-    handleZoom(scale); // This will now use the memoized version
-    fabricCanvas.centerVpt(fabricCanvas.getCenter());
-  };
+  }, [fabricCanvas, isLeftPanelCollapsed, isRightPanelCollapsed, fitToScreen]);
 
   // 🚀 NEW: Sync Fabric.js canvas layers with our React state for the ObjectPanel
   useEffect(() => {
@@ -125,7 +114,20 @@ export default function PublishPost() {
       setSelectedObject(fabricCanvas.getActiveObject());
     };
     
+    // ✅ FIX: Debounced function to update the live preview to avoid performance issues.
+    const debounce = (func, delay) => {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+    };
+    const updatePreview = debounce(() => {
+      if (fabricCanvas) setPreviewImageUrl(exportToImage('jpeg'));
+    }, 250); // Update preview 250ms after the last change
+
     fabricCanvas.on('object:added', updateLayers);
+    fabricCanvas.on('after:render', updatePreview); // The most reliable event for any visual change
     fabricCanvas.on('object:removed', updateLayers);
     fabricCanvas.on('selection:created', updateSelection);
     fabricCanvas.on('selection:updated', updateSelection);
@@ -166,6 +168,7 @@ export default function PublishPost() {
     return () => {
       if (fabricCanvas) {
         fabricCanvas.off('object:added', updateLayers);
+        fabricCanvas.off('after:render', updatePreview);
         fabricCanvas.off('object:removed', updateLayers);
         fabricCanvas.off('selection:created', updateSelection);
         fabricCanvas.off('selection:updated', updateSelection);
@@ -176,7 +179,24 @@ export default function PublishPost() {
         fabricCanvas.off('mouse:up', onMouseUp);
       }
     };
-  }, [fabricCanvas, handleZoom]);
+  }, [fabricCanvas, handleZoom, exportToImage]);
+
+  // ✅ FIX: Update preview on initial render
+  useEffect(() => {
+    if (fabricCanvas) {
+      setPreviewImageUrl(exportToImage('jpeg'));
+    }
+  }, [fabricCanvas, exportToImage, renderDesign]); // Re-render preview if renderDesign changes (e.g. new draft loaded)
+
+  // ✅ FIX: Keyboard shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+      if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const handlePublish = async () => {
     setIsPublishing(true);
@@ -347,6 +367,13 @@ export default function PublishPost() {
       fabricCanvas.remove(selectedObject);
       fabricCanvas.discardActiveObject();
     }
+    // ✅ FIX: Use Undo/Redo from the hook
+    if (action === 'undo') {
+      undo();
+    }
+    if (action === 'redo') {
+      redo();
+    }
     if (fabricCanvas) fabricCanvas.renderAll();
   };
 
@@ -444,6 +471,10 @@ export default function PublishPost() {
           
           {/* Add Object Toolbar */}
           <div className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#111] border border-gray-800 rounded-xl p-2 flex flex-col gap-2 z-10">
+            {/* ✅ FIX: Use canUndo/canRedo to disable buttons */}
+            <button onClick={undo} disabled={!canUndo} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed" title="Undo (Ctrl+Z)"><Undo size={20} /></button>
+            <button onClick={redo} disabled={!canRedo} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed" title="Redo (Ctrl+Y)"><Redo size={20} /></button>
+            <div className="h-px w-full bg-gray-700 my-1"></div>
             <button onClick={() => handleToolbarAction('addText')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Text"><Type size={20} /></button>
             <button onClick={() => handleToolbarAction('addImage')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Image"><ImageIcon size={20} /></button>
             <button onClick={() => handleToolbarAction('addShape')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Shape"><Square size={20} /></button>
@@ -473,7 +504,8 @@ export default function PublishPost() {
                 <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500"></div>
                 <p className="text-xs font-bold">{user?.brandKit?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</p>
               </div>
-              <img src={exportToImage('jpeg')} alt="Live Preview" className="w-full aspect-square object-cover" />
+              {/* ✅ FIX: Use state for live preview image source */}
+              <img src={previewImageUrl} alt="Live Preview" className="w-full aspect-square object-cover" />
               <div className="p-3 text-white">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-4">

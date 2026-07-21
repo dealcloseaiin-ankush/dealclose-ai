@@ -1,131 +1,119 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fabric } from 'fabric';
 
-/**
- * Custom Hook to manage a Fabric.js canvas instance.
- * @param {React.RefObject<HTMLCanvasElement>} canvasRef - The ref to the canvas element.
- * @returns {object} An object containing the fabric canvas instance and helper functions.
- */
 export const useFabric = (canvasRef) => {
   const [fabricCanvas, setFabricCanvas] = useState(null);
-  const fabricCanvasRef = useRef(null);
+  
+  // ✅ NEW: State for Undo/Redo history
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isProcessing, setIsProcessing] = useState(false); // Prevents saving state during undo/redo
 
   // Initialize the canvas
   useEffect(() => {
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width: 500,
-      height: 500,
-      backgroundColor: '#1a1a1a',
-    });
-    setFabricCanvas(canvas);
-    fabricCanvasRef.current = canvas;
+    // Debounce function to prevent excessive history saves
+    const debounce = (func, delay) => {
+      let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); };
+    };
 
-    // Cleanup on unmount
+    const canvas = new fabric.Canvas(canvasRef.current, {
+      width: 1080,
+      height: 1080,
+      backgroundColor: '#0a0a0a',
+      preserveObjectStacking: true,
+    });
+
+    const saveState = debounce(() => {
+      if (isProcessing) return;
+      const json = canvas.toJSON();
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(json);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }, 500); // Debounce history saves by 500ms
+
+    // Capture initial state
+    saveState();
+
+    // Event listeners to capture changes
+    canvas.on('object:added', saveState);
+    canvas.on('object:removed', saveState);
+    canvas.on('object:modified', saveState);
+
+    setFabricCanvas(canvas);
+
     return () => {
       canvas.dispose();
+      setFabricCanvas(null);
     };
-  }, [canvasRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasRef]); // This effect should only run once to initialize the canvas. The functions inside create closures, which is intended.
 
-  /**
-   * Renders a design from a JSON specification onto the canvas.
-   * This function is memoized with useCallback for performance.
-   */
   const renderDesign = useCallback((designJson) => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas || !designJson) return;
+    if (!fabricCanvas || !designJson) return;
+    
+    fabricCanvas.loadFromJSON(designJson, () => {
+      fabricCanvas.renderAll();
+      // After loading, fit the canvas to the screen
+      // ✅ NEW: Reset history after loading a new design
+      const json = fabricCanvas.toJSON();
+      setHistory([json]);
+      setHistoryIndex(0);
+      setIsProcessing(false);
 
-    // Saved drafts created by older versions contain Fabric's `objects` array.
-    // Convert it to the shared AI design contract before rendering.
-    const normalizedDesign = designJson.canvas
-      ? designJson
-      : {
-          canvas: {
-            width: designJson.width || 1080,
-            height: designJson.height || 1080,
-            backgroundColor: designJson.background || designJson.backgroundColor || '#ffffff',
-          },
-          caption: designJson.caption || '',
-          hashtags: designJson.hashtags || '',
-          layers: designJson.layers || designJson.objects || [],
-        };
-
-    // Clear previous design
-    canvas.clear();
-
-    // Set background color
-    canvas.backgroundColor = normalizedDesign.canvas.backgroundColor || '#ffffff';
-    canvas.designCaption = normalizedDesign.caption || '';
-    canvas.designHashtags = normalizedDesign.hashtags || '';
-
-    // Fabric's fromObject method is used to load layers
-    fabric.util.enlivenObjects(normalizedDesign.layers, (objects) => {
-      objects.forEach(obj => {
-        // Handle image placeholders
-        if (obj.type === 'image' && obj.src && obj.src.startsWith('AI_IMAGE_PROMPT:')) {
-          // For now, we can show a placeholder or skip it.
-          // In the next step, the backend will replace this with a real image URL.
-          // Let's create a placeholder rectangle for now.
-          const placeholder = new fabric.Rect({
-            left: obj.left,
-            top: obj.top,
-            width: obj.width,
-            height: obj.height,
-            fill: '#333',
-            originX: obj.originX || 'left',
-            originY: obj.originY || 'top',
-          });
-          canvas.add(placeholder);
-        } else {
-          canvas.add(obj);
-        }
-      });
-
-      // Scale canvas to fit the container while maintaining aspect ratio
-      const scale = 500 / (normalizedDesign.canvas.width || 1080);
-      canvas.setZoom(scale);
-      canvas.setWidth(normalizedDesign.canvas.width * scale);
-      canvas.setHeight(normalizedDesign.canvas.height * scale);
-
-      canvas.renderAll();
+      const container = canvasRef.current.parentElement.parentElement;
+      if (container) {
+        const containerWidth = container.offsetWidth - 80;
+        const containerHeight = container.offsetHeight - 100;
+        const scale = Math.min(containerWidth / 1080, containerHeight / 1080);
+        fabricCanvas.setZoom(scale);
+        fabricCanvas.setWidth(1080 * scale);
+        fabricCanvas.setHeight(1080 * scale);
+        fabricCanvas.renderAll();
+      }
     });
-  }, []);
-
-  /**
-   * Exports the current canvas state to a JSON object.
-   */
+  }, [fabricCanvas, canvasRef]);
+  
   const exportToJson = useCallback(() => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return null;
-    const zoom = canvas.getZoom() || 1;
-    return {
-      canvas: {
-        width: Math.round(canvas.getWidth() / zoom),
-        height: Math.round(canvas.getHeight() / zoom),
-        backgroundColor: canvas.backgroundColor || '#ffffff',
-      },
-      caption: canvas.designCaption || '',
-      hashtags: canvas.designHashtags || '',
-      layers: canvas.toObject().objects,
-    };
-  }, []);
-
-  /**
-   * Exports the canvas to a data URL (e.g., for PNG/JPG).
-   */
+    if (!fabricCanvas) return null;
+    return fabricCanvas.toJSON(['id', 'layers', 'objects']);
+  }, [fabricCanvas]);
+  
   const exportToImage = useCallback((format = 'png') => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return null;
-    return canvas.toDataURL({
+    if (!fabricCanvas) return '';
+    return fabricCanvas.toDataURL({
       format: format,
       quality: 0.9,
-      multiplier: 1 / (canvas.getZoom() || 1),
     });
-  }, []);
+  }, [fabricCanvas]);
 
-  return {
-    fabricCanvas,
-    renderDesign,
-    exportToJson,
-    exportToImage,
-  };
+  // ✅ NEW: Undo/Redo functions
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      setIsProcessing(true);
+      const newIndex = historyIndex - 1;
+      fabricCanvas.loadFromJSON(history[newIndex], () => {
+        fabricCanvas.renderAll();
+        setHistoryIndex(newIndex);
+        setIsProcessing(false);
+      });
+    }
+  }, [fabricCanvas, history, historyIndex]);
+
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      setIsProcessing(true);
+      const newIndex = historyIndex + 1;
+      fabricCanvas.loadFromJSON(history[newIndex], () => {
+        fabricCanvas.renderAll();
+        setHistoryIndex(newIndex);
+        setIsProcessing(false);
+      });
+    }
+  }, [fabricCanvas, history, historyIndex]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  return { fabricCanvas, renderDesign, exportToJson, exportToImage, undo, redo, canUndo, canRedo };
 };
