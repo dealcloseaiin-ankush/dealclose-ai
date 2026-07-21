@@ -73,8 +73,8 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
     } else {
       // Instagram uses Standard Access Token Flow (Cleaned Scopes)
       fbLoginConfig = {
-        ...fbLoginConfig,
-        scope: 'pages_show_list,pages_manage_metadata,pages_messaging,instagram_basic,instagram_manage_messages,instagram_manage_comments'
+        ...fbLoginConfig, // ✅ FIX: Added required permissions for publishing and analytics
+        scope: 'pages_show_list,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_content_publish,instagram_manage_insights,read_insights'
       };
     }
 

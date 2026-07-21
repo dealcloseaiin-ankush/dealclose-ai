@@ -258,6 +258,10 @@ exports.publishImagePost = async (igAccountId, accessToken, imageUrl, caption) =
     return { success: true, postId: publishResponse.data.id };
   } catch (error) {
     const errorMessage = error.response?.data?.error?.message || error.message;
+    // ✅ NEW: Provide a user-friendly error message for the most common permission issue.
+    if (errorMessage.includes('Requires instagram_content_publish permission')) {
+      throw new Error('Permission to publish content is missing. Please reconnect your Instagram account in Settings and grant all permissions.');
+    }
     console.error(`[IG Publish] Error publishing to Instagram:`, errorMessage);
     throw new Error(errorMessage);
   }
