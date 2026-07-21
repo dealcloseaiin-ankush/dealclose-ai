@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import more icons for the new UI
-import { Send, Loader2, CheckCircle, ExternalLink, Bot, Sparkles, Save, Edit, Trash2, ClipboardPlus, Calendar, Clock, Repeat } from 'lucide-react';
+import { fabric } from 'fabric'; // ✅ FIX: Import fabric
+import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: More icons for the new professional UI
+import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
-import { FaInstagram, FaFacebook } from "react-icons/fa"; // ✅ FIX: Use react-icons for brand logos
-
+import { FaInstagram, FaFacebook, FaThreads } from "react-icons/fa6"; // ✅ FIX: Use react-icons for brand logos
+import { Heart, MessageCircle, Send as SendIcon, Bookmark } from 'lucide-react'; // For realistic preview
 import CanvasRenderer from '../components/editor/CanvasRenderer'; // 🚀 NEW
 import Toolbar from '../components/editor/Toolbar';             // 🚀 NEW
 import ObjectPanel from '../components/editor/ObjectPanel';       // 🚀 NEW
@@ -26,7 +27,6 @@ export default function PublishPost() {
   // Main form state (now also used for editing drafts)
   const [caption, setCaption] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
-  const [publishedUrl, setPublishedUrl] = useState('');
 
   // 🚀 NEW: State for advanced publishing options
   const [publishMode, setPublishMode] = useState('now'); // now, schedule
@@ -34,10 +34,20 @@ export default function PublishPost() {
   const [platforms, setPlatforms] = useState({ instagram: true, facebook: false });
 
   // 🚀 UPGRADED: Canvas logic is now managed by the useFabric hook
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null); // ✅ FIX: Add fabric instance to handleToolbarAction
   const { fabricCanvas, renderDesign, exportToJson, exportToImage } = useFabric(canvasRef);
   const [canvasLayers, setCanvasLayers] = useState([]);
   const [selectedObject, setSelectedObject] = useState(null);
+  
+  // 🚀 NEW: State for canvas zoom and pan
+  const [zoom, setZoom] = useState(1);
+  const canvasContainerRef = useRef(null);
+  const isPanning = useRef(false);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+
+
+  const lastPanPoint = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     api.get('/users/profile').then(res => {
@@ -51,6 +61,51 @@ export default function PublishPost() {
       .then(({ data }) => setDrafts(data.drafts || []))
       .catch(() => toast.error('Could not load saved drafts.'));
   }, [activeWorkspace]);
+
+  // 🚀 NEW: Fit canvas to screen on initial load and on window resize
+  useEffect(() => {
+    const fitCanvasToScreen = () => {
+      if (!fabricCanvas || !canvasContainerRef.current) return; // Exit if canvas or container isn't ready
+      const container = canvasContainerRef.current;
+      const containerWidth = container.offsetWidth - 80; // Add more horizontal padding for a spacious feel
+      const containerHeight = container.offsetHeight - 100; // Add vertical padding and space for zoom controls
+      const canvasWidth = 1080; // Always scale based on the base 1080x1080 size
+      const canvasHeight = fabricCanvas.height;
+
+      const scale = Math.min(containerWidth / canvasWidth, containerHeight / canvasHeight);
+      setZoom(scale);
+      fabricCanvas.setZoom(scale);
+      fabricCanvas.setWidth(canvasWidth * scale);
+      fabricCanvas.setHeight(canvasHeight * scale);
+      fabricCanvas.renderAll();
+    };
+
+    fitCanvasToScreen();
+    // 🚀 FIX: Also refit when panels are collapsed/expanded for a truly responsive feel
+    const resizeObserver = new ResizeObserver(fitCanvasToScreen);
+    if (canvasContainerRef.current) resizeObserver.observe(canvasContainerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, [fabricCanvas, isLeftPanelCollapsed, isRightPanelCollapsed, handleZoom]);
+
+  // 🚀 NEW: Handlers for Zoom controls
+  const handleZoom = useCallback((newZoom) => {
+    if (!fabricCanvas) return;
+    const clampedZoom = Math.max(0.1, Math.min(newZoom, 3)); // Clamp zoom between 10% and 300%
+    setZoom(clampedZoom);
+    fabricCanvas.setZoom(clampedZoom);
+    fabricCanvas.setWidth(fabricCanvas.width * (clampedZoom / zoom));
+    fabricCanvas.setHeight(fabricCanvas.height * (clampedZoom / zoom));
+    fabricCanvas.renderAll();
+  }, [fabricCanvas, zoom]);
+
+  const fitToScreen = () => {
+    if (!fabricCanvas || !canvasContainerRef.current) return;
+    const containerWidth = canvasContainerRef.current.offsetWidth - 40;
+    const scale = containerWidth / 1080; // Assuming base canvas width is 1080
+    handleZoom(scale); // This will now use the memoized version
+    fabricCanvas.centerVpt(fabricCanvas.getCenter());
+  };
 
   // 🚀 NEW: Sync Fabric.js canvas layers with our React state for the ObjectPanel
   useEffect(() => {
@@ -75,6 +130,38 @@ export default function PublishPost() {
     fabricCanvas.on('selection:created', updateSelection);
     fabricCanvas.on('selection:updated', updateSelection);
     fabricCanvas.on('selection:cleared', updateSelection);
+    
+    // 🚀 NEW: Pan and Zoom wheel listeners
+    const onMouseWheel = (opt) => {
+      if (opt.e.ctrlKey) { // Zoom with Ctrl + Mouse Wheel
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+        const delta = opt.e.deltaY;
+        let newZoom = fabricCanvas.getZoom();
+        newZoom *= 0.999 ** delta;
+        handleZoom(newZoom);
+      }
+    };
+
+    const onMouseDown = (opt) => {
+      if (opt.e.isSpace) { isPanning.current = true; lastPanPoint.current = { x: opt.e.clientX, y: opt.e.clientY }; }
+    };
+    const onMouseMove = (opt) => {
+      if (isPanning.current && opt.e.isSpace) {
+        const vpt = fabricCanvas.viewportTransform;
+        vpt[4] += opt.e.clientX - lastPanPoint.current.x;
+        vpt[5] += opt.e.clientY - lastPanPoint.current.y;
+        fabricCanvas.requestRenderAll();
+        lastPanPoint.current = { x: opt.e.clientX, y: opt.e.clientY };
+      }
+    };
+    const onMouseUp = () => { isPanning.current = false; };
+
+    fabricCanvas.on('mouse:wheel', onMouseWheel);
+    fabricCanvas.on('mouse:down', onMouseDown);
+    fabricCanvas.on('mouse:move', onMouseMove);
+    fabricCanvas.on('mouse:up', onMouseUp);
+
 
     return () => {
       if (fabricCanvas) {
@@ -83,9 +170,13 @@ export default function PublishPost() {
         fabricCanvas.off('selection:created', updateSelection);
         fabricCanvas.off('selection:updated', updateSelection);
         fabricCanvas.off('selection:cleared', updateSelection);
+        fabricCanvas.off('mouse:wheel', onMouseWheel);
+        fabricCanvas.off('mouse:down', onMouseDown);
+        fabricCanvas.off('mouse:move', onMouseMove);
+        fabricCanvas.off('mouse:up', onMouseUp);
       }
     };
-  }, [fabricCanvas]);
+  }, [fabricCanvas, handleZoom]);
 
   const handlePublish = async () => {
     setIsPublishing(true);
@@ -97,7 +188,6 @@ export default function PublishPost() {
       return setIsPublishing(false);
     }
 
-    setPublishedUrl('');
     const toastId = toast.loading('Publishing post to Instagram...');
 
     // Convert data URL to a file object to send to the backend
@@ -126,11 +216,16 @@ export default function PublishPost() {
 
       if (data.success) {
         if (publishMode === 'schedule') {
-          toast.success('Post scheduled successfully!', { id: toastId });
+          toast.success(`Post scheduled for ${new Date(scheduleDate).toLocaleString()}`, { id: toastId, duration: 5000 });
         } else {
-          toast.success('Post published successfully!', { id: toastId });
+          // ✅ FIX: Show a toast with a link to the published post
+          const postUrl = data.post?.postUrl || (data.post?.platformPostIds?.instagram ? `https://instagram.com/p/${data.post.platformPostIds.instagram}` : null);
+          if (postUrl) {
+            toast.success(<span>Post published! <a href={postUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-400 underline">View Post</a></span>, { id: toastId, duration: 10000 });
+          } else {
+            toast.success('Post is being published!', { id: toastId });
+          }
         }
-        setPublishedUrl(data.post?.postUrl || '');
       } else {
         throw new Error(data.message || 'An unknown error occurred.');
       }
@@ -220,191 +315,190 @@ export default function PublishPost() {
 
   // 🚀 NEW: Toolbar action handler
   const handleToolbarAction = (action) => {
-    if (!selectedObject) return toast.error("Please select an object on the canvas first.");
+    // Actions that don't require a selected object
+    if (action === 'addText') {
+      fabricCanvas.add(new fabric.Textbox('New Text', { left: 100, top: 100, fill: '#ffffff', fontSize: 80, fontFamily: 'Poppins' }));
+      return;
+    }
+    if (action === 'addShape') {
+      fabricCanvas.add(new fabric.Rect({ left: 150, top: 150, fill: '#8A2BE2', width: 200, height: 200 }));
+      return;
+    }
+    // For future implementation
+    if (action === 'addImage' || action === 'addIcon') {
+      return toast('This feature is coming soon!', { icon: '🚧' });
+    }
+
+    // Actions that require a selected object
+    if (!selectedObject) {
+      return toast.error("Please select an object on the canvas first.");
+    }
+
     if (action === 'bold') {
       selectedObject.set('fontWeight', selectedObject.fontWeight === 'bold' ? 'normal' : 'bold');
     }
-    if (action === 'italic') selectedObject.set('fontStyle', selectedObject.fontStyle === 'italic' ? 'normal' : 'italic');
-    if (action === 'underline') selectedObject.set('underline', !selectedObject.underline);
+    if (action === 'italic') {
+      selectedObject.set('fontStyle', selectedObject.fontStyle === 'italic' ? 'normal' : 'italic');
+    }
+    if (action === 'underline') {
+      selectedObject.set('underline', !selectedObject.underline);
+    }
+    if (action === 'delete') {
+      fabricCanvas.remove(selectedObject);
+      fabricCanvas.discardActiveObject();
+    }
     if (fabricCanvas) fabricCanvas.renderAll();
   };
 
   return (
-    <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 mb-2">
-              Publish to Instagram
-            </h1>
-            <p className="text-gray-400">Upload an image, write a caption, and post directly to your feed.</p>
-          </div>
+    <div className="flex flex-col h-screen bg-[#0a0a0a] text-gray-100 font-sans">
+      {/* Header */}
+      <header className="flex items-center justify-between p-3 border-b border-gray-800 bg-[#111] z-20 shrink-0">
+        <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">
+          AI Post Designer
+        </h1>
+        <div className="flex items-center gap-4">
           <select
             value={activeWorkspace}
             onChange={(e) => setActiveWorkspace(e.target.value)}
-            className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
+            className="bg-[#1a1a1a] border border-gray-700 text-white text-sm font-semibold rounded-lg px-3 py-2 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
           >
-            {workspaces.map(ws => (
-              <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
-            ))}
+            {workspaces.map(ws => <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>)}
           </select>
+          <button type="button" onClick={handleSaveDraft} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg transition-all flex justify-center items-center gap-2 text-sm border border-gray-700">
+            <Save size={16} /> {editingDraft ? 'Update' : 'Save'}
+          </button>
+          <button type="submit" form="publish-form" disabled={isPublishing} className="px-6 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-lg transition-all shadow-lg shadow-purple-600/20 disabled:opacity-50 flex justify-center items-center gap-2 text-sm">
+            {isPublishing ? <Loader2 className="animate-spin" /> : <Send size={16} />}
+            {publishMode === 'schedule' ? 'Schedule' : 'Publish'}
+          </button>
         </div>
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* 🚀 UPGRADED: Left panel for Layers and Toolbar */}
-          <div className="lg:col-span-1 space-y-6">
-            <Toolbar onAction={handleToolbarAction} />
-            <ObjectPanel layers={canvasLayers} onSelect={(layer) => {
-              const object = fabricCanvas?.getObjects()[layer.index];
-              if (object && fabricCanvas) {
-                fabricCanvas.setActiveObject(object);
-                fabricCanvas.renderAll();
-                setSelectedObject(object);
-              }
-            }} />
-          </div>
-          {/* 🚀 UPGRADED: Center panel for the Canvas */}
-          <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 shadow-xl">
-            <form onSubmit={(e) => { e.preventDefault(); handlePublish(); }} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">Write Caption</label>
-                <textarea
-                  rows="8"
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  required
-                  placeholder="Write your engaging caption here..."
-                  className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-pink-500 outline-none transition-colors"
-                ></textarea>
-              </div>
-
-              {/* 🚀 NEW: Platform Selector */}
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">Publish to</label>
-                <div className="flex gap-3"> 
-                  <button type="button" onClick={() => togglePlatform('instagram')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${platforms.instagram ? 'bg-pink-500/20 border-pink-500 text-white' : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                    <FaInstagram size={18} /> Instagram
-                  </button>
-                  <button type="button" onClick={() => togglePlatform('facebook')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${platforms.facebook ? 'bg-blue-500/20 border-blue-500 text-white' : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                    <FaFacebook size={18} /> Facebook
-                  </button>
-                </div>
-              </div>
-
-              {/* 🚀 NEW: Scheduling Options */}
-              <div>
-                <div className="flex bg-[#0a0a0a] p-1 rounded-lg border border-gray-700">
-                  <button type="button" onClick={() => setPublishMode('now')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${publishMode === 'now' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Publish Now</button>
-                  <button type="button" onClick={() => setPublishMode('schedule')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${publishMode === 'schedule' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Schedule</button>
-                </div>
-                {publishMode === 'schedule' && (
-                  <div className="mt-3">
-                    <input 
-                      type="datetime-local"
-                      value={scheduleDate}
-                      onChange={(e) => setScheduleDate(e.target.value)}
-                      className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-pink-500 outline-none"
-                      required
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-2 border-t border-gray-800">
-                <button type="button" onClick={handleSaveDraft} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2">
-                  <Save size={18} /> {editingDraft ? 'Update Draft' : 'Save Draft'}
-                </button>
-                <button type="submit" disabled={isPublishing} className="flex-1 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-pink-600/20 disabled:opacity-50 flex justify-center items-center gap-2">
-                  {isPublishing ? <Loader2 className="animate-spin" /> : (publishMode === 'schedule' ? <Calendar size={18} /> : <Send size={18} />)}
-                  {publishMode === 'schedule' ? 'Schedule Post' : 'Publish Now'}
-                </button>
-              </div>
-
+      <div className="flex flex-1 overflow-hidden bg-[#050505]">
+        {/* Left Panel: Controls */}
+        <aside className={`bg-[#111] p-4 border-r border-gray-800 overflow-y-auto space-y-6 transition-all duration-300 ${isLeftPanelCollapsed ? 'w-0 p-0' : 'w-80'}`}>
+          {/* AI Assistant */}
+          <div className="bg-[#1a1a1a] border border-blue-500/20 rounded-2xl p-4">
+            <h2 className="text-md font-bold text-white mb-3 flex items-center gap-2"><Bot className="text-blue-400" /> AI Assistant</h2>
+            <div className="bg-[#0a0a0a] border border-gray-800 rounded-xl h-48 p-3 overflow-y-auto flex flex-col gap-2 mb-3 custom-scrollbar">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`p-2.5 rounded-xl max-w-[85%] text-xs ${msg.role === 'ai' ? 'bg-[#2a2a2a] self-start' : 'bg-blue-600 text-white self-end'}`}>{msg.text}</div>
+              ))}
+              {isAiWorking && <div className="self-start p-2.5 bg-[#2a2a2a] rounded-xl"><Loader2 size={16} className="animate-spin text-blue-400" /></div>}
+            </div>
+            <form onSubmit={handleAiChat} className="flex gap-2">
+              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="e.g., 'Diwali sale post'" className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+              <button type="submit" disabled={isAiWorking} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 rounded-lg transition-all disabled:opacity-50 flex items-center">
+                <Sparkles size={14} />
+              </button>
             </form>
           </div>
 
-          {/* 🚀 UPGRADED: Right panel for the Live Preview */}
-          <div className="bg-[#0a0a0a] border border-gray-800 rounded-2xl p-6 shadow-inner">
-            <h2 className="text-lg font-bold text-white mb-4">Live Preview</h2>
-            <div className="bg-black border border-gray-700 rounded-xl overflow-hidden max-w-sm mx-auto">
-              <div className="p-3 flex items-center gap-2 border-b border-gray-800">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500"></div>
-                <p className="text-sm font-bold">{user?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</p>
+          {/* Publish Form */}
+          <form id="publish-form" onSubmit={(e) => { e.preventDefault(); handlePublish(); }} className="space-y-5">
+            <textarea rows="5" value={caption} onChange={(e) => setCaption(e.target.value)} required placeholder="Write your engaging caption here..." className="w-full bg-[#1a1a1a] border border-gray-700 rounded-xl p-3 text-white focus:border-pink-500 outline-none transition-colors text-sm shadow-inner"></textarea>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2">Publish to</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button type="button" onClick={() => togglePlatform('instagram')} className={`flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all text-sm ${platforms.instagram ? 'bg-pink-500/20 border-pink-500 text-white' : 'bg-[#1a1a1a] border-gray-700 text-gray-400 hover:border-gray-500'}`}><FaInstagram size={16} /></button>
+                <button type="button" onClick={() => togglePlatform('facebook')} className={`flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all text-sm ${platforms.facebook ? 'bg-blue-500/20 border-blue-500 text-white' : 'bg-[#1a1a1a] border-gray-700 text-gray-400 hover:border-gray-500'}`}><FaFacebook size={16} /></button>
+                <button type="button" onClick={() => togglePlatform('threads')} className={`flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all text-sm ${platforms.threads ? 'bg-gray-400/20 border-gray-400 text-white' : 'bg-[#1a1a1a] border-gray-700 text-gray-400 hover:border-gray-500'}`}><FaThreads size={16} /></button>
               </div>
-              <CanvasRenderer ref={canvasRef} />
             </div>
-            {publishedUrl && (
-              <div className="mt-6 bg-green-500/10 border border-green-500/20 p-4 rounded-xl animate-fade-in text-center">
-                <div className="flex items-center justify-center gap-2 font-bold text-green-400 mb-3">
-                  <CheckCircle size={20} /> Post Published Successfully!
-                </div>
-                <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-white bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg font-semibold transition-colors">
-                  View on Instagram <ExternalLink size={14} />
-                </a>
+            <div>
+              <div className="flex bg-[#1a1a1a] p-1 rounded-lg border border-gray-700">
+                <button type="button" onClick={() => setPublishMode('now')} className={`flex-1 py-1.5 text-sm font-bold rounded-md transition-colors ${publishMode === 'now' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Now</button>
+                <button type="button" onClick={() => setPublishMode('schedule')} className={`flex-1 py-1.5 text-sm font-bold rounded-md transition-colors ${publishMode === 'schedule' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Schedule</button>
+              </div>
+              {publishMode === 'schedule' && (
+                <div className="mt-2"><input type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-pink-500 outline-none text-sm" required /></div>
+              )}
+            </div>
+          </form>
+
+          {/* Saved Drafts */}
+          <div>
+            <h2 className="text-md font-bold text-white mb-3">Recent Drafts</h2>
+            {drafts.length === 0 ? (
+              <p className="text-gray-500 text-center text-sm py-4 bg-[#1a1a1a] border border-dashed border-gray-800 rounded-xl">No drafts saved.</p>
+            ) : (
+              <div className="space-y-2">
+                {drafts.slice(0, 5).map(draft => (
+                  <div key={draft._id} className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-2 flex items-center gap-3 hover:border-gray-600 transition-colors">
+                    <img src={draft.imageUrl} alt="Draft" className="w-12 h-12 object-cover rounded-md border border-gray-700" />
+                    <div className="flex-1"><p className="text-xs text-gray-300 line-clamp-2">{draft.caption || 'Untitled Draft'}</p></div>
+                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); renderDesign(draft.designJson); if (draft.platforms) setPlatforms(draft.platforms); if (draft.publishMode) setPublishMode(draft.publishMode); if (draft.scheduleDate) setScheduleDate(draft.scheduleDate); }} className="p-2 text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"><Edit size={14} /></button>
+                    <button onClick={async () => { try { await api.delete(`/instagram/drafts/${draft._id}`); setDrafts(p => p.filter(d => d._id !== draft._id)); toast.success('Draft deleted.'); } catch { toast.error('Could not delete draft.'); } }} className="p-2 text-gray-400 hover:text-rose-400 bg-red-900/30 hover:bg-red-900/60 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
+        </aside>
 
-        {/* 🚀 NEW: AI Chat Command Center */}
-        <div className="mt-8 bg-[#111] border border-blue-500/20 rounded-2xl p-6 shadow-xl">
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Bot className="text-blue-400" /> AI Content Assistant</h2>
-          <div className="bg-[#0a0a0a] border border-gray-800 rounded-xl h-64 p-4 overflow-y-auto flex flex-col gap-3 mb-4">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`p-3 rounded-lg max-w-[85%] text-sm ${msg.role === 'ai' ? 'bg-[#1a1a1a] self-start' : 'bg-blue-600 text-white self-end'}`}>{msg.text}</div>
-            ))}
-            {isAiWorking && <div className="self-start p-3 bg-[#1a1a1a] rounded-lg"><Loader2 className="animate-spin text-blue-400" /></div>}
+        {/* Center Panel: Canvas & Toolbars */}
+        <main ref={canvasContainerRef} className="flex-1 flex items-center justify-center bg-[#050505] relative p-4 overflow-hidden">
+          {/* Floating Toolbar for selected object */}
+          {selectedObject && <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10"><Toolbar onAction={handleToolbarAction} selectedObject={selectedObject} /></div>}
+          
+          {/* Add Object Toolbar */}
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#111] border border-gray-800 rounded-xl p-2 flex flex-col gap-2 z-10">
+            <button onClick={() => handleToolbarAction('addText')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Text"><Type size={20} /></button>
+            <button onClick={() => handleToolbarAction('addImage')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Image"><ImageIcon size={20} /></button>
+            <button onClick={() => handleToolbarAction('addShape')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Shape"><Square size={20} /></button>
+            <button onClick={() => handleToolbarAction('addIcon')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Icon/Logo"><Star size={20} /></button>
           </div>
-          <form onSubmit={handleAiChat} className="flex gap-3">
-            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Tell AI what to do... e.g., 'Create a post for a 20% Diwali sale'" className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
-            <button type="submit" disabled={isAiWorking} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 rounded-lg transition-all shadow-lg disabled:opacity-50 flex items-center gap-2">
-              <Sparkles size={16} /> {isAiWorking ? 'Thinking...' : 'Generate'}
-            </button>
-          </form>
-        </div>
 
-        {/* 🚀 NEW: Saved Drafts Section */}
-        <div className="mt-8">
-          <h2 className="text-xl font-bold text-white mb-4">Saved Drafts</h2>
-          {drafts.length === 0 ? (
-            <p className="text-gray-500 text-center py-8 bg-[#111] border border-dashed border-gray-800 rounded-2xl">No drafts saved yet. Use the form above or the AI assistant to create one.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {drafts.map(draft => (
-                <div key={draft._id} className="bg-[#111] border border-gray-800 rounded-2xl p-4 flex flex-col gap-3">
-                  <img src={draft.imageUrl} alt="Draft" className="w-full h-32 object-cover rounded-lg border border-gray-700" />
-                  <p className="text-xs text-gray-400 line-clamp-2">{draft.caption}</p>
-                  <p className="text-[10px] text-gray-600 font-mono">ID: {draft._id}</p>
-                  <div className="flex gap-2 mt-auto pt-2 border-t border-gray-800">
-                    {/* ✅ FIX: Restore all draft info on edit, not just caption/design */}
-                    <button onClick={() => { 
-                      setEditingDraft(draft); 
-                      setCaption(draft.caption); 
-                      renderDesign(draft.designJson);
-                      // 🚀 NEW: Restore platforms and schedule info
-                      if (draft.platforms) setPlatforms(draft.platforms);
-                      if (draft.publishMode) setPublishMode(draft.publishMode);
-                      if (draft.scheduleDate) setScheduleDate(draft.scheduleDate);
-                     }} className="flex-1 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center gap-1"><Edit size={12}/> Edit</button>
-                    <button onClick={async () => {
-                      try {
-                        await api.delete(`/instagram/drafts/${draft._id}`);
-                        setDrafts(prev => prev.filter(d => d._id !== draft._id));
-                        if (editingDraft?._id === draft._id) setEditingDraft(null);
-                        toast.success('Draft deleted.');
-                      } catch (error) {
-                        toast.error(error.response?.data?.message || 'Could not delete draft.');
-                      }
-                    }} className="py-2 px-3 text-xs bg-red-900/50 hover:bg-red-900/80 rounded-lg"><Trash2 size={12}/></button>
-                  </div>
-                  <p className="text-xs text-gray-500">Open this draft to choose platforms and a publish time.</p>
-                </div>
-              ))}
+          <div className="flex-1 w-full h-full flex items-center justify-center" id="canvas-wrapper">
+            <div className="shadow-2xl shadow-black/50">
+              <CanvasRenderer ref={canvasRef} />
             </div>
-          )}
-        </div>
+          </div>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-gray-700 rounded-lg p-1 flex items-center gap-2 text-white shadow-lg">
+            <button onClick={() => handleZoom(zoom - 0.1)} className="p-2 hover:bg-gray-700 rounded-md"><ZoomOut size={16} /></button>
+            <button onClick={fitToScreen} className="p-2 hover:bg-gray-700 rounded-md"><Expand size={16} /></button>
+            <span className="text-xs font-mono w-12 text-center">{(zoom * 100).toFixed(0)}%</span>
+            <button onClick={() => handleZoom(1)} className="p-2 hover:bg-gray-700 rounded-md"><Minimize size={16} /></button>
+            <button onClick={() => handleZoom(zoom + 0.1)} className="p-2 hover:bg-gray-700 rounded-md"><ZoomIn size={16} /></button>
+          </div>
+        </main>
 
+        {/* Right Panel: Preview & Layers */}
+        <aside className={`bg-[#111] p-4 border-l border-gray-800 overflow-y-auto space-y-6 transition-all duration-300 ${isRightPanelCollapsed ? 'w-0 p-0' : 'w-80'}`}>
+          <div className="bg-[#1a1a1a] border border-gray-700 rounded-2xl p-4">
+            <h2 className="text-md font-bold text-white mb-3">Live Preview</h2>
+            <div className="bg-black border border-gray-700 rounded-2xl overflow-hidden max-w-sm mx-auto shadow-inner">
+              <div className="p-2 flex items-center gap-2 border-b border-gray-800">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500"></div>
+                <p className="text-xs font-bold">{user?.brandKit?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</p>
+              </div>
+              <img src={exportToImage('jpeg')} alt="Live Preview" className="w-full aspect-square object-cover" />
+              <div className="p-3 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-4">
+                    <Heart size={22} /> <MessageCircle size={22} /> <SendIcon size={22} />
+                  </div>
+                  <Bookmark size={22} />
+                </div>
+                <p className="text-xs mt-2"><span className="font-bold">{user?.brandKit?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</span> <span className="text-gray-300 line-clamp-2">{caption}</span></p>
+              </div>
+            </div>
+          </div>
+          <ObjectPanel layers={canvasLayers} onSelect={(layer) => {
+            const object = fabricCanvas?.getObjects()[layer.index];
+            if (object && fabricCanvas) { fabricCanvas.setActiveObject(object); fabricCanvas.renderAll(); setSelectedObject(object); }
+          }} />
+        </aside>
       </div>
+
+      {/* Panel Collapse Toggles */}
+      <button onClick={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)} className="absolute top-1/2 -translate-y-1/2 left-0 z-10 bg-[#1a1a1a] p-1 rounded-r-lg border-y border-r border-gray-700 text-gray-400 hover:bg-gray-800">
+        <ChevronLeft className={`transition-transform ${isLeftPanelCollapsed ? 'rotate-180' : ''}`} />
+      </button>
+      <button onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)} className="absolute top-1/2 -translate-y-1/2 right-0 z-10 bg-[#1a1a1a] p-1 rounded-l-lg border-y border-l border-gray-700 text-gray-400 hover:bg-gray-800">
+        <ChevronLeft className={`transition-transform ${!isRightPanelCollapsed ? 'rotate-180' : ''}`} />
+      </button>
     </div>
   );
 }
