@@ -12,6 +12,7 @@ const generateDesignImages = async (design) => {
     if (layer.type !== 'image' || typeof layer.src !== 'string' || !layer.src.startsWith('AI_IMAGE_PROMPT:')) return;
     try {
       const output = await replicate.run(IMAGE_MODEL, {
+        // ✅ NEW: Add more context to the image prompt for better results
         input: { prompt: `${layer.src.replace('AI_IMAGE_PROMPT:', '').trim()}, professional social-media design, high quality` }
       });
       const imageUrl = Array.isArray(output) ? output[0] : output;
@@ -20,7 +21,7 @@ const generateDesignImages = async (design) => {
         layer.crossOrigin = 'anonymous';
       }
     } catch (error) {
-      console.warn('[AI Designer] Background image generation failed:', error.message);
+      console.warn('[AI Designer] ⚠️ Background image generation failed:', error.message);
     }
   }));
 
@@ -74,9 +75,12 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
     if (!template) {
       console.log(`[AI Designer] No templates found in DB. Generating a new design from scratch.`);
       // This service asks the AI to create a full design, not just fill one.
-      const generatedDesign = await aiDesignService.generateDesignJson(prompt, businessContext);
-      // 🐛 FIX: Return usage data for tracking
-      return { designJson: await generateDesignImages(generatedDesign), usage: generatedDesign.usage };
+      // ✅ FIX: The generateDesignJson service returns an object { designJson, usage }.
+      // We need to extract the 'designJson' part before passing it to the image generator.
+      const { designJson: generatedDesignSpec, usage: designUsage } = await aiDesignService.generateDesignJson(prompt, businessContext);
+      const finalDesignWithImages = await generateDesignImages(generatedDesignSpec);
+      console.log(`✅ [AI Designer] Generated a new design from scratch with a background color and AI image.`);
+      return { designJson: finalDesignWithImages, usage: designUsage };
     }
 
     designJsonForPrompt = template.designJson;
