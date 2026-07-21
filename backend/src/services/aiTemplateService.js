@@ -1,5 +1,6 @@
 const Template = require('../models/templateModel');
 const aiService = require('./aiService');
+const aiDesignService = require('./aiDesignService'); // ✅ NEW: Import the from-scratch design service
 
 /**
  * Intelligently finds a template, fills it, or edits an existing design using AI.
@@ -32,13 +33,26 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
   } else {
     // --- CREATION LOGIC (Existing Logic) ---
     console.log(`[AI Designer] Creating new design from template.`);
-    const keywords = prompt.toLowerCase().split(' ');
-    const template = await Template.findOne({
+    const keywords = prompt.toLowerCase().split(/\s+/).filter(k => k.length > 2); // Filter out short words
+    let template = await Template.findOne({
       $or: [{ name: { $regex: keywords.join('|'), $options: 'i' } }, { tags: { $in: keywords } }]
     }).sort({ usageCount: -1 }).lean();
 
-    if (!template) throw new Error("No suitable template found. Try a different prompt.");
+    // ✅ FIX: If no specific template is found, use the most popular generic one as a fallback.
+    if (!template) {
+      console.log(`[AI Designer] No specific template found for "${prompt}". Using a popular fallback template.`);
+      template = await Template.findOne({}).sort({ usageCount: -1 }).lean();
+    }
+
+    // ✅ FIX: If still no template, generate a design from scratch.
+    if (!template) {
+      console.log(`[AI Designer] No templates found in DB. Generating a new design from scratch.`);
+      // This service asks the AI to create a full design, not just fill one.
+      return aiDesignService.generateDesignJson(prompt, businessContext);
+    }
+
     designJsonForPrompt = template.designJson;
+    console.log(`[AI Designer] Using template "${template.name}" to generate design.`);
 
     systemPrompt = `
       You are an expert copywriter and graphic designer. Your task is to populate a given JSON design template with new content based on a user's prompt and their business details.
