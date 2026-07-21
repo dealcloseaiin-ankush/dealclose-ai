@@ -463,7 +463,7 @@ exports.getDrafts = async (req, res) => {
 exports.saveDraft = async (req, res) => {
   try {
     const userId = req.user?._id;
-    const { draftId, caption, workspaceId = 'main' } = req.body;
+    const { draftId, caption, workspaceId = 'main', platforms, publishMode, scheduleDate } = req.body;
     let designJson = null;
     if (req.body.designJson) {
       try {
@@ -497,7 +497,11 @@ exports.saveDraft = async (req, res) => {
       imageUrl,
       designJson,
       platform: 'instagram',
-      status: 'draft'
+      status: 'draft',
+      // ✅ FIX: Save platform and schedule info with the draft
+      platforms: platforms ? JSON.parse(platforms) : { instagram: true, facebook: false },
+      publishMode: publishMode || 'now',
+      scheduleDate: scheduleDate ? new Date(scheduleDate) : null,
     };
 
     let savedDraft;

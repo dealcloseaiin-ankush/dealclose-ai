@@ -44,8 +44,10 @@ exports.createPost = async (req, res) => {
       userId,
       workspaceId: workspaceId || 'main',
       caption,
-      platforms: requestedPlatforms,
-      status,
+      platforms: requestedPlatforms, // ✅ FIX: Change 'now' to 'publishing' before saving to DB
+      // ✅ FIX: The database model does not accept 'now' as a status. We must convert it to a valid enum value ('publishing') BEFORE saving.
+      // For drafts or scheduled posts, the status is already valid.
+      status: status === 'now' ? 'publishing' : status,
       scheduledAt: status === 'scheduled' ? new Date(scheduledAt) : null,
       mediaUrls,
     });
@@ -57,16 +59,15 @@ exports.createPost = async (req, res) => {
     if (status === 'scheduled') {
       const delay = new Date(scheduledAt).getTime() - Date.now();
       if (delay > 0) {
-        console.log(`🚀 [DEBUG] 7. Adding post to BullMQ worker queue for scheduling (delay: ${delay}ms).`);
+        console.log(`🚀 [DEBUG] 7a. Adding post to BullMQ worker queue for scheduling (delay: ${delay}ms).`);
         await automationQueue.add('publish_scheduled_post', { postId: post._id }, { delay });
         console.log("================== [SOCIAL POST END] ==================\n");
         return res.status(201).json({ success: true, message: 'Post scheduled successfully!', post });
       }
     }
 
-    if (status === 'now') {
-      post.status = 'publishing';
-      await post.save();
+    // The status is already set to 'publishing' from the constructor, so we just need to check for it.
+    if (post.status === 'publishing') {
       console.log(`🚀 [DEBUG] 7. Adding post to BullMQ worker queue for immediate publishing.`);
       // Immediately add to queue for publishing
       await automationQueue.add('publish_scheduled_post', { postId: post._id });
