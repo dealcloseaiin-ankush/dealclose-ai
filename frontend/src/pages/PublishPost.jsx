@@ -61,6 +61,52 @@ export default function PublishPost() {
     }).catch(console.error);
   }, []);
 
+  // 🚀 NEW: AI Chat Handler (wrapped in useCallback to fix crash)
+  const handleAiChat = useCallback(async (e, predefinedPrompt = null) => {
+    if (e) e.preventDefault(); // Prevent form submission if called from an event
+    const currentPrompt = predefinedPrompt || chatInput.trim();
+    if (!currentPrompt) return;
+
+    const userMessage = { role: 'user', text: currentPrompt };
+    setChatMessages(prev => [...prev, userMessage]);
+    if (!predefinedPrompt)
+    setChatInput('');
+    setIsAiWorking(true);
+
+    try {
+      const currentDesignJson = exportToJson();
+      const isEditing = Boolean(currentDesignJson && ((Array.isArray(currentDesignJson.objects) && currentDesignJson.objects.length > 0) || (Array.isArray(currentDesignJson.layers) && currentDesignJson.layers.length > 0)));
+
+      const { data } = await api.post('/instagram/ai-generate-post', {
+        prompt: currentPrompt,
+        workspaceId: activeWorkspace,
+        existingDesign: isEditing ? currentDesignJson : null
+      });
+
+      if (data.success) {
+        setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply || (isEditing ? "I've updated the design for you!" : "Here's a new design!") }]);
+        const designToRender = data.designJson || null;
+
+        if (renderDesign && designToRender) {
+          renderDesign(designToRender, () => {
+            setTimeout(() => {
+              const nextImage = exportToImage('jpeg');
+              setPreviewImageUrl(nextImage || '');
+              if (designToRender?.caption) {
+                setCaption([designToRender.caption, designToRender.hashtags].filter(Boolean).join('\n\n'));
+              }
+            }, 150);
+          });
+        }
+        toast.success('AI has generated a new design!');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "AI Assistant is currently unavailable.");
+    } finally {
+      setIsAiWorking(false);
+    }
+  }, [chatInput, exportToJson, activeWorkspace, renderDesign, exportToImage]);
+
   // 🚀 NEW: Handle loading post for editing or enhancing with AI
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -333,63 +379,6 @@ export default function PublishPost() {
       setIsPublishing(false);
     }
   };
-
-  // 🚀 NEW: AI Chat Handler
-  const handleAiChat = useCallback(async (e, predefinedPrompt = null) => {
-    if (e) e.preventDefault(); // Prevent form submission if called from an event
-    const currentPrompt = predefinedPrompt || chatInput.trim();
-    if (!currentPrompt) return;
-
-    const userMessage = { role: 'user', text: currentPrompt };
-    setChatMessages(prev => [...prev, userMessage]);
-    if (!predefinedPrompt)
-    setChatInput('');
-    setIsAiWorking(true);
-
-    try {
-      // 🚀 NEW: Check if there's a design on the canvas to edit.
-      const currentDesignJson = exportToJson();
-      const isEditing = Boolean(
-        currentDesignJson &&
-        ((Array.isArray(currentDesignJson.objects) && currentDesignJson.objects.length > 0) ||
-          (Array.isArray(currentDesignJson.layers) && currentDesignJson.layers.length > 0))
-      );
-
-      // 🚀 REAL API CALL to the new backend endpoint
-      const { data } = await api.post('/instagram/ai-generate-post', {
-        prompt: currentPrompt, // Use the stored prompt
-        workspaceId: activeWorkspace,
-        existingDesign: isEditing ? currentDesignJson : null // Pass existing design for edits
-      });
-
-      if (data.success) {
-        setChatMessages(prev => [...prev, { role: 'ai', text: data.aiReply || (isEditing ? "I've updated the design for you!" : "Here's a new design!") }]);
-        const designToRender = data.designJson || null;
-
-        if (renderDesign && designToRender) {
-          renderDesign(designToRender, () => {
-            setTimeout(() => {
-              const nextImage = exportToImage('jpeg');
-              setPreviewImageUrl(nextImage || '');
-              if (designToRender?.caption) {
-                setCaption([designToRender.caption, designToRender.hashtags].filter(Boolean).join('\n\n'));
-              }
-            }, 150);
-          });
-        }
-
-        if (designToRender?.caption) {
-          setCaption([designToRender.caption, designToRender.hashtags].filter(Boolean).join('\n\n'));
-        }
-
-        toast.success('AI has generated a new design!');
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "AI Assistant is currently unavailable.");
-    } finally {
-      setIsAiWorking(false);
-    }
-  }, [chatInput, exportToJson, activeWorkspace, renderDesign, exportToImage]);
 
   // 🚀 NEW: Save as Draft
   const handleSaveDraft = async () => {
