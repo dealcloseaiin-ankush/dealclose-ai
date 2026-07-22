@@ -13,12 +13,12 @@ exports.getPosts = async (req, res) => {
 
     const query = { userId };
     if (workspaceId && workspaceId !== 'main') {
+      // If a specific branch/workspace is selected, filter by it.
       query.workspaceId = workspaceId;
-    } else if (workspaceId === 'main') {
-      query.workspaceId = { $in: ['main', null, ''] }; // Also include posts where workspaceId is empty
-    } else if (!workspaceId) {
-      // No workspaceId provided, fetch for all workspaces
-      // This means query.workspaceId is not set, so it should match all posts for the user.
+    } else {
+      // If 'main' is selected or no workspaceId is provided (for 'All' filter),
+      // do not add a workspaceId filter to the query. This will fetch posts
+      // from ALL workspaces belonging to the user.
     }
 
     if (status && status !== 'all') {
