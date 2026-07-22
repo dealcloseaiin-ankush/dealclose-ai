@@ -461,6 +461,8 @@ exports.getDrafts = async (req, res) => {
 // @desc    Save or update a draft post
 // @route   POST /api/instagram/drafts
 exports.saveDraft = async (req, res) => {
+  console.log("\n================== [DRAFT SAVE START] ==================");
+  console.log("🚀 [DRAFT DEBUG] 1. /api/instagram/drafts endpoint hit.");
   try {
     const userId = req.user?._id;
     const { draftId, caption, workspaceId = 'main', platforms, publishMode, scheduleDate } = req.body;
@@ -473,15 +475,19 @@ exports.saveDraft = async (req, res) => {
       }
     }
 
+    console.log("🚀 [DRAFT DEBUG] 2. Received data:", { hasCaption: !!caption, hasDesign: !!designJson, hasFile: !!(req.file || req.files?.media) });
+
     let imageUrl = req.body.imageUrl || ''; // Use existing image URL if provided
 
     // If a new file is uploaded, upload it to Cloudinary
     if (req.file || req.files?.media) {
       const fileToUpload = req.file || req.files.media[0];
+      console.log("🚀 [DRAFT DEBUG] 3. Uploading preview image to Cloudinary...");
       try {
         const result = await cloudinary.uploader.upload(fileToUpload.path, { resource_type: 'auto' });
         imageUrl = result.secure_url;
         fs.unlinkSync(fileToUpload.path); // Clean up local file
+        console.log("✅ [DRAFT DEBUG] 4. Image uploaded successfully:", imageUrl);
       } catch (uploadError) {
         return res.status(500).json({ success: false, message: 'Image upload failed.' });
       }
@@ -506,22 +512,29 @@ exports.saveDraft = async (req, res) => {
 
     let savedDraft;
     if (draftId) {
+      console.log(`🚀 [DRAFT DEBUG] 5a. Updating existing draft with ID: ${draftId}`);
       // Update existing draft
       savedDraft = await DraftPost.findOneAndUpdate(
         { _id: draftId, userId },
         draftData,
         { new: true }
       );
-      if (!savedDraft) return res.status(404).json({ success: false, message: 'Draft not found.' });
+      if (!savedDraft) {
+        console.log(`❌ [DRAFT DEBUG] 6a. Draft with ID ${draftId} not found for this user.`);
+        return res.status(404).json({ success: false, message: 'Draft not found.' });
+      }
+      console.log(`✅ [DRAFT DEBUG] 6a. Draft updated successfully.`);
     } else {
+      console.log(`🚀 [DRAFT DEBUG] 5b. Creating new draft...`);
       // Create new draft
       savedDraft = await DraftPost.create(draftData);
+      console.log(`✅ [DRAFT DEBUG] 6b. New draft created with ID: ${savedDraft._id}`);
     }
-
+    console.log("================== [DRAFT SAVE END] ==================\n");
     res.status(201).json({ success: true, draft: savedDraft });
 
   } catch (error) {
-    console.error('Save Draft Error:', error);
+    console.error('❌ [CRITICAL DRAFT ERROR] Save Draft Failed:', error);
     res.status(500).json({ success: false, message: 'Failed to save draft.' });
   }
 };
