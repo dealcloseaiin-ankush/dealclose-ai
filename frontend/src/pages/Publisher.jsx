@@ -9,7 +9,7 @@ export default function Publisher() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('list');
+  const [view, setView] = useState('list'); // list, analytics
   const [filter, setFilter] = useState('all'); // all, scheduled, published, drafts, failed
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
@@ -55,7 +55,7 @@ export default function Publisher() {
 
   // 🚀 NEW: Delete a post
   const handleDeletePost = async (postId) => {
-    if (!window.confirm('Are you sure you want to permanently delete this post?')) return;
+    if (!window.confirm('Are you sure you want to permanently delete this post? This action cannot be undone.')) return;
     try {
       await api.delete(`/posts/${postId}`);
       setPosts(prev => prev.filter(p => p._id !== postId));
@@ -81,10 +81,10 @@ export default function Publisher() {
   };
 
   // 🚀 NEW: Enhance post with AI
-  const handleEnhanceWithAI = async (postId) => {
-    toast.loading('AI is enhancing the post...');
-    // This is a placeholder. You would typically navigate to the editor with the post ID
-    // and have the editor call an AI service.
+  const handleEnhanceWithAI = (postId) => {
+    // This will navigate to the editor with the post ID
+    // The editor will then fetch the post and allow AI enhancement.
+    toast.success('Loading post in editor for AI enhancement...');
     navigate(`/publish-post?import_id=${postId}`);
   };
 
@@ -168,7 +168,7 @@ export default function Publisher() {
                     <span className="capitalize">{post.status}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {post.isImported && (
+                    {post.isImported && !post.designJson && (
                       <button onClick={() => handleEnhanceWithAI(post._id)} className="p-1.5 text-purple-400 bg-purple-500/10 rounded-md hover:bg-purple-500/20" title="Enhance with AI">
                         <Sparkles size={14} />
                       </button>

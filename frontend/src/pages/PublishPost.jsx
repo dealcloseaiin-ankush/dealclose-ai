@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom'; // 🚀 NEW: For handling import/edit IDs from URL
 import { fabric } from 'fabric'; // ✅ FIX: Import fabric
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: More icons for the new professional UI
-import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu, Undo, Redo } from 'lucide-react';
+import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu, Undo, Redo, UploadCloud } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
 import { FaInstagram, FaFacebook, FaThreads } from "react-icons/fa6"; // ✅ FIX: Use react-icons for brand logos
 import { Heart, MessageCircle, Send as SendIcon, Bookmark } from 'lucide-react'; // For realistic preview
@@ -116,6 +116,34 @@ export default function PublishPost() {
     fabricCanvas.setHeight(1080 * clampedZoom);
     fabricCanvas.renderAll();
   }, [fabricCanvas]);
+
+  // 🚀 NEW: Handle user uploading their own media file
+  const handleMediaUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file || !fabricCanvas) return;
+
+    const reader = new FileReader();
+    reader.onload = (f) => {
+      const data = f.target.result;
+      fabric.Image.fromURL(data, (img) => {
+        // Scale image to fit the canvas
+        const scale = Math.min(1080 / img.width, 1080 / img.height);
+        img.set({
+          left: 540,
+          top: 540,
+          originX: 'center',
+          originY: 'center',
+          scaleX: scale,
+          scaleY: scale,
+        });
+        fabricCanvas.add(img);
+        fabricCanvas.centerObject(img);
+        fabricCanvas.renderAll();
+        toast.success('Image loaded! Now ask the AI to create a caption for it.');
+      });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fitToScreen = useCallback(() => {
     if (!fabricCanvas || !canvasContainerRef.current) return;
@@ -542,6 +570,14 @@ export default function PublishPost() {
             <button onClick={() => handleToolbarAction('addImage')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Image"><ImageIcon size={20} /></button>
             <button onClick={() => handleToolbarAction('addShape')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Shape"><Square size={20} /></button>
             <button onClick={() => handleToolbarAction('addIcon')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Icon/Logo"><Star size={20} /></button>
+          </div>
+          
+          {/* 🚀 NEW: Upload Media Button */}
+          <div className="absolute left-4 bottom-4 z-10">
+            <label className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all cursor-pointer text-sm" title="Upload your own image or video">
+              <UploadCloud size={16} /> Upload Media
+              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
+            </label>
           </div>
 
           <div className="flex-1 w-full h-full flex items-center justify-center" id="canvas-wrapper">
