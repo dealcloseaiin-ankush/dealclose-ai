@@ -130,9 +130,9 @@ export default function Publisher() {
                     {new Date(post.scheduledAt || post.createdAt).toLocaleDateString()}
                   </div>
                 </div>
-                {/* ✅ NEW: Show the failure reason if a post fails to publish */}
+                {/* ✅ FIX: Show the failure reason if a post fails to publish */}
                 {post.status === 'failed' && post.failureReason && (
-                  <p className="text-xs text-red-400 bg-red-500/10 p-2 rounded-md mt-2"><strong>Failed:</strong> {post.failureReason}</p>
+                  <p className="text-xs text-red-400 bg-red-500/10 p-2 rounded-md mt-2"><strong>Reason:</strong> {post.failureReason}</p>
                 )}
               </div>
             ))}
