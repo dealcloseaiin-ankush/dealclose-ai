@@ -1,5 +1,6 @@
 const Post = require('../models/postModel');
 const User = require('../models/userModel');
+const instagramService = require('../services/instagramService');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 
 // @desc    Get all posts for a user/workspace
@@ -94,5 +95,45 @@ exports.deletePost = async (req, res) => {
   } catch (error) {
     console.error("Delete Post Error:", error);
     res.status(500).json({ success: false, message: 'Failed to delete post.', error: error.message });
+  }
+};
+
+// @desc    Import existing posts from Instagram
+// @route   POST /api/posts/import-instagram
+exports.importInstagramPosts = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const igConfig = user.instagramConfig;
+    if (!igConfig?.accessToken || !igConfig?.instagramAccountId) {
+      return res.status(400).json({ success: false, message: 'Instagram account not connected.' });
+    }
+
+    const recentPosts = await instagramService.getRecentMedia(igConfig.instagramAccountId, igConfig.accessToken);
+
+    let importedCount = 0;
+    for (const post of recentPosts) {
+      const existingPost = await Post.findOne({ "platformPostIds.instagram": post.id, userId });
+      if (!existingPost) {
+        await Post.create({
+          userId,
+          workspaceId: 'main', // Or determine from context if possible
+          caption: post.caption,
+          mediaUrls: [{ url: post.media_url, type: post.media_type.toLowerCase() === 'video' ? 'video' : 'image' }],
+          status: 'published',
+          publishedAt: new Date(post.timestamp),
+          platformPostIds: { instagram: post.id },
+          isImported: true,
+          analytics: { likes: post.like_count || 0, comments: post.comments_count || 0 }
+        });
+        importedCount++;
+      }
+    }
+
+    res.status(200).json({ success: true, message: `${importedCount} new posts imported.`, importedCount });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to import posts.' });
   }
 };

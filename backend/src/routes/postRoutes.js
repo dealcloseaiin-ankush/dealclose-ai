@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { getPosts, getPostById, createPost, deletePost } = require('../controllers/postController');
+const { getPosts, getPostById, createPost, deletePost, importInstagramPosts } = require('../controllers/postController');
 const multer = require('multer');
 
 // Multer setup for handling file uploads in memory
@@ -11,6 +11,9 @@ const upload = multer({ storage: storage });
 router.route('/')
   .get(protect, getPosts)
   .post(protect, upload.single('media'), createPost);
+
+router.route('/import-instagram')
+  .post(protect, importInstagramPosts);
 
 router.route('/:id')
   .get(protect, getPostById)
