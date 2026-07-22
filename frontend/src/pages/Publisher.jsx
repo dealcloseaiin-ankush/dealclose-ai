@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Publisher() {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('list'); // list, analytics
+  const [view, setView] = useState('list');
   const [filter, setFilter] = useState('all'); // all, scheduled, published, drafts, failed
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
@@ -52,6 +53,41 @@ export default function Publisher() {
     }
   }, [filter, view, fetchPosts, fetchAnalytics]);
 
+  // 🚀 NEW: Delete a post
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this post?')) return;
+    try {
+      await api.delete(`/posts/${postId}`);
+      setPosts(prev => prev.filter(p => p._id !== postId));
+      toast.success('Post deleted successfully.');
+    } catch (error) {
+      toast.error('Failed to delete post.');
+      console.error(error);
+    }
+  };
+
+  // 🚀 NEW: Import existing posts from Instagram
+  const handleImportPosts = async () => {
+    const toastId = toast.loading('Importing posts from Instagram...');
+    try {
+      const { data } = await api.post('/posts/import-instagram');
+      if (data.success) {
+        toast.success(`${data.importedCount} new posts imported!`, { id: toastId });
+        fetchPosts(); // Refresh the list
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to import posts.', { id: toastId });
+    }
+  };
+
+  // 🚀 NEW: Enhance post with AI
+  const handleEnhanceWithAI = async (postId) => {
+    toast.loading('AI is enhancing the post...');
+    // This is a placeholder. You would typically navigate to the editor with the post ID
+    // and have the editor call an AI service.
+    navigate(`/publish-post?import_id=${postId}`);
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'scheduled': return <Clock className="text-yellow-400" size={14} />;
@@ -73,12 +109,17 @@ export default function Publisher() {
             </h1>
             <p className="text-gray-400">Plan, schedule, and analyze your social media content from one place.</p>
           </div>
-          <Link
-            to="/publish-post"
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
-          >
-            <Plus size={18} /> Create New Post
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={handleImportPosts} className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all">
+              <Download size={16} /> Import Posts
+            </button>
+            <Link
+              to="/publish-post"
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
+            >
+              <Plus size={18} /> Create New Post
+            </Link>
+          </div>
         </div>
 
         {/* View & Filter Tabs */}
@@ -114,18 +155,33 @@ export default function Publisher() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {posts.map(post => (
-              <div key={post._id} className="bg-[#111] border border-gray-800 rounded-2xl p-4 flex flex-col gap-3 group hover:border-blue-500/50 transition-all">
+              <div key={post._id} className="bg-[#111] border border-gray-800 rounded-2xl p-4 flex flex-col gap-3 group hover:border-blue-500/50 transition-all relative">
                 {post.mediaUrls && post.mediaUrls.length > 0 && (
                   <div className="aspect-square bg-black rounded-lg overflow-hidden">
                     <img src={post.mediaUrls[0].url} alt="Post media" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   </div>
                 )}
                 <p className="text-xs text-gray-400 line-clamp-2 flex-1">{post.caption}</p>
-                <div className="flex justify-between items-center pt-2 border-t border-gray-800">
+                <div className="flex justify-between items-center pt-3 border-t border-gray-800">
                   <div className="flex items-center gap-2 text-xs font-bold">
                     {getStatusIcon(post.status)}
                     <span className="capitalize">{post.status}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {post.isImported && (
+                      <button onClick={() => handleEnhanceWithAI(post._id)} className="p-1.5 text-purple-400 bg-purple-500/10 rounded-md hover:bg-purple-500/20" title="Enhance with AI">
+                        <Sparkles size={14} />
+                      </button>
+                    )}
+                    <Link to={`/publish-post?edit_id=${post._id}`} className="p-1.5 text-gray-400 bg-gray-700/50 rounded-md hover:bg-gray-700" title="Edit Post">
+                      <Edit size={14} />
+                    </Link>
+                    <button onClick={() => handleDeletePost(post._id)} className="p-1.5 text-red-400 bg-red-500/10 rounded-md hover:bg-red-500/20" title="Delete Post">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 text-right -mt-2">
                   <div className="text-xs text-gray-500">
                     {new Date(post.scheduledAt || post.createdAt).toLocaleDateString()}
                   </div>

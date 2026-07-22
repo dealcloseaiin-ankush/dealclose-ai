@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import api from './services/api';
 import MainLayout from './layouts/MainLayout';
 import LandingPage from './pages/LandingPage';
@@ -164,6 +164,7 @@ const PWAInstallPopup = () => {
 export default function App() {
   return (
     <Router>
+      <Toaster position="top-center" reverseOrder={false} />
       <GlobalNotification />
       <PWAInstallPopup />
       <Routes>

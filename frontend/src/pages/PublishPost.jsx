@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useLocation, useNavigate } from 'react-router-dom'; // 🚀 NEW: For handling import/edit IDs from URL
 import { fabric } from 'fabric'; // ✅ FIX: Import fabric
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: More icons for the new professional UI
 import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu, Undo, Redo } from 'lucide-react';
@@ -12,6 +13,8 @@ import Toolbar from '../components/editor/Toolbar';             // 🚀 NEW
 import ObjectPanel from '../components/editor/ObjectPanel';       // 🚀 NEW
 
 export default function PublishPost() {
+  const location = useLocation(); // 🚀 NEW: Get URL query params
+  const navigate = useNavigate(); // 🚀 NEW: For redirecting after save
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
@@ -57,6 +60,51 @@ export default function PublishPost() {
       if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
     }).catch(console.error);
   }, []);
+
+  // 🚀 NEW: Handle loading post for editing or enhancing with AI
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit_id');
+    const importId = params.get('import_id');
+    const postId = editId || importId;
+
+    if (postId) {
+      const toastId = toast.loading('Loading post data...');
+      api.get(`/posts/${postId}`)
+        .then(({ data }) => {
+          if (data.success && data.post) {
+            const post = data.post;
+            setCaption(post.caption || '');
+            if (post.designJson) {
+              renderDesign(post.designJson);
+            } else if (post.mediaUrls && post.mediaUrls.length > 0) {
+              // If it's an imported post without a design, load the image onto the canvas
+              const design = {
+                version: '5.3.0',
+                objects: [{
+                  type: 'image',
+                  src: post.mediaUrls[0].url,
+                  scaleX: 1,
+                  scaleY: 1,
+                  crossOrigin: 'anonymous'
+                }]
+              };
+              renderDesign(design);
+            }
+            setEditingDraft({ _id: post._id }); // Set it as an editing draft
+            toast.success('Post loaded for editing!', { id: toastId });
+
+            // If it's an import, trigger AI enhancement
+            if (importId) {
+              handleAiChat(null, "Enhance this post with a better caption and hashtags.");
+            }
+          }
+        })
+        .catch(err => {
+          toast.error(err.response?.data?.message || 'Failed to load post.', { id: toastId });
+        });
+    }
+  }, [location.search, renderDesign, handleAiChat]);
 
   // ✅ FIX: Moved zoom handlers before the useEffect that depends on them to fix crash.
   const handleZoom = useCallback((newZoom) => {
@@ -245,6 +293,7 @@ export default function PublishPost() {
           } else {
             toast.success('Post is being published!', { id: toastId });
           }
+        navigate('/publisher'); // ✅ FIX: Redirect to publisher page after success
         }
       } else {
         throw new Error(data.message || 'An unknown error occurred.');
@@ -258,13 +307,14 @@ export default function PublishPost() {
   };
 
   // 🚀 NEW: AI Chat Handler
-  const handleAiChat = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
+  const handleAiChat = useCallback(async (e, predefinedPrompt = null) => {
+    if (e) e.preventDefault(); // Prevent form submission if called from an event
+    const currentPrompt = predefinedPrompt || chatInput.trim();
+    if (!currentPrompt) return;
 
-    const currentPrompt = chatInput.trim(); // 🐛 FIX: Store prompt before clearing input
     const userMessage = { role: 'user', text: currentPrompt };
     setChatMessages(prev => [...prev, userMessage]);
+    if (!predefinedPrompt)
     setChatInput('');
     setIsAiWorking(true);
 
@@ -311,7 +361,7 @@ export default function PublishPost() {
     } finally {
       setIsAiWorking(false);
     }
-  };
+  }, [chatInput, exportToJson, activeWorkspace, renderDesign, exportToImage]);
 
   // 🚀 NEW: Save as Draft
   const handleSaveDraft = async () => {
