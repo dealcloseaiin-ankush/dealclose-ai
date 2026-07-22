@@ -13,8 +13,10 @@ exports.getPosts = async (req, res) => {
     const query = { userId };
     if (workspaceId && workspaceId !== 'main') {
       query.workspaceId = workspaceId;
-    } else {
+    } else if (workspaceId === 'main') {
       query.workspaceId = { $in: ['main', null] };
+    } else {
+      // No workspaceId provided, fetch for all workspaces
     }
 
     if (status && status !== 'all') {
@@ -105,13 +107,26 @@ exports.importInstagramPosts = async (req, res) => {
     const userId = req.user?._id;
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+    
+    // ✅ FIX: Find the first available Instagram connection, whether in root or workspaces.
+    let igConfig = user.instagramConfig;
+    let workspaceForPost = 'main';
 
-    const igConfig = user.instagramConfig;
-    if (!igConfig?.accessToken || !igConfig?.instagramAccountId) {
+    if (!igConfig?.accessToken && user.workspaces?.length > 0) {
+      const firstActiveWorkspace = user.workspaces.find(ws => ws.instagramConfig?.accessToken);
+      if (firstActiveWorkspace) {
+        igConfig = firstActiveWorkspace.instagramConfig;
+        workspaceForPost = firstActiveWorkspace._id.toString();
+      }
+    }
+
+    const igAccountId = igConfig?.instagramAccountId || igConfig?.accountId;
+
+    if (!igConfig?.accessToken || !igAccountId) {
       return res.status(400).json({ success: false, message: 'Instagram account not connected.' });
     }
 
-    const recentPosts = await instagramService.getRecentMedia(igConfig.instagramAccountId, igConfig.accessToken);
+    const recentPosts = await instagramService.getRecentMedia(igAccountId, igConfig.accessToken);
 
     let importedCount = 0;
     for (const post of recentPosts) {
@@ -119,7 +134,7 @@ exports.importInstagramPosts = async (req, res) => {
       if (!existingPost) {
         await Post.create({
           userId,
-          workspaceId: 'main', // Or determine from context if possible
+          workspaceId: workspaceForPost, // Use the workspace where the IG account was found
           caption: post.caption,
           mediaUrls: [{ url: post.media_url, type: post.media_type.toLowerCase() === 'video' ? 'video' : 'image' }],
           status: 'published',

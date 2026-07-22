@@ -46,6 +46,7 @@ export default function PublishPost() {
   const [zoom, setZoom] = useState(1);
   const canvasContainerRef = useRef(null);
   const isPanning = useRef(false);
+  const [backgroundColor, setBackgroundColor] = useState('#1a1a1a'); // 🚀 NEW: State for background color
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
@@ -60,6 +61,14 @@ export default function PublishPost() {
       if (u) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
     }).catch(console.error);
   }, []);
+
+  // 🚀 NEW: Effect to update canvas background color when state changes
+  useEffect(() => {
+    if (fabricCanvas) {
+      fabricCanvas.setBackgroundColor(backgroundColor, fabricCanvas.renderAll.bind(fabricCanvas));
+    }
+  }, [backgroundColor, fabricCanvas]);
+
 
   // 🚀 NEW: AI Chat Handler (wrapped in useCallback to fix crash)
   const handleAiChat = useCallback(async (e, predefinedPrompt = null) => {
@@ -121,6 +130,7 @@ export default function PublishPost() {
           if (data.success && data.post) {
             const post = data.post;
             setCaption(post.caption || '');
+            setBackgroundColor(post.designJson?.canvas?.backgroundColor || post.designJson?.background || '#1a1a1a');
             if (post.designJson) {
               renderDesign(post.designJson);
             } else if (post.mediaUrls && post.mediaUrls.length > 0) {
@@ -602,6 +612,24 @@ export default function PublishPost() {
                   <Bookmark size={22} />
                 </div>
                 <p className="text-xs mt-2"><span className="font-bold">{user?.brandKit?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</span> <span className="text-gray-300 line-clamp-2">{caption}</span></p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-[#1a1a1a] border border-gray-700 rounded-2xl p-4">
+            <h2 className="text-md font-bold text-white mb-3">Canvas</h2>
+            <div className="flex items-center justify-between">
+              <label htmlFor="bg-color" className="text-sm text-gray-300">Background Color</label>
+              <div className="flex items-center gap-2">
+                {['#ffffff', '#000000', '#1a1a1a', '#ff4b4b', '#4b79ff', '#4bff9f'].map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setBackgroundColor(color)}
+                    className={`w-6 h-6 rounded-full cursor-pointer border-2 transition-all ${backgroundColor === color ? 'border-white' : 'border-transparent hover:border-gray-500'}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+                <input id="bg-color" type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-8 h-8 p-0 border-none rounded-md cursor-pointer bg-transparent" />
               </div>
             </div>
           </div>
