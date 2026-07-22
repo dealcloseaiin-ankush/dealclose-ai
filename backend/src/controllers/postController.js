@@ -7,6 +7,7 @@ const { uploadToCloudinary } = require('../services/cloudinaryService');
 // @route   GET /api/posts
 exports.getPosts = async (req, res) => {
   try {
+    console.log("\n🚀 [DEBUG] getPosts controller hit!");
     const userId = req.user?._id;
     const { workspaceId, status } = req.query;
 
@@ -17,13 +18,16 @@ exports.getPosts = async (req, res) => {
       query.workspaceId = { $in: ['main', null] };
     } else {
       // No workspaceId provided, fetch for all workspaces
+      // This means query.workspaceId is not set, so it should match all posts for the user.
     }
 
     if (status && status !== 'all') {
       query.status = status;
     }
+    console.log("🔍 [DEBUG] Querying posts with:", JSON.stringify(query));
 
     const posts = await Post.find(query).sort({ createdAt: -1 }).limit(100).lean();
+    console.log(`✅ [DEBUG] Found ${posts.length} posts for user ${userId}.`);
     res.status(200).json({ success: true, posts });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch posts.', error: error.message });

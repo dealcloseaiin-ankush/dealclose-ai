@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
 import toast from 'react-hot-toast';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -13,11 +14,22 @@ export default function Publisher() {
   const [filter, setFilter] = useState('all'); // all, scheduled, published, drafts, failed
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  
+  // 🚀 NEW: Workspace states
+  const { user } = useAuth() || {};
+  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }]);
+  const [activeWorkspace, setActiveWorkspace] = useState('main');
+
+  useEffect(() => {
+    if (user) {
+      setWorkspaces(prev => [...prev, ...(user.workspaces || [])]);
+    }
+  }, [user]);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = filter === 'all' ? {} : { status: filter };
+      const params = { ... (filter === 'all' ? {} : { status: filter }), workspaceId: activeWorkspace };
       const { data } = await api.get('/posts', { params });
       if (data.success) {
         setPosts(data.posts);
@@ -28,7 +40,7 @@ export default function Publisher() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, activeWorkspace]); // Add activeWorkspace to dependencies
 
   const fetchAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
@@ -51,7 +63,7 @@ export default function Publisher() {
     } else if (view === 'analytics') {
       fetchAnalytics();
     }
-  }, [filter, view, fetchPosts, fetchAnalytics]);
+  }, [filter, view, fetchPosts, fetchAnalytics, activeWorkspace]); // Add activeWorkspace to dependencies
 
   // 🚀 NEW: Delete a post
   const handleDeletePost = async (postId) => {
@@ -120,6 +132,17 @@ export default function Publisher() {
               <Plus size={18} /> Create New Post
             </Link>
           </div>
+        </div>
+        
+        {/* 🚀 NEW: Workspace Selector */}
+        <div className="mb-6">
+          <select
+            value={activeWorkspace}
+            onChange={(e) => setActiveWorkspace(e.target.value)}
+            className="bg-[#1a1a1a] border border-gray-700 text-white text-sm font-semibold rounded-lg px-3 py-2 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+          >
+            {workspaces.map(ws => <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>)}
+          </select>
         </div>
 
         {/* View & Filter Tabs */}
