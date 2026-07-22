@@ -32,6 +32,7 @@ const instagramRoutes = require('./routes/instagramRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const inboundWebhookRoutes = require('./routes/inboundWebhookRoutes');
 const designRoutes = require('./routes/designRoutes'); // 🚀 NEW: Design Studio routes
+const templateRoutes = require('./routes/templateRoutes'); // 🚀 NEW: Template Engine routes
 const postRoutes = require('./routes/postRoutes'); // ✅ FIX: Using the new post routes with delete functionality
 const automarketerRoutes = require('./routes/automarketerRoutes'); // 🚀 NEW: Auto-Marketer
 const socialPostRoutes = require('./routes/socialPostRoutes'); // 🚀 NEW: Social Publisher routes
