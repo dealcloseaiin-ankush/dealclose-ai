@@ -20,6 +20,13 @@ router.patch('/comment-ai/post-toggle', protect, instagramController.updateComme
 router.get('/posts/:id/insights', protect, instagramController.getPostInsights); // Naya route
 router.post('/posts/:id/analyze', protect, instagramController.analyzePostPerformance); // AI Analysis route
 
+// --- NEW COMMENT MANAGEMENT ROUTES ---
+router.get('/posts/:id/comments', protect, instagramController.getCommentsForPost);
+router.post('/comments/:id/reply', protect, instagramController.replyToComment);
+
+// --- NEW HUMAN AGENT DM ROUTE ---
+router.post('/dm/reply', protect, instagramController.sendDirectMessage);
+
 // --- NEW CONTENT PUBLISH ROUTE ---
 router.post('/publish', protect, upload.single('image'), instagramController.publishPost);
 

@@ -1053,3 +1053,96 @@ exports.analyzePostPerformance = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get all comments for a specific Instagram Post
+// @route   GET /api/instagram/posts/:id/comments
+exports.getCommentsForPost = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id: mediaId } = req.params;
+    const { workspaceId } = req.query;
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Instagram not connected.' });
+    }
+
+    const comments = await instagramService.getCommentsForPost(mediaId, accessToken);
+    res.status(200).json({ success: true, comments });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch comments.' });
+  }
+};
+
+// @desc    Reply to a specific Instagram Comment
+// @route   POST /api/instagram/comments/:id/reply
+exports.replyToComment = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id: commentId } = req.params;
+    const { message, workspaceId } = req.body;
+
+    if (!message) return res.status(400).json({ success: false, message: 'Reply message is required.' });
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Instagram not connected.' });
+    }
+
+    const reply = await instagramService.replyToComment(commentId, accessToken, message);
+    res.status(201).json({ success: true, reply });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to post reply.' });
+  }
+};
+
+// @desc    Send a direct message to an Instagram user
+// @route   POST /api/instagram/dm/reply
+exports.sendDirectMessage = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { recipientId, message, workspaceId } = req.body;
+
+    if (!recipientId || !message) {
+      return res.status(400).json({ success: false, message: 'Recipient ID and message are required.' });
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const selectedWorkspace = workspaceId && workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+
+    if (!accessToken) {
+      return res.status(400).json({ success: false, message: 'Instagram not connected for this workspace.' });
+    }
+
+    const result = await instagramService.sendDirectMessage(recipientId, message, accessToken);
+
+    res.status(200).json({ success: true, message: 'Reply sent successfully.', data: result });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to send DM.' });
+  }
+};

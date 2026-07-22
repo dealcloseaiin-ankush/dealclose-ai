@@ -75,7 +75,7 @@ const MetaConnectButton = ({ buttonText = 'Connect WhatsApp', platform = 'whatsa
       fbLoginConfig = {
         ...fbLoginConfig, // ✅ FIX: Added required permissions for publishing and analytics
         // ✅ NEW: Added more granular permissions as requested for full functionality
-        scope: 'pages_show_list,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_content_publish,instagram_manage_insights,business_management'
+        scope: 'pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_content_publish,instagram_manage_insights,business_management,pages_messaging'
       };
     }
 

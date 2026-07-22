@@ -15,14 +15,19 @@ exports.getPosts = async (req, res) => {
     if (workspaceId && workspaceId !== 'main') {
       query.workspaceId = workspaceId;
     } else if (workspaceId === 'main') {
-      query.workspaceId = { $in: ['main', null] };
-    } else {
+      query.workspaceId = { $in: ['main', null, ''] }; // Also include posts where workspaceId is empty
+    } else if (!workspaceId) {
       // No workspaceId provided, fetch for all workspaces
       // This means query.workspaceId is not set, so it should match all posts for the user.
     }
 
     if (status && status !== 'all') {
-      query.status = status;
+      // ✅ FIX: Handle the new 'live' filter from the frontend
+      if (status === 'live') {
+        query.status = 'published';
+      } else {
+        query.status = status;
+      }
     }
     console.log("🔍 [DEBUG] Querying posts with:", JSON.stringify(query));
 
@@ -154,5 +159,68 @@ exports.importInstagramPosts = async (req, res) => {
     res.status(200).json({ success: true, message: `${importedCount} new posts imported.`, importedCount });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Failed to import posts.' });
+  }
+};
+
+/**
+ * @desc    Get aggregated analytics for all posts
+ * @route   GET /api/posts/analytics
+ * @access  Private
+ */
+exports.getPostAnalytics = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { workspaceId } = req.query;
+
+    const query = { userId, status: 'published' };
+    if (workspaceId && workspaceId !== 'main') {
+      query.workspaceId = workspaceId;
+    }
+
+    const posts = await Post.find(query).sort({ 'analytics.engagement': -1 }).lean();
+
+    if (posts.length === 0) {
+      return res.status(200).json({ success: true, analytics: { totalReach: 0, totalLikes: 0, totalComments: 0, totalSaves: 0, totalProfileVisits: 0, engagementRate: 0, topPosts: [], bestTimeToPost: 'N/A', aiRecommendation: 'Not enough data to generate recommendations. Publish more posts to get insights.' } });
+    }
+
+    let totalReach = 0, totalLikes = 0, totalComments = 0, totalSaves = 0, totalProfileVisits = 0, totalEngagement = 0;
+    const timeMap = {}; // { 'day-hour': { count: x, engagement: y } }
+
+    posts.forEach(post => {
+      const a = post.analytics || {};
+      totalReach += a.reach || 0;
+      totalLikes += a.likes || 0;
+      totalComments += a.comments || 0;
+      totalSaves += a.saves || 0;
+      totalProfileVisits += a.profileVisits || 0;
+      
+      const engagement = (a.likes || 0) + (a.comments || 0) + (a.saves || 0);
+      totalEngagement += engagement;
+
+      if (post.publishedAt) {
+        const date = new Date(post.publishedAt);
+        const day = date.getDay();
+        const hour = date.getHours();
+        const key = `${day}-${hour}`;
+        if (!timeMap[key]) timeMap[key] = { count: 0, engagement: 0 };
+        timeMap[key].count++;
+        timeMap[key].engagement += engagement;
+      }
+    });
+
+    const engagementRate = totalReach > 0 ? ((totalEngagement / totalReach) * 100).toFixed(2) : 0;
+
+    const topPosts = posts.slice(0, 5).map(p => ({ _id: p._id, caption: p.caption, mediaUrl: p.mediaUrls?.[0]?.url, ...p.analytics }));
+    const bestTimeToPost = 'N/A'; // Placeholder for now
+    const aiRecommendation = `Your top post about "${topPosts[0]?.caption.substring(0, 30)}..." received high engagement. Try creating more content with similar themes.`;
+
+    res.status(200).json({
+      success: true,
+      analytics: { totalReach, totalLikes, totalComments, totalSaves, totalProfileVisits, engagementRate, topPosts, bestTimeToPost, aiRecommendation }
+    });
+
+  } catch (error) {
+    console.error('Error fetching post analytics:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching analytics.' });
   }
 };

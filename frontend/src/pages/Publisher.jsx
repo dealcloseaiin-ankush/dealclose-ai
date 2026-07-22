@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles, MessageSquare, Send, X, RefreshCw, Heart, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
@@ -19,6 +19,12 @@ export default function Publisher() {
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
+
+  // 🚀 NEW: State for the Comments Modal
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [replyTexts, setReplyTexts] = useState({}); // ✅ FIX: State to hold reply text for each comment individually
 
   useEffect(() => {
     if (user) {
@@ -100,6 +106,69 @@ export default function Publisher() {
     navigate(`/publish-post?import_id=${postId}`);
   };
 
+  // 🚀 NEW: Open comments modal and fetch comments
+  const handleOpenComments = async (post) => {
+    setSelectedPostForComments(post);
+    setIsCommentModalOpen(true);
+    setComments([]); // Clear old comments
+    setReplyTexts({}); // ✅ FIX: Clear all reply inputs when opening modal
+    try {
+      const { data } = await api.get(`/instagram/posts/${post.id}/comments`, {
+        params: { workspaceId: activeWorkspace }
+      });
+      if (data.success) {
+        setComments(data.comments);
+      } else {
+        toast.error('Failed to load comments.');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not fetch comments.');
+    }
+  };
+
+  // 🚀 NEW: Handle submitting a reply to a comment
+  const handleReplySubmit = async (commentId) => {
+    const messageToPost = replyTexts[commentId] || '';
+    if (!messageToPost.trim()) return;
+    const toastId = toast.loading('Posting reply...');
+    try {
+      const { data } = await api.post(`/instagram/comments/${commentId}/reply`, {
+        message: messageToPost,
+        workspaceId: activeWorkspace
+      });
+      if (data.success) {
+        toast.success('Reply posted!', { id: toastId });
+        setReplyTexts(prev => ({ ...prev, [commentId]: '' })); // ✅ FIX: Clear only the specific input field
+        // Refresh comments to show the new reply
+        if (selectedPostForComments) {
+          handleOpenComments(selectedPostForComments);
+        }
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to post reply.', { id: toastId });
+    }
+  };
+
+  // 🚀 NEW: Fetch live insights for a single post
+  const handleRefreshStats = async (postId, platformPostId) => {
+    if (!platformPostId) return toast.error('This post was not published via API, live stats unavailable.');
+    const toastId = toast.loading('Refreshing stats...');
+    try {
+      const { data } = await api.get(`/instagram/posts/${platformPostId}/insights`, {
+        params: { workspaceId: activeWorkspace }
+      });
+      if (data.success) {
+        setPosts(prevPosts => prevPosts.map(p => p._id === postId ? { ...p, analytics: { ...p.analytics, ...data.insights } } : p));
+        toast.success('Stats updated!', { id: toastId });
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not refresh stats.', { id: toastId });
+    }
+  };
+
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'scheduled': return <Clock className="text-yellow-400" size={14} />;
@@ -112,7 +181,7 @@ export default function Publisher() {
   };
 
   return (
-    <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
+    <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans relative">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
@@ -149,18 +218,18 @@ export default function Publisher() {
         <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-gray-800 pb-4">
           <button onClick={() => setView('list')} className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 border ${view === 'list' ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900'}`}><Calendar size={16}/> Content</button>
           <button onClick={() => setView('analytics')} className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 border ${view === 'analytics' ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900'}`}><BarChart2 size={16}/> Analytics</button>
-          <div className="w-px h-6 bg-gray-700 mx-2"></div>
-          {view === 'list' && ['all', 'scheduled', 'published', 'draft', 'failed'].map(status => (
+          <div className="w-px h-6 bg-gray-700 mx-2 hidden sm:block"></div>
+          {view === 'list' && ['all', 'live', 'scheduled', 'draft', 'failed'].map(status => (
               <button
                 key={status}
                 onClick={() => setFilter(status)}
                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 border ${
                   filter === status
-                    ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                    ? status === 'live' ? 'bg-pink-500/10 text-pink-300 border-pink-500/30' : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
                     : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900 hover:border-gray-700'
                 }`}
               >
-                <span>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                <span>{status === 'live' ? 'Live on Instagram' : status.charAt(0).toUpperCase() + status.slice(1)}</span>
               </button>
             ))}
         </div>
@@ -185,6 +254,21 @@ export default function Publisher() {
                   </div>
                 )}
                 <p className="text-xs text-gray-400 line-clamp-2 flex-1">{post.caption}</p>
+                
+                {/* 🚀 NEW: Live Post Stats Display */}
+                {post.status === 'published' && (
+                  <div className="flex items-center justify-end gap-4 text-xs text-gray-400 pt-2">
+                    <div className="flex items-center gap-1.5" title="Likes"><Heart size={12} className="text-red-500/80"/> {post.analytics?.likes?.toLocaleString() || 0}</div>
+                    <div className="flex items-center gap-1.5" title="Comments"><MessageSquare size={12} className="text-blue-400/80"/> {post.analytics?.comments?.toLocaleString() || 0}</div>
+                    <div className="flex items-center gap-1.5" title="Reach"><Eye size={12} className="text-green-400/80"/> {post.analytics?.reach?.toLocaleString() || 0}</div>
+                    <button 
+                      onClick={() => handleRefreshStats(post._id, post.platformPostIds?.instagram)} 
+                      className="p-1 text-gray-500 hover:text-white hover:bg-gray-700 rounded-full transition-all" title="Refresh Stats">
+                      <RefreshCw size={10} />
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center pt-3 border-t border-gray-800">
                   <div className="flex items-center gap-2 text-xs font-bold">
                     {getStatusIcon(post.status)}
@@ -196,6 +280,9 @@ export default function Publisher() {
                         <Sparkles size={14} />
                       </button>
                     )}
+                    <button onClick={() => handleOpenComments(post)} className="p-1.5 text-blue-400 bg-blue-500/10 rounded-md hover:bg-blue-500/20" title="View Comments">
+                      <MessageSquare size={14} />
+                    </button>
                     <Link to={`/publish-post?edit_id=${post._id}`} className="p-1.5 text-gray-400 bg-gray-700/50 rounded-md hover:bg-gray-700" title="Edit Post">
                       <Edit size={14} />
                     </Link>
@@ -276,6 +363,47 @@ export default function Publisher() {
           </div>
         ))}
       </div>
+
+      {/* Comments Modal */}
+      {isCommentModalOpen && selectedPostForComments && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#111] border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <h2 className="font-bold text-lg text-white">Comments for Post</h2>
+              <button onClick={() => setIsCommentModalOpen(false)} className="p-2 rounded-full hover:bg-gray-800"><X size={20} /></button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-4">
+              {comments.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No comments found or still loading...</p>
+              ) : (
+                comments.map(comment => (
+                  <div key={comment.id} className="text-sm">
+                    <div className="flex gap-3 items-start">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 shrink-0 mt-1"></div>
+                      <div className="flex-1">
+                        <p><span className="font-bold text-white">{comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
+                        {/* Reply form for each comment */}
+                        <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(comment.id); }} className="flex gap-2 mt-2">
+                          <input // ✅ FIX: Input is now controlled by the specific comment's state
+                            type="text"
+                            value={replyTexts[comment.id] || ''}
+                            onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                            placeholder={`Reply to @${comment.username}...`}
+                            className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2 text-white text-xs focus:border-blue-500 outline-none"
+                          />
+                          <button type="submit" disabled={!replyTexts[comment.id]?.trim()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 rounded-lg transition-all disabled:opacity-50 flex items-center">
+                            <Send size={14} />
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -211,6 +211,80 @@ exports.getBusinessInsights = async (igAccountId, accessToken) => {
 };
 
 /**
+ * Sends a direct message to an Instagram user.
+ * @param {string} recipientId - The Instagram-scoped ID of the user.
+ * @param {string} message - The text message to send.
+ * @param {string} pageAccessToken - The access token of the Facebook Page linked to the IG account.
+ * @returns {Promise<object>} The response from the Graph API.
+ */
+exports.sendDirectMessage = async (recipientId, message, pageAccessToken) => {
+  try {
+    const url = `https://graph.facebook.com/v19.0/me/messages`;
+    const response = await axios.post(url, 
+      {
+        recipient: { id: recipientId },
+        message: { text: message },
+        messaging_type: 'RESPONSE'
+      },
+      { params: { access_token: pageAccessToken } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Graph API Error sending DM:', error.response?.data?.error);
+    throw new Error(error.response?.data?.error?.message || 'Failed to send direct message via Instagram.');
+  }
+};
+
+/**
+ * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
+ * @param {string} mediaId - The ID of the Instagram post or reel.
+ * @param {string} accessToken - The user's Instagram access token.
+ * @returns {Promise<object>} - An object containing the insights data.
+ */
+exports.getPostInsights = async (mediaId, accessToken) => {
+  try {
+    // Ye metrics hum Meta se maang rahe hain
+    const metrics = 'impressions,reach,saved,video_views,likes,comments';
+    const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
+
+    const response = await axios.get(url, {
+      params: {
+        metric: metrics,
+        access_token: accessToken,
+      },
+    });
+
+    // API se mile data ko saaf format me return karein
+    const insights = {};
+    response.data.data.forEach(metric => {
+      insights[metric.name] = metric.values[0].value;
+    });
+
+    return insights;
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
+/**
+ * 🚀 NEW: Fetches key business insights for an Instagram account.
+ * @param {string} igAccountId - The user's Instagram Business Account ID.
+ * @param {string} accessToken - The user's Instagram access token.
+ * @returns {Promise<object>} - An object containing the insights data.
+ */
+exports.getBusinessInsights = async (igAccountId, accessToken) => {
+  try {
+    const metrics = 'reach,impressions,profile_views,follower_count,accounts_engaged_count';
+    const url = `https://graph.facebook.com/v19.0/${igAccountId}/insights?metric=${metrics}&period=day&access_token=${accessToken}`;
+    const response = await axios.get(url);
+    return response.data.data;
+  } catch (error) {
+    console.error("❌ Meta Graph API Business Insights Fetch Error:", error.response?.data?.error?.message || error.message);
+    throw new Error(error.response?.data?.error?.message || 'Failed to fetch Instagram Insights.');
+  }
+};
+
+/**
  * 🚀 NEW & ROBUST: Publishes a single image post with container status check.
  * @param {string} igAccountId - The user's Instagram Business Account ID.
  * @param {string} accessToken - The user's Instagram access token.
