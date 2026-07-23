@@ -99,7 +99,11 @@ exports.createPost = async (req, res) => {
     if (post.status === 'scheduled') {
       const delay = new Date(post.scheduledAt).getTime() - Date.now();
       console.log(`🚀 [DEBUG] 7a. Adding post to BullMQ worker queue for scheduling (delay: ${delay}ms).`);
-      await automationQueue.add('publish_scheduled_post', { postId: post._id });
+      await automationQueue.add(
+        'publish_scheduled_post',
+        { postId: post._id },
+        { delay: Math.max(0, delay) }
+      );
       return res.status(201).json({ success: true, message: 'Post scheduled successfully!', post });
     }
 
@@ -151,10 +155,17 @@ exports.importInstagramPosts = async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
     
     // ✅ FIX: Find the first available Instagram connection, whether in root or workspaces.
+    const { workspaceId, refreshInsights = false } = req.body;
     let igConfig = user.instagramConfig;
     let workspaceForPost = 'main';
 
-    if (!igConfig?.accessToken && user.workspaces?.length > 0) {
+    if (workspaceId && workspaceId !== 'main') {
+      const selectedWorkspace = user.workspaces?.find(ws => String(ws._id) === String(workspaceId));
+      igConfig = selectedWorkspace?.instagramConfig;
+      workspaceForPost = String(workspaceId);
+    }
+
+    if ((!workspaceId || workspaceId === 'main') && !igConfig?.accessToken && user.workspaces?.length > 0) {
       const firstActiveWorkspace = user.workspaces.find(ws => ws.instagramConfig?.accessToken);
       if (firstActiveWorkspace) {
         igConfig = firstActiveWorkspace.instagramConfig;
@@ -168,11 +179,22 @@ exports.importInstagramPosts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram account not connected.' });
     }
 
-    const recentPosts = await instagramService.fetchRecentPosts(igAccountId, igConfig.accessToken);
+    const recentPosts = await instagramService.fetchRecentPosts(igAccountId, igConfig.accessToken, 100);
 
     let importedCount = 0;
-    for (const post of recentPosts) {
+    let updatedCount = 0;
+    for (const [index, post] of recentPosts.entries()) {
       const existingPost = await Post.findOne({ "platformPostIds.instagram": post.id, userId });
+      // Analytics view requests a fresh Meta insight pull for the newest posts.
+      // Keep it bounded so an account with a large history cannot exhaust API quota.
+      let liveInsights = null;
+      if (refreshInsights && index < 20) {
+        try {
+          liveInsights = await instagramService.getPostInsights(post.id, igConfig.accessToken);
+        } catch (error) {
+          console.warn(`[Instagram sync] Insights unavailable for ${post.id}: ${error.message}`);
+        }
+      }
       if (!existingPost) {
         await Post.create({
           userId,
@@ -183,13 +205,31 @@ exports.importInstagramPosts = async (req, res) => {
           publishedAt: new Date(post.timestamp),
           platformPostIds: { instagram: post.id },
           isImported: true,
-          analytics: { likes: post.like_count || 0, comments: post.comments_count || 0 }
+          analytics: {
+            likes: liveInsights?.likes ?? post.like_count ?? 0,
+            comments: liveInsights?.comments ?? post.comments_count ?? 0,
+            reach: liveInsights?.reach ?? 0,
+          }
         });
         importedCount++;
+      } else {
+        await Post.updateOne(
+          { _id: existingPost._id },
+          {
+            $set: {
+              caption: post.caption || existingPost.caption,
+              'mediaUrls.0.url': post.media_url || existingPost.mediaUrls?.[0]?.url,
+              'analytics.likes': liveInsights?.likes ?? post.like_count ?? 0,
+              'analytics.comments': liveInsights?.comments ?? post.comments_count ?? 0,
+              'analytics.reach': liveInsights?.reach ?? existingPost.analytics?.reach ?? 0,
+            },
+          }
+        );
+        updatedCount++;
       }
     }
 
-    res.status(200).json({ success: true, message: `${importedCount} new posts imported.`, importedCount });
+    res.status(200).json({ success: true, message: `${importedCount} new posts imported and ${updatedCount} existing posts refreshed.`, importedCount, updatedCount });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Failed to import posts.' });
   }
@@ -281,7 +321,7 @@ exports.getPostInsights = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram not connected for this workspace.' });
     }
 
-    const insights = await instagramService.fetchPostInsights(platformPostId, igConfig.accessToken);
+    const insights = await instagramService.getPostInsights(platformPostId, igConfig.accessToken);
 
     // Update the post in our database with the fresh analytics
     await Post.updateOne(

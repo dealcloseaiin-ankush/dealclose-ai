@@ -136,6 +136,34 @@ exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
   }
 };
 
+/** Fetches public comments for one Instagram media item. */
+exports.getCommentsForPost = async (mediaId, accessToken) => {
+  try {
+    const response = await axios.get(`https://graph.facebook.com/v19.0/${mediaId}/comments`, {
+      params: {
+        fields: 'id,text,username,timestamp,like_count,replies{id,text,username,timestamp}',
+        access_token: accessToken,
+      },
+    });
+    return response.data?.data || [];
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
+/** Replies publicly to an Instagram comment. */
+exports.replyToComment = async (commentId, accessToken, message) => {
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${commentId}/replies`,
+      { message, access_token: accessToken }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
 /**
  * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
  * @param {string} mediaId - The ID of the Instagram post or reel.

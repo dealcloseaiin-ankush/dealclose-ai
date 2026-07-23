@@ -9,7 +9,7 @@ const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 FIX: Case
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/aiService');
-const SocialPost = require('../models/SocialPostModel');
+const Post = require('../models/postModel');
 const instagramService = require('../services/instagramService');
 
 // Redis connection (Supports Upstash Cloud Redis & Local)
@@ -45,7 +45,9 @@ const automationWorker = new Worker('automationQueue', async job => {
   if (job.name === 'publish_scheduled_post') {
     console.log("\n================== [WORKER: PUBLISH POST START] ==================");
     console.log(`🚀 [WORKER DEBUG] 1. Processing job 'publish_scheduled_post' for Post ID: ${job.data.postId}`);
-    const post = await SocialPost.findById(job.data.postId);
+    // Publisher writes to the canonical Post collection. Looking in the legacy
+    // SocialPost collection meant every Publisher job exited without publishing.
+    const post = await Post.findById(job.data.postId);
     if (!post || ['published', 'failed'].includes(post.status)) return;
 
     try {
@@ -57,7 +59,11 @@ const automationWorker = new Worker('automationQueue', async job => {
       const workspace = post.workspaceId !== 'main'
         ? user.workspaces?.find(w => String(w._id) === String(post.workspaceId))
         : null;
-      const config = workspace ? workspace.instagramConfig : user.instagramConfig;
+      // "main" can display posts from all workspaces. When its own connection
+      // is absent, use the connected workspace just like the Instagram dashboard.
+      const config = workspace?.instagramConfig
+        || user.instagramConfig
+        || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
       const imageUrl = post.mediaUrls?.find(media => media.type === 'image')?.url;
       console.log(`🚀 [WORKER DEBUG] 3. Found User: ${user.email}, Image URL: ${imageUrl ? 'Yes' : 'No'}`);
       if (!imageUrl) throw new Error('A publishable image is required.');

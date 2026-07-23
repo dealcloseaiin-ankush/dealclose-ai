@@ -938,7 +938,9 @@ exports.getPostInsights = async (req, res) => {
     const selectedWorkspace = workspaceId && workspaceId !== 'main'
       ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
       : null;
-    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const igConfig = selectedWorkspace?.instagramConfig
+      || user.instagramConfig
+      || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
     const accessToken = igConfig?.accessToken;
 
     if (!accessToken) {
@@ -1068,7 +1070,9 @@ exports.getCommentsForPost = async (req, res) => {
     const selectedWorkspace = workspaceId && workspaceId !== 'main'
       ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
       : null;
-    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const igConfig = selectedWorkspace?.instagramConfig
+      || user.instagramConfig
+      || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
     const accessToken = igConfig?.accessToken;
 
     if (!accessToken) {
@@ -1099,7 +1103,9 @@ exports.replyToComment = async (req, res) => {
     const selectedWorkspace = workspaceId && workspaceId !== 'main'
       ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
       : null;
-    const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
+    const igConfig = selectedWorkspace?.instagramConfig
+      || user.instagramConfig
+      || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
     const accessToken = igConfig?.accessToken;
 
     if (!accessToken) {

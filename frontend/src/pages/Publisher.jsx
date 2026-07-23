@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles, MessageSquare, Send, X, RefreshCw, Heart, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -26,9 +26,11 @@ export default function Publisher() {
   const [comments, setComments] = useState([]);
   const [replyTexts, setReplyTexts] = useState({}); // ✅ FIX: State to hold reply text for each comment individually
 
+  const isSyncing = useRef(false);
+
   useEffect(() => {
     if (user) {
-      setWorkspaces(prev => [...prev, ...(user.workspaces || [])]);
+      setWorkspaces([{ _id: 'main', name: user.businessName || 'Main Business' }, ...(user.workspaces || [])]);
     }
   }, [user]);
 
@@ -51,7 +53,7 @@ export default function Publisher() {
   const fetchAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
     try {
-      const { data } = await api.get('/posts/analytics');
+      const { data } = await api.get('/posts/analytics', { params: { workspaceId: activeWorkspace } });
       if (data.success) {
         setAnalytics(data.analytics);
       }
@@ -61,15 +63,46 @@ export default function Publisher() {
     } finally {
       setLoadingAnalytics(false);
     }
-  }, []);
+  }, [activeWorkspace]);
+
+  const syncInstagramPosts = useCallback(async (showToast = false, refreshInsights = false) => {
+    if (isSyncing.current) return;
+    isSyncing.current = true;
+    const toastId = showToast ? toast.loading('Syncing live Instagram posts...') : null;
+    try {
+      const { data } = await api.post('/posts/import-instagram', { workspaceId: activeWorkspace, refreshInsights });
+      if (showToast) toast.success(data.message, { id: toastId });
+    } catch (error) {
+      if (showToast) toast.error(error.response?.data?.message || 'Instagram sync failed.', { id: toastId });
+    } finally {
+      isSyncing.current = false;
+    }
+  }, [activeWorkspace]);
 
   useEffect(() => {
     if (view === 'list') {
-      fetchPosts();
+      syncInstagramPosts().finally(fetchPosts);
     } else if (view === 'analytics') {
-      fetchAnalytics();
+      syncInstagramPosts(false, true).finally(fetchAnalytics);
     }
-  }, [filter, view, fetchPosts, fetchAnalytics, activeWorkspace]); // Add activeWorkspace to dependencies
+  }, [filter, view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
+
+  useEffect(() => {
+    const timer = window.setInterval(async () => {
+      await syncInstagramPosts(false, view === 'analytics');
+      if (view === 'list') fetchPosts();
+      else fetchAnalytics();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
+
+  // A publish job completes asynchronously. Refresh while one is in flight so
+  // the Publisher switches to "published" without requiring a manual reload.
+  useEffect(() => {
+    if (!posts.some(post => post.status === 'publishing')) return undefined;
+    const timer = window.setInterval(fetchPosts, 5000);
+    return () => window.clearInterval(timer);
+  }, [posts, fetchPosts]);
 
   // 🚀 NEW: Delete a post
   const handleDeletePost = async (postId) => {
@@ -86,15 +119,11 @@ export default function Publisher() {
 
   // 🚀 NEW: Import existing posts from Instagram
   const handleImportPosts = async () => {
-    const toastId = toast.loading('Importing posts from Instagram...');
     try {
-      const { data } = await api.post('/posts/import-instagram');
-      if (data.success) {
-        toast.success(`${data.importedCount} new posts imported!`, { id: toastId });
-        fetchPosts(); // Refresh the list
-      }
+      await syncInstagramPosts(true);
+      fetchPosts();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to import posts.', { id: toastId });
+      toast.error(error.response?.data?.message || 'Failed to import posts.');
     }
   };
 
@@ -113,7 +142,9 @@ export default function Publisher() {
     setComments([]); // Clear old comments
     setReplyTexts({}); // ✅ FIX: Clear all reply inputs when opening modal
     try {
-      const { data } = await api.get(`/instagram/posts/${post.id}/comments`, {
+      const instagramPostId = post.platformPostIds?.instagram;
+      if (!instagramPostId) throw new Error('This post is not available on Instagram yet.');
+      const { data } = await api.get(`/instagram/posts/${instagramPostId}/comments`, {
         params: { workspaceId: activeWorkspace }
       });
       if (data.success) {
@@ -125,6 +156,12 @@ export default function Publisher() {
       toast.error(error.response?.data?.message || 'Could not fetch comments.');
     }
   };
+
+  useEffect(() => {
+    if (!isCommentModalOpen || !selectedPostForComments) return undefined;
+    const timer = window.setInterval(() => handleOpenComments(selectedPostForComments), 10000);
+    return () => window.clearInterval(timer);
+  }, [isCommentModalOpen, selectedPostForComments]);
 
   // 🚀 NEW: Handle submitting a reply to a comment
   const handleReplySubmit = async (commentId) => {
