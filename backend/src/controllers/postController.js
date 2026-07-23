@@ -257,3 +257,41 @@ exports.getPostAnalytics = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error while fetching analytics.' });
   }
 };
+
+// @desc    Get live insights for a single post from Instagram
+// @route   GET /api/posts/:platformPostId/insights
+exports.getPostInsights = async (req, res) => {
+  try {
+    const { platformPostId } = req.params;
+    const { workspaceId } = req.query;
+    const userId = req.user?._id;
+
+    if (!platformPostId) {
+      return res.status(400).json({ success: false, message: 'Platform Post ID is required.' });
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const igConfig = (workspaceId && workspaceId !== 'main')
+      ? user.workspaces.find(ws => ws._id.toString() === workspaceId)?.instagramConfig
+      : user.instagramConfig;
+
+    if (!igConfig?.accessToken) {
+      return res.status(400).json({ success: false, message: 'Instagram not connected for this workspace.' });
+    }
+
+    const insights = await instagramService.fetchPostInsights(platformPostId, igConfig.accessToken);
+
+    // Update the post in our database with the fresh analytics
+    await Post.updateOne(
+      { userId, "platformPostIds.instagram": platformPostId },
+      { $set: { "analytics.likes": insights.likes, "analytics.comments": insights.comments, "analytics.reach": insights.reach } }
+    );
+
+    res.status(200).json({ success: true, insights });
+  } catch (error) {
+    console.error('Get Post Insights Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch post insights.' });
+  }
+};
