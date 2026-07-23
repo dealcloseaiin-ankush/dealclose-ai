@@ -770,14 +770,7 @@ export default function Settings() {
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely.</p>
                    {/* ✅ FIXED MAIN BUSINESS INSTAGRAM CONDITIONAL BUTTON DISCONNECT ZONE */}
-                    {!mainIgConnected ? (
-                      <MetaConnectButton 
-                        buttonText="Connect Instagram via Meta" 
-                        platform="instagram" 
-                        workspaceId="main" 
-                        onSuccess={(data) => openInstagramPicker(data, 'main')} 
-                      />
-                    ) : (
+                    {mainIgConnected ? (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
                          <button 
@@ -787,6 +780,28 @@ export default function Settings() {
                          >
                            Disconnect Account 🔌
                          </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <MetaConnectButton 
+                            variant="facebook"
+                            buttonText="Connect via Facebook" 
+                            platform="instagram" 
+                            workspaceId="main" 
+                            onSuccess={(data) => openInstagramPicker(data, 'main')} 
+                          />
+                          <p className="text-xs text-gray-500 mt-2">Recommended for IG accounts linked to a Facebook Page.</p>
+                        </div>
+                        <div>
+                          <MetaConnectButton 
+                            buttonText="Connect with Instagram" 
+                            platform="instagram" 
+                            workspaceId="main" 
+                            onSuccess={(data) => openInstagramPicker(data, 'main')} 
+                          />
+                          <p className="text-xs text-gray-500 mt-2">For direct login without a Facebook Page.</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1107,7 +1122,7 @@ export default function Settings() {
 
                          {/* Instagram Conditional Layout */}
                          {!activeWs.instagramConfig?.accessToken ? (
-                            <MetaConnectButton buttonText="Connect Instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                            <MetaConnectButton buttonText="Connect Instagram" variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                          ) : (
                             <button type="button"
                               onClick={() => disconnectInstagram(activeWs?._id)}

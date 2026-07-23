@@ -432,6 +432,101 @@ exports.instagramConnectSelected = async (req, res) => {
   }
 };
 
+// @desc    Connect Selected Instagram via Meta Login
+// @route   POST /api/users/settings/instagram-connect-selected
+exports.instagramConnectSelected = async (req, res) => {
+  try {
+    const { selectedAccountId, selectedPageId, workspaceId: requestedWorkspaceId } = req.body;
+    const userId = req.user?._id || req.user?.id;
+    console.log('[Instagram Connect Selected] request body:', req.body, 'userId:', userId);
+
+    const user = await User.findById(userId);
+    const pending = user?.pendingInstagramConnection;
+    console.log('[Instagram Connect Selected] pending session:', pending ? {
+      workspaceId: pending.workspaceId,
+      expiresAt: pending.expiresAt,
+      accountsCount: pending.accounts?.length
+    } : null);
+    if (!userId || !selectedAccountId || !selectedPageId || !pending || pending.expiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
+    }
+
+    if (requestedWorkspaceId && requestedWorkspaceId !== (pending.workspaceId || 'main')) {
+      return res.status(400).json({ success: false, message: 'Instagram selection workspace mismatch. Please connect Instagram again for this workspace.' });
+    }
+
+    const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
+    if (!selected) {
+      return res.status(400).json({ success: false, message: 'Selected Instagram account was not returned by Meta.' });
+    }
+
+    const workspaceId = pending.workspaceId || 'main';
+    const instagramConfig = {
+      accessToken: selected.pageToken || pending.accessToken,
+      instagramAccountId: selected.accountId,
+      facebookPageId: selected.pageId,
+      tokenExpiresAt: pending.tokenExpiresAt
+    };
+
+    console.log('[Instagram Connect Selected] 🔍 instagramConfig object being saved:', JSON.stringify(instagramConfig, null, 2));
+    console.log('[Instagram Connect Selected] 🔍 workspaceId:', workspaceId);
+
+    const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
+    const update = workspaceId !== 'main'
+      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig } }
+      : { $set: { instagramConfig } };
+
+    console.log('[Instagram Connect Selected] 🔍 Update query:', JSON.stringify(update, null, 2));
+
+    const updateResult = await User.updateOne(filter, update);
+    console.log('[Instagram Connect Selected] ✅ Update result:', updateResult);
+
+    await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
+    console.log('[Instagram Connect Selected] saved instagramConfig for', workspaceId, 'selectedAccountId:', selectedAccountId, 'selectedPageId:', selectedPageId);
+
+    // 🔥 VERIFY: Check if data was actually saved (with timeout protection)
+    try {
+      const verifyUser = await Promise.race([
+        User.findById(userId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Verification timeout')), 5000))
+      ]);
+      
+      if (workspaceId !== 'main') {
+        const savedWs = verifyUser.workspaces.find(w => w._id.toString() === workspaceId);
+        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved workspace instagramConfig:', JSON.stringify(savedWs?.instagramConfig, null, 2));
+      } else {
+        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved root instagramConfig:', JSON.stringify(verifyUser.instagramConfig, null, 2));
+      }
+    } catch (verifyError) {
+      console.error('[Instagram Connect Selected] ⚠️ Verification failed:', verifyError.message);
+    }
+
+    // 🔥 Webhook subscription - don't let it hang the entire response
+    let webhookWarning;
+    try {
+      const webhookPromise = axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
+        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken },
+        timeout: 5000 // 5 second timeout
+      });
+      
+      await Promise.race([
+        webhookPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Webhook subscription timeout')), 6000))
+      ]);
+      
+      console.log('[Instagram Connect Selected] ✅ Webhook subscription successful');
+    } catch (subscriptionError) {
+      webhookWarning = subscriptionError.response?.data?.error?.message || subscriptionError.message;
+      console.warn('⚠️ Webhook subscription warning after Instagram connection:', webhookWarning);
+    }
+
+    return res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: instagramConfig, webhookWarning });
+  } catch (error) {
+    console.error('Instagram Connect Selected Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Failed to finalize Instagram account selection. Try again.' });
+  }
+};
+
 // @desc    Connect Instagram via Meta Login
 // @route   POST /api/users/settings/instagram-connect
 exports.instagramConnect = async (req, res) => {

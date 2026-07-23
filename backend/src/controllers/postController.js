@@ -2,6 +2,7 @@ const Post = require('../models/postModel');
 const User = require('../models/userModel');
 const instagramService = require('../services/instagramService');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
+const { automationQueue } = require('../workers/automationWorker'); // 🚀 NEW: Import BullMQ queue
 
 // @desc    Get all posts for a user/workspace
 // @route   GET /api/posts
@@ -56,28 +57,60 @@ exports.getPostById = async (req, res) => {
 // @desc    Create a new post
 // @route   POST /api/posts
 exports.createPost = async (req, res) => {
+  console.log("\n================== [POST CREATION START] ==================");
+  console.log("🚀 [DEBUG] 1. /api/posts (postController) endpoint hit.");
   try {
     const { caption, workspaceId, status, scheduledAt, platforms, designJson } = req.body;
     const userId = req.user?._id;
 
     if (!req.file) {
+      console.log("❌ [DEBUG] Post creation failed: Media file is required.");
       return res.status(400).json({ success: false, message: 'Media file is required.' });
     }
 
-    const mediaResult = await uploadToCloudinary(req.file.buffer, 'posts');
+    const requestedPlatforms = platforms ? JSON.parse(platforms) : ['instagram'];
+    if (!Array.isArray(requestedPlatforms) || requestedPlatforms.length === 0) {
+      return res.status(400).json({ success: false, message: 'Select at least one platform.' });
+    }
+    if (status === 'scheduled' && (!scheduledAt || new Date(scheduledAt) <= new Date())) {
+      return res.status(400).json({ success: false, message: 'Choose a future date and time for scheduling.' });
+    }
+    console.log(`🚀 [DEBUG] 2. User: ${userId}, Status: ${status}, Platforms: ${requestedPlatforms}`);
 
-    const newPost = await Post.create({
+    console.log(`🚀 [DEBUG] 3. Uploading media file to Cloudinary...`);
+    const mediaResult = await uploadToCloudinary(req.file.buffer, 'posts');
+    console.log(`✅ [DEBUG] 4. Media uploaded successfully.`);
+
+    const post = new Post({
       userId,
       workspaceId: workspaceId || 'main',
       caption,
       mediaUrls: [{ url: mediaResult.secure_url, type: req.file.mimetype.split('/')[0] }],
-      status: status || 'draft',
+      status: status === 'now' ? 'publishing' : (status || 'draft'),
       scheduledAt: status === 'scheduled' ? new Date(scheduledAt) : null,
-      platforms: platforms ? JSON.parse(platforms) : ['instagram'],
+      platforms: requestedPlatforms,
       designJson: designJson ? JSON.parse(designJson) : null,
     });
 
-    res.status(201).json({ success: true, post: newPost });
+    console.log(`🚀 [DEBUG] 5. Saving post to database with status: '${post.status}'`);
+    await post.save();
+    console.log(`✅ [DEBUG] 6. Post saved with ID: ${post._id}`);
+
+    if (post.status === 'scheduled') {
+      const delay = new Date(post.scheduledAt).getTime() - Date.now();
+      console.log(`🚀 [DEBUG] 7a. Adding post to BullMQ worker queue for scheduling (delay: ${delay}ms).`);
+      await automationQueue.add('publish_scheduled_post', { postId: post._id });
+      return res.status(201).json({ success: true, message: 'Post scheduled successfully!', post });
+    }
+
+    if (post.status === 'publishing') {
+      console.log(`🚀 [DEBUG] 7b. Adding post to BullMQ worker queue for immediate publishing.`);
+      await automationQueue.add('publish_scheduled_post', { postId: post._id });
+      return res.status(201).json({ success: true, message: 'Post is being published now!', post });
+    }
+
+    console.log(`✅ [DEBUG] 7c. Post saved as draft.`);
+    res.status(201).json({ success: true, post: post, message: 'Draft saved successfully!' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to create post.', error: error.message });
   }
@@ -135,7 +168,7 @@ exports.importInstagramPosts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram account not connected.' });
     }
 
-    const recentPosts = await instagramService.getRecentMedia(igAccountId, igConfig.accessToken);
+    const recentPosts = await instagramService.fetchRecentPosts(igAccountId, igConfig.accessToken);
 
     let importedCount = 0;
     for (const post of recentPosts) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { getPosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics } = require('../controllers/postController');
+const { getPosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics, getPostInsights } = require('../controllers/postController'); // 🚀 NEW: Import getPostInsights
 const multer = require('multer');
 
 // Multer setup for handling file uploads in memory
@@ -17,6 +17,9 @@ router.route('/analytics')
 
 router.route('/import-instagram')
   .post(protect, importInstagramPosts);
+
+// 🚀 NEW: Route to get live insights for a single post
+router.route('/:platformPostId/insights').get(protect, getPostInsights);
 
 router.route('/:id')
   .get(protect, getPostById)

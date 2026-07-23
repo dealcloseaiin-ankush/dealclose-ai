@@ -362,7 +362,7 @@ export default function PublishPost() {
     formData.append('platforms', JSON.stringify(selectedPlatforms));
 
     try {
-      const { data } = await api.post('/posts', formData, {
+      const { data } = await api.post('/posts', formData, { // This now correctly calls postController.createPost
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
