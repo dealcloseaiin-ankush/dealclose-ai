@@ -173,7 +173,7 @@ exports.replyToComment = async (commentId, accessToken, message) => {
 exports.getPostInsights = async (mediaId, accessToken) => {
   try {
     // Ye metrics hum Meta se maang rahe hain
-    const metrics = 'impressions,reach,saved,video_views,likes,comments';
+    const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
     const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
 
     const response = await axios.get(url, {
@@ -272,7 +272,7 @@ exports.sendDirectMessage = async (recipientId, message, pageAccessToken) => {
 exports.getPostInsights = async (mediaId, accessToken) => {
   try {
     // Ye metrics hum Meta se maang rahe hain
-    const metrics = 'impressions,reach,saved,video_views,likes,comments';
+    const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
     const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
 
     const response = await axios.get(url, {

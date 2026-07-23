@@ -62,12 +62,37 @@ export default function PublishPost() {
     }).catch(console.error);
   }, []);
 
-  // 🚀 NEW: Effect to update canvas background color when state changes
+  // Keep the editor canvas and React controls in sync, including after AI
+  // generation and when a saved design is reopened.
   useEffect(() => {
     if (fabricCanvas) {
-      fabricCanvas.setBackgroundColor(backgroundColor, fabricCanvas.renderAll.bind(fabricCanvas));
+      fabricCanvas.setBackgroundColor(backgroundColor);
+      fabricCanvas.requestRenderAll();
     }
   }, [backgroundColor, fabricCanvas]);
+
+  const handleBackgroundColorChange = useCallback((color) => {
+    setBackgroundColor(color);
+    if (!fabricCanvas) return;
+
+    // AI fallback templates can contain a full-canvas rectangle above the
+    // Fabric background. Update that base layer too, so a colour choice is
+    // always visible instead of being hidden behind a template gradient.
+    const canvasWidth = fabricCanvas.getWidth();
+    const canvasHeight = fabricCanvas.getHeight();
+    const backgroundLayer = fabricCanvas.getObjects().find((object) => (
+      object.type === 'rect'
+      && object.getScaledWidth() >= canvasWidth * 0.98
+      && object.getScaledHeight() >= canvasHeight * 0.98
+    ));
+
+    fabricCanvas.setBackgroundColor(color);
+    if (backgroundLayer) {
+      backgroundLayer.set({ fill: color, dirty: true });
+      fabricCanvas.fire('object:modified', { target: backgroundLayer });
+    }
+    fabricCanvas.requestRenderAll();
+  }, [fabricCanvas]);
 
 
   // 🚀 NEW: AI Chat Handler (wrapped in useCallback to fix crash)
@@ -97,6 +122,11 @@ export default function PublishPost() {
         const designToRender = data.designJson || null;
 
         if (renderDesign && designToRender) {
+          setBackgroundColor(
+            designToRender.canvas?.backgroundColor
+              || designToRender.backgroundColor
+              || '#ffffff'
+          );
           renderDesign(designToRender, () => {
             setTimeout(() => {
               const nextImage = exportToImage('jpeg');
@@ -130,7 +160,7 @@ export default function PublishPost() {
           if (data.success && data.post) {
             const post = data.post;
             setCaption(post.caption || '');
-            setBackgroundColor(post.designJson?.canvas?.backgroundColor || post.designJson?.background || '#1a1a1a');
+            setBackgroundColor(post.designJson?.canvas?.backgroundColor || post.designJson?.backgroundColor || post.designJson?.background || '#1a1a1a');
             if (post.designJson) {
               renderDesign(post.designJson);
             } else if (post.mediaUrls && post.mediaUrls.length > 0) {
@@ -356,6 +386,7 @@ export default function PublishPost() {
     formData.append('media', imageFileFromCanvas);
     formData.append('caption', caption);
     formData.append('workspaceId', activeWorkspace);
+    formData.append('designJson', JSON.stringify(exportToJson()));
     // 🚀 NEW: Send publishing options to backend
     formData.append('status', publishMode === 'schedule' ? 'scheduled' : 'now');
     if (publishMode === 'schedule') formData.append('scheduledAt', scheduleDate);
@@ -393,7 +424,7 @@ export default function PublishPost() {
   // 🚀 NEW: Save as Draft
   const handleSaveDraft = async () => {
     const designData = exportToJson();
-    if (!designData || !designData.layers?.length) {
+    if (!designData || !(designData.objects?.length || designData.layers?.length)) {
       return toast.error("Canvas is empty, nothing to save.");
     }
     try {
@@ -520,7 +551,7 @@ export default function PublishPost() {
               <div className="grid grid-cols-3 gap-2">
                 <button type="button" onClick={() => togglePlatform('instagram')} className={`flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all text-sm ${platforms.instagram ? 'bg-pink-500/20 border-pink-500 text-white' : 'bg-[#1a1a1a] border-gray-700 text-gray-400 hover:border-gray-500'}`}><FaInstagram size={16} /></button>
                 <button type="button" onClick={() => togglePlatform('facebook')} className={`flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all text-sm ${platforms.facebook ? 'bg-blue-500/20 border-blue-500 text-white' : 'bg-[#1a1a1a] border-gray-700 text-gray-400 hover:border-gray-500'}`}><FaFacebook size={16} /></button>
-                <button type="button" onClick={() => togglePlatform('threads')} className={`flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all text-sm ${platforms.threads ? 'bg-gray-400/20 border-gray-400 text-white' : 'bg-[#1a1a1a] border-gray-700 text-gray-400 hover:border-gray-500'}`}><FaThreads size={16} /></button>
+                <button type="button" disabled title="Threads publishing is coming soon" className="flex items-center justify-center gap-2 py-2 rounded-lg border-2 bg-[#1a1a1a] border-gray-800 text-gray-600 cursor-not-allowed text-sm"><FaThreads size={16} /></button>
               </div>
             </div>
             <div>
@@ -545,7 +576,7 @@ export default function PublishPost() {
                   <div key={draft._id} className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-2 flex items-center gap-3 hover:border-gray-600 transition-colors">
                     <img src={draft.imageUrl} alt="Draft" className="w-12 h-12 object-cover rounded-md border border-gray-700" />
                     <div className="flex-1"><p className="text-xs text-gray-300 line-clamp-2">{draft.caption || 'Untitled Draft'}</p></div>
-                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); renderDesign(draft.designJson); if (draft.platforms) setPlatforms(draft.platforms); if (draft.publishMode) setPublishMode(draft.publishMode); if (draft.scheduleDate) setScheduleDate(draft.scheduleDate); }} className="p-2 text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"><Edit size={14} /></button>
+                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); setBackgroundColor(draft.designJson?.canvas?.backgroundColor || draft.designJson?.backgroundColor || draft.designJson?.background || '#1a1a1a'); renderDesign(draft.designJson); if (draft.platforms) setPlatforms(draft.platforms); if (draft.publishMode) setPublishMode(draft.publishMode); if (draft.scheduleDate) setScheduleDate(draft.scheduleDate); }} className="p-2 text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"><Edit size={14} /></button>
                     <button onClick={async () => { try { await api.delete(`/instagram/drafts/${draft._id}`); setDrafts(p => p.filter(d => d._id !== draft._id)); toast.success('Draft deleted.'); } catch { toast.error('Could not delete draft.'); } }} className="p-2 text-gray-400 hover:text-rose-400 bg-red-900/30 hover:bg-red-900/60 rounded-lg transition-colors"><Trash2 size={14} /></button>
                   </div>
                 ))}
@@ -624,12 +655,12 @@ export default function PublishPost() {
                   <button
                     key={color}
                     type="button"
-                    onClick={() => setBackgroundColor(color)}
+                    onClick={() => handleBackgroundColorChange(color)}
                     className={`w-6 h-6 rounded-full cursor-pointer border-2 transition-all ${backgroundColor === color ? 'border-white' : 'border-transparent hover:border-gray-500'}`}
                     style={{ backgroundColor: color }}
                   />
                 ))}
-                <input id="bg-color" type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-8 h-8 p-0 border-none rounded-md cursor-pointer bg-transparent" />
+                <input id="bg-color" type="color" value={backgroundColor} onChange={(e) => handleBackgroundColorChange(e.target.value)} className="w-8 h-8 p-0 border-none rounded-md cursor-pointer bg-transparent" />
               </div>
             </div>
           </div>

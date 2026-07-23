@@ -7,11 +7,27 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-exports.uploadToCloudinary = async (filePath, folder = 'dealclose_assets') => {
+exports.uploadToCloudinary = async (file, folder = 'dealclose_assets') => {
   try {
-    const result = await cloudinary.uploader.upload(filePath, { folder, resource_type: 'auto' });
-    // Delete the temporary file from server memory after successful upload
-    fs.unlinkSync(filePath);
+    const options = { folder, resource_type: 'auto' };
+
+    if (Buffer.isBuffer(file)) {
+      return await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        });
+        stream.end(file);
+      });
+    }
+
+    if (typeof file !== 'string' || !file) {
+      throw new Error('A file buffer or path is required for upload.');
+    }
+
+    const result = await cloudinary.uploader.upload(file, options);
+    // Only disk-backed uploads have a temporary file to remove.
+    if (fs.existsSync(file)) fs.unlinkSync(file);
     return result;
   } catch (error) {
     console.error("Cloudinary Upload Service Error:", error);

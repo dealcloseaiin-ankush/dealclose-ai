@@ -1,8 +1,38 @@
 const Post = require('../models/postModel');
+const SocialPost = require('../models/SocialPostModel');
 const User = require('../models/userModel');
 const instagramService = require('../services/instagramService');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const { automationQueue } = require('../workers/automationWorker'); // 🚀 NEW: Import BullMQ queue
+
+const migrateLegacyPosts = async (userId) => {
+  const legacyPosts = await SocialPost.find({ userId }).lean();
+  for (const legacy of legacyPosts) {
+    if (await Post.exists({ legacySocialPostId: legacy._id })) continue;
+    const duplicate = legacy.platformPostIds?.instagram
+      ? await Post.findOne({ userId, 'platformPostIds.instagram': legacy.platformPostIds.instagram })
+      : null;
+    if (duplicate) {
+      await Post.updateOne({ _id: duplicate._id }, { $set: { legacySocialPostId: legacy._id } });
+      continue;
+    }
+    await Post.create({
+      userId,
+      workspaceId: legacy.workspaceId || 'main',
+      caption: legacy.caption,
+      mediaUrls: legacy.mediaUrls || [],
+      platforms: legacy.platforms || [],
+      status: legacy.status || 'draft',
+      scheduledAt: legacy.scheduledAt,
+      publishedAt: legacy.publishedAt,
+      platformPostIds: legacy.platformPostIds || {},
+      failureReason: legacy.failureReason,
+      legacySocialPostId: legacy._id,
+      createdAt: legacy.createdAt,
+      updatedAt: legacy.updatedAt,
+    });
+  }
+};
 
 // @desc    Get all posts for a user/workspace
 // @route   GET /api/posts
@@ -11,6 +41,7 @@ exports.getPosts = async (req, res) => {
     console.log("\n🚀 [DEBUG] getPosts controller hit!");
     const userId = req.user?._id;
     const { workspaceId, status } = req.query;
+    await migrateLegacyPosts(userId);
 
     const query = { userId };
     if (workspaceId && workspaceId !== 'main') {
@@ -26,6 +57,7 @@ exports.getPosts = async (req, res) => {
       // ✅ FIX: Handle the new 'live' filter from the frontend
       if (status === 'live') {
         query.status = 'published';
+        query['platformPostIds.instagram'] = { $exists: true, $nin: [null, ''] };
       } else {
         query.status = status;
       }
@@ -68,9 +100,20 @@ exports.createPost = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Media file is required.' });
     }
 
-    const requestedPlatforms = platforms ? JSON.parse(platforms) : ['instagram'];
+    let requestedPlatforms;
+    let parsedDesignJson = null;
+    try {
+      requestedPlatforms = platforms ? JSON.parse(platforms) : ['instagram'];
+      parsedDesignJson = designJson ? JSON.parse(designJson) : null;
+    } catch (error) {
+      return res.status(400).json({ success: false, message: 'Post design or platform data is invalid.' });
+    }
     if (!Array.isArray(requestedPlatforms) || requestedPlatforms.length === 0) {
       return res.status(400).json({ success: false, message: 'Select at least one platform.' });
+    }
+    const supportedPlatforms = ['instagram', 'facebook'];
+    if (requestedPlatforms.some(platform => !supportedPlatforms.includes(platform))) {
+      return res.status(400).json({ success: false, message: 'Threads publishing is not available yet. Please select Instagram or Facebook.' });
     }
     if (status === 'scheduled' && (!scheduledAt || new Date(scheduledAt) <= new Date())) {
       return res.status(400).json({ success: false, message: 'Choose a future date and time for scheduling.' });
@@ -89,7 +132,7 @@ exports.createPost = async (req, res) => {
       status: status === 'now' ? 'publishing' : (status || 'draft'),
       scheduledAt: status === 'scheduled' ? new Date(scheduledAt) : null,
       platforms: requestedPlatforms,
-      designJson: designJson ? JSON.parse(designJson) : null,
+      designJson: parsedDesignJson,
     });
 
     console.log(`🚀 [DEBUG] 5. Saving post to database with status: '${post.status}'`);
@@ -200,10 +243,14 @@ exports.importInstagramPosts = async (req, res) => {
           userId,
           workspaceId: workspaceForPost, // Use the workspace where the IG account was found
           caption: post.caption,
-          mediaUrls: [{ url: post.media_url, type: post.media_type.toLowerCase() === 'video' ? 'video' : 'image' }],
+          mediaUrls: [{
+            url: post.media_type.toLowerCase() === 'video' ? (post.thumbnail_url || post.media_url) : post.media_url,
+            type: 'image',
+          }],
           status: 'published',
           publishedAt: new Date(post.timestamp),
           platformPostIds: { instagram: post.id },
+          platforms: ['instagram'],
           isImported: true,
           analytics: {
             likes: liveInsights?.likes ?? post.like_count ?? 0,
@@ -218,7 +265,9 @@ exports.importInstagramPosts = async (req, res) => {
           {
             $set: {
               caption: post.caption || existingPost.caption,
-              'mediaUrls.0.url': post.media_url || existingPost.mediaUrls?.[0]?.url,
+              'mediaUrls.0.url': post.media_type?.toLowerCase() === 'video'
+                ? (post.thumbnail_url || post.media_url || existingPost.mediaUrls?.[0]?.url)
+                : (post.media_url || existingPost.mediaUrls?.[0]?.url),
               'analytics.likes': liveInsights?.likes ?? post.like_count ?? 0,
               'analytics.comments': liveInsights?.comments ?? post.comments_count ?? 0,
               'analytics.reach': liveInsights?.reach ?? existingPost.analytics?.reach ?? 0,
@@ -245,7 +294,12 @@ exports.getPostAnalytics = async (req, res) => {
     const userId = req.user._id;
     const { workspaceId } = req.query;
 
-    const query = { userId, status: 'published' };
+    // Publisher analytics are for posts that actually exist on Instagram.
+    const query = {
+      userId,
+      status: 'published',
+      'platformPostIds.instagram': { $exists: true, $nin: [null, ''] },
+    };
     if (workspaceId && workspaceId !== 'main') {
       query.workspaceId = workspaceId;
     }
@@ -256,7 +310,7 @@ exports.getPostAnalytics = async (req, res) => {
       return res.status(200).json({ success: true, analytics: { totalReach: 0, totalLikes: 0, totalComments: 0, totalSaves: 0, totalProfileVisits: 0, engagementRate: 0, topPosts: [], bestTimeToPost: 'N/A', aiRecommendation: 'Not enough data to generate recommendations. Publish more posts to get insights.' } });
     }
 
-    let totalReach = 0, totalLikes = 0, totalComments = 0, totalSaves = 0, totalProfileVisits = 0, totalEngagement = 0;
+    let totalReach = 0, totalLikes = 0, totalComments = 0, totalShares = 0, totalSaves = 0, totalProfileVisits = 0, totalEngagement = 0;
     const timeMap = {}; // { 'day-hour': { count: x, engagement: y } }
 
     posts.forEach(post => {
@@ -264,10 +318,11 @@ exports.getPostAnalytics = async (req, res) => {
       totalReach += a.reach || 0;
       totalLikes += a.likes || 0;
       totalComments += a.comments || 0;
+      totalShares += a.shares || 0;
       totalSaves += a.saves || 0;
       totalProfileVisits += a.profileVisits || 0;
       
-      const engagement = (a.likes || 0) + (a.comments || 0) + (a.saves || 0);
+      const engagement = (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.saves || 0);
       totalEngagement += engagement;
 
       if (post.publishedAt) {
@@ -289,7 +344,7 @@ exports.getPostAnalytics = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      analytics: { totalReach, totalLikes, totalComments, totalSaves, totalProfileVisits, engagementRate, topPosts, bestTimeToPost, aiRecommendation }
+      analytics: { totalReach, totalLikes, totalComments, totalShares, totalSaves, totalProfileVisits, engagementRate, topPosts, bestTimeToPost, aiRecommendation }
     });
 
   } catch (error) {
@@ -326,7 +381,13 @@ exports.getPostInsights = async (req, res) => {
     // Update the post in our database with the fresh analytics
     await Post.updateOne(
       { userId, "platformPostIds.instagram": platformPostId },
-      { $set: { "analytics.likes": insights.likes, "analytics.comments": insights.comments, "analytics.reach": insights.reach } }
+      { $set: {
+        "analytics.likes": insights.likes,
+        "analytics.comments": insights.comments,
+        "analytics.reach": insights.reach,
+        "analytics.saves": insights.saved,
+        "analytics.shares": insights.shares,
+      } }
     );
 
     res.status(200).json({ success: true, insights });

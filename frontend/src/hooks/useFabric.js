@@ -142,7 +142,20 @@ export const useFabric = (canvasRef) => {
   
   const exportToJson = useCallback(() => {
     if (!fabricCanvas) return null;
-    return fabricCanvas.toJSON(['id', 'layers', 'objects']);
+    const design = fabricCanvas.toJSON(['id', 'layers', 'objects']);
+
+    // Keep an explicit, portable canvas definition. Fabric's serialized
+    // background field differs between versions, while the AI and API use
+    // `canvas.backgroundColor` as their design contract.
+    return {
+      ...design,
+      canvas: {
+        width: fabricCanvas.getWidth(),
+        height: fabricCanvas.getHeight(),
+        backgroundColor: fabricCanvas.backgroundColor || '#ffffff',
+      },
+      backgroundColor: fabricCanvas.backgroundColor || '#ffffff',
+    };
   }, [fabricCanvas]);
   
   const exportToImage = useCallback((format = 'png') => {

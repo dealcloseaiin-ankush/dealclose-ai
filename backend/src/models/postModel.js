@@ -35,10 +35,13 @@ const postSchema = new mongoose.Schema({
   },
   designJson: { type: Object }, // For fabric.js designs
   isImported: { type: Boolean, default: false }, // To identify posts imported from Instagram
+  legacySocialPostId: { type: mongoose.Schema.Types.ObjectId, index: true },
   analytics: {
     likes: { type: Number, default: 0 },
     comments: { type: Number, default: 0 },
     reach: { type: Number, default: 0 },
+    saves: { type: Number, default: 0 },
+    shares: { type: Number, default: 0 },
   },
 }, { timestamps: true });
 

@@ -641,8 +641,9 @@ export default function Settings() {
                       <p className="text-xs text-gray-400">Use this to log out and log back into WhatsApp for testing. Sub-branches can also connect or logout with their own WhatsApp number.</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                      <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
-                      {(config.whatsappToken || config.phoneNumberId) && (
+                      {!(config.whatsappToken || config.phoneNumberId) ? (
+                        <MetaConnectButton buttonText="Connect WhatsApp" platform="whatsapp" workspaceId="main" onSuccess={fetchSettings} />
+                      ) : (
                         <button type="button" onClick={() => disconnectWhatsApp('main')} className="px-4 py-2 bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded-xl border border-rose-500/20 text-sm font-semibold transition-all">
                           Logout WhatsApp
                         </button>
@@ -770,7 +771,7 @@ export default function Settings() {
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely.</p>
                    {/* ✅ FIXED MAIN BUSINESS INSTAGRAM CONDITIONAL BUTTON DISCONNECT ZONE */}
-                    {mainIgConnected ? (
+                    {mainIgConnected && (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
                          <button 
@@ -781,29 +782,29 @@ export default function Settings() {
                            Disconnect Account 🔌
                          </button>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div>
-                          <MetaConnectButton 
-                            variant="facebook"
-                            buttonText="Connect via Facebook" 
-                            platform="instagram" 
-                            workspaceId="main" 
-                            onSuccess={(data) => openInstagramPicker(data, 'main')} 
-                          />
-                          <p className="text-xs text-gray-500 mt-2">Recommended for IG accounts linked to a Facebook Page.</p>
-                        </div>
-                        <div>
-                          <MetaConnectButton 
-                            buttonText="Connect with Instagram" 
-                            platform="instagram" 
-                            workspaceId="main" 
-                            onSuccess={(data) => openInstagramPicker(data, 'main')} 
-                          />
-                          <p className="text-xs text-gray-500 mt-2">For direct login without a Facebook Page.</p>
-                        </div>
-                      </div>
                     )}
+                    <div className="space-y-4 mt-4">
+                      {mainIgConnected && <p className="text-xs text-gray-500">To replace the connected account, choose a new connection method below.</p>}
+                      <div>
+                        <MetaConnectButton 
+                          variant="facebook"
+                          buttonText={mainIgConnected ? "Replace via Facebook" : "Connect via Facebook"}
+                          platform="instagram" 
+                          workspaceId="main" 
+                          onSuccess={(data) => openInstagramPicker(data, 'main')} 
+                        />
+                        <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account linked to a Facebook Page.</p>
+                      </div>
+                      <div>
+                        <MetaConnectButton 
+                          buttonText={mainIgConnected ? "Replace with Instagram Login" : "Connect with Instagram Login"}
+                          platform="instagram" 
+                          workspaceId="main" 
+                          onSuccess={(data) => openInstagramPicker(data, 'main')} 
+                        />
+                        <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account that is not linked to a Facebook Page.</p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Meta Ads Conversions API */}
@@ -1121,9 +1122,7 @@ export default function Settings() {
                          )}
 
                          {/* Instagram Conditional Layout */}
-                         {!activeWs.instagramConfig?.accessToken ? (
-                            <MetaConnectButton buttonText="Connect Instagram" variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
-                         ) : (
+                         {activeWs.instagramConfig?.accessToken && (
                             <button type="button"
                               onClick={() => disconnectInstagram(activeWs?._id)}
                               className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
@@ -1131,6 +1130,16 @@ export default function Settings() {
                               Disconnect Instagram
                             </button>
                          )}
+                         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3">
+                           <div>
+                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace via Facebook" : "Connect via Facebook"} variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                             <p className="mt-1 text-[11px] text-gray-500">Facebook Page linked Instagram</p>
+                           </div>
+                           <div>
+                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                             <p className="mt-1 text-[11px] text-gray-500">Instagram Professional account</p>
+                           </div>
+                         </div>
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

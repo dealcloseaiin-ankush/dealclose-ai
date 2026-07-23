@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles, MessageSquare, Send, X, RefreshCw, Heart, Eye } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles, MessageSquare, Send, X, RefreshCw, Heart, Eye, Share2, Bookmark } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
@@ -55,7 +55,20 @@ export default function Publisher() {
     try {
       const { data } = await api.get('/posts/analytics', { params: { workspaceId: activeWorkspace } });
       if (data.success) {
-        setAnalytics(data.analytics);
+        setAnalytics({
+          totalReach: 0,
+          totalLikes: 0,
+          totalComments: 0,
+          totalShares: 0,
+          totalSaves: 0,
+          totalProfileVisits: 0,
+          engagementRate: 0,
+          topPosts: [],
+          bestTimeToPost: 'N/A',
+          aiRecommendation: 'Live analytics are syncing from Instagram.',
+          ...data.analytics,
+          topPosts: Array.isArray(data.analytics?.topPosts) ? data.analytics.topPosts : [],
+        });
       }
     } catch (error) {
       toast.error('Failed to fetch analytics.');
@@ -83,15 +96,22 @@ export default function Publisher() {
     if (view === 'list') {
       syncInstagramPosts().finally(fetchPosts);
     } else if (view === 'analytics') {
-      syncInstagramPosts(false, true).finally(fetchAnalytics);
+      // Render saved metrics immediately; refresh from Meta in the background.
+      // Waiting for every live-insight request left this screen blank for too long.
+      fetchAnalytics();
+      syncInstagramPosts(false, true).then(fetchAnalytics);
     }
   }, [filter, view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
 
   useEffect(() => {
     const timer = window.setInterval(async () => {
-      await syncInstagramPosts(false, view === 'analytics');
-      if (view === 'list') fetchPosts();
-      else fetchAnalytics();
+      if (view === 'list') {
+        await syncInstagramPosts();
+        fetchPosts();
+      } else {
+        fetchAnalytics();
+        syncInstagramPosts(false, true).then(fetchAnalytics);
+      }
     }, 30000);
     return () => window.clearInterval(timer);
   }, [view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
@@ -297,6 +317,8 @@ export default function Publisher() {
                   <div className="flex items-center justify-end gap-4 text-xs text-gray-400 pt-2">
                     <div className="flex items-center gap-1.5" title="Likes"><Heart size={12} className="text-red-500/80"/> {post.analytics?.likes?.toLocaleString() || 0}</div>
                     <div className="flex items-center gap-1.5" title="Comments"><MessageSquare size={12} className="text-blue-400/80"/> {post.analytics?.comments?.toLocaleString() || 0}</div>
+                    <div className="flex items-center gap-1.5" title="Shares"><Share2 size={12} className="text-purple-400/80"/> {post.analytics?.shares?.toLocaleString() || 0}</div>
+                    <div className="flex items-center gap-1.5" title="Saves"><Bookmark size={12} className="text-yellow-400/80"/> {post.analytics?.saves?.toLocaleString() || 0}</div>
                     <div className="flex items-center gap-1.5" title="Reach"><Eye size={12} className="text-green-400/80"/> {post.analytics?.reach?.toLocaleString() || 0}</div>
                     <button 
                       onClick={() => handleRefreshStats(post._id, post.platformPostIds?.instagram)} 
@@ -351,6 +373,7 @@ export default function Publisher() {
               <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Reach</p><p className="text-2xl font-bold text-white">{analytics.totalReach.toLocaleString()}</p></div>
               <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Likes</p><p className="text-2xl font-bold text-white">{analytics.totalLikes.toLocaleString()}</p></div>
               <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Comments</p><p className="text-2xl font-bold text-white">{analytics.totalComments.toLocaleString()}</p></div>
+              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Shares</p><p className="text-2xl font-bold text-white">{analytics.totalShares.toLocaleString()}</p></div>
               <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Saves</p><p className="text-2xl font-bold text-white">{analytics.totalSaves.toLocaleString()}</p></div>
               <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Profile Visits</p><p className="text-2xl font-bold text-white">{analytics.totalProfileVisits.toLocaleString()}</p></div>
               <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/30 text-center"><p className="text-xs text-purple-300">Engagement Rate</p><p className="text-2xl font-bold text-white">{analytics.engagementRate}%</p></div>
