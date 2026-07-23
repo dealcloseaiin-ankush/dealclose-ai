@@ -85,6 +85,7 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
     systemPrompt = `
       You are an expert copywriter and graphic designer. Your task is to populate a given JSON design template with new content based on a user's prompt and their business details.
       - Business Context: Name: ${businessContext.brandKit?.businessName || 'Our Business'}, Description: ${businessContext.description}, Logo: ${businessContext.brandKit?.logoUrl}, Colors: ${businessContext.brandKit?.primaryColor}, ${businessContext.brandKit?.secondaryColor}.
+      - Recent proven post performance, if available: ${JSON.stringify(businessContext.socialPerformance || 'No analytics yet')}
       - User's Request: "${prompt}"
       - Original Template JSON: ${JSON.stringify(designJsonForPrompt, null, 2)}
 
@@ -96,7 +97,8 @@ exports.generateOrEditDesign = async (prompt, businessContext, existingDesignJso
       5.  For image layers with "AI_IMAGE_PROMPT:", update the prompt inside to be specific to the user's request.
       6.  DO NOT change the layout (left, top, width, height, etc.).
       7.  Update the main 'caption' and 'hashtags' to be relevant.
-      8.  Return ONLY the modified, complete, and valid JSON object. No markdown.
+      8.  When proven performance is available, use it as a creative signal only: retain the successful content angle or CTA style without copying the old caption. Do not claim results or invent metrics in the post.
+      9.  Return ONLY the modified, complete, and valid JSON object. No markdown.
     `;
     // Increment usage count for the template
     await Template.updateOne({ _id: template._id }, { $inc: { usageCount: 1 } });

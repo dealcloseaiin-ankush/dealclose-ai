@@ -174,15 +174,25 @@ exports.deletePost = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Post not found or you do not have permission to delete it.' });
     }
 
-    // TODO: Agar post Cloudinary par hai, to wahan se bhi delete karne ka logic add kar sakte hain.
-    // if (post.mediaUrls && post.mediaUrls.length > 0) {
-    //   const publicId = post.mediaUrls[0].url.split('/').pop().split('.')[0];
-    //   await cloudinary.uploader.destroy(`posts/${publicId}`);
-    // }
+    // A published IG post must be deleted on Instagram first. Previously this
+    // route only removed our database record, so the post stayed visible on IG.
+    if (post.platformPostIds?.instagram) {
+      const user = await User.findById(userId).lean();
+      const workspace = post.workspaceId !== 'main'
+        ? user?.workspaces?.find(w => String(w._id) === String(post.workspaceId))
+        : null;
+      const igConfig = workspace?.instagramConfig
+        || user?.instagramConfig
+        || user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
+      if (!igConfig?.accessToken) {
+        return res.status(400).json({ success: false, message: 'Reconnect Instagram before deleting this live post.' });
+      }
+      await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken);
+    }
 
     await post.deleteOne();
 
-    res.status(200).json({ success: true, message: 'Post deleted successfully.' });
+    res.status(200).json({ success: true, message: 'Post deleted successfully from Instagram and the dashboard.' });
   } catch (error) {
     console.error("Delete Post Error:", error);
     res.status(500).json({ success: false, message: 'Failed to delete post.', error: error.message });

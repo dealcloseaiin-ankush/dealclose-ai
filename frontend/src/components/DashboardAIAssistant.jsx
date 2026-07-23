@@ -79,7 +79,7 @@ const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction p
                 <Bot size={24} />
                 <div>
                   <h3 className="font-bold text-sm">DealClose AI</h3>
-                  <p className="text-xs text-blue-100">Setup Assistant</p>
+                  <p className="text-xs text-blue-100">Setup & Analytics Assistant</p>
                 </div>
               </div>
               <button onClick={toggleChat} className="text-blue-100 hover:text-white transition-colors p-1 hover:bg-white/20 rounded-md">
@@ -115,7 +115,7 @@ const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction p
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your message..."
+                  placeholder="Ask about setup, posts, or Instagram analytics..."
                   className="flex-1 bg-gray-100 text-gray-900 text-sm rounded-full px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-300"
                   disabled={isLoading}
                 />

@@ -164,6 +164,30 @@ exports.replyToComment = async (commentId, accessToken, message) => {
   }
 };
 
+/** Deletes a comment on media owned by the connected Instagram account. */
+exports.deleteComment = async (commentId, accessToken) => {
+  try {
+    const response = await axios.delete(`https://graph.facebook.com/v19.0/${commentId}`, {
+      params: { access_token: accessToken },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
+/** Deletes an Instagram media item owned by the connected account. */
+exports.deleteMedia = async (mediaId, accessToken) => {
+  try {
+    const response = await axios.delete(`https://graph.facebook.com/v19.0/${mediaId}`, {
+      params: { access_token: accessToken },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
 /**
  * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
  * @param {string} mediaId - The ID of the Instagram post or reel.
@@ -302,10 +326,23 @@ exports.getPostInsights = async (mediaId, accessToken) => {
  */
 exports.getBusinessInsights = async (igAccountId, accessToken) => {
   try {
-    const metrics = 'reach,impressions,profile_views,follower_count,accounts_engaged_count';
-    const url = `https://graph.facebook.com/v19.0/${igAccountId}/insights?metric=${metrics}&period=day&access_token=${accessToken}`;
-    const response = await axios.get(url);
-    return response.data.data;
+    const dailyMetrics = 'reach,impressions,profile_views,website_clicks,accounts_engaged_count';
+    const insightsUrl = `https://graph.facebook.com/v19.0/${igAccountId}/insights`;
+    const [dailyResponse, lifetimeResponse] = await Promise.all([
+      axios.get(insightsUrl, {
+        params: { metric: dailyMetrics, period: 'day', access_token: accessToken },
+      }),
+      axios.get(insightsUrl, {
+        params: { metric: 'follower_count', period: 'lifetime', access_token: accessToken },
+      }),
+    ]);
+
+    const insights = { last_updated: new Date().toISOString() };
+    [...(dailyResponse.data?.data || []), ...(lifetimeResponse.data?.data || [])].forEach(metric => {
+      const latest = metric.values?.[metric.values.length - 1];
+      if (latest && typeof latest.value !== 'undefined') insights[metric.name] = latest.value;
+    });
+    return insights;
   } catch (error) {
     console.error("❌ Meta Graph API Business Insights Fetch Error:", error.response?.data?.error?.message || error.message);
     throw new Error(error.response?.data?.error?.message || 'Failed to fetch Instagram Insights.');

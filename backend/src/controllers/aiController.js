@@ -4,6 +4,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
 const Flow = require('../models/flowModel');
 const Lead = require('../models/leadModel');
+const Post = require('../models/postModel');
+const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const whatsappService = require('../services/whatsappService');
 
 // 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
@@ -183,6 +185,33 @@ exports.handleDashboardAssistant = async (req, res) => {
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+    // Give the chat assistant real, compact social-performance context. It can
+    // recommend a next post without guessing or exposing raw customer data.
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [recentPosts, insightHistory] = await Promise.all([
+      Post.find({ userId, status: 'published', publishedAt: { $gte: thirtyDaysAgo } })
+        .select('caption publishedAt analytics').lean(),
+      InstagramInsightSnapshot.find({ userId, date: { $gte: thirtyDaysAgo } })
+        .select('date followerCount reach impressions profileViews websiteClicks accountsEngaged').sort({ date: 1 }).lean(),
+    ]);
+    const postTotals = recentPosts.reduce((total, post) => ({
+      reach: total.reach + (post.analytics?.reach || 0),
+      likes: total.likes + (post.analytics?.likes || 0),
+      comments: total.comments + (post.analytics?.comments || 0),
+      saves: total.saves + (post.analytics?.saves || 0),
+      shares: total.shares + (post.analytics?.shares || 0),
+    }), { reach: 0, likes: 0, comments: 0, saves: 0, shares: 0 });
+    const topPost = recentPosts.slice().sort((a, b) => {
+      const scoreA = (a.analytics?.likes || 0) + (a.analytics?.comments || 0) + (a.analytics?.saves || 0) + (a.analytics?.shares || 0);
+      const scoreB = (b.analytics?.likes || 0) + (b.analytics?.comments || 0) + (b.analytics?.saves || 0) + (b.analytics?.shares || 0);
+      return scoreB - scoreA;
+    })[0];
+    const firstSnapshot = insightHistory[0];
+    const latestSnapshot = insightHistory[insightHistory.length - 1];
+    const socialAnalyticsContext = recentPosts.length
+      ? `Instagram last 30 days: ${recentPosts.length} published posts; reach ${postTotals.reach}; likes ${postTotals.likes}; comments ${postTotals.comments}; saves ${postTotals.saves}; shares ${postTotals.shares}. Top post: "${(topPost?.caption || '').slice(0, 140)}" (reach ${topPost?.analytics?.reach || 0}, saves ${topPost?.analytics?.saves || 0}, shares ${topPost?.analytics?.shares || 0}). Account snapshots: followers ${firstSnapshot?.followerCount ?? 'N/A'} to ${latestSnapshot?.followerCount ?? 'N/A'}; latest profile views ${latestSnapshot?.profileViews ?? 'N/A'}; website clicks ${latestSnapshot?.websiteClicks ?? 'N/A'}.`
+      : 'Instagram analytics: no published-post data has been collected yet.';
+
     // 🚀 NEW: Create a concise summary of the user's progress for the AI.
     const onboardingChecklist = `
     - Business Profile Setup: ${user.businessDescription ? '✅ Done' : '❌ Pending'}
@@ -205,6 +234,9 @@ exports.handleDashboardAssistant = async (req, res) => {
     
     --- ONBOARDING CHECKLIST ---
     ${onboardingChecklist}
+
+    --- REAL INSTAGRAM ANALYTICS (LAST 30 DAYS) ---
+    ${socialAnalyticsContext}
     
     --- YOUR JOB ---
     1. Greet the user and review their checklist.
@@ -212,7 +244,7 @@ exports.handleDashboardAssistant = async (req, res) => {
     3. If all items are 'Done', congratulate them and ask what advanced automation they want to build next.
     4. If the user asks to modify something that is already 'Done' (e.g., "change my business description"), then help them with that.
     5. CREDIT AWARENESS: If the user's AI Credits are below 50, you MUST gently remind them: "I noticed your AI credits are getting low. To ensure uninterrupted service, please recharge from your wallet."
-    5. Keep your answers extremely short and to the point.
+    5. If the user asks about Instagram analytics, content ideas, a post review, or how to improve a post, use ONLY the real Instagram metrics above. Explain one evidence-based insight and give 2 concrete next-post improvements. Never invent metrics.
     
     CRITICAL RULES:
     1. STRICT SCOPE: You are a B2B AI Assistant. You must STRICTLY REFUSE to answer any questions that are unrelated to DealClose AI, marketing automation, CRM, or the user's specific business. If asked about random topics, politely decline and steer the conversation back to business growth.
@@ -220,7 +252,7 @@ exports.handleDashboardAssistant = async (req, res) => {
     3. MATCH LANGUAGE: Always reply in the EXACT same language the user is speaking. If the user types in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish. Do not reply in English if the user asks a question in Hindi.
     4. BULK MESSAGING: If the user explicitly asks you to send a message to certain leads (e.g. "send this template to lost leads" or "sabko bhej do"), you MUST output EXACTLY this JSON format and NOTHING ELSE:
     {"action": "send_bulk", "status": "lost", "message": "Your crafted message here"}
-    5. BE CONCISE: Keep your answers extremely short, clear, and to the point. Use 1-2 sentences maximum. Do not write long paragraphs. Get straight to the action.`;
+    5. BE CONCISE: Keep normal answers to 1-2 sentences. For analytics requests, use at most 3 short bullets.`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext, userId);
 

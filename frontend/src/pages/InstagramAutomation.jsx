@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText, BarChart3, Sparkles, BrainCircuit } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 import PostInsightsModal from '../components/PostInsightsModal'; // Naya component import karein
 
@@ -22,6 +23,7 @@ export default function InstagramAutomation() {
     accounts_engaged_count: 0,
     last_updated: null,
   });
+  const [insightHistory, setInsightHistory] = useState([]);
 
   const [config, setConfig] = useState({
     aiSmartReply: false,
@@ -238,6 +240,7 @@ export default function InstagramAutomation() {
         if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
         if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
         api.get('/instagram/business/insights', { params: { workspaceId: activeWorkspace } }).then(res => setInsights(res.data.insights)).catch(err => console.error("Failed to fetch business insights", err));
+        api.get('/instagram/business/insights/history', { params: { workspaceId: activeWorkspace, days: 30 } }).then(res => setInsightHistory(res.data.snapshots || [])).catch(err => console.error("Failed to fetch analytics history", err));
 
         const [postsRes, automationsRes] = await Promise.all([
           api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } }),
@@ -457,6 +460,33 @@ export default function InstagramAutomation() {
         <div className="bg-[#111111] border border-gray-700 p-5 rounded-2xl shadow-lg">
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Accounts Engaged (Last Day)</p>
           <p className="text-3xl font-bold text-white mt-2">{insights.accounts_engaged_count?.toLocaleString() || '...'}</p>
+        </div>
+      </div>
+
+      <div className="bg-[#111] border border-gray-800 rounded-2xl p-5 mb-10">
+        <div className="flex items-baseline justify-between gap-4 mb-5">
+          <div>
+            <h2 className="text-lg font-bold text-white">30-Day Account Growth</h2>
+            <p className="text-xs text-gray-500">Daily snapshots are saved whenever this dashboard refreshes.</p>
+          </div>
+          <span className="text-xs text-gray-400">{insightHistory.length} day{insightHistory.length === 1 ? '' : 's'} recorded</span>
+        </div>
+        <div className="h-64">
+          {insightHistory.length < 2 ? (
+            <div className="h-full grid place-items-center text-sm text-gray-500 text-center px-6">Today's snapshot is saved. The follower and reach trends will appear as daily data is collected.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={insightHistory.map(item => ({ ...item, label: new Date(item.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' }) }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                <XAxis dataKey="label" stroke="#737373" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="followers" stroke="#ec4899" tick={{ fontSize: 11 }} width={52} />
+                <YAxis yAxisId="reach" orientation="right" stroke="#60a5fa" tick={{ fontSize: 11 }} width={52} />
+                <Tooltip contentStyle={{ background: '#171717', border: '1px solid #404040', borderRadius: 10 }} />
+                <Line yAxisId="followers" type="monotone" dataKey="followerCount" name="Followers" stroke="#ec4899" strokeWidth={2} dot={false} />
+                <Line yAxisId="reach" type="monotone" dataKey="reach" name="Daily Reach" stroke="#60a5fa" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 

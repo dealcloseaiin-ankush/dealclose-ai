@@ -1,9 +1,11 @@
 const User = require('../models/userModel');
+const Post = require('../models/postModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel');
 const PostAnalysis = require('../models/PostAnalysisModel'); // Naya model import karein
 const DraftPost = require('../models/DraftPostModel'); // 🚀 NEW: Draft model
 const axios = require('axios');
+const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
 const aiTemplateService = require('../services/aiTemplateService'); // 🚀 Use the new TEMPLATE service
@@ -135,6 +137,20 @@ exports.getBusinessInsights = async (req, res) => {
     }
 
     const insights = await instagramService.getBusinessInsights(accountId, accessToken);
+    const date = new Date();
+    date.setUTCHours(0, 0, 0, 0);
+    await InstagramInsightSnapshot.findOneAndUpdate(
+      { userId, workspaceId, date },
+      { $set: {
+        followerCount: Number(insights.follower_count) || 0,
+        reach: Number(insights.reach) || 0,
+        impressions: Number(insights.impressions) || 0,
+        profileViews: Number(insights.profile_views) || 0,
+        websiteClicks: Number(insights.website_clicks) || 0,
+        accountsEngaged: Number(insights.accounts_engaged_count) || 0,
+      } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     res.status(200).json({ success: true, insights });
 
@@ -387,6 +403,22 @@ exports.generateAiPost = async (req, res) => {
       phone: user.ownerPhone || '',
       brandKit: user.brandKit // Pass the entire brand kit
     };
+    const recentPublishedPosts = await Post.find({
+      userId,
+      ...(workspaceId && workspaceId !== 'main' ? { workspaceId } : {}),
+      status: 'published',
+    }).sort({ publishedAt: -1 }).limit(12).select('caption analytics').lean();
+    if (recentPublishedPosts.length) {
+      const topPost = recentPublishedPosts.slice().sort((a, b) => {
+        const score = post => (post.analytics?.likes || 0) + (post.analytics?.comments || 0) + (post.analytics?.saves || 0) + (post.analytics?.shares || 0);
+        return score(b) - score(a);
+      })[0];
+      businessContext.socialPerformance = {
+        recentPostCount: recentPublishedPosts.length,
+        topPostCaption: (topPost.caption || '').slice(0, 180),
+        topPostMetrics: topPost.analytics || {},
+      };
+    }
     console.log("🚀 [DEBUG] 3. Constructed Business Context for AI.");
 
     // 🚀 UPGRADED: Call the new template filling service
@@ -1117,6 +1149,49 @@ exports.replyToComment = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Failed to post reply.' });
+  }
+};
+
+exports.getBusinessInsightsHistory = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const workspaceId = req.query.workspaceId || 'main';
+    const days = Math.min(Math.max(Number.parseInt(req.query.days, 10) || 30, 7), 90);
+    const fromDate = new Date();
+    fromDate.setUTCHours(0, 0, 0, 0);
+    fromDate.setUTCDate(fromDate.getUTCDate() - (days - 1));
+    const snapshots = await InstagramInsightSnapshot.find({ userId, workspaceId, date: { $gte: fromDate } }).sort({ date: 1 }).lean();
+    res.status(200).json({ success: true, snapshots });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to load analytics history.' });
+  }
+};
+
+// @desc    Delete a comment from an Instagram post owned by the connected account
+// @route   DELETE /api/instagram/comments/:id
+exports.deleteComment = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id: commentId } = req.params;
+    const { workspaceId = 'main' } = req.query;
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+    const selectedWorkspace = workspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      : null;
+    const igConfig = selectedWorkspace?.instagramConfig
+      || user.instagramConfig
+      || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
+
+    if (!igConfig?.accessToken) {
+      return res.status(400).json({ success: false, message: 'Instagram is not connected for this workspace.' });
+    }
+
+    await instagramService.deleteComment(commentId, igConfig.accessToken);
+    res.status(200).json({ success: true, message: 'Comment deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete comment.' });
   }
 };
 

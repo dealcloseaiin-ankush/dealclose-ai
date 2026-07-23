@@ -10,6 +10,7 @@ const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/aiService');
 const Post = require('../models/postModel');
+const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const instagramService = require('../services/instagramService');
 
 // Redis connection (Supports Upstash Cloud Redis & Local)
@@ -99,6 +100,50 @@ const automationWorker = new Worker('automationQueue', async job => {
       await post.save();
       console.log("================== [WORKER: PUBLISH POST END] ==================\n");
       throw error;
+    }
+    return;
+  }
+
+  if (job.name === 'capture_instagram_insights') {
+    const snapshotDate = new Date();
+    snapshotDate.setUTCHours(0, 0, 0, 0);
+    const users = await User.find({
+      $or: [
+        { 'instagramConfig.accessToken': { $exists: true, $ne: '' } },
+        { 'workspaces.instagramConfig.accessToken': { $exists: true, $ne: '' } },
+      ],
+    }).lean();
+
+    for (const user of users) {
+      const accounts = [];
+      if (user.instagramConfig?.accessToken) accounts.push({ workspaceId: 'main', config: user.instagramConfig });
+      (user.workspaces || []).forEach(workspace => {
+        if (workspace.instagramConfig?.accessToken) {
+          accounts.push({ workspaceId: String(workspace._id), config: workspace.instagramConfig });
+        }
+      });
+
+      for (const { workspaceId, config } of accounts) {
+        const accountId = config.instagramAccountId || config.accountId;
+        if (!accountId) continue;
+        try {
+          const insights = await instagramService.getBusinessInsights(accountId, config.accessToken);
+          await InstagramInsightSnapshot.findOneAndUpdate(
+            { userId: user._id, workspaceId, date: snapshotDate },
+            { $set: {
+              followerCount: Number(insights.follower_count) || 0,
+              reach: Number(insights.reach) || 0,
+              impressions: Number(insights.impressions) || 0,
+              profileViews: Number(insights.profile_views) || 0,
+              websiteClicks: Number(insights.website_clicks) || 0,
+              accountsEngaged: Number(insights.accounts_engaged_count) || 0,
+            } },
+            { upsert: true, setDefaultsOnInsert: true }
+          );
+        } catch (error) {
+          console.warn(`[Instagram insights] Snapshot skipped for ${user._id}/${workspaceId}: ${error.message}`);
+        }
+      }
     }
     return;
   }
@@ -421,6 +466,13 @@ automationQueue.add('daily_token_refresh', {}, {
     pattern: '0 2 * * *' // Cron syntax for 02:00 AM daily
   },
   jobId: 'system_token_refresh'
+});
+
+// Store account metrics every day so follower/reach growth is available even
+// when the user does not open the dashboard.
+automationQueue.add('capture_instagram_insights', {}, {
+  repeat: { pattern: '10 0 * * *' },
+  jobId: 'daily_instagram_insight_snapshot'
 });
 
 // 🚀 NEW: Start the Daily Cron Job for CRM Summary & Follow-ups

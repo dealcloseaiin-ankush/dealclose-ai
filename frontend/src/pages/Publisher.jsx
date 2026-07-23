@@ -63,7 +63,6 @@ export default function Publisher() {
           totalSaves: 0,
           totalProfileVisits: 0,
           engagementRate: 0,
-          topPosts: [],
           bestTimeToPost: 'N/A',
           aiRecommendation: 'Live analytics are syncing from Instagram.',
           ...data.analytics,
@@ -203,6 +202,20 @@ export default function Publisher() {
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to post reply.', { id: toastId });
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Delete this Instagram comment permanently?')) return;
+    const toastId = toast.loading('Deleting comment...');
+    try {
+      await api.delete(`/instagram/comments/${commentId}`, {
+        params: { workspaceId: activeWorkspace }
+      });
+      setComments(prev => prev.filter(comment => comment.id !== commentId));
+      toast.success('Comment deleted.', { id: toastId });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not delete this comment.', { id: toastId });
     }
   };
 
@@ -441,7 +454,12 @@ export default function Publisher() {
                     <div className="flex gap-3 items-start">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 shrink-0 mt-1"></div>
                       <div className="flex-1">
-                        <p><span className="font-bold text-white">{comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
+                        <div className="flex items-start justify-between gap-3">
+                          <p><span className="font-bold text-white">{comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
+                          <button type="button" onClick={() => handleDeleteComment(comment.id)} className="shrink-0 p-1.5 rounded-md text-red-400 hover:bg-red-500/10" title="Delete comment">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                         {/* Reply form for each comment */}
                         <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(comment.id); }} className="flex gap-2 mt-2">
                           <input // ✅ FIX: Input is now controlled by the specific comment's state
