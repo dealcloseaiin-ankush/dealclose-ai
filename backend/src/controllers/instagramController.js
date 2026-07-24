@@ -1111,7 +1111,10 @@ exports.getCommentsForPost = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
     }
 
-    const comments = await instagramService.getCommentsForPost(mediaId, accessToken);
+    // 🚀 FIX: Explicitly request the 'replies' field for each comment.
+    // Without this, the API only returns top-level comments, and we can't show the nested replies in the UI.
+    // We also ask for the username for each reply.
+    const comments = await instagramService.getCommentsForPost(mediaId, accessToken, 'id,text,username,timestamp,replies{id,text,username,timestamp}');
     res.status(200).json({ success: true, comments });
 
   } catch (error) {

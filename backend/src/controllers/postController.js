@@ -174,32 +174,48 @@ exports.deletePost = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Post not found or you do not have permission to delete it.' });
     }
 
-    // A published IG post must be deleted on Instagram first. Previously this
-    // route only removed our database record, so the post stayed visible on IG.
-    // 🚀 FIX: Also delete 'live' posts imported from Instagram, not just 'published' ones.
-    // This ensures that any post with an Instagram ID is deleted from the platform.
-    if (post.platformPostIds?.instagram) {
-      const user = await User.findById(userId).lean();
-      const workspace = post.workspaceId !== 'main'
-        ? user?.workspaces?.find(w => String(w._id) === String(post.workspaceId))
-        : null;
-      const igConfig = workspace?.instagramConfig // 🚀 FIX: Use optional chaining for safety
-        || user?.instagramConfig
-        || user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
-      if (!igConfig?.accessToken) {
-        return res.status(400).json({ success: false, message: 'Reconnect Instagram before deleting this live post.' });
+    let instagramDeletionSuccess = true;
+    let instagramDeletionMessage = 'Post deleted successfully from the dashboard.';
+
+    // 🚀 FIX: Only attempt to delete from Instagram if the post was originally published by our app (not imported).
+    // And if it has an Instagram ID.
+    if (post.platformPostIds?.instagram && !post.isImported) {
+      try {
+        // 🚀 FIX: Remove .lean() to ensure Mongoose document methods and virtuals are available.
+        // Using .lean() was causing a crash when trying to access nested properties like `workspaces.instagramConfig`.
+        // This ensures that `igConfig` is correctly resolved even for posts in workspaces.
+        const user = await User.findById(userId);
+        const workspace = post.workspaceId !== 'main'
+          ? user?.workspaces?.find(w => String(w._id) === String(post.workspaceId))
+          : null;
+        // 🚀 FIX: More robustly find the correct Instagram configuration.
+        const igConfig = workspace?.instagramConfig?.accessToken
+          ? workspace.instagramConfig // Use workspace config if token exists
+          : user?.instagramConfig?.accessToken ? user.instagramConfig // Else, use main user config if token exists
+          : user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig; // Finally, find any other workspace with a token
+        
+        if (!igConfig?.accessToken) {
+          instagramDeletionSuccess = false;
+          instagramDeletionMessage = 'Instagram not connected. Post deleted from dashboard, but may remain on Instagram.';
+          console.warn(`⚠️ [Delete Post] Instagram token missing for post ${post._id}. Not attempting Instagram deletion.`);
+        } else {
+          await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken);
+          instagramDeletionMessage = 'Post deleted successfully from Instagram and the dashboard.';
+        }
+      } catch (igDeleteError) {
+        instagramDeletionSuccess = false;
+        instagramDeletionMessage = `Post deleted from dashboard, but failed to delete from Instagram: ${igDeleteError.message}`;
+        console.error(`❌ [Delete Post] Failed to delete Instagram media ${post.platformPostIds.instagram}: ${igDeleteError.message}`);
       }
-      await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken);
     }
 
-    // 🚀 FIX: If this post was migrated from the legacy collection, delete the original as well.
-    // This prevents the `migrateLegacyPosts` function from re-creating the post on the next page load.
+    // If this post was migrated from the legacy collection, delete the original as well.
     if (post.legacySocialPostId) {
       await SocialPost.findByIdAndDelete(post.legacySocialPostId);
     }
     await post.deleteOne();
 
-    res.status(200).json({ success: true, message: 'Post deleted successfully from Instagram and the dashboard.' });
+    res.status(200).json({ success: true, message: instagramDeletionMessage });
   } catch (error) {
     console.error("Delete Post Error:", error);
     res.status(500).json({ success: false, message: 'Failed to delete post.', error: error.message });
