@@ -1177,7 +1177,8 @@ exports.deleteComment = async (req, res) => {
     const userId = req.user?._id;
     const { id: commentId } = req.params;
     const { workspaceId = 'main' } = req.query;
-    const user = await User.findById(userId).lean();
+    // 🚀 FIX: Removed .lean() to prevent a crash when accessing nested workspace config.
+    const user = await User.findById(userId); // Do NOT use .lean() here
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
     const selectedWorkspace = workspaceId !== 'main'

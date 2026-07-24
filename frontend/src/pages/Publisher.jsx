@@ -102,19 +102,6 @@ export default function Publisher() {
     }
   }, [filter, view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
 
-  useEffect(() => {
-    const timer = window.setInterval(async () => {
-      if (view === 'list') {
-        await syncInstagramPosts();
-        fetchPosts();
-      } else {
-        fetchAnalytics();
-        syncInstagramPosts(false, true).then(fetchAnalytics);
-      }
-    }, 30000);
-    return () => window.clearInterval(timer);
-  }, [view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
-
   // A publish job completes asynchronously. Refresh while one is in flight so
   // the Publisher switches to "published" without requiring a manual reload.
   useEffect(() => {
