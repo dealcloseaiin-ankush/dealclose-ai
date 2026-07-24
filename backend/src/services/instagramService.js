@@ -224,7 +224,7 @@ exports.sendDirectMessage = async (recipientId, message, pageAccessToken) => {
  */
 exports.getBusinessInsights = async (igAccountId, accessToken) => {
   try {
-    const dailyMetrics = 'reach,impressions,profile_views,website_clicks,accounts_engaged_count';
+    const dailyMetrics = 'reach,impressions,profile_views,website_clicks,accounts_engaged'; // ✅ FIX: Replaced deprecated 'accounts_engaged_count' with 'accounts_engaged'.
     const insightsUrl = `https://graph.facebook.com/v19.0/${igAccountId}/insights`;
     const [dailyResponse, lifetimeResponse] = await Promise.all([
       axios.get(insightsUrl, {

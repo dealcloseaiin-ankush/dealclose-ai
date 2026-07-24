@@ -553,7 +553,7 @@ exports.instagramConnectSelected = async (req, res) => {
       instagramBusinessAccountId: selected.accountId,
       facebookPageId: selected.pageId,
       businessId: selected.businessId,
-      accessToken: longLivedToken,
+      accessToken: longLivedToken, // Save the user's long-lived token
       tokenType: 'bearer',
       expiresAt: tokenExpiresAt,
       grantedPermissions: verificationResults.token.scopes,
@@ -575,7 +575,8 @@ exports.instagramConnectSelected = async (req, res) => {
     let webhookWarning;
     try {
       await axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
-        params: { subscribed_fields: 'messages,messaging_postbacks,feed,comments', access_token: selectedPageToken },
+        // ✅ FIX: Removed 'comments' as it's not a valid field for Page subscriptions. 'feed' covers public post interactions.
+        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selectedPageToken },
         timeout: process.env.META_API_TIMEOUT || 10000
       });
       console.log('✅ Webhook subscription successful for page:', selected.pageName);
