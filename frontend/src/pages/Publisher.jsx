@@ -3,7 +3,7 @@ import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, D
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
-import toast from 'react-hot-toast'; // 🚀 NEW: Import useAuth to get user and workspaces
+import toast from 'react-hot-toast';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Publisher() {
@@ -24,7 +24,7 @@ export default function Publisher() {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [selectedPostForComments, setSelectedPostForComments] = useState(null);
   const [comments, setComments] = useState([]);
-  // 🚀 NEW: Ref for the hidden file input
+  // 🚀 FIX: 'fileInputRef' was not defined. Added useRef to create the reference.
   const fileInputRef = useRef(null);
 
   const [replyTexts, setReplyTexts] = useState({}); // ✅ FIX: State to hold reply text for each comment individually

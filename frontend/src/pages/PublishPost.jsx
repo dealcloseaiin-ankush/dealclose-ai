@@ -49,6 +49,7 @@ export default function PublishPost() {
   const [zoom, setZoom] = useState(1);
   const canvasContainerRef = useRef(null);
   const isPanning = useRef(false);
+  const uploadInputRef = useRef(null); // 🚀 NEW: Ref for the upload button
   const [backgroundColor, setBackgroundColor] = useState('#1a1a1a'); // 🚀 NEW: State for background color
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
@@ -248,14 +249,24 @@ export default function PublishPost() {
     reader.readAsDataURL(file);
   };
 
+  // 🚀 NEW: Trigger the hidden file input for media upload
+  const triggerMediaUpload = () => {
+    if (uploadInputRef.current) {
+      uploadInputRef.current.click();
+    }
+  };
+
   const fitToScreen = useCallback(() => {
     if (!fabricCanvas || !canvasContainerRef.current) return;
     const container = canvasContainerRef.current;
     const containerWidth = container.offsetWidth - 80;
     const containerHeight = container.offsetHeight - 100;
     const scale = Math.min(containerWidth / 1080, containerHeight / 1080);
-    handleZoom(scale);
-  }, [fabricCanvas, handleZoom]);
+    // 🚀 FIX: Only auto-zoom if the canvas isn't already zoomed in by the user
+    if (zoom <= 1) {
+      handleZoom(scale);
+    }
+  }, [fabricCanvas, handleZoom, zoom]);
 
   useEffect(() => {
     api.get('/instagram/drafts', { params: { workspaceId: activeWorkspace } })
@@ -487,9 +498,10 @@ export default function PublishPost() {
       fabricCanvas.add(new fabric.Rect({ left: 150, top: 150, fill: '#8A2BE2', width: 200, height: 200 }));
       return;
     }
-    // For future implementation
+    // 🚀 FIX: Make 'Add Image' button functional
     if (action === 'addImage' || action === 'addIcon') {
-      return toast('This feature is coming soon!', { icon: '🚧' });
+      triggerMediaUpload();
+      return;
     }
 
     // Actions that require a selected object
@@ -626,10 +638,11 @@ export default function PublishPost() {
           
           {/* 🚀 NEW: Upload Media Button */}
           <div className="absolute left-4 bottom-4 z-10">
-            <label className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all cursor-pointer text-sm" title="Upload your own image or video">
+            {/* This button is now live and will open the file dialog */}
+            <button onClick={triggerMediaUpload} className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all cursor-pointer text-sm" title="Upload your own image or video">
               <UploadCloud size={16} /> Upload Media
-              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
-            </label>
+            </button>
+            <input type="file" ref={uploadInputRef} accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
           </div>
 
           <div className="flex-1 w-full h-full flex items-center justify-center" id="canvas-wrapper">
