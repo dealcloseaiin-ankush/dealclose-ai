@@ -441,8 +441,12 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
 
   try {
     // Step 1: Exchange short-lived token for a long-lived one
-    const { accessToken: longLivedToken, expiresIn } = await getLongLivedAccessToken(authCode);
-    const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
+    const { accessToken: longLivedToken, expiresIn } = await getLongLivedAccessToken(authCode).catch(e => {
+      console.error("getLongLivedAccessToken failed:", e.message);
+      return { accessToken: authCode, expiresIn: 3600 }; // Fallback to short-lived if exchange fails
+    });
+    // ✅ FIX: Safely calculate expiry. If expiresIn is undefined, set a default of 1 hour.
+    const tokenExpiresAt = new Date(Date.now() + (expiresIn || 3600) * 1000);
  
     // Step 2: Get user's pages and their linked Instagram Business Accounts
     const accountsUrl = `https://graph.facebook.com/v19.0/me/accounts`;
