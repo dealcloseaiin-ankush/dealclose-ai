@@ -5,6 +5,7 @@ const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
+const META_APP_SECRET = process.env.META_APP_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
 
@@ -337,378 +338,265 @@ exports.whatsappConnect = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to connect Meta account. Check server logs.' });
   }
 };
-// @desc    Connect Selected Instagram via Meta Login
-// @route   POST /api/users/settings/instagram-connect-selected
-exports.instagramConnectSelected = async (req, res) => {
+
+/**
+ * Exchanges a short-lived access token for a long-lived one.
+ */
+const getLongLivedAccessToken = async (shortLivedToken) => {
+  const url = `https://graph.facebook.com/v19.0/oauth/access_token`;
+  const params = {
+    grant_type: 'fb_exchange_token',
+    client_id: process.env.META_APP_ID,
+    client_secret: META_APP_SECRET,
+    fb_exchange_token: shortLivedToken,
+  };
+  const { data } = await axios.get(url, { params });
+  return {
+    accessToken: data.access_token,
+    expiresIn: data.expires_in, // in seconds
+  };
+};
+
+/**
+ * Fetches the Instagram Business Account ID linked to a Facebook Page.
+ */
+const getInstagramBusinessAccount = async (pageId, accessToken) => {
+  const url = `https://graph.facebook.com/v19.0/${pageId}`;
+  const params = {
+    fields: 'instagram_business_account{id,username,profile_picture_url},business',
+    access_token: accessToken,
+  };
+  const { data } = await axios.get(url, { params });
+  if (!data.instagram_business_account) {
+    throw new Error('This Facebook Page is not connected to an Instagram Business Account.');
+  }
+  return {
+    instagramBusinessAccountId: data.instagram_business_account.id,
+    username: data.instagram_business_account.username,
+    profilePictureUrl: data.instagram_business_account.profile_picture_url,
+    businessId: data.business?.id,
+  };
+};
+
+/**
+ * Verifies token, permissions, and runs lightweight API calls to trigger Meta's test cases.
+ */
+const performVerificationAndTriggerAPITests = async (igBusinessAccountId, accessToken) => {
+  const verificationResults = {};
+  const APP_ID = process.env.META_APP_ID;
+
   try {
-    const { selectedAccountId, selectedPageId, workspaceId: requestedWorkspaceId } = req.body;
-    const userId = req.user?._id || req.user?.id;
-    console.log('[Instagram Connect Selected] request body:', req.body, 'userId:', userId);
+    // 1. Verify Token & Permissions (/debug_token)
+    const debugTokenUrl = `https://graph.facebook.com/debug_token`;
+    const { data: tokenData } = await axios.get(debugTokenUrl, { params: { input_token: accessToken, access_token: `${APP_ID}|${META_APP_SECRET}` } });
+    verificationResults.token = { isValid: tokenData.data.is_valid, scopes: tokenData.data.scopes, userId: tokenData.data.user_id };
+    if (!tokenData.data.is_valid) throw new Error('Access Token is invalid.');
 
-    const user = await User.findById(userId);
-    const pending = user?.pendingInstagramConnection;
-    console.log('[Instagram Connect Selected] pending session:', pending ? {
-      workspaceId: pending.workspaceId,
-      expiresAt: pending.expiresAt,
-      accountsCount: pending.accounts?.length
-    } : null);
-    if (!userId || !selectedAccountId || !selectedPageId || !pending || pending.expiresAt < new Date()) {
-      return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
+    // 2. Trigger "Content Publish" test (read operation)
+    const mediaUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/media`;
+    await axios.get(mediaUrl, { params: { access_token: accessToken, limit: 1 } });
+    verificationResults.contentPublish = 'OK';
+
+    // 3. Trigger "Insights" test (read operation)
+    const insightsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/insights`;
+    await axios.get(insightsUrl, { params: { access_token: accessToken, metric: 'impressions,reach', period: 'day' } });
+    verificationResults.insights = 'OK';
+
+    // 4. Trigger "Comments" test (read operation)
+    const { data: mediaData } = await axios.get(mediaUrl, { params: { access_token: accessToken, limit: 1, fields: 'id' } });
+    if (mediaData.data && mediaData.data.length > 0) {
+      const mediaId = mediaData.data[0].id;
+      const commentsUrl = `https://graph.facebook.com/v19.0/${mediaId}/comments`;
+      await axios.get(commentsUrl, { params: { access_token: accessToken, limit: 1 } });
     }
+    verificationResults.comments = 'OK';
 
-    if (requestedWorkspaceId && requestedWorkspaceId !== (pending.workspaceId || 'main')) {
-      return res.status(400).json({ success: false, message: 'Instagram selection workspace mismatch. Please connect Instagram again for this workspace.' });
-    }
+    // 5. Trigger "Messaging" test (read operation)
+    const conversationsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/conversations`;
+    await axios.get(conversationsUrl, { params: { access_token: accessToken, limit: 1, platform: 'instagram' } });
+    verificationResults.messaging = 'OK';
 
-    const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
-    if (!selected) {
-      return res.status(400).json({ success: false, message: 'Selected Instagram account was not returned by Meta.' });
-    }
+    return verificationResults;
 
-    const workspaceId = pending.workspaceId || 'main';
-    const instagramConfig = {
-      accessToken: selected.pageToken || pending.accessToken,
-      instagramAccountId: selected.accountId,
-      facebookPageId: selected.pageId,
-      tokenExpiresAt: pending.tokenExpiresAt
-    };
-
-    console.log('[Instagram Connect Selected] 🔍 instagramConfig object being saved:', JSON.stringify(instagramConfig, null, 2));
-    console.log('[Instagram Connect Selected] 🔍 workspaceId:', workspaceId);
-
-    const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
-    const update = workspaceId !== 'main'
-      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig } }
-      : { $set: { instagramConfig } };
-
-    console.log('[Instagram Connect Selected] 🔍 Update query:', JSON.stringify(update, null, 2));
-
-    const updateResult = await User.updateOne(filter, update);
-    console.log('[Instagram Connect Selected] ✅ Update result:', updateResult);
-
-    await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
-    console.log('[Instagram Connect Selected] saved instagramConfig for', workspaceId, 'selectedAccountId:', selectedAccountId, 'selectedPageId:', selectedPageId);
-
-    // 🔥 VERIFY: Check if data was actually saved (with timeout protection)
-    try {
-      const verifyUser = await Promise.race([
-        User.findById(userId),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Verification timeout')), 5000))
-      ]);
-      
-      if (workspaceId !== 'main') {
-        const savedWs = verifyUser.workspaces.find(w => w._id.toString() === workspaceId);
-        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved workspace instagramConfig:', JSON.stringify(savedWs?.instagramConfig, null, 2));
-      } else {
-        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved root instagramConfig:', JSON.stringify(verifyUser.instagramConfig, null, 2));
-      }
-    } catch (verifyError) {
-      console.error('[Instagram Connect Selected] ⚠️ Verification failed:', verifyError.message);
-    }
-
-    // 🔥 Webhook subscription - don't let it hang the entire response
-    let webhookWarning;
-    try {
-      const webhookPromise = axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
-        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken },
-        timeout: 5000 // 5 second timeout
-      });
-      
-      await Promise.race([
-        webhookPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Webhook subscription timeout')), 6000))
-      ]);
-      
-      console.log('[Instagram Connect Selected] ✅ Webhook subscription successful');
-    } catch (subscriptionError) {
-      webhookWarning = subscriptionError.response?.data?.error?.message || subscriptionError.message;
-      console.warn('⚠️ Webhook subscription warning after Instagram connection:', webhookWarning);
-    }
-
-    return res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: instagramConfig, webhookWarning });
   } catch (error) {
-    console.error('Instagram Connect Selected Error:', error.response?.data || error.message);
-    res.status(500).json({ success: false, message: 'Failed to finalize Instagram account selection. Try again.' });
+    console.error('❌ Verification Error:', error.response?.data || error.message);
+    if (!verificationResults.token?.isValid) {
+      throw new Error('Token verification failed. Cannot proceed.');
+    }
+    return { ...verificationResults, error: error.message };
   }
 };
 
-// @desc    Connect Selected Instagram via Meta Login
-// @route   POST /api/users/settings/instagram-connect-selected
-exports.instagramConnectSelected = async (req, res) => {
-  try {
-    const { selectedAccountId, selectedPageId, workspaceId: requestedWorkspaceId } = req.body;
-    const userId = req.user?._id || req.user?.id;
-    console.log('[Instagram Connect Selected] request body:', req.body, 'userId:', userId);
+/**
+ * @desc    Connect Instagram via Meta Login (New Independent Business Flow)
+ * @route   POST /api/users/settings/instagram-connect
+ */
+ exports.instagramConnect = async (req, res) => {
+  const { authCode, workspaceId } = req.body;
+  const userId = req.user?._id || req.user?.id;
 
-    const user = await User.findById(userId);
-    const pending = user?.pendingInstagramConnection;
-    console.log('[Instagram Connect Selected] pending session:', pending ? {
-      workspaceId: pending.workspaceId,
-      expiresAt: pending.expiresAt,
-      accountsCount: pending.accounts?.length
-    } : null);
-    if (!userId || !selectedAccountId || !selectedPageId || !pending || pending.expiresAt < new Date()) {
-      return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
-    }
-
-    if (requestedWorkspaceId && requestedWorkspaceId !== (pending.workspaceId || 'main')) {
-      return res.status(400).json({ success: false, message: 'Instagram selection workspace mismatch. Please connect Instagram again for this workspace.' });
-    }
-
-    const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
-    if (!selected) {
-      return res.status(400).json({ success: false, message: 'Selected Instagram account was not returned by Meta.' });
-    }
-
-    const workspaceId = pending.workspaceId || 'main';
-    const instagramConfig = {
-      accessToken: selected.pageToken || pending.accessToken,
-      instagramAccountId: selected.accountId,
-      facebookPageId: selected.pageId,
-      tokenExpiresAt: pending.tokenExpiresAt
-    };
-
-    console.log('[Instagram Connect Selected] 🔍 instagramConfig object being saved:', JSON.stringify(instagramConfig, null, 2));
-    console.log('[Instagram Connect Selected] 🔍 workspaceId:', workspaceId);
-
-    const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
-    const update = workspaceId !== 'main'
-      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig } }
-      : { $set: { instagramConfig } };
-
-    console.log('[Instagram Connect Selected] 🔍 Update query:', JSON.stringify(update, null, 2));
-
-    const updateResult = await User.updateOne(filter, update);
-    console.log('[Instagram Connect Selected] ✅ Update result:', updateResult);
-
-    await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
-    console.log('[Instagram Connect Selected] saved instagramConfig for', workspaceId, 'selectedAccountId:', selectedAccountId, 'selectedPageId:', selectedPageId);
-
-    // 🔥 VERIFY: Check if data was actually saved (with timeout protection)
-    try {
-      const verifyUser = await Promise.race([
-        User.findById(userId),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Verification timeout')), 5000))
-      ]);
-      
-      if (workspaceId !== 'main') {
-        const savedWs = verifyUser.workspaces.find(w => w._id.toString() === workspaceId);
-        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved workspace instagramConfig:', JSON.stringify(savedWs?.instagramConfig, null, 2));
-      } else {
-        console.log('[Instagram Connect Selected] ✅ VERIFICATION - Saved root instagramConfig:', JSON.stringify(verifyUser.instagramConfig, null, 2));
-      }
-    } catch (verifyError) {
-      console.error('[Instagram Connect Selected] ⚠️ Verification failed:', verifyError.message);
-    }
-
-    // 🔥 Webhook subscription - don't let it hang the entire response
-    let webhookWarning;
-    try {
-      const webhookPromise = axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
-        params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selected.pageToken || pending.accessToken },
-        timeout: 5000 // 5 second timeout
-      });
-      
-      await Promise.race([
-        webhookPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Webhook subscription timeout')), 6000))
-      ]);
-      
-      console.log('[Instagram Connect Selected] ✅ Webhook subscription successful');
-    } catch (subscriptionError) {
-      webhookWarning = subscriptionError.response?.data?.error?.message || subscriptionError.message;
-      console.warn('⚠️ Webhook subscription warning after Instagram connection:', webhookWarning);
-    }
-
-    return res.status(200).json({ success: true, message: 'Instagram successfully connected!', data: instagramConfig, webhookWarning });
-  } catch (error) {
-    console.error('Instagram Connect Selected Error:', error.response?.data || error.message);
-    res.status(500).json({ success: false, message: 'Failed to finalize Instagram account selection. Try again.' });
+  if (!authCode || !workspaceId) {
+    return res.status(400).json({ success: false, message: 'Authorization code and workspace ID are required.' });
   }
-};
 
-// @desc    Connect Instagram via Meta Login
-// @route   POST /api/users/settings/instagram-connect
-exports.instagramConnect = async (req, res) => {
   try {
-    const { authCode, workspaceId } = req.body;
-    const userId = req.user?._id || req.user?.id;
-
-    if (!userId || !authCode) {
-      return res.status(400).json({ success: false, message: 'Missing authCode or unauthorized session' });
-    }
-
-    const APP_ID = process.env.META_APP_ID;
-    const APP_SECRET = process.env.META_APP_SECRET;
-    
-    if (!APP_ID || !APP_SECRET) return res.status(400).json({ success: false, message: 'Backend .env is missing META_APP_ID or META_APP_SECRET' });
-
-    let clientAccessToken = authCode;
-
-    // Exchange code for token if it's a short-lived code
-    if (!authCode.startsWith('EAA') && !authCode.startsWith('EA')) {
-      try {
-        const tokenResponse = await Promise.race([
-          axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
-            params: {
-              client_id: APP_ID,
-              client_secret: APP_SECRET,
-              code: authCode,
-              redirect_uri: '' 
-            },
-            timeout: 10000 // 10 second timeout
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Token exchange timeout')), 12000))
-        ]);
-        clientAccessToken = tokenResponse.data.access_token;
-      } catch (err) {
-        console.error('Failed to exchange auth code for token:', err.message);
-        return res.status(400).json({ success: false, message: 'Failed to authenticate with Meta' });
-      }
-    }
-
-    // 🔥 FIX: Automatically exchange Short-Lived Token for a Long-Lived Token (Valid for 60 Days)
-    let expiresInDays = 60; // Default Meta long-lived token
-    try {
-      const longLivedResponse = await Promise.race([
-        axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
-          params: {
-            grant_type: 'fb_exchange_token',
-            client_id: APP_ID,
-            client_secret: APP_SECRET,
-            fb_exchange_token: clientAccessToken
-          },
-          timeout: 10000
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Long-lived token exchange timeout')), 12000))
-      ]);
-      
-      if (longLivedResponse.data && longLivedResponse.data.access_token) {
-        clientAccessToken = longLivedResponse.data.access_token;
-        if (longLivedResponse.data.expires_in) {
-           expiresInDays = Math.floor(longLivedResponse.data.expires_in / (60 * 60 * 24));
-        }
-      }
-    } catch (exchangeErr) {
-      console.error('Failed to get long-lived Instagram token, continuing with short-lived:', exchangeErr.message);
-    }
-
-    // Fetch User's Facebook Pages
-    let pagesResponse;
-    try {
-      pagesResponse = await Promise.race([
-        axios.get(`https://graph.facebook.com/v19.0/me/accounts`, {
-          params: { access_token: clientAccessToken },
-          timeout: 10000
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Pages fetch timeout')), 12000))
-      ]);
-    } catch (pagesErr) {
-      console.error('Failed to fetch Facebook pages:', pagesErr.message);
-      return res.status(400).json({ success: false, message: 'Failed to fetch Facebook pages. Check your token.' });
-    }
-
-    const pages = pagesResponse.data.data;
-    console.log(`\n================== [META INSTAGRAM DEBUG] ==================`);
-    console.log(`🔍 1. Facebook Pages Found from Meta (${pages?.length || 0}):`, pages ? pages.map(p => `${p.name} (ID: ${p.id})`) : 'None');
-
-    if (!pages || pages.length === 0) {
-        return res.status(400).json({ success: false, message: 'No Facebook Pages found for your account.' });
-    }
-
-    // 🔥 FIX: Prevent Branch from stealing Main's IG Account
-    const userDb = await User.findById(userId);
-    const usedIgAccountIds = [];
-    if (userDb.instagramConfig?.instagramAccountId || userDb.instagramConfig?.instagramAccountId) {
-      const rootIgAccountId = userDb.instagramConfig?.instagramAccountId || userDb.instagramConfig?.instagramAccountId;
-      if (workspaceId !== 'main') usedIgAccountIds.push(rootIgAccountId);
-    }
-    if (userDb.workspaces) {
-      userDb.workspaces.forEach(w => {
-        if (w._id.toString() !== workspaceId) {
-          const workspaceIgAccountId = w.instagramConfig?.instagramAccountId || w.instagramConfig?.instagramAccountId;
-          if (workspaceIgAccountId) {
-            usedIgAccountIds.push(workspaceIgAccountId);
-          }
-        }
-      });
-    }
-
-    let availableAccounts = [];
-
-    // Find all connected Instagram accounts
-    for (const page of pages) {
-        try {
-            const igResponse = await Promise.race([
-              axios.get(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${clientAccessToken}`, {
-                timeout: 8000
-              }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('IG account fetch timeout')), 10000))
-            ]);
-            const igAcc = igResponse.data.instagram_business_account;
-            console.log(`🔍 2. Checking FB Page "${page.name}": IG Account Linked? ->`, igAcc ? `YES (ID: ${igAcc.id})` : 'NO');
-            
-            if (igAcc) {
-                availableAccounts.push({ // Storing all available accounts from Meta
-                   accountId: igAcc.id,
-                   pageId: page.id,
-                       pageName: page.name,
-                       pageToken: page.access_token
-                });
-            }
-        } catch (err) {
-            console.log('Skipping page, no IG connected or timeout:', err.message);
-        }
-    }
-    
-    console.log(`🔍 3. Total Available IG Accounts:`, availableAccounts.map(a => `IG ID: ${a.accountId} (From FB Page: ${a.pageName})`));
-
-    if (availableAccounts.length === 0) {
-        return res.status(400).json({ success: false, message: 'No Instagram Business Account linked to your Facebook Pages.' });
-    }
-
-    // This endpoint only discovers accounts. It never auto-selects or saves one.
-    const selectableAccounts = availableAccounts.filter(account => !usedIgAccountIds.includes(account.accountId));
-    if (selectableAccounts.length === 0) {
-      return res.status(400).json({ success: false, message: 'The Instagram accounts Meta returned are already assigned to another workspace.' });
-    }
-
-    const tokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
-    
-    try {
-      await Promise.race([
-        User.updateOne({ _id: userId }, {
-          $set: {
-            pendingInstagramConnection: {
-              workspaceId: workspaceId || 'main',
-              accessToken: clientAccessToken,
-              tokenExpiresAt,
-              expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-              accounts: selectableAccounts
-            }
-          }
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('DB update timeout')), 5000))
-      ]);
-    } catch (err) {
-      console.error('Failed to save pending Instagram connection:', err.message);
-      return res.status(500).json({ success: false, message: 'Failed to save connection state. Try again.' });
-    }
-
-    return res.status(200).json({
-      success: true,
-      availableAccounts: selectableAccounts.map(({ accountId, pageId, pageName }) => ({ accountId, pageId, pageName }))
+    // Step 1: Exchange short-lived token for a long-lived one
+    const { accessToken: longLivedToken, expiresIn } = await getLongLivedAccessToken(authCode);
+    const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
+ 
+    // Step 2: Get user's pages and their linked Instagram Business Accounts
+    const accountsUrl = `https://graph.facebook.com/v19.0/me/accounts`;
+    const { data: accountsData } = await axios.get(accountsUrl, { 
+      params: { 
+        access_token: longLivedToken, 
+        fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url,business}' 
+      },
+      timeout: process.env.META_API_TIMEOUT || 10000 // Use configurable timeout
     });
-
-  
-    
-   
+ 
+    if (!accountsData.data || accountsData.data.length === 0) {
+      return res.status(404).json({ success: false, message: 'No Facebook Pages found for this account. An Instagram Business Account must be linked to a Facebook Page to connect.' });
+    }
+ 
+    const availableAccounts = [];
+    for (const page of accountsData.data) {
+      try {
+        if (page.instagram_business_account) {
+          availableAccounts.push({
+            accountId: page.instagram_business_account.id,
+            pageId: page.id,
+            pageName: page.name,
+            pageToken: page.access_token, // Page-specific access token
+            username: page.instagram_business_account.username,
+            profilePictureUrl: page.instagram_business_account.profile_picture_url,
+            businessId: page.instagram_business_account.business?.id,
+          });
+        }
+      } catch (e) {
+        console.log(`Skipping page "${page.name}": ${e.message}`);
+      }
+    }
+ 
+    if (availableAccounts.length === 0) {
+      return res.status(404).json({ success: false, message: 'None of your Facebook Pages are connected to an Instagram Business Account.' });
+    }
+ 
+    // Store the list of available accounts in pendingInstagramConnection
+    await User.updateOne({ _id: userId }, {
+      $set: {
+        pendingInstagramConnection: {
+          workspaceId: workspaceId || 'main',
+          accessToken: longLivedToken, // This is the user's long-lived token
+          tokenExpiresAt: tokenExpiresAt,
+          expiresAt: new Date(Date.now() + (10 * 60 * 1000)), // Session expiry for selection
+          accounts: availableAccounts
+        }
+      }
+    });
+ 
+    res.status(200).json({
+      success: true,
+      availableAccounts: availableAccounts.map(({ accountId, pageId, pageName, username, profilePictureUrl }) => ({ 
+        accountId, pageId, pageName, username, profilePictureUrl 
+      }))
+    });
+ 
   } catch (error) {
-    console.error('Instagram Connect Error:', error.response?.data || error.message);
-    res.status(500).json({ success: false, message: 'Failed to connect Instagram account. Try again.' });
+    console.error('❌ Instagram Connect Error:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.error?.message || 'An unknown error occurred during Instagram connection.';
+    res.status(500).json({ success: false, message: errorMessage });
   }
 };
-
+ 
+// @desc    Connect Selected Instagram via Meta Login
+// @route   POST /api/users/settings/instagram-connect-selected
+exports.instagramConnectSelected = async (req, res) => {
+  const { selectedAccountId, selectedPageId, workspaceId: requestedWorkspaceId } = req.body;
+  const userId = req.user?._id || req.user?.id;
+ 
+  if (!userId || !selectedAccountId || !selectedPageId) {
+    return res.status(400).json({ success: false, message: 'Missing selection details or unauthorized session.' });
+  }
+ 
+  try {
+    const user = await User.findById(userId);
+    const pending = user?.pendingInstagramConnection;
+ 
+    if (!pending || pending.expiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: 'This account-selection session expired. Please connect Instagram again.' });
+    }
+ 
+    if (requestedWorkspaceId && requestedWorkspaceId !== (pending.workspaceId || 'main')) {
+      return res.status(400).json({ success: false, message: 'Instagram selection workspace mismatch. Please connect Instagram again for this workspace.' });
+    }
+ 
+    const selected = pending.accounts.find(account => account.accountId === selectedAccountId && account.pageId === selectedPageId);
+    if (!selected) {
+      return res.status(400).json({ success: false, message: 'Selected Instagram account was not found in pending list.' });
+    }
+ 
+    const longLivedToken = pending.accessToken; // User's long-lived token
+    const tokenExpiresAt = pending.tokenExpiresAt;
+    const selectedPageToken = selected.pageToken; // Page-specific token
+ 
+    // Step 1: Perform verification calls to trigger Meta API tests
+    const verificationResults = await performVerificationAndTriggerAPITests(selected.accountId, longLivedToken);
+    console.log('✅ [Meta Verification] API tests triggered:', verificationResults);
+ 
+    // Step 2: Prepare the configuration object to be saved in the User model
+    const instagramConfig = {
+      instagramUserId: verificationResults.token.userId,
+      instagramBusinessAccountId: selected.accountId,
+      facebookPageId: selected.pageId,
+      businessId: selected.businessId,
+      accessToken: longLivedToken,
+      tokenType: 'bearer',
+      expiresAt: tokenExpiresAt,
+      grantedPermissions: verificationResults.token.scopes,
+      username: selected.username,
+      profilePictureUrl: selected.profilePictureUrl,
+      lastVerifiedAt: new Date(),
+    };
+ 
+    // Step 3: Save the connection details to the correct workspace in the User model
+    const workspaceId = pending.workspaceId || 'main';
+    const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
+    const update = workspaceId !== 'main'
+      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig } }
+      : { $set: { instagramConfig } };
+ 
+    await User.updateOne(filter, update);
+ 
+    // Step 4: Subscribe app to the selected Facebook Page for webhooks
+    let webhookWarning;
+    try {
+      await axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
+        params: { subscribed_fields: 'messages,messaging_postbacks,feed,comments', access_token: selectedPageToken },
+        timeout: process.env.META_API_TIMEOUT || 10000
+      });
+      console.log('✅ Webhook subscription successful for page:', selected.pageName);
+    } catch (subscriptionError) {
+      webhookWarning = subscriptionError.response?.data?.error?.message || subscriptionError.message;
+      console.warn('⚠️ Webhook subscription warning after Instagram connection:', webhookWarning);
+    }
+ 
+    // Step 5: Clear pending connection state
+    await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
+ 
+    res.status(200).json({
+      success: true,
+      message: `Instagram account @${instagramConfig.username} connected and verified successfully!`,
+      data: instagramConfig,
+      verification: verificationResults,
+      webhookWarning: webhookWarning
+    });
+ 
+  } catch (error) {
+    console.error('❌ Instagram Connect Error:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.error?.message || 'An unknown error occurred during Instagram connection.';
+    res.status(500).json({ success: false, message: errorMessage });
+  }
+};
 // @desc    Register a New User (Standard Email/Password)
 // @route   POST /api/users/register
 exports.register = async (req, res) => {

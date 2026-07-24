@@ -2,6 +2,30 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const Schema = mongoose.Schema;
 
+// ✅ NEW: Comprehensive schema for Instagram Business connections.
+// This will store all the new data from the updated login flow.
+const instagramConfigSchema = new Schema({
+  // Core IDs
+  instagramUserId: { type: String }, // The user who authorized the app
+  instagramBusinessAccountId: { type:String },
+  facebookPageId: { type: String },
+  businessId: { type: String }, // Meta Business Manager ID
+
+  // Legacy field for backward compatibility
+  instagramAccountId: { type: String }, 
+  
+  // Authentication & Permissions
+  accessToken: { type: String },
+  tokenType: { type: String, default: 'bearer' },
+  expiresAt: { type: Date },
+  grantedPermissions: [{ type: String }],
+
+  // Metadata
+  username: { type: String },
+  profilePictureUrl: { type: String },
+  lastVerifiedAt: { type: Date },
+}, { _id: false });
+
 const userSchema = new Schema({
   email: {
     type: String,
@@ -103,13 +127,7 @@ const userSchema = new Schema({
       phoneNumberId: { type: String },
       wabaId: { type: String }
     },
-    // Canonical Instagram connection for a workspace.
-    instagramConfig: {
-      accessToken: { type: String },
-      instagramAccountId: { type: String },
-      facebookPageId: { type: String },
-      tokenExpiresAt: { type: Date }
-    },
+    instagramConfig: instagramConfigSchema, // ✅ USE: Using the new comprehensive schema
     // --- Separate AI Brain for each Workspace ---
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
@@ -149,12 +167,7 @@ const userSchema = new Schema({
     webhookVerifyToken: { type: String },
     wabaId: { type: String } // Required by Meta for Template Approvals
   },
-  instagramConfig: {
-    accessToken: { type: String }, // Page Access Token (igAccessToken)
-    instagramAccountId: { type: String }, // Instagram Business/Creator ID
-    facebookPageId: { type: String }, // Linked FB Page ID
-    tokenExpiresAt: { type: Date }
-  },
+  instagramConfig: instagramConfigSchema, // ✅ USE: Using the new comprehensive schema
   // Server-side, 10-minute state for the account picker. It is never sent in profile responses.
   pendingInstagramConnection: {
     workspaceId: { type: String },

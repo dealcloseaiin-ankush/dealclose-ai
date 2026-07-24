@@ -2,46 +2,6 @@
 const axios = require('axios');
 
 /**
- * Publishes a single image post to an Instagram Business Account.
- */
-exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, caption) => {
-  try {
-    console.log(`[IG Publish] Step 1: Uploading image container for account ${igAccountId}`);
-    const containerResponse = await axios.post(
-      `https://graph.facebook.com/v19.0/${igAccountId}/media`,
-      {
-        image_url: imageUrl,
-        caption: caption,
-        access_token: accessToken,
-      }
-    );
-
-    const creationId = containerResponse.data.id;
-    if (!creationId) {
-      throw new Error('Failed to create media container.');
-    }
-    console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
-
-    console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
-    const publishResponse = await axios.post(
-      `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`,
-      {
-        creation_id: creationId,
-        access_token: accessToken,
-      }
-    );
-    
-    console.log(`[IG Publish] Step 2 Success: Post published with ID: ${publishResponse.data.id}`);
-    return { success: true, postId: publishResponse.data.id };
-
-  } catch (error) {
-    const errorMessage = error.response?.data?.error?.message || error.message;
-    console.error(`[IG Publish] Error publishing to Instagram:`, errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
-/**
  * 🚀 UPGRADED: Publishes Reels or Images directly with Status Processing Loops
  * (Used by AI Video Dashboard & Pipelines)
  */
@@ -189,37 +149,6 @@ exports.deleteMedia = async (mediaId, accessToken) => {
 };
 
 /**
- * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
- * @param {string} mediaId - The ID of the Instagram post or reel.
- * @param {string} accessToken - The user's Instagram access token.
- * @returns {Promise<object>} - An object containing the insights data.
- */
-exports.getPostInsights = async (mediaId, accessToken) => {
-  try {
-    // Ye metrics hum Meta se maang rahe hain
-    const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
-    const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
-
-    const response = await axios.get(url, {
-      params: {
-        metric: metrics,
-        access_token: accessToken,
-      },
-    });
-
-    // API se mile data ko saaf format me return karein
-    const insights = {};
-    response.data.data.forEach(metric => {
-      insights[metric.name] = metric.values[0].value;
-    });
-
-    return insights;
-  } catch (error) {
-    throw new Error(error.response?.data?.error?.message || error.message);
-  }
-};
-
-/**
  * 🚀 NEW: Fetches key business insights for an Instagram account.
  * @param {string} igAccountId - The user's Instagram Business Account ID.
  * @param {string} accessToken - The user's Instagram access token.
@@ -288,37 +217,6 @@ exports.sendDirectMessage = async (recipientId, message, pageAccessToken) => {
 };
 
 /**
- * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
- * @param {string} mediaId - The ID of the Instagram post or reel.
- * @param {string} accessToken - The user's Instagram access token.
- * @returns {Promise<object>} - An object containing the insights data.
- */
-exports.getPostInsights = async (mediaId, accessToken) => {
-  try {
-    // Ye metrics hum Meta se maang rahe hain
-    const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
-    const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
-
-    const response = await axios.get(url, {
-      params: {
-        metric: metrics,
-        access_token: accessToken,
-      },
-    });
-
-    // API se mile data ko saaf format me return karein
-    const insights = {};
-    response.data.data.forEach(metric => {
-      insights[metric.name] = metric.values[0].value;
-    });
-
-    return insights;
-  } catch (error) {
-    throw new Error(error.response?.data?.error?.message || error.message);
-  }
-};
-
-/**
  * 🚀 NEW: Fetches key business insights for an Instagram account.
  * @param {string} igAccountId - The user's Instagram Business Account ID.
  * @param {string} accessToken - The user's Instagram access token.
@@ -357,7 +255,7 @@ exports.getBusinessInsights = async (igAccountId, accessToken) => {
  * @param {string} caption - The caption for the post.
  * @returns {Promise<object>} - An object containing the success status and post ID.
  */
-exports.publishImagePost = async (igAccountId, accessToken, imageUrl, caption) => {
+exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, caption) => {
   try {
     console.log(`[IG Publish] Step 1: Creating media container for image.`);
     const containerResponse = await axios.post(
@@ -417,6 +315,33 @@ exports.publishFacebookPhoto = async (pageId, accessToken, imageUrl, caption) =>
     const postId = response.data?.post_id || response.data?.id;
     if (!postId) throw new Error('Facebook did not return a post ID.');
     return { success: true, postId };
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
+/**
+ * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
+ * @param {string} mediaId - The ID of the Instagram post or reel.
+ * @param {string} accessToken - The user's Instagram access token.
+ * @returns {Promise<object>} - An object containing the insights data.
+ */
+exports.getPostInsights = async (mediaId, accessToken) => {
+  try {
+    const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
+    const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
+
+    const response = await axios.get(url, {
+      params: { metric: metrics, access_token: accessToken },
+    });
+
+    const insights = {};
+    if (response.data?.data) {
+      response.data.data.forEach(metric => {
+        insights[metric.name] = metric.values[0]?.value || 0;
+      });
+    }
+    return insights;
   } catch (error) {
     throw new Error(error.response?.data?.error?.message || error.message);
   }

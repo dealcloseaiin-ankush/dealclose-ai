@@ -183,7 +183,7 @@ exports.getRecentPosts = async (req, res) => {
       ? selectedWorkspace.instagramConfig
       : user.instagramConfig;
     let accessToken = selectedInstagram?.accessToken;
-    let accountId = selectedInstagram?.instagramAccountId || selectedInstagram?.accountId;
+    let accountId = selectedInstagram?.instagramBusinessAccountId || selectedInstagram?.instagramAccountId || selectedInstagram?.accountId;
     let source = selectedWorkspace ? `Workspace: ${selectedWorkspace.name}` : 'Main Config';
 
     if (workspaceId === 'main' && !accessToken && user?.workspaces) {
@@ -192,7 +192,7 @@ exports.getRecentPosts = async (req, res) => {
         selectedWorkspace = ws;
         const workspaceInstagram = ws.instagramConfig;
         accessToken = workspaceInstagram.accessToken;
-        accountId = workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
+        accountId = workspaceInstagram.instagramBusinessAccountId || workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
         source = `Workspace: ${ws.name}`;
       }
     }

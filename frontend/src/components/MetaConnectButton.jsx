@@ -85,9 +85,15 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
     } else {
       // Instagram uses Standard Access Token Flow (Cleaned Scopes)
       fbLoginConfig = {
-        ...fbLoginConfig, // ✅ FIX: Added required permissions for publishing and analytics
-        // ✅ NEW: Added more granular permissions as requested for full functionality
-        scope: 'pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_content_publish,instagram_manage_insights,business_management,pages_messaging'
+        ...fbLoginConfig,
+        // ✅ NEW: Comprehensive scope for the independent Instagram Business Login.
+        // This requests all permissions needed for publishing, insights, comments, messaging, and business management.
+        scope: [
+          'business_management',
+          'instagram_basic',
+          'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
+          'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
+        ].join(',')
       };
     }
 
@@ -123,7 +129,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
           console.log(`INSTAGRAM RESPONSE =>`, res.data);
           
           // Agar Instagram accounts select karne ke liye array aa raha hai
-          if (platform === 'instagram' && res.data.availableAccounts) {
+          if (platform === 'instagram' && res.data.availableAccounts && res.data.availableAccounts.length > 0) {
              if (onSuccess) {
                onSuccess({ availableAccounts: res.data.availableAccounts, authCode }); 
              }
