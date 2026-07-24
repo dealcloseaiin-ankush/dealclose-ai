@@ -399,7 +399,8 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
 
     // 3. Trigger "Insights" test (read operation)
     const insightsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/insights`;
-    await axios.get(insightsUrl, { params: { access_token: accessToken, metric: 'impressions,reach', period: 'day' } });
+    // ✅ FIX: Replaced 'impressions' with 'profile_views' as 'impressions' is not always available for 'day' period.
+    await axios.get(insightsUrl, { params: { access_token: accessToken, metric: 'reach,profile_views', period: 'day' } });
     verificationResults.insights = 'OK';
 
     // 4. Trigger "Comments" test (read operation)
