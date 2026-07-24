@@ -25,6 +25,9 @@ export default function PublishPost() {
   const [isAiWorking, setIsAiWorking] = useState(false);
   
   const [drafts, setDrafts] = useState([]);
+  // 🚀 NEW: State to hold the file passed from the Publisher page
+  const [initialFile] = useState(location.state?.newPostFile || null);
+
   const [editingDraft, setEditingDraft] = useState(null);
 
   // Main form state (now also used for editing drafts)
@@ -192,6 +195,20 @@ export default function PublishPost() {
     }
   }, [location.search, renderDesign, handleAiChat]);
 
+  // 🚀 NEW: Effect to load the initial file onto the canvas
+  useEffect(() => {
+    if (initialFile && fabricCanvas) {
+      const toastId = toast.loading('Loading your media...');
+      const reader = new FileReader();
+      reader.onload = (f) => {
+        fabric.Image.fromURL(f.target.result, (img) => {
+          fabricCanvas.add(img).centerObject(img).renderAll();
+          toast.success('Media loaded! Write a caption or ask AI.', { id: toastId });
+        });
+      };
+      reader.readAsDataURL(initialFile);
+    }
+  }, [initialFile, fabricCanvas]);
   // ✅ FIX: Moved zoom handlers before the useEffect that depends on them to fix crash.
   const handleZoom = useCallback((newZoom) => {
     if (!fabricCanvas) return; // Safety check
@@ -362,19 +379,24 @@ export default function PublishPost() {
 
   const handlePublish = async () => {
     setIsPublishing(true);
-    
-    // 🚀 NEW: Export the canvas as an image
-    const imageDataUrl = exportToImage('jpeg');
-    if (!imageDataUrl) {
-      toast.error("Canvas is empty. Cannot publish.");
-      return setIsPublishing(false);
+    const toastId = toast.loading('Preparing your post...');
+
+    let fileToUpload;
+
+    // 🚀 FIX: If an initial file was provided, use it directly. Otherwise, export from canvas.
+    if (initialFile) {
+      fileToUpload = initialFile;
+    } else {
+      const imageDataUrl = exportToImage('jpeg');
+      if (!imageDataUrl) { toast.error("Canvas is empty. Cannot publish."); return setIsPublishing(false); }
+      const blob = await (await fetch(imageDataUrl)).blob();
+      fileToUpload = new File([blob], 'design.jpg', { type: 'image/jpeg' });
     }
 
-    const toastId = toast.loading('Publishing post to Instagram...');
-
-    // Convert data URL to a file object to send to the backend
-    const blob = await (await fetch(imageDataUrl)).blob();
-    const imageFileFromCanvas = new File([blob], 'design.jpg', { type: 'image/jpeg' });
+    if (!fileToUpload) {
+      toast.error("No media file found to publish.");
+      return setIsPublishing(false);
+    }
 
     const selectedPlatforms = Object.keys(platforms).filter(p => platforms[p]);
     if (selectedPlatforms.length === 0) {
@@ -383,7 +405,7 @@ export default function PublishPost() {
     }
 
     const formData = new FormData();
-    formData.append('media', imageFileFromCanvas);
+    formData.append('media', fileToUpload);
     formData.append('caption', caption);
     formData.append('workspaceId', activeWorkspace);
     formData.append('designJson', JSON.stringify(exportToJson()));

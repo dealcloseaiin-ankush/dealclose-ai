@@ -769,42 +769,33 @@ export default function Settings() {
                         <input type="text" name="igAccountId" value={config.igAccountId} onChange={handleChange} placeholder="Target Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
                       </div>
                     </div>
-                    <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely.</p>
-                   {/* ✅ FIXED MAIN BUSINESS INSTAGRAM CONDITIONAL BUTTON DISCONNECT ZONE */}
+                    <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely. You only need to connect once.</p>
+                   
+                    {/* 🚀 FIX: Show EITHER connect options OR a disconnect button, not both. */}
                     {mainIgConnected && (
                       <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
                          <p className="text-sm text-green-400 font-semibold">Instagram is actively monitored by AI.</p>
                          <button 
                            type="button" 
                            onClick={() => disconnectInstagram('main')} 
-                           className="mt-3 text-sm text-red-400 font-bold hover:text-red-500 hover:underline cursor-pointer transition-colors"
+                           className="mt-3 px-4 py-2 bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded-xl border border-rose-500/20 text-sm font-semibold transition-all"
                          >
-                           Disconnect Account 🔌
+                           Disconnect Instagram Account
                          </button>
                       </div>
                     )}
-                    <div className="space-y-4 mt-4">
-                      {mainIgConnected && <p className="text-xs text-gray-500">To replace the connected account, choose a new connection method below.</p>}
+                    {!mainIgConnected && (
+                      <div className="space-y-4 mt-4">
                       <div>
-                        <MetaConnectButton 
-                          variant="facebook"
-                          buttonText={mainIgConnected ? "Replace via Facebook" : "Connect via Facebook"}
-                          platform="instagram" 
-                          workspaceId="main" 
-                          onSuccess={(data) => openInstagramPicker(data, 'main')} 
-                        />
+                        <MetaConnectButton variant="facebook" buttonText="Connect via Facebook" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
                         <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account linked to a Facebook Page.</p>
                       </div>
                       <div>
-                        <MetaConnectButton 
-                          buttonText={mainIgConnected ? "Replace with Instagram Login" : "Connect with Instagram Login"}
-                          platform="instagram" 
-                          workspaceId="main" 
-                          onSuccess={(data) => openInstagramPicker(data, 'main')} 
-                        />
+                        <MetaConnectButton buttonText="Connect with Instagram Login" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
                         <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account that is not linked to a Facebook Page.</p>
                       </div>
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Meta Ads Conversions API */}

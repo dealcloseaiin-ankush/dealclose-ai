@@ -1,23 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 
+// 🚀 FIX: Global flags to ensure SDK is loaded only once across the entire application.
+// This prevents the "overriding current access token" warning.
+let globalIsSdkLoaded = false;
+let globalIsSdkLoading = false;
+const globalSdkLoadCallbacks = [];
+
 const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', workspaceId = 'main', onSuccess, variant }) => {
-  const [isSdkLoaded, setIsSdkLoaded] = useState(typeof window !== 'undefined' && !!window.FB);
+  // Use local state to reflect global SDK load status
+  const [isSdkReady, setIsSdkReady] = useState(globalIsSdkLoaded);
   const [loading, setLoading] = useState(false);
 
   const APP_ID = import.meta.env.VITE_META_APP_ID; 
   const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
 
-  // 1. Load Facebook SDK Safely
+  // 1. Load Facebook SDK Safely and only once
   useEffect(() => {
-    const checkInterval = setInterval(() => {
-      if (window.FB && window.isFbInitialized) {
-        setIsSdkLoaded(true);
-        clearInterval(checkInterval);
-      }
-    }, 500);
+    // Add current component's readiness setter to callbacks
+    globalSdkLoadCallbacks.push(() => setIsSdkReady(true));
 
-    if (!document.getElementById('facebook-jssdk')) {
+    // If SDK is not currently loading, initiate loading
+    if (!globalIsSdkLoading) {
+      globalIsSdkLoading = true;
+
+      // Define fbAsyncInit globally before the script loads
       window.fbAsyncInit = function () {
         window.FB.init({
           appId: APP_ID,
@@ -25,19 +32,24 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
           xfbml: true,
           version: 'v19.0' 
         });
-        window.isFbInitialized = true;
-        setIsSdkLoaded(true);
+        globalIsSdkLoaded = true;
+        globalIsSdkLoading = false;
+        // Call all pending callbacks
+        globalSdkLoadCallbacks.forEach(cb => cb());
+        // Clear callbacks after execution
+        globalSdkLoadCallbacks.length = 0; 
       };
 
-      const script = document.createElement('script');
-      script.id = 'facebook-jssdk';
-      script.src = "https://connect.facebook.net/en_US/sdk.js";
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
+      // Inject the SDK script if it's not already there
+      if (!document.getElementById('facebook-jssdk')) {
+        const script = document.createElement('script');
+        script.id = 'facebook-jssdk';
+        script.src = "https://connect.facebook.net/en_US/sdk.js";
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+      }
     }
-
-    return () => clearInterval(checkInterval);
   }, [APP_ID]);
 
   // 2. Handle Login Flow
@@ -157,7 +169,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
   return (
     <button type="button"
       onClick={handleMetaLogin}
-      disabled={loading || !isSdkLoaded}
+      disabled={loading || !isSdkReady}
       className={`w-full flex items-center justify-center gap-2 ${buttonClass} text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all disabled:opacity-50`}
     >
       <img 
@@ -165,7 +177,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         alt="Meta" 
         className={`w-5 h-5 ${(platform === 'whatsapp' || isFacebookVariant) ? 'bg-white rounded-full p-0.5' : ''}`} 
       />
-      {loading ? 'Connecting...' : (!isSdkLoaded ? 'Loading Meta SDK...' : buttonText)}
+      {loading ? 'Connecting...' : (!isSdkReady ? 'Loading Meta SDK...' : buttonText)}
     </button>
   );
 };

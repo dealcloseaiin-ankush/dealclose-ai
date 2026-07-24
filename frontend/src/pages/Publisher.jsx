@@ -3,7 +3,7 @@ import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, D
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'; // 🚀 NEW: Import useAuth to get user and workspaces
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Publisher() {
@@ -24,6 +24,9 @@ export default function Publisher() {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [selectedPostForComments, setSelectedPostForComments] = useState(null);
   const [comments, setComments] = useState([]);
+  // 🚀 NEW: Ref for the hidden file input
+  const fileInputRef = useRef(null);
+
   const [replyTexts, setReplyTexts] = useState({}); // ✅ FIX: State to hold reply text for each comment individually
 
   const isSyncing = useRef(false);
@@ -139,6 +142,20 @@ export default function Publisher() {
     // The editor will then fetch the post and allow AI enhancement.
     toast.success('Loading post in editor for AI enhancement...');
     navigate(`/publish-post?import_id=${postId}`);
+  };
+
+  // 🚀 NEW: Trigger file input click
+  const handleCreatePostClick = () => {
+    fileInputRef.current.click();
+  };
+
+  // 🚀 NEW: Handle file selection and navigate to editor
+  const handleFileSelectForNewPost = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Use state to pass the file to the editor component
+      navigate('/publish-post', { state: { newPostFile: file } });
+    }
   };
 
   // 🚀 NEW: Download post media
@@ -270,12 +287,16 @@ export default function Publisher() {
             <button onClick={handleImportPosts} className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all">
               <Download size={16} /> Import Posts
             </button>
-            <Link
-              to="/publish-post"
+            {/* 🚀 FIX: Changed Link to a button that triggers file input */}
+            <button
+              onClick={handleCreatePostClick}
               className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
             >
               <Plus size={18} /> Create New Post
-            </Link>
+            </button>
+            {/* Hidden file input */}
+            <input type="file" ref={fileInputRef} onChange={handleFileSelectForNewPost} className="hidden" accept="image/*,video/*" />
+
           </div>
         </div>
         
