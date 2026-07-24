@@ -176,12 +176,14 @@ exports.deletePost = async (req, res) => {
 
     // A published IG post must be deleted on Instagram first. Previously this
     // route only removed our database record, so the post stayed visible on IG.
+    // 🚀 FIX: Also delete 'live' posts imported from Instagram, not just 'published' ones.
+    // This ensures that any post with an Instagram ID is deleted from the platform.
     if (post.platformPostIds?.instagram) {
       const user = await User.findById(userId).lean();
       const workspace = post.workspaceId !== 'main'
         ? user?.workspaces?.find(w => String(w._id) === String(post.workspaceId))
         : null;
-      const igConfig = workspace?.instagramConfig
+      const igConfig = workspace?.instagramConfig // 🚀 FIX: Use optional chaining for safety
         || user?.instagramConfig
         || user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
       if (!igConfig?.accessToken) {
@@ -190,6 +192,11 @@ exports.deletePost = async (req, res) => {
       await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken);
     }
 
+    // 🚀 FIX: If this post was migrated from the legacy collection, delete the original as well.
+    // This prevents the `migrateLegacyPosts` function from re-creating the post on the next page load.
+    if (post.legacySocialPostId) {
+      await SocialPost.findByIdAndDelete(post.legacySocialPostId);
+    }
     await post.deleteOne();
 
     res.status(200).json({ success: true, message: 'Post deleted successfully from Instagram and the dashboard.' });
@@ -404,5 +411,29 @@ exports.getPostInsights = async (req, res) => {
   } catch (error) {
     console.error('Get Post Insights Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: error.message || 'Failed to fetch post insights.' });
+  }
+};
+
+// @desc    Download a post's media
+// @route   GET /api/posts/:id/download
+exports.downloadPostMedia = async (req, res) => {
+  try {
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user?._id }).lean();
+    if (!post || !post.mediaUrls || post.mediaUrls.length === 0) {
+      return res.status(404).json({ success: false, message: 'Post or media not found.' });
+    }
+
+    const mediaUrl = post.mediaUrls[0].url;
+    const response = await require('axios')({
+      url: mediaUrl,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    res.setHeader('Content-Disposition', `attachment; filename="post_${post._id}.jpg"`);
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Download Post Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to download media.' });
   }
 };

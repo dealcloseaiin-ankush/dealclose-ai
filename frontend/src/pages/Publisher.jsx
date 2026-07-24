@@ -154,8 +154,27 @@ export default function Publisher() {
     navigate(`/publish-post?import_id=${postId}`);
   };
 
+  // 🚀 NEW: Download post media
+  const handleDownloadPost = async (postId, mediaUrl) => {
+    if (!mediaUrl) {
+      toast.error('This post has no media to download.');
+      return;
+    }
+    const toastId = toast.loading('Preparing download...');
+    try {
+      // We can't use api.get for file streams easily.
+      // Instead, we'll open the backend URL in a new tab, which will trigger the browser's download prompt.
+      const downloadUrl = `${api.defaults.baseURL}/posts/${postId}/download`;
+      window.open(downloadUrl, '_blank');
+      toast.success('Download started!', { id: toastId });
+    } catch (error) {
+      console.error("Download failed:", error); // 🚀 FIX: Log the actual error
+      toast.error('Download failed.', { id: toastId });
+    }
+  };
+
   // 🚀 NEW: Open comments modal and fetch comments
-  const handleOpenComments = async (post) => {
+  const handleOpenComments = useCallback(async (post) => {
     setSelectedPostForComments(post);
     setIsCommentModalOpen(true);
     setComments([]); // Clear old comments
@@ -174,13 +193,13 @@ export default function Publisher() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not fetch comments.');
     }
-  };
+  }, [activeWorkspace]); // 🚀 FIX: Add dependency for useCallback
 
   useEffect(() => {
     if (!isCommentModalOpen || !selectedPostForComments) return undefined;
     const timer = window.setInterval(() => handleOpenComments(selectedPostForComments), 10000);
     return () => window.clearInterval(timer);
-  }, [isCommentModalOpen, selectedPostForComments]);
+  }, [isCommentModalOpen, selectedPostForComments, handleOpenComments]); // 🚀 FIX: Add missing dependency
 
   // 🚀 NEW: Handle submitting a reply to a comment
   const handleReplySubmit = async (commentId) => {
@@ -355,6 +374,9 @@ export default function Publisher() {
                     <button onClick={() => handleOpenComments(post)} className="p-1.5 text-blue-400 bg-blue-500/10 rounded-md hover:bg-blue-500/20" title="View Comments">
                       <MessageSquare size={14} />
                     </button>
+                    <button onClick={() => handleDownloadPost(post._id, post.mediaUrls?.[0]?.url)} className="p-1.5 text-green-400 bg-green-500/10 rounded-md hover:bg-green-500/20" title="Download Media">
+                      <Download size={14} />
+                    </button>
                     <Link to={`/publish-post?edit_id=${post._id}`} className="p-1.5 text-gray-400 bg-gray-700/50 rounded-md hover:bg-gray-700" title="Edit Post">
                       <Edit size={14} />
                     </Link>
@@ -452,21 +474,39 @@ export default function Publisher() {
                 comments.map(comment => (
                   <div key={comment.id} className="text-sm">
                     <div className="flex gap-3 items-start">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 shrink-0 mt-1"></div>
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 shrink-0"></div>
                       <div className="flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <p><span className="font-bold text-white">{comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
-                          <button type="button" onClick={() => handleDeleteComment(comment.id)} className="shrink-0 p-1.5 rounded-md text-red-400 hover:bg-red-500/10" title="Delete comment">
+                          <button type="button" onClick={() => handleDeleteComment(comment.id)} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete comment">
                             <Trash2 size={14} />
                           </button>
                         </div>
+                        {/* 🚀 NEW: Render replies nested under the parent comment */}
+                        {comment.replies && comment.replies.data && comment.replies.data.length > 0 && (
+                          <div className="mt-3 pl-6 border-l-2 border-gray-800 space-y-3">
+                            {comment.replies.data.map(reply => (
+                              <div key={reply.id} className="flex gap-3 items-start">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 shrink-0"></div>
+                                <div className="flex-1">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <p><span className="font-bold text-white">{reply.username}</span> <span className="text-gray-400">{reply.text}</span></p>
+                                    <button type="button" onClick={() => handleDeleteComment(reply.id)} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete reply">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {/* Reply form for each comment */}
                         <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(comment.id); }} className="flex gap-2 mt-2">
                           <input // ✅ FIX: Input is now controlled by the specific comment's state
                             type="text"
                             value={replyTexts[comment.id] || ''}
                             onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                            placeholder={`Reply to @${comment.username}...`}
+                            placeholder={`Reply to @${comment.username}...`} 
                             className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2 text-white text-xs focus:border-blue-500 outline-none"
                           />
                           <button type="submit" disabled={!replyTexts[comment.id]?.trim()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 rounded-lg transition-all disabled:opacity-50 flex items-center">
