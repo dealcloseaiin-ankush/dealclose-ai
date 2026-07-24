@@ -362,8 +362,8 @@ const getLongLivedAccessToken = async (shortLivedToken) => {
  */
 const getInstagramBusinessAccount = async (pageId, accessToken) => {
   const url = `https://graph.facebook.com/v19.0/${pageId}`;
-  const params = {
-    fields: 'instagram_business_account{id,username,profile_picture_url},business',
+  const params = { // ✅ FIX: Removed the 'business' field which was causing the crash.
+    fields: 'instagram_business_account{id,username,profile_picture_url}',
     access_token: accessToken,
   };
   const { data } = await axios.get(url, { params });
@@ -374,7 +374,7 @@ const getInstagramBusinessAccount = async (pageId, accessToken) => {
     instagramBusinessAccountId: data.instagram_business_account.id,
     username: data.instagram_business_account.username,
     profilePictureUrl: data.instagram_business_account.profile_picture_url,
-    businessId: data.business?.id,
+    businessId: null, // Set to null as we are no longer fetching it.
   };
 };
 
@@ -449,7 +449,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     const { data: accountsData } = await axios.get(accountsUrl, { 
       params: { 
         access_token: longLivedToken, 
-        fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url,business}' 
+        fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}' // ✅ FIX: Removed the 'business' field.
       },
       timeout: process.env.META_API_TIMEOUT || 10000 // Use configurable timeout
     });
@@ -469,7 +469,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
             pageToken: page.access_token, // Page-specific access token
             username: page.instagram_business_account.username || 'N/A',
             profilePictureUrl: page.instagram_business_account.profile_picture_url,
-            businessId: page.instagram_business_account.business?.id,
+            businessId: page.instagram_business_account.business?.id || null, // ✅ FIX: Safely access business.id and fallback to null.
           });
         }
       } catch (e) {
