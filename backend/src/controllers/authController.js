@@ -467,7 +467,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
             pageId: page.id,
             pageName: page.name,
             pageToken: page.access_token, // Page-specific access token
-            username: page.instagram_business_account.username,
+            username: page.instagram_business_account.username || 'N/A',
             profilePictureUrl: page.instagram_business_account.profile_picture_url,
             businessId: page.instagram_business_account.business?.id,
           });
