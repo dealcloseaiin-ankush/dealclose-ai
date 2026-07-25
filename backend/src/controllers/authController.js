@@ -4,13 +4,12 @@ const bcrypt = require('bcryptjs');
 const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
-
-const META_APP_SECRET = process.env.META_APP_SECRET;
+ 
+// ✅ FIX: Use dedicated Instagram App secrets. Fallback to main secrets for backward compatibility.
+const META_APP_SECRET = process.env.INSTAGRAM_META_APP_SECRET || process.env.META_APP_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
-// 🚀 FIX: Use a dedicated App ID for Instagram Login. Do NOT fallback to the main Meta App ID.
-// This is the most common cause of the "Invalid platform app" error, as the main app ID
-// might be for Facebook Login, not the "Instagram Login" product.
-const META_INSTAGRAM_LOGIN_APP_ID = process.env.META_INSTAGRAM_LOGIN_APP_ID;
+// ✅ FIX: Use dedicated Instagram App ID. Fallback to main App ID.
+const META_INSTAGRAM_LOGIN_APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID;
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
@@ -352,8 +351,8 @@ exports.whatsappConnect = async (req, res) => {
 const getLongLivedAccessToken = async (shortLivedToken) => {
   const url = `https://graph.facebook.com/v19.0/oauth/access_token`;
   const params = {
-    grant_type: 'fb_exchange_token',
-    client_id: process.env.META_APP_ID,
+    grant_type: 'fb_exchange_token', // ✅ FIX: Use the correct App ID for the exchange.
+    client_id: process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID,
     client_secret: META_APP_SECRET,
     fb_exchange_token: shortLivedToken,
   };
@@ -390,7 +389,7 @@ const getInstagramBusinessAccount = async (pageId, accessToken) => {
  */
 const performVerificationAndTriggerAPITests = async (igBusinessAccountId, accessToken) => {
   const verificationResults = {};
-  const APP_ID = process.env.META_APP_ID;
+  const APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID;
 
   try {
     // 1. Verify Token & Permissions (/debug_token)

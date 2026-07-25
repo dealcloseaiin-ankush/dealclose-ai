@@ -143,8 +143,9 @@ exports.sendManualMessage = async (req, res) => {
       
       // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents 'Cannot read properties of undefined' crashes)
       let igToken = null;
-      if (user && user.workspaces && wsIdIg !== 'main') {
-         const ws = user.workspaces.find(w => w && w._id && w._id.toString() === wsIdIg);
+      // 🐛 FIX: Added optional chaining `?.` to prevent `TypeError: Cannot read properties of null (reading 'find')`
+      if (user && wsIdIg !== 'main') {
+         const ws = user.workspaces?.find(w => w && w._id && w._id.toString() === wsIdIg);
           const workspaceInstagram = ws?.instagramConfig || ws?.instagramConfig;
           if (workspaceInstagram?.accessToken) igToken = workspaceInstagram.accessToken;
       }
