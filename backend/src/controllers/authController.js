@@ -492,6 +492,8 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
         access_token: longLivedToken, 
         // ✅ YAHAN BHI ADD KIYA HAI:
         // Yeh backend se verify karta hai ki saari permissions (publishing, insights, messaging) mil gayi hain.
+        // In scopes ko add karne se hum yeh sunishchit karte hain ki user ne saari zaroori anumatiyan di hain.
+        // Iske bina, API tests aur features fail ho sakte hain.
         fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}',
         scope: 'business_management,instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,instagram_manage_messages,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging'
       },
@@ -560,6 +562,89 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
   }
 };
  
+/**
+ * FLOW 2 helpers — Instagram API with Instagram Login
+ */
+const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
+  // Strip the trailing "#_" fragment artifact that Instagram sometimes appends to the code
+  const cleanCode = (authCode || '').replace(/#_$/, '');
+
+  const form = new URLSearchParams();
+  form.append('client_id', META_INSTAGRAM_LOGIN_APP_ID);
+  form.append('client_secret', META_APP_SECRET);
+  form.append('grant_type', 'authorization_code');
+  form.append('redirect_uri', redirectUri);
+  form.append('code', cleanCode);
+
+  const { data } = await axios.post('https://api.instagram.com/oauth/access_token', form, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
+
+  // Response shape can be flat or { data: [ {...} ] } depending on API version
+  const result = Array.isArray(data?.data) ? data.data[0] : data;
+
+  return {
+    accessToken: result.access_token,
+    userId: result.user_id,
+    permissions: result.permissions || [],
+    expiresIn: result.expires_in || 3600,
+  };
+};
+
+const getInstagramBasicLongLivedToken = async (shortLivedToken) => {
+  const { data } = await axios.get('https://graph.instagram.com/access_token', {
+    params: {
+      grant_type: 'ig_exchange_token',
+      client_secret: META_APP_SECRET,
+      access_token: shortLivedToken,
+    }
+  });
+  return {
+    accessToken: data.access_token,
+    expiresIn: data.expires_in, // ~5184000 seconds (60 days)
+  };
+};
+
+const getInstagramBasicProfile = async (igUserId, accessToken) => {
+  const { data } = await axios.get('https://graph.instagram.com/v21.0/me', {
+    params: {
+      fields: 'user_id,username,account_type,name,profile_picture_url',
+      access_token: accessToken,
+    }
+  });
+  return {
+    instagramUserId: data.user_id || igUserId,
+    username: data.username,
+    profilePictureUrl: data.profile_picture_url || null,
+    accountType: data.account_type,
+  };
+};
+
+const performInstagramBasicVerification = async (igUserId, accessToken) => {
+  const results = { token: { isValid: false, scopes: [], userId: igUserId } };
+
+  try {
+    // Confirm token works (instagram_business_basic)
+    const { data: me } = await axios.get('https://graph.instagram.com/v21.0/me', {
+      params: { fields: 'user_id,username', access_token: accessToken }
+    });
+    results.token.isValid = true;
+    results.token.userId = me.user_id || igUserId;
+  } catch (e) {
+    console.error('❌ [IG Basic Verify] Token check failed:', e.response?.data || e.message);
+    return results; // isValid stays false
+  }
+
+  // For the "Instagram Login" flow, we don't need to run all the other checks
+  // as they are for the Business API. The token check is sufficient.
+  results.token.scopes = [
+    'instagram_graph_user_profile',
+    'instagram_graph_user_media',
+  ];
+
+  return results;
+};
+
 // 🚀 NEW: This is FLOW 2: Instagram Login (Basic Display API)
 // @desc    Connect Instagram via Instagram Login (Basic Display API)
 // @route   POST /api/users/settings/instagram-basic-connect
