@@ -175,8 +175,12 @@ const userSchema = new Schema({
       accountId: { type: String },
       pageId: { type: String },
       pageName: { type: String },
-      pageToken: { type: String }
-    }]
+      pageToken: { type: String },
+      // ✅ NEW: Add username and profile picture to the pending connection
+      // This ensures the account picker UI can show the user which account they are selecting.
+      username: { type: String },
+      profilePictureUrl: { type: String },
+    }],
   },
   // --- New AI-related fields ---
   businessName: { type: String, default: '' },

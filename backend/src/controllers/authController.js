@@ -493,7 +493,9 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
             pageId: page.id,
             pageName: page.name,
             pageToken: page.access_token, // Page-specific access token
-            username: page.instagram_business_account.username || 'N/A',
+            // ✅ FIX: Add username and profile picture to the pending connection data
+            // so it can be saved in the final step. This was a critical bug.
+            username: page.instagram_business_account.username,
             profilePictureUrl: page.instagram_business_account.profile_picture_url,
             businessId: page.instagram_business_account.business?.id || null, // ✅ FIX: Safely access business.id and fallback to null.
           });
@@ -580,6 +582,8 @@ exports.instagramConnectSelected = async (req, res) => {
       tokenType: 'bearer',
       tokenExpiresAt: tokenExpiresAt,
       grantedPermissions: verificationResults.token.scopes || [],
+      // ✅ FIX: The username and profile picture were not being saved correctly.
+      // They exist in the 'selected' object from the pending connection.
       username: selected.username,
       profilePictureUrl: selected.profilePictureUrl,
       lastVerifiedAt: new Date(),
