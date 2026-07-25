@@ -78,10 +78,10 @@ app.use('/api/settings', settingsRoutes); // 🔥 Fixed settings routes mount
 app.use('/api/leads', leadRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/forms', formRoutes);
-// ✅ FIX: The frontend calls `/api/users/settings/instagram-basic-connect`. This route's controller
-// (`instagramBasicConnect`) is in `authController.js`, which is used by `authRoutes`.
-// By mounting `authRoutes` on `/api/users/settings` as well, we ensure that the 404 error is fixed.
-app.use('/api/users/settings', authRoutes);
+// ✅ FIX: The frontend calls `/api/users/settings/instagram-basic-connect`. The controller for this
+// is in `settingsRoutes.js`. By mounting `settingsRoutes` on `/api/users/settings`, we ensure
+// that the request is correctly routed, fixing the 404 error.
+app.use('/api/users/settings', settingsRoutes);
 app.use('/api/users', authRoutes); // Frontend auth/profile routes
 app.use('/api/users', userRoutes); // Backward-compatible profile routes
 app.use('/api/webhooks', webhookRoutes);
