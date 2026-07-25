@@ -88,12 +88,12 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
       // Instagram uses Standard Access Token Flow (Cleaned Scopes)
       fbLoginConfig = {
         ...fbLoginConfig,
-        // ✅ NEW: Comprehensive scope for the independent Instagram Business Login.
-        // This requests all permissions needed for publishing, insights, comments, messaging, and business management.
+        // ✅ YAHAN ADD KIYA HAI:
+        // Yeh Instagram Business Login ke liye saari zaroori permissions (publishing, insights, comments, messaging) request karta hai.
         scope: [
           'business_management',
           'instagram_basic',
-          'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
+          'instagram_business_content_publish', 'instagram_business_manage_comments', 'instagram_business_manage_insights', 'instagram_manage_messages',
           'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
         ].join(',')
       };

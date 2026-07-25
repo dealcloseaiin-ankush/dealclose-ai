@@ -399,8 +399,16 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
 
     // 3. Trigger "Insights" test (read operation)
     const insightsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/insights`;
-    // ✅ FIX: Replaced 'impressions' with 'profile_views' as 'impressions' is not always available for 'day' period.
-    await axios.get(insightsUrl, { params: { access_token: accessToken, metric: 'reach,profile_views', period: 'day' } });
+    // ✅ FIX: The 'profile_views' metric now requires 'metric_type=total_value' as per Meta API updates.
+    // This was causing the verification step to fail.
+    await axios.get(insightsUrl, { 
+      params: { 
+        access_token: accessToken, 
+        metric: 'reach,profile_views', 
+        period: 'day',
+        metric_type: 'total_value' // Yeh line add ki gayi hai
+      } 
+    });
     verificationResults.insights = 'OK';
 
     // 4. Trigger "Comments" test (read operation)
@@ -454,7 +462,10 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     const { data: accountsData } = await axios.get(accountsUrl, { 
       params: { 
         access_token: longLivedToken, 
-        fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}' // ✅ FIX: Removed the 'business' field.
+        // ✅ YAHAN BHI ADD KIYA HAI:
+        // Yeh backend se verify karta hai ki saari permissions (publishing, insights, messaging) mil gayi hain.
+        fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}',
+        scope: 'business_management,instagram_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights,instagram_manage_messages,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging'
       },
       timeout: process.env.META_API_TIMEOUT || 10000 // Use configurable timeout
     });
