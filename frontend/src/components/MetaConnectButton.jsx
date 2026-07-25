@@ -15,6 +15,18 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
   // The variable in Vercel is `VITE_INSTAGRAM_META_APP_ID`, not `VITE_META_INSTAGRAM_APP_ID`.
   const IG_APP_ID = import.meta.env.VITE_INSTAGRAM_META_APP_ID || import.meta.env.VITE_META_APP_ID;
 
+  // 🚀 MEGA DEBUG (FRONTEND): Yeh component load hote hi browser console me print hoga.
+  // Isse Vercel se aa rahe saare environment variables dikh jayenge.
+  useEffect(() => {
+    console.log('================== [VERCEL ENV DEBUG] ==================');
+    console.log('Yeh Vercel se aa rahe variables hain (frontend):');
+    console.log('VITE_META_APP_ID:', import.meta.env.VITE_META_APP_ID ? 'Present ✅' : 'MISSING ❌');
+    console.log('VITE_INSTAGRAM_META_APP_ID:', import.meta.env.VITE_INSTAGRAM_META_APP_ID ? 'Present ✅' : 'MISSING ❌');
+    console.log('VITE_META_CONFIG_ID:', import.meta.env.VITE_META_CONFIG_ID ? 'Present ✅' : 'MISSING ❌');
+    console.log('Final IG_APP_ID jo use ho raha hai:', IG_APP_ID || 'None');
+    console.log('========================================================');
+  }, [IG_APP_ID]);
+
   useEffect(() => {
     const onSdkReady = () => setIsSdkReady(true);
     if (globalIsSdkLoaded) { onSdkReady(); return; }

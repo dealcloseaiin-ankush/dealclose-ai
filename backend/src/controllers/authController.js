@@ -1,5 +1,16 @@
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
+
+// 🚀 MEGA DEBUG (BACKEND): Yeh server start hote hi Render logs me print hoga.
+// Isse Render se aa rahe saare environment variables dikh jayenge.
+console.log('================== [RENDER ENV DEBUG] ==================');
+console.log('Yeh Render se aa rahe variables hain (backend):');
+console.log('META_APP_ID:', process.env.META_APP_ID ? 'Present ✅' : 'MISSING ❌');
+console.log('META_APP_SECRET:', process.env.META_APP_SECRET ? 'Present ✅' : 'MISSING ❌');
+console.log('INSTAGRAM_META_APP_ID:', process.env.INSTAGRAM_META_APP_ID ? 'Present ✅' : 'MISSING ❌');
+console.log('INSTAGRAM_META_APP_SECRET:', process.env.INSTAGRAM_META_APP_SECRET ? 'Present ✅' : 'MISSING ❌');
+console.log('========================================================');
+
 const bcrypt = require('bcryptjs');
 const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
