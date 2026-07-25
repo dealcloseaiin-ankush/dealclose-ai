@@ -475,7 +475,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
         // ✅ YAHAN BHI ADD KIYA HAI:
         // Yeh backend se verify karta hai ki saari permissions (publishing, insights, messaging) mil gayi hain.
         fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}',
-        scope: 'business_management,instagram_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights,instagram_manage_messages,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging'
+        scope: 'business_management,instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,instagram_manage_messages,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging'
       },
       timeout: process.env.META_API_TIMEOUT || 10000 // Use configurable timeout
     });

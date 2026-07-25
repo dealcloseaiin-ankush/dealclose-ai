@@ -93,7 +93,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         scope: [
           'business_management',
           'instagram_basic',
-          'instagram_business_content_publish', 'instagram_business_manage_comments', 'instagram_business_manage_insights', 'instagram_manage_messages',
+          'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
           'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
         ].join(',')
       };
