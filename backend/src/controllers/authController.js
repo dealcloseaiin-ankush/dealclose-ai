@@ -624,7 +624,6 @@ const performInstagramBasicVerification = async (igUserId, accessToken) => {
   const results = { token: { isValid: false, scopes: [], userId: igUserId } };
 
   try {
-    // Confirm token works (instagram_business_basic)
     const { data: me } = await axios.get('https://graph.instagram.com/v21.0/me', {
       params: { fields: 'user_id,username', access_token: accessToken }
     });
@@ -632,14 +631,61 @@ const performInstagramBasicVerification = async (igUserId, accessToken) => {
     results.token.userId = me.user_id || igUserId;
   } catch (e) {
     console.error('❌ [IG Basic Verify] Token check failed:', e.response?.data || e.message);
-    return results; // isValid stays false
+    return results;
   }
 
-  // For the "Instagram Login" flow, we don't need to run all the other checks
-  // as they are for the Business API. The token check is sufficient.
+  let firstMediaId = null;
+  try {
+    const { data: media } = await axios.get(`https://graph.instagram.com/v21.0/${igUserId}/media`, {
+      params: { fields: 'id', limit: 1, access_token: accessToken }
+    });
+    firstMediaId = media?.data?.[0]?.id || null;
+    results.contentPublish = 'OK';
+  } catch (e) {
+    console.warn('⚠️ [IG Basic Verify] Media check failed:', e.response?.data?.error?.message || e.message);
+    results.contentPublish = 'Failed';
+  }
+
+  if (firstMediaId) {
+    try {
+      await axios.get(`https://graph.instagram.com/v21.0/${firstMediaId}/comments`, {
+        params: { fields: 'id', limit: 1, access_token: accessToken }
+      });
+      results.comments = 'OK';
+    } catch (e) {
+      console.warn('⚠️ [IG Basic Verify] Comments check failed:', e.response?.data?.error?.message || e.message);
+      results.comments = 'Failed';
+    }
+  } else {
+    results.comments = 'Skipped - no media';
+  }
+
+  try {
+    await axios.get(`https://graph.instagram.com/v21.0/${igUserId}/insights`, {
+      params: { metric: 'reach', period: 'day', access_token: accessToken }
+    });
+    results.insights = 'OK';
+  } catch (e) {
+    console.warn('⚠️ [IG Basic Verify] Insights check failed:', e.response?.data?.error?.message || e.message);
+    results.insights = 'Failed';
+  }
+
+  try {
+    await axios.get(`https://graph.instagram.com/v21.0/${igUserId}/conversations`, {
+      params: { platform: 'instagram', access_token: accessToken }
+    });
+    results.messaging = 'OK';
+  } catch (e) {
+    console.warn('⚠️ [IG Basic Verify] Messaging check failed:', e.response?.data?.error?.message || e.message);
+    results.messaging = 'Failed';
+  }
+
   results.token.scopes = [
-    'instagram_graph_user_profile',
-    'instagram_graph_user_media',
+    'instagram_business_basic',
+    'instagram_business_content_publish',
+    'instagram_business_manage_comments',
+    'instagram_business_manage_messages',
+    'instagram_business_manage_insights'
   ];
 
   return results;

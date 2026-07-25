@@ -14,6 +14,7 @@ router.post('/', protect, settingsController.saveSettings);
 router.post('/whatsapp-connect', protect, authController.whatsappConnect);
 router.post('/instagram-connect', protect, authController.instagramConnect);
 router.post('/instagram-connect-selected', protect, authController.instagramConnectSelected);
+router.post('/instagram-basic-connect', protect, authController.instagramBasicConnect);
 router.post('/meta-connect', protect, settingsController.connectMetaAccount); // For Embedded Signup
 router.post('/instagram-disconnect', protect, settingsController.instagramDisconnect);
 router.post('/whatsapp-disconnect', protect, settingsController.whatsappDisconnect);
