@@ -7,6 +7,7 @@ const axios = require('axios');
 
 const META_APP_SECRET = process.env.META_APP_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
+const META_INSTAGRAM_LOGIN_APP_ID = process.env.META_INSTAGRAM_LOGIN_APP_ID || process.env.META_APP_ID; // Use a separate ID if needed, fallback to main
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
@@ -450,6 +451,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
  * @desc    Connect Instagram via Meta Login (New Independent Business Flow)
  * @route   POST /api/users/settings/instagram-connect
  */
+// This is FLOW 1: Facebook Login for Business
  exports.instagramConnect = async (req, res) => {
   const { authCode, workspaceId } = req.body;
   const userId = req.user?._id || req.user?.id;
@@ -461,7 +463,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
   try {
     // Step 1: Exchange short-lived token for a long-lived one
     const { accessToken: longLivedToken, expiresIn } = await getLongLivedAccessToken(authCode).catch(e => {
-      console.error("getLongLivedAccessToken failed:", e.message);
+      console.error("getLongLivedAccessToken (Facebook-linked) failed:", e.message);
       return { accessToken: authCode, expiresIn: 3600 }; // Fallback to short-lived if exchange fails
     });
     // ✅ FIX: Safely calculate expiry. If expiresIn is undefined, set a default of 1 hour.
@@ -477,7 +479,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
         fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}',
         scope: 'business_management,instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,instagram_manage_messages,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging'
       },
-      timeout: process.env.META_API_TIMEOUT || 10000 // Use configurable timeout
+      timeout: process.env.META_API_TIMEOUT || 15000 // Use configurable timeout
     });
  
     if (!accountsData.data || accountsData.data.length === 0) {
@@ -489,13 +491,13 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
       try {
         if (page.instagram_business_account) {
           availableAccounts.push({
-            accountId: page.instagram_business_account.id,
+            accountId: page.instagram_business_account.id, // This is the instagramBusinessAccountId
             pageId: page.id,
             pageName: page.name,
             pageToken: page.access_token, // Page-specific access token
-            // ✅ FIX: Add username and profile picture to the pending connection data
-            // so it can be saved in the final step. This was a critical bug.
-            username: page.instagram_business_account.username,
+            // ✅ FIX: Add username and profile picture to the pending connection data.
+            // This information is now required by the frontend account picker modal.
+            username: page.instagram_business_account.username || 'N/A',
             profilePictureUrl: page.instagram_business_account.profile_picture_url,
             businessId: page.instagram_business_account.business?.id || null, // ✅ FIX: Safely access business.id and fallback to null.
           });
@@ -516,7 +518,8 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
           workspaceId: workspaceId || 'main',
           accessToken: longLivedToken, // This is the user's long-lived token
           tokenExpiresAt: tokenExpiresAt,
-          expiresAt: new Date(Date.now() + (10 * 60 * 1000)), // Session expiry for selection
+          expiresAt: new Date(Date.now() + (10 * 60 * 1000)), // Session expiry for selection (10 minutes)
+          loginType: 'facebook_business', // 🚀 NEW: Set login type
           accounts: availableAccounts
         }
       }
@@ -536,6 +539,86 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
   }
 };
  
+// 🚀 NEW: This is FLOW 2: Instagram Login (Basic Display API)
+// @desc    Connect Instagram via Instagram Login (Basic Display API)
+// @route   POST /api/users/settings/instagram-basic-connect
+exports.instagramBasicConnect = async (req, res) => {
+  const { authCode, workspaceId, redirectUri } = req.body;
+  const userId = req.user?._id || req.user?.id;
+
+  if (!userId || !authCode || !redirectUri) {
+    return res.status(400).json({ success: false, message: 'Authorization code, workspace ID, and redirect URI are required.' });
+  }
+
+  try {
+    // Step 1: Exchange code for short-lived token
+    const { accessToken: shortLivedToken, userId: igUserId, expiresIn: shortExpiresIn } = await getInstagramBasicShortLivedToken(authCode, redirectUri);
+
+    // Step 2: Exchange short-lived for long-lived token
+    const { accessToken: longLivedToken, expiresIn: longExpiresIn } = await getInstagramBasicLongLivedToken(shortLivedToken);
+    const tokenExpiresAt = new Date(Date.now() + longExpiresIn * 1000);
+
+    // Step 3: Get basic profile info
+    const profileInfo = await getInstagramBasicProfile(igUserId, longLivedToken);
+
+    // Step 4: Perform basic verification (just token validity)
+    const verificationResults = await performInstagramBasicVerification(igUserId, longLivedToken);
+    console.log('✅ [Meta Verification - Basic Display] API tests triggered:', verificationResults);
+
+    // Step 5: Prepare the configuration object to be saved
+    const instagramConfig = {
+      instagramUserId: profileInfo.instagramUserId,
+      instagramBusinessAccountId: profileInfo.instagramUserId, // For Basic Display, this is the same as userId
+      facebookPageId: null, // No Facebook Page involved in this flow
+      businessId: null,
+      accessToken: longLivedToken,
+      tokenType: 'bearer',
+      tokenExpiresAt: tokenExpiresAt,
+      grantedPermissions: verificationResults.token.scopes || [],
+      username: profileInfo.username,
+      profilePictureUrl: profileInfo.profilePictureUrl,
+      lastVerifiedAt: new Date(),
+      loginType: 'instagram_basic_display', // 🚀 NEW: Set login type
+    };
+
+    // Step 6: Save the connection details to the correct workspace
+    const filter = workspaceId !== 'main' ? { _id: userId, 'workspaces._id': workspaceId } : { _id: userId };
+    const update = workspaceId !== 'main'
+      ? { $set: { 'workspaces.$.instagramConfig': instagramConfig } }
+      : { $set: { instagramConfig } };
+
+    await User.updateOne(filter, update);
+
+    // Step 6: Clear pending connection state (if any)
+    await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
+
+    // ⚠️ Webhook subscription: Instagram Login flow ke liye subscribe_apps endpoint 
+    // graph.instagram.com pe Business Account ID ke against hota hai, Page ID pe nahi.
+    let webhookWarning;
+    try {
+      await axios.post(`https://graph.instagram.com/v21.0/${profileInfo.instagramUserId}/subscribed_apps`, null, {
+        params: { subscribed_fields: 'messages,comments', access_token: longLivedToken }
+      });
+      console.log('✅ [Instagram Login] Webhook subscription successful for:', profileInfo.username);
+    } catch (subErr) {
+      webhookWarning = subErr.response?.data?.error?.message || subErr.message;
+      console.warn('⚠️ [Instagram Login] Webhook subscription warning:', webhookWarning);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Instagram account @${instagramConfig.username} connected successfully!`,
+      data: instagramConfig,
+      webhookWarning
+    });
+
+  } catch (error) {
+    console.error('❌ Instagram Business Login Connect Error:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.error_message || error.response?.data?.error?.message || 'An unknown error occurred during Instagram connection.';
+    res.status(500).json({ success: false, message: errorMessage });
+  }
+};
+
 // @desc    Connect Selected Instagram via Meta Login
 // @route   POST /api/users/settings/instagram-connect-selected
 exports.instagramConnectSelected = async (req, res) => {
@@ -575,7 +658,7 @@ exports.instagramConnectSelected = async (req, res) => {
     // ✅ FIX: Added all necessary fields (username, profilePictureUrl, pageToken) to ensure the frontend can display the connection status correctly and all features work.
     const instagramConfig = {
       instagramUserId: verificationResults.token.userId,
-      instagramBusinessAccountId: selected.accountId, // ✅ FIX: Using the correct, non-legacy field name from userModel.
+      instagramBusinessAccountId: selected.accountId,
       facebookPageId: selected.pageId,
       businessId: selected.businessId,
       accessToken: selected.pageToken || longLivedToken, // 🔥 FIX: Prioritize Page Token for page-specific actions.
@@ -587,6 +670,7 @@ exports.instagramConnectSelected = async (req, res) => {
       username: selected.username,
       profilePictureUrl: selected.profilePictureUrl,
       lastVerifiedAt: new Date(),
+      loginType: pending.loginType || 'facebook_business', // 🚀 NEW: Save login type
     };
  
     // Step 3: Save the connection details to the correct workspace in the User model

@@ -194,10 +194,12 @@ exports.handleInstagramWebhook = async (req, res) => {
               
               console.log(` [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
  
-              let user = await User.findOne({ 
+              // ✅ CRITICAL FIX: Use 'instagramBusinessAccountId' which is the correct field name in the userModel schema.
+              // The old 'instagramAccountId' field does not exist, causing this query to always fail.
+              let user = await User.findOne({
                 $or: [
-                  { "instagramConfig.instagramAccountId": igAccountId },
-                  { "workspaces.instagramConfig.instagramAccountId": igAccountId }
+                  { "instagramConfig.instagramBusinessAccountId": igAccountId },
+                  { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }
                 ]
               }).lean();
               
@@ -213,14 +215,16 @@ exports.handleInstagramWebhook = async (req, res) => {
               let igToken = null;
               let igPageId = null;
               let incomingWorkspaceId = 'main';
+              let loginType = 'facebook_business'; // Default
               let activeWorkspace = null;
               
               if (user && user.workspaces && user.workspaces.length > 0) {
-                  activeWorkspace = user.workspaces.find(w => w?.instagramConfig?.instagramAccountId === igAccountId);
+                  activeWorkspace = user.workspaces.find(w => w?.instagramConfig?.instagramBusinessAccountId === igAccountId);
                   const workspaceInstagram = activeWorkspace?.instagramConfig;
                   if (workspaceInstagram?.accessToken) {
                      igToken = workspaceInstagram.accessToken;
                      igPageId = workspaceInstagram.facebookPageId;
+                     loginType = workspaceInstagram.loginType || 'facebook_business';
                      incomingWorkspaceId = activeWorkspace._id ? activeWorkspace._id.toString() : 'main';
                  }
               }
@@ -228,6 +232,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (!igToken && user && user.instagramConfig && user.instagramConfig.accessToken) {
                   igToken = user.instagramConfig.accessToken;
                   igPageId = user.instagramConfig.facebookPageId;
+                  loginType = user.instagramConfig.loginType || 'facebook_business';
                   incomingWorkspaceId = 'main';
               }
 
@@ -823,24 +828,11 @@ with whatever information is available (leave budget field empty/null if not pro
             console.error('Error during self-comment check:', e.message);
           }
 
-          // ====== DEDUPLICATION: prevent processing same comment twice ======
-          const dedupKey = `processed_comment:${commentData.id}`;
-          try {
-            const already = await redis.get(dedupKey);
-            if (already) {
-              console.log('Skipped: duplicate comment (already processed within TTL)');
-              continue;
-            }
-            await redis.set(dedupKey, '1', 'EX', 24 * 60 * 60);
-          } catch (e) {
-            console.error('⚠️ [Redis Dedup] Error checking/setting dedup key:', e.message);
-          }
-
+          // ✅ CRITICAL FIX: Use 'instagramBusinessAccountId' which is the correct field name in the userModel schema.
           let user = await User.findOne({
             $or: [
-              { "instagramConfig.instagramAccountId": igAccountId },
-              { "igConfig.instagramAccountId": igAccountId },
-              { "workspaces.instagramConfig.instagramAccountId": igAccountId }
+              { "instagramConfig.instagramBusinessAccountId": igAccountId },
+              { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }
             ]
           });
           
@@ -856,7 +848,7 @@ with whatever information is available (leave budget field empty/null if not pro
           console.log("[COMMENT WEBHOOK DEBUG] initial pageId:", igPageId, "initial token present:", Boolean(igToken));
 
           if (user.workspaces && user.workspaces.length > 0) {
-             activeWorkspaceNode = user.workspaces.find(w => w?.instagramConfig?.instagramAccountId === igAccountId);
+             activeWorkspaceNode = user.workspaces.find(w => w?.instagramConfig?.instagramBusinessAccountId === igAccountId);
              if (activeWorkspaceNode?.instagramConfig?.accessToken) {
                 igToken = activeWorkspaceNode.instagramConfig.accessToken;
                 igPageId = activeWorkspaceNode.instagramConfig.facebookPageId || igPageId;
@@ -896,7 +888,6 @@ with whatever information is available (leave budget field empty/null if not pro
              continue; // Skip flow routing for phone capture drops
           }
 
-          // 🚀 Bulletproof string type casting comparison layer
           let matchedRule = null;
           let isPostSpecific = false;
           console.log("\n========================================================");

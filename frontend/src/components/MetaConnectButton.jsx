@@ -68,7 +68,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
 
     setLoading(true);
 
-    // Dynamic Login Configuration Base
+    // 🚀 Dynamic Login Configuration Base
     let fbLoginConfig = {
       return_scopes: true,
       auth_type: 'rerequest'
@@ -84,19 +84,33 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         response_type: 'code',
         override_default_response_type: true
       };
-    } else {
-      // Instagram uses Standard Access Token Flow (Cleaned Scopes)
-      fbLoginConfig = {
-        ...fbLoginConfig,
-        // ✅ YAHAN ADD KIYA HAI:
-        // Yeh Instagram Business Login ke liye saari zaroori permissions (publishing, insights, comments, messaging) request karta hai.
-        scope: [
-          'business_management',
-          'instagram_basic',
-          'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
-          'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
-        ].join(',')
-      };
+    } else if (platform === 'instagram') {
+      if (variant === 'facebook') {
+        // FLOW 1: Facebook Login for Business (Page-linked IG)
+        fbLoginConfig = {
+          ...fbLoginConfig,
+          scope: [
+            'business_management',
+            'instagram_basic',
+            'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
+            'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
+          ].join(',')
+        };
+      } else if (variant === 'instagram') {
+        // FLOW 2: Instagram Login (Basic Display API) - Direct IG Login
+        // This flow does NOT use window.FB.login directly for the Instagram OAuth endpoint.
+        // Instead, we construct the URL and redirect.
+        const redirectUri = `${window.location.origin}/instagram-oauth-callback`; // A new dedicated callback route
+        const instagramOAuthUrl = `https://api.instagram.com/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user_profile,user_media&response_type=code`;
+        
+        // Store workspaceId in localStorage to retrieve after redirect
+        localStorage.setItem('instagramLoginWorkspaceId', workspaceId);
+        localStorage.setItem('instagramLoginRedirectUri', redirectUri);
+
+        window.location.href = instagramOAuthUrl; // Redirect to Instagram's OAuth
+        setLoading(false); // Stop loading as we are redirecting
+        return; // Exit early, as we are not using FB.login for this variant
+      }
     }
 
     // Trigger Meta Popup
@@ -115,7 +129,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
       
       if (response.status === 'connected' && response.authResponse) {
         // WhatsApp ke liye code uthayega, Instagram ke liye accessToken
-        const authCode = platform === 'whatsapp' 
+        const authCode = platform === 'whatsapp'
           ? (response.authResponse.code || response.authResponse.accessToken)
           : response.authResponse.accessToken; 
         
@@ -162,11 +176,11 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
   const isInstagram = platform === 'instagram';
   const isFacebookVariant = isInstagram && variant === 'facebook';
   
-  const buttonClass = isFacebookVariant
-    ? 'bg-[#1877F2] hover:bg-[#166FE5]'
-    : isInstagram
-    ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90'
-    : 'bg-[#1877F2] hover:bg-[#166FE5]'; // Default to Facebook blue for WhatsApp
+  const buttonClass = isFacebookVariant // Facebook-linked Instagram
+    ? 'bg-[#1877F2] hover:bg-[#166FE5]' 
+    : isInstagram && variant === 'instagram' // Direct Instagram Login
+    ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90' 
+    : 'bg-[#1877F2] hover:bg-[#166FE5]'; // WhatsApp (uses Facebook blue)
 
   const iconSrc = isFacebookVariant
     ? "https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg"

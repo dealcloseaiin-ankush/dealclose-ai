@@ -169,8 +169,8 @@ export default function Settings() {
           externalApiBlogUrl: savedData.externalApiBlogUrl || prevConfig.externalApiBlogUrl,
           externalApiVisitUrl: savedData.externalApiVisitUrl || prevConfig.externalApiVisitUrl,
           customWebhooks: savedData.customWebhooks || prevConfig.customWebhooks,
-          igAccessToken: savedData.instagramConfig?.accessToken || prevConfig.igAccessToken,
-          igAccountId: savedData.instagramConfig?.instagramAccountId || prevConfig.igAccountId,
+        igAccessToken: savedData.instagramConfig?.accessToken || '',
+        igAccountId: savedData.instagramConfig?.instagramBusinessAccountId || '', // ✅ FIX: Use the correct field 'instagramBusinessAccountId' from the backend schema.
           fbPageId: savedData.instagramConfig?.facebookPageId || prevConfig.fbPageId,
           brandKit: savedData.brandKit || prevConfig.brandKit || {},
           businessName: savedData.brandKit?.businessName || savedData.businessName || '',
@@ -309,7 +309,7 @@ export default function Settings() {
         },
         instagramConfig: {
           accessToken: config.igAccessToken,
-          instagramAccountId: config.igAccountId,
+          instagramBusinessAccountId: config.igAccountId, // ✅ FIX: Save with the correct field name 'instagramBusinessAccountId'.
           facebookPageId: config.fbPageId
         },
         externalApiUrl: config.externalApiUrl,
@@ -766,7 +766,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
-                        <input type="text" name="igAccountId" value={config.igAccountId} onChange={handleChange} placeholder="Target Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" />
+                      <input type="text" name="igAccountId" value={config.igAccountId} onChange={handleChange} placeholder="Target Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-purple-500" readOnly />
                       </div>
                     </div>
                     <p className="text-xs text-blue-400 font-medium mb-4">💡 Note: Tokens are automatically fetched from Meta securely. You only need to connect once.</p>
@@ -786,14 +786,14 @@ export default function Settings() {
                     )}
                     {!mainIgConnected && (
                       <div className="space-y-4 mt-4">
-                      <div>
-                        <MetaConnectButton variant="facebook" buttonText="Connect via Facebook" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
-                        <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account linked to a Facebook Page.</p>
-                      </div>
-                      <div>
-                        <MetaConnectButton buttonText="Connect with Instagram Login" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
-                        <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account that is not linked to a Facebook Page.</p>
-                      </div>
+                        <div>
+                          <MetaConnectButton variant="facebook" buttonText="Connect via Facebook" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
+                          <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account linked to a Facebook Page (full features).</p>
+                        </div>
+                        <div>
+                          <MetaConnectButton variant="instagram" buttonText="Connect with Instagram Login" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
+                          <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account not linked to a Facebook Page (limited features).</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1081,7 +1081,7 @@ export default function Settings() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target IG Account ID</label>
-                      <input type="text" value={activeWs.instagramConfig?.instagramAccountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, instagramAccountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none focus:border-blue-500" />
+                      <input type="text" value={activeWs.instagramConfig?.instagramBusinessAccountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, instagramBusinessAccountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none" readOnly />
                     </div>
                   </div>
                   
@@ -1123,11 +1123,11 @@ export default function Settings() {
                          )}
                          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3">
                            <div>
-                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace via Facebook" : "Connect via Facebook"} variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace via Facebook" : "Connect via Facebook"} variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} /> {/* ✅ FIX: Pass variant */}
                              <p className="mt-1 text-[11px] text-gray-500">Facebook Page linked Instagram</p>
                            </div>
                            <div>
-                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} /> {/* ✅ FIX: Pass variant */}
                              <p className="mt-1 text-[11px] text-gray-500">Instagram Professional account</p>
                            </div>
                          </div>

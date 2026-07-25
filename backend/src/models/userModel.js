@@ -21,6 +21,7 @@ const instagramConfigSchema = new Schema({
   username: { type: String },
   profilePictureUrl: { type: String },
   lastVerifiedAt: { type: Date },
+  loginType: { type: String, enum: ['facebook_business', 'instagram_business_login'], default: 'facebook_business' }, // 🚀 NEW: To differentiate OAuth flows
 }, { _id: false });
 
 const userSchema = new Schema({
