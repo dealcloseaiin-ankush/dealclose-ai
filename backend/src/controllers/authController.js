@@ -7,7 +7,10 @@ const axios = require('axios');
 
 const META_APP_SECRET = process.env.META_APP_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
-const META_INSTAGRAM_LOGIN_APP_ID = process.env.META_INSTAGRAM_LOGIN_APP_ID || process.env.META_APP_ID; // Use a separate ID if needed, fallback to main
+// 🚀 FIX: Use a dedicated App ID for Instagram Login. Do NOT fallback to the main Meta App ID.
+// This is the most common cause of the "Invalid platform app" error, as the main app ID
+// might be for Facebook Login, not the "Instagram Login" product.
+const META_INSTAGRAM_LOGIN_APP_ID = process.env.META_INSTAGRAM_LOGIN_APP_ID;
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
@@ -584,7 +587,7 @@ exports.instagramBasicConnect = async (req, res) => {
       tokenExpiresAt: tokenExpiresAt,
       grantedPermissions: verificationResults.token.scopes || [],
       username: profileInfo.username,
-      profilePictureUrl: profileInfo.profilePictureUrl,
+      profilePictureUrl: profileInfo.profilePictureUrl, // This will be null from Basic Display API
       lastVerifiedAt: new Date(),
       loginType: 'instagram_basic_display', // 🚀 NEW: Set login type
     };
@@ -603,15 +606,11 @@ exports.instagramBasicConnect = async (req, res) => {
     // ⚠️ Webhook subscription: Instagram Login flow ke liye subscribe_apps endpoint 
     // graph.instagram.com pe Business Account ID ke against hota hai, Page ID pe nahi.
     let webhookWarning;
-    try {
-      await axios.post(`https://graph.instagram.com/v21.0/${profileInfo.instagramUserId}/subscribed_apps`, null, {
-        params: { subscribed_fields: 'messages,comments', access_token: longLivedToken }
-      });
-      console.log('✅ [Instagram Login] Webhook subscription successful for:', profileInfo.username);
-    } catch (subErr) {
-      webhookWarning = subErr.response?.data?.error?.message || subErr.message;
-      console.warn('⚠️ [Instagram Login] Webhook subscription warning:', webhookWarning);
-    }
+    // 🐛 FIX: Basic Display API does not support webhook subscriptions.
+    // Attempting to subscribe was causing an unnecessary error. This block is now removed.
+    // Webhooks are only available for Instagram Business accounts connected via Facebook Login.
+    webhookWarning = "Webhook subscription is not available for Instagram Basic Display connections. Real-time features like comment/DM replies will not work with this connection type.";
+    console.warn('⚠️ [Instagram Login] ' + webhookWarning);
 
     res.status(200).json({
       success: true,
@@ -626,6 +625,7 @@ exports.instagramBasicConnect = async (req, res) => {
     res.status(500).json({ success: false, message: errorMessage });
   }
 };
+
 
 // @desc    Connect Selected Instagram via Meta Login
 // @route   POST /api/users/settings/instagram-connect-selected

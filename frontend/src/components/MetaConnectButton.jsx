@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 
-// ✅ FIX: Global flags to ensure SDK is loaded only once across the entire application.
-// This prevents the "overriding current access token" warning when multiple buttons are on the same page.
 let globalIsSdkLoaded = false;
 let globalIsSdkLoading = false;
 const globalSdkLoadCallbacks = [];
@@ -11,10 +9,10 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
   const [isSdkReady, setIsSdkReady] = useState(globalIsSdkLoaded);
   const [loading, setLoading] = useState(false);
 
-  const APP_ID = import.meta.env.VITE_META_APP_ID; 
+  const APP_ID = import.meta.env.VITE_META_APP_ID;
   const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
+  const IG_APP_ID = import.meta.env.VITE_META_INSTAGRAM_APP_ID; // 🚀 NEW: Separate Instagram App ID
 
-  // 1. Load Facebook SDK Safely and only once
   useEffect(() => {
     const onSdkReady = () => setIsSdkReady(true);
     if (globalIsSdkLoaded) { onSdkReady(); return; }
@@ -32,7 +30,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         globalIsSdkLoaded = true;
         globalIsSdkLoading = false;
         globalSdkLoadCallbacks.forEach(cb => cb());
-        onSdkReady(); // Call it for the current component too
+        onSdkReady();
         globalSdkLoadCallbacks.length = 0;
       };
 
@@ -54,8 +52,36 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
     };
   }, [APP_ID]);
 
-  // 2. Handle Login Flow
   const handleMetaLogin = () => {
+    // 🚀 FLOW 2: Instagram API with Instagram Login — Facebook SDK use nahi hota, seedha redirect
+    if (platform === 'instagram' && variant === 'instagram') {
+      if (!IG_APP_ID) {
+        alert("⚠️ VITE_META_INSTAGRAM_APP_ID is missing in .env file.");
+        return;
+      }
+      setLoading(true);
+
+      const redirectUri = `${window.location.origin}/instagram-oauth-callback`;
+      // Instagram API with Instagram Login (Business Login) — these 5 scopes are 
+      // the ONLY valid scopes for this product. Do NOT change to user_profile/
+      // user_media (that is the deprecated Basic Display API and will break this 
+      // flow with "Invalid platform app").
+      const scopes = [
+        'instagram_business_basic',
+        'instagram_business_content_publish',
+        'instagram_business_manage_comments',
+        'instagram_business_manage_messages',
+        'instagram_business_manage_insights'
+      ].join(',');
+      const instagramOAuthUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}`;
+
+      localStorage.setItem('instagramLoginWorkspaceId', workspaceId);
+      localStorage.setItem('instagramLoginRedirectUri', redirectUri);
+
+      window.location.href = instagramOAuthUrl;
+      return;
+    }
+
     if (!window.FB) {
       alert('Meta SDK is loading, please wait a second...');
       return;
@@ -68,15 +94,12 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
 
     setLoading(true);
 
-    // 🚀 Dynamic Login Configuration Base
     let fbLoginConfig = {
       return_scopes: true,
       auth_type: 'rerequest'
     };
 
-    // 🚀 PLATFORM BASED CONDITIONAL CONFIGURATION
     if (platform === 'whatsapp') {
-      // WhatsApp Embedded Signup uses Code Flow
       fbLoginConfig = {
         ...fbLoginConfig,
         scope: 'whatsapp_business_management,whatsapp_business_messaging',
@@ -84,39 +107,22 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         response_type: 'code',
         override_default_response_type: true
       };
-    } else if (platform === 'instagram') {
-      if (variant === 'facebook') {
-        // FLOW 1: Facebook Login for Business (Page-linked IG)
-        fbLoginConfig = {
-          ...fbLoginConfig,
-          scope: [
-            'business_management',
-            'instagram_basic',
-            'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
-            'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
-          ].join(',')
-        };
-      } else if (variant === 'instagram') {
-        // FLOW 2: Instagram Login (Basic Display API) - Direct IG Login
-        // This flow does NOT use window.FB.login directly for the Instagram OAuth endpoint.
-        // Instead, we construct the URL and redirect.
-        const redirectUri = `${window.location.origin}/instagram-oauth-callback`; // A new dedicated callback route
-        const instagramOAuthUrl = `https://api.instagram.com/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user_profile,user_media&response_type=code`;
-        
-        // Store workspaceId in localStorage to retrieve after redirect
-        localStorage.setItem('instagramLoginWorkspaceId', workspaceId);
-        localStorage.setItem('instagramLoginRedirectUri', redirectUri);
-
-        window.location.href = instagramOAuthUrl; // Redirect to Instagram's OAuth
-        setLoading(false); // Stop loading as we are redirecting
-        return; // Exit early, as we are not using FB.login for this variant
-      }
+    } else if (platform === 'instagram' && variant === 'facebook') {
+      // FLOW 1: Facebook Login for Business (Page-linked IG) — bilkul waisa hi
+      fbLoginConfig = {
+        ...fbLoginConfig,
+        scope: [
+          'business_management',
+          'instagram_basic',
+          'instagram_content_publish', 'instagram_manage_comments', 'instagram_manage_insights', 'instagram_manage_messages',
+          'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_messaging'
+        ].join(',')
+      };
     }
 
-    // Trigger Meta Popup
     window.FB.login((response) => {
       console.log(`➡️ [MetaConnect] ${platform} FB.login response:`, response);
-      
+
       if (response.status === 'unknown' || response.error || !response.authResponse) {
         let userFriendlyError = 'Meta Login Failed! Please allow popups and try again.';
         if (response.status === 'not_authorized') {
@@ -126,15 +132,14 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         setLoading(false);
         return;
       }
-      
+
       if (response.status === 'connected' && response.authResponse) {
-        // WhatsApp ke liye code uthayega, Instagram ke liye accessToken
         const authCode = platform === 'whatsapp'
           ? (response.authResponse.code || response.authResponse.accessToken)
-          : response.authResponse.accessToken; 
-        
+          : response.authResponse.accessToken;
+
         console.log('✅ [MetaConnect] Auth Success. Token/Code extracted:', authCode);
-        
+
         const backendRoute = `/users/settings/${platform}-connect`;
 
         api.post(backendRoute, {
@@ -143,11 +148,10 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         })
         .then(res => {
           console.log(`INSTAGRAM RESPONSE =>`, res.data);
-          
-          // Agar Instagram accounts select karne ke liye array aa raha hai
+
           if (platform === 'instagram' && res.data.availableAccounts && res.data.availableAccounts.length > 0) {
              if (onSuccess) {
-               onSuccess({ availableAccounts: res.data.availableAccounts, authCode }); 
+               onSuccess({ availableAccounts: res.data.availableAccounts, authCode });
              }
              return;
           }
@@ -172,34 +176,33 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
     }, fbLoginConfig);
   };
 
-  // Determine button style and icon based on platform and variant
   const isInstagram = platform === 'instagram';
   const isFacebookVariant = isInstagram && variant === 'facebook';
-  
-  const buttonClass = isFacebookVariant // Facebook-linked Instagram
-    ? 'bg-[#1877F2] hover:bg-[#166FE5]' 
-    : isInstagram && variant === 'instagram' // Direct Instagram Login
-    ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90' 
-    : 'bg-[#1877F2] hover:bg-[#166FE5]'; // WhatsApp (uses Facebook blue)
+
+  const buttonClass = isFacebookVariant
+    ? 'bg-[#1877F2] hover:bg-[#166FE5]'
+    : isInstagram && variant === 'instagram'
+    ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90'
+    : 'bg-[#1877F2] hover:bg-[#166FE5]';
 
   const iconSrc = isFacebookVariant
     ? "https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg"
     : isInstagram
     ? "https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg"
-    : "https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg"; // Default to Facebook icon
+    : "https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg";
 
   return (
     <button type="button"
       onClick={handleMetaLogin}
-      disabled={loading || !isSdkReady}
+      disabled={loading || (platform !== 'instagram' && !isSdkReady) || (platform === 'instagram' && variant === 'facebook' && !isSdkReady)}
       className={`w-full flex items-center justify-center gap-2 ${buttonClass} text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all disabled:opacity-50`}
     >
-      <img 
+      <img
         src={iconSrc}
-        alt="Meta" 
-        className={`w-5 h-5 ${(platform === 'whatsapp' || isFacebookVariant) ? 'bg-white rounded-full p-0.5' : ''}`} 
+        alt="Meta"
+        className={`w-5 h-5 ${(platform === 'whatsapp' || isFacebookVariant) ? 'bg-white rounded-full p-0.5' : ''}`}
       />
-      {loading ? 'Connecting...' : (!isSdkReady ? 'Loading Meta SDK...' : buttonText)}
+      {loading ? 'Connecting...' : buttonText}
     </button>
   );
 };
