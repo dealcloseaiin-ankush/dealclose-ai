@@ -113,22 +113,23 @@ exports.getBusinessInsights = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
+    // 🚀 FIX: More robustly find the correct Instagram configuration.
     const workspaceId = req.query.workspaceId || 'main';
     let selectedWorkspace = workspaceId !== 'main'
       ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
       : null;
-    let selectedInstagram = selectedWorkspace
-      ? selectedWorkspace.instagramConfig
-      : user.instagramConfig;
-    let accessToken = selectedInstagram?.accessToken;
-    let accountId = selectedInstagram?.instagramAccountId || selectedInstagram?.accountId;
+    let accessToken = selectedWorkspace?.instagramConfig?.accessToken || user.instagramConfig?.accessToken;
+    let accountId = selectedWorkspace?.instagramConfig?.instagramBusinessAccountId 
+      || selectedWorkspace?.instagramConfig?.instagramAccountId 
+      || user.instagramConfig?.instagramBusinessAccountId 
+      || user.instagramConfig?.instagramAccountId;
 
-    if (workspaceId === 'main' && !accessToken && user?.workspaces) {
+    // If main is selected but has no token, find the first available workspace token
+    if (!accessToken && user?.workspaces) {
       const ws = user.workspaces.find(w => w.instagramConfig?.accessToken);
       if (ws) {
-        const workspaceInstagram = ws.instagramConfig;
-        accessToken = workspaceInstagram.accessToken;
-        accountId = workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
+        accessToken = ws.instagramConfig.accessToken;
+        accountId = ws.instagramConfig.instagramBusinessAccountId || ws.instagramConfig.instagramAccountId;
       }
     }
 
@@ -175,24 +176,23 @@ exports.getRecentPosts = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
+    // 🚀 FIX: More robustly find the correct Instagram configuration.
     const workspaceId = req.query.workspaceId || 'main';
     let selectedWorkspace = workspaceId !== 'main'
       ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
       : null;
-    let selectedInstagram = selectedWorkspace
-      ? selectedWorkspace.instagramConfig
-      : user.instagramConfig;
-    let accessToken = selectedInstagram?.accessToken;
-    let accountId = selectedInstagram?.instagramBusinessAccountId || selectedInstagram?.instagramAccountId || selectedInstagram?.accountId;
+    let accessToken = selectedWorkspace?.instagramConfig?.accessToken || user.instagramConfig?.accessToken;
+    let accountId = selectedWorkspace?.instagramConfig?.instagramBusinessAccountId 
+      || user.instagramConfig?.instagramBusinessAccountId;
     let source = selectedWorkspace ? `Workspace: ${selectedWorkspace.name}` : 'Main Config';
 
-    if (workspaceId === 'main' && !accessToken && user?.workspaces) {
+    // If main is selected but has no token, find the first available workspace token
+    if (!accessToken && user?.workspaces) {
       const ws = user.workspaces.find(w => w.instagramConfig?.accessToken);
       if (ws) {
         selectedWorkspace = ws;
-        const workspaceInstagram = ws.instagramConfig;
-        accessToken = workspaceInstagram.accessToken;
-        accountId = workspaceInstagram.instagramBusinessAccountId || workspaceInstagram.instagramAccountId || workspaceInstagram.accountId;
+        accessToken = ws.instagramConfig.accessToken;
+        accountId = ws.instagramConfig.instagramBusinessAccountId || ws.instagramConfig.instagramAccountId;
         source = `Workspace: ${ws.name}`;
       }
     }

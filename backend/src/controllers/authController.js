@@ -214,7 +214,10 @@ exports.whatsappConnect = async (req, res) => {
 
     let targetPhone = null;
     let targetWaba = null;
-    let requestedPhoneId = workspaceId && workspaceId !== 'main' ? userDb.workspaces.find(w => w._id.toString() === workspaceId)?.whatsappConfig?.phoneNumberId : userDb.whatsappConfig?.phoneNumberId;
+    // 🐛 FIX: Added a null check for userDb.workspaces to prevent a crash if the array doesn't exist.
+    // This was causing a `TypeError: Cannot read properties of undefined (reading 'find')` when connecting to a workspace.
+    let requestedPhoneId = workspaceId && workspaceId !== 'main' 
+      ? userDb.workspaces?.find(w => w._id.toString() === workspaceId)?.whatsappConfig?.phoneNumberId : userDb.whatsappConfig?.phoneNumberId;
 
     const allPhones = [];
     // 3. Fetch Phone Number ID attached to this WABA
@@ -481,6 +484,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
       },
       timeout: process.env.META_API_TIMEOUT || 15000 // Use configurable timeout
     });
+    console.log(`[IG DEBUG] 5. Meta API response received. Found ${accountsData.data?.length || 0} potential pages.`);
  
     if (!accountsData.data || accountsData.data.length === 0) {
       return res.status(404).json({ success: false, message: 'No Facebook Pages found for this account. An Instagram Business Account must be linked to a Facebook Page to connect.' });
@@ -510,6 +514,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     if (availableAccounts.length === 0) {
       return res.status(404).json({ success: false, message: 'None of your Facebook Pages are connected to an Instagram Business Account.' });
     }
+    console.log(`[IG DEBUG] 6. Filtered down to ${availableAccounts.length} valid, connectable Instagram Business Accounts.`);
  
     // Store the list of available accounts in pendingInstagramConnection
     await User.updateOne({ _id: userId }, {
@@ -524,12 +529,15 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
         }
       }
     });
+    console.log("[IG DEBUG] 7. Saved available accounts to DB. Now sending list to frontend for user to select.");
+    console.log("================== [IG CONNECT - STEP 1: END] ==================\n");
  
     res.status(200).json({
       success: true,
       availableAccounts: availableAccounts.map(({ accountId, pageId, pageName, username, profilePictureUrl }) => ({ 
         accountId, pageId, pageName, username, profilePictureUrl 
-      }))
+      })),
+      message: "Please select an account to continue." // 🚀 DEBUG: Added message for clarity
     });
  
   } catch (error) {
@@ -623,6 +631,10 @@ exports.instagramBasicConnect = async (req, res) => {
 // @route   POST /api/users/settings/instagram-connect-selected
 exports.instagramConnectSelected = async (req, res) => {
   const { selectedAccountId, selectedPageId, workspaceId: requestedWorkspaceId } = req.body;
+  // 🚀 DEBUGGER: Added detailed logging for the final step of the connection.
+  console.log("\n\n================== [IG CONNECT - STEP 2: START] ==================");
+  console.log(`[IG DEBUG] 1. User selected an account. AccountID: ${selectedAccountId}, PageID: ${selectedPageId}`);
+
   const userId = req.user?._id || req.user?.id;
  
   if (!userId || !selectedAccountId || !selectedPageId) {
@@ -631,6 +643,7 @@ exports.instagramConnectSelected = async (req, res) => {
  
   try {
     const user = await User.findById(userId);
+    console.log("[IG DEBUG] 2. Fetched user from DB to get pending connection data.");
     const pending = user?.pendingInstagramConnection;
  
     if (!pending || pending.expiresAt < new Date()) {
@@ -649,10 +662,12 @@ exports.instagramConnectSelected = async (req, res) => {
     const longLivedToken = pending.accessToken; // User's long-lived token
     const tokenExpiresAt = pending.tokenExpiresAt;
     const selectedPageToken = selected.pageToken; // Page-specific token
+    console.log("[IG DEBUG] 3. Found matching account in pending data. Proceeding with verification.");
  
     // Step 1: Perform verification calls to trigger Meta API tests
+    console.log("[IG DEBUG] 4. Performing API verification checks with Meta to confirm permissions...");
     const verificationResults = await performVerificationAndTriggerAPITests(selected.accountId, longLivedToken);
-    console.log('✅ [Meta Verification] API tests triggered:', verificationResults);
+    console.log('✅ [IG DEBUG] 5. Meta Verification complete. Results:', verificationResults);
  
     // Step 2: Prepare the configuration object to be saved in the User model
     // ✅ FIX: Added all necessary fields (username, profilePictureUrl, pageToken) to ensure the frontend can display the connection status correctly and all features work.
@@ -672,6 +687,7 @@ exports.instagramConnectSelected = async (req, res) => {
       lastVerifiedAt: new Date(),
       loginType: pending.loginType || 'facebook_business', // 🚀 NEW: Save login type
     };
+    console.log("[IG DEBUG] 6. Prepared final 'instagramConfig' object to save in DB.");
  
     // Step 3: Save the connection details to the correct workspace in the User model
     const workspaceId = pending.workspaceId || 'main';
@@ -681,10 +697,12 @@ exports.instagramConnectSelected = async (req, res) => {
       : { $set: { instagramConfig } };
  
     await User.updateOne(filter, update);
+    console.log(`[IG DEBUG] 7. Saved configuration to DB for Workspace: ${workspaceId}.`);
  
     // Step 4: Subscribe app to the selected Facebook Page for webhooks
     let webhookWarning;
     try {
+      console.log(`[IG DEBUG] 8. Subscribing to webhooks for Page ID: ${selected.pageId}...`);
       await axios.post(`https://graph.facebook.com/v19.0/${selected.pageId}/subscribed_apps`, null, {
         // ✅ FIX: Removed 'comments' as it's not a valid field for Page subscriptions. 'feed' covers public post interactions.
         params: { subscribed_fields: 'messages,messaging_postbacks,feed', access_token: selectedPageToken },
@@ -698,6 +716,8 @@ exports.instagramConnectSelected = async (req, res) => {
  
     // Step 5: Clear pending connection state
     await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
+    console.log("[IG DEBUG] 9. Cleared pending connection data. Connection successful!");
+    console.log("================== [IG CONNECT - STEP 2: END] ==================\n");
  
     res.status(200).json({
       success: true,
