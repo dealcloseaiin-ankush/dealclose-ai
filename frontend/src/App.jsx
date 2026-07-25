@@ -45,6 +45,7 @@ import SolutionRecommender from './pages/SolutionRecommender';
 import Publisher from './pages/Publisher'; // 🚀 NEW: Publisher Page
 import AdminTemplates from './pages/AdminTemplates'; // 🚀 NEW: Admin Page
 import AutoMarketerDashboard from './pages/AutoMarketerDashboard'; // 🚀 NEW
+import InstagramOAuthCallback from './pages/InstagramOAuthCallback'; // ✅ FIX: Import the callback component
 import MetaAdsManager from './pages/MetaAdsManager'; // 🚀 NEW: Meta Ads Page
 import BillingPage from './pages/BillingPage'; // 🚀 NEW: Billing Page
 import { useAuth } from './hooks/useAuth';
@@ -177,6 +178,9 @@ export default function App() {
         <Route path="/about" element={<AboutUs />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/help" element={<Help />} />
+        
+        {/* ✅ FIX: Add the route for the Instagram OAuth callback page */}
+        <Route path="/instagram-oauth-callback" element={<InstagramOAuthCallback />} />
         <Route path="/delete-data" element={<DataDeletion />} />
         
         {/* Secondary Landing Page for AI Video Product */}
