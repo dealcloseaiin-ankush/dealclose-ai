@@ -11,7 +11,9 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
 
   const APP_ID = import.meta.env.VITE_META_APP_ID;
   const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
-  const IG_APP_ID = import.meta.env.VITE_META_INSTAGRAM_APP_ID; // 🚀 NEW: Separate Instagram App ID
+  // ✅ FIX: Simplified to use a single App ID for all Meta connections (WhatsApp, Instagram via FB, Instagram Login).
+  // This removes confusion between VITE_META_APP_ID and VITE_META_INSTAGRAM_APP_ID.
+  const IG_APP_ID = import.meta.env.VITE_META_APP_ID;
 
   useEffect(() => {
     const onSdkReady = () => setIsSdkReady(true);
@@ -56,7 +58,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
     // 🚀 FLOW 2: Instagram API with Instagram Login — Facebook SDK use nahi hota, seedha redirect
     if (platform === 'instagram' && variant === 'instagram') {
       if (!IG_APP_ID) {
-        alert("⚠️ VITE_META_INSTAGRAM_APP_ID is missing in .env file.");
+        alert("Configuration Error: The VITE_META_APP_ID is not set in your frontend hosting environment (e.g., Vercel). Please add it and redeploy.");
         return;
       }
       setLoading(true);
