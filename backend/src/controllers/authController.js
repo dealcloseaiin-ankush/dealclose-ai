@@ -421,9 +421,19 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     verificationResults.comments = 'OK';
 
     // 5. Trigger "Messaging" test (read operation)
-    const conversationsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/conversations`;
-    await axios.get(conversationsUrl, { params: { access_token: accessToken, limit: 1, platform: 'instagram' } });
-    verificationResults.messaging = 'OK';
+    // 🚀 FIX: 'conversations' endpoint ke liye Advanced Access chahiye.
+    // Development mode mein, yeh call non-tester users ke liye fail ho jaati hai, jisse (#3) error aata hai.
+    // Ise try-catch mein daalne se, agar yeh test fail bhi ho, toh bhi connection process safal hoga.
+    // App ke Live hone se pehle yeh expected behaviour hai.
+    try {
+      const conversationsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/conversations`;
+      await axios.get(conversationsUrl, { params: { access_token: accessToken, limit: 1, platform: 'instagram' } });
+      verificationResults.messaging = 'OK';
+    } catch (messagingError) {
+      // Yahan hum error ko log karke aage badh jayenge
+      console.warn('⚠️ [Meta Verification] Messaging test fail hua (Development Mode mein yeh normal hai):', messagingError.response?.data?.error?.message || messagingError.message);
+      verificationResults.messaging = 'Failed';
+    }
 
     return verificationResults;
 
