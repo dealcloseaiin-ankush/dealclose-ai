@@ -73,7 +73,12 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
       }
       setLoading(true);
 
-      const redirectUri = `${window.location.origin}/instagram-oauth-callback`;
+      // ✅ FIX: The redirect_uri must EXACTLY match what is in the Meta App Dashboard.
+      // This logic ensures that no matter where the app is running (localhost, vercel preview, production),
+      // it always uses the one single, valid, hardcoded redirect URI that is registered in the Meta App.
+      // This completely eliminates "Invalid redirect_uri" errors.
+      const origin = 'https://www.dealcloseai.in';
+      const redirectUri = `${origin}/instagram-oauth-callback`;
       // Instagram API with Instagram Login (Business Login) — these 5 scopes are 
       // the ONLY valid scopes for this product. Do NOT change to user_profile/
       // user_media (that is the deprecated Basic Display API and will break this 

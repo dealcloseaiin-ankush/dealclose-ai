@@ -5,10 +5,11 @@ import api from '../services/api';
 // ✅ FIX: Check for parameters outside the component to set initial state correctly.
 // This avoids a cascading render and resolves the ESLint warning.
 const urlParams = new URLSearchParams(window.location.search);
-const code = urlParams.get('code');
-const storedWorkspaceId = localStorage.getItem('instagramLoginWorkspaceId');
-const storedRedirectUri = localStorage.getItem('instagramLoginRedirectUri');
-const initialError = (!code || !storedWorkspaceId || !storedRedirectUri)
+const codeFromUrl = urlParams.get('code');
+const storedWorkspaceIdFromStorage = localStorage.getItem('instagramLoginWorkspaceId');
+// ✅ FIX: Hardcode the redirect URI to match the one sent to Meta, preventing any mismatch.
+const correctRedirectUri = 'https://www.dealcloseai.in/instagram-oauth-callback';
+const initialError = (!codeFromUrl || !storedWorkspaceIdFromStorage)
   ? 'Missing authorization code or session data. Please try connecting again from Settings.'
   : null;
 
@@ -22,14 +23,13 @@ export default function InstagramOAuthCallback() {
     if (initialError) return;
 
     localStorage.removeItem('instagramLoginWorkspaceId');
-    localStorage.removeItem('instagramLoginRedirectUri');
 
     // 🐛 FIX: The backend route for the Instagram Login (Basic Display) flow is 'instagram-basic-connect'.
     // The previous route '/instagram-business-login-connect' does not exist and was causing a 404 error.
     api.post('/users/settings/instagram-basic-connect', {
-      authCode: code,
-      workspaceId: storedWorkspaceId,
-      redirectUri: storedRedirectUri,
+      authCode: codeFromUrl,
+      workspaceId: storedWorkspaceIdFromStorage,
+      redirectUri: correctRedirectUri, // Send the correct, hardcoded URI to the backend for validation.
     })
       .then(res => {
         if (res.data.success) {
