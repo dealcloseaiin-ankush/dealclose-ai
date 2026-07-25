@@ -11,9 +11,9 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
 
   const APP_ID = import.meta.env.VITE_META_APP_ID;
   const CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
-  // ✅ FIX: Simplified to use a single App ID for all Meta connections (WhatsApp, Instagram via FB, Instagram Login).
-  // This removes confusion between VITE_META_APP_ID and VITE_META_INSTAGRAM_APP_ID.
-  const IG_APP_ID = import.meta.env.VITE_META_APP_ID;
+  // ✅ FIX: Use the correct environment variable name as set in Vercel.
+  // The variable in Vercel is `VITE_INSTAGRAM_META_APP_ID`, not `VITE_META_INSTAGRAM_APP_ID`.
+  const IG_APP_ID = import.meta.env.VITE_INSTAGRAM_META_APP_ID || import.meta.env.VITE_META_APP_ID;
 
   useEffect(() => {
     const onSdkReady = () => setIsSdkReady(true);
@@ -58,7 +58,7 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
     // 🚀 FLOW 2: Instagram API with Instagram Login — Facebook SDK use nahi hota, seedha redirect
     if (platform === 'instagram' && variant === 'instagram') {
       if (!IG_APP_ID) {
-        alert("Configuration Error: The VITE_META_APP_ID is not set in your frontend hosting environment (e.g., Vercel). Please add it and redeploy.");
+        alert("Configuration Error: The VITE_INSTAGRAM_META_APP_ID or VITE_META_APP_ID is not set in your frontend hosting environment (e.g., Vercel). Please add it and redeploy.");
         return;
       }
       setLoading(true);
@@ -76,6 +76,14 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
         'instagram_business_manage_insights'
       ].join(',');
       const instagramOAuthUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}`;
+
+      // 🚀 MEGA DEBUG: Log the exact URL being constructed to find the issue.
+      console.log('================== [INSTAGRAM CONNECT DEBUG] ==================');
+      console.log('1. Platform:', platform, 'Variant:', variant);
+      console.log('2. VITE_META_APP_ID from .env:', APP_ID);
+      console.log('3. Final IG_APP_ID being used:', IG_APP_ID);
+      console.log('4. Final OAuth URL:', instagramOAuthUrl);
+      console.log('===============================================================');
 
       localStorage.setItem('instagramLoginWorkspaceId', workspaceId);
       localStorage.setItem('instagramLoginRedirectUri', redirectUri);
