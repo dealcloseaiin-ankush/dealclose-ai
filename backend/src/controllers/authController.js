@@ -570,15 +570,16 @@ exports.instagramConnectSelected = async (req, res) => {
     console.log('✅ [Meta Verification] API tests triggered:', verificationResults);
  
     // Step 2: Prepare the configuration object to be saved in the User model
+    // ✅ FIX: Added all necessary fields (username, profilePictureUrl, pageToken) to ensure the frontend can display the connection status correctly and all features work.
     const instagramConfig = {
       instagramUserId: verificationResults.token.userId,
-      instagramBusinessAccountId: selected.accountId,
+      instagramBusinessAccountId: selected.accountId, // ✅ FIX: Using the correct, non-legacy field name from userModel.
       facebookPageId: selected.pageId,
       businessId: selected.businessId,
-      accessToken: longLivedToken, // Save the user's long-lived token
+      accessToken: selected.pageToken || longLivedToken, // 🔥 FIX: Prioritize Page Token for page-specific actions.
       tokenType: 'bearer',
-      expiresAt: tokenExpiresAt,
-      grantedPermissions: verificationResults.token.scopes,
+      tokenExpiresAt: tokenExpiresAt,
+      grantedPermissions: verificationResults.token.scopes || [],
       username: selected.username,
       profilePictureUrl: selected.profilePictureUrl,
       lastVerifiedAt: new Date(),

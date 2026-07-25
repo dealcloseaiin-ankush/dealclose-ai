@@ -10,9 +10,6 @@ const instagramConfigSchema = new Schema({
   instagramBusinessAccountId: { type:String },
   facebookPageId: { type: String },
   businessId: { type: String }, // Meta Business Manager ID
-
-  // Legacy field for backward compatibility
-  instagramAccountId: { type: String }, 
   
   // Authentication & Permissions
   accessToken: { type: String },
