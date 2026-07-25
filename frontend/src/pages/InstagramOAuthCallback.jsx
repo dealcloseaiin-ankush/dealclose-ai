@@ -24,7 +24,9 @@ export default function InstagramOAuthCallback() {
     localStorage.removeItem('instagramLoginWorkspaceId');
     localStorage.removeItem('instagramLoginRedirectUri');
 
-    api.post('/users/settings/instagram-business-login-connect', {
+    // 🐛 FIX: The backend route for the Instagram Login (Basic Display) flow is 'instagram-basic-connect'.
+    // The previous route '/instagram-business-login-connect' does not exist and was causing a 404 error.
+    api.post('/users/settings/instagram-basic-connect', {
       authCode: code,
       workspaceId: storedWorkspaceId,
       redirectUri: storedRedirectUri,
