@@ -616,8 +616,12 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
 const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
   // Strip the trailing "#_" fragment artifact that Instagram sometimes appends to the code
   const cleanCode = (authCode || '').replace(/#_$/, '');
-  console.log('[IG DEBUG] Exchanging short-lived code for token. Using App ID:', META_INSTAGRAM_LOGIN_APP_ID);
-  console.log('[IG DEBUG] Redirect URI being sent to Meta:', redirectUri);
+  // 🚀 DEBUG: Add detailed logging to trace the exact values being sent to Meta.
+  console.log('\n[IG TOKEN EXCHANGE DEBUG] 1. Preparing to exchange code for token.');
+  console.log(`   - App ID Used: ${META_INSTAGRAM_LOGIN_APP_ID ? 'Present ✅' : 'MISSING ❌'}`);
+  console.log(`   - App Secret Used: ${META_APP_SECRET ? 'Present ✅' : 'MISSING ❌'}`);
+  console.log(`   - Redirect URI Sent to Meta: ${redirectUri}`);
+  console.log(`   - Auth Code Received: ${cleanCode ? 'Present ✅' : 'MISSING ❌'}`);
 
   const form = new URLSearchParams();
   form.append('client_id', META_INSTAGRAM_LOGIN_APP_ID);
@@ -626,10 +630,14 @@ const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
   form.append('redirect_uri', redirectUri);
   form.append('code', cleanCode);
 
+  console.log('[IG TOKEN EXCHANGE DEBUG] 2. Sending POST request to api.instagram.com/oauth/access_token...');
   const { data } = await axios.post('https://api.instagram.com/oauth/access_token', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   }).catch(err => {
-    console.error('❌ [CRITICAL] Instagram short-lived token exchange failed:', err.response?.data || err.message);
+    // 🚀 DEBUG: Log the exact error response from Meta.
+    console.error('❌ [CRITICAL] Instagram short-lived token exchange FAILED.');
+    console.error('   - Meta Error Response:', JSON.stringify(err.response?.data, null, 2));
+    console.error('   - Full Error Message:', err.message);
     throw err;
   });
 
@@ -755,6 +763,11 @@ exports.instagramBasicConnect = async (req, res) => { // This function is now ef
     return res.status(400).json({ success: false, message: 'Authorization code, workspace ID, and redirect URI are required.' });
   }
 
+  // 🚀 DEBUG: Log the incoming request to trace the issue.
+  console.log('[IG Basic Connect] 1. Received request with:');
+  console.log(`   - authCode: ${authCode ? 'Present' : 'MISSING'}`);
+  console.log(`   - workspaceId: ${workspaceId}`);
+  console.log(`   - redirectUri: ${redirectUri}`);
   try {
     // Step 1: Exchange code for short-lived token
     const { accessToken: shortLivedToken, userId: igUserId, expiresIn: shortExpiresIn } = await getInstagramBasicShortLivedToken(authCode, redirectUri);
