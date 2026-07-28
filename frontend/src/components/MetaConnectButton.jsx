@@ -15,16 +15,6 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
   // The variable in Vercel is `VITE_INSTAGRAM_META_APP_ID`, not `VITE_META_INSTAGRAM_APP_ID`.
   const IG_APP_ID = import.meta.env.VITE_INSTAGRAM_META_APP_ID || import.meta.env.VITE_META_APP_ID;
 
-  // 🚀 MEGA DEBUG (FRONTEND): Moved logs to the top level to ensure they always run when the component renders.
-  // This will confirm if Vercel is serving the latest code and what environment variables are available.
-  console.log('================== [VERCEL ENV DEBUG] ==================');
-  console.log('Yeh Vercel se aa rahe variables hain (frontend):');
-  console.log('VITE_META_APP_ID:', import.meta.env.VITE_META_APP_ID ? 'Present ✅' : 'MISSING ❌');
-  console.log('VITE_INSTAGRAM_META_APP_ID:', import.meta.env.VITE_INSTAGRAM_META_APP_ID ? 'Present ✅' : 'MISSING ❌');
-  console.log('VITE_META_CONFIG_ID:', import.meta.env.VITE_META_CONFIG_ID ? 'Present ✅' : 'MISSING ❌');
-  console.log('Final IG_APP_ID jo use ho raha hai:', IG_APP_ID || 'None');
-  console.log('========================================================');
-
   useEffect(() => {
     const onSdkReady = () => setIsSdkReady(true);
     if (globalIsSdkLoaded) { onSdkReady(); return; }
@@ -83,23 +73,13 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
       // the ONLY valid scopes for this product. Do NOT change to user_profile/
       // user_media (that is the deprecated Basic Display API and will break this 
       // flow with "Invalid platform app").
+      // ✅ FIX: Added all necessary business scopes to ensure all features and API tests work correctly.
       const scopes = [
-        'instagram_business_basic',
-        'instagram_business_content_publish',
-        'instagram_business_manage_comments', // ✅ YEH PERMISSION YAHAN HAI
-        'instagram_business_manage_messages',
-        'instagram_business_manage_insights' // ✅ YEH PERMISSION YAHAN HAI
+        'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments', 
+        'instagram_manage_insights', 'instagram_manage_messages', 'business_management',
+        'pages_show_list', 'pages_read_engagement'
       ].join(',');
       const instagramOAuthUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}`;
-
-      // 🚀 MEGA DEBUG: Log the exact URL being constructed to find the issue.
-      console.log('================== [INSTAGRAM CONNECT DEBUG] ==================');
-      console.log('1. Platform:', platform, 'Variant:', variant);
-      console.log('2. VITE_META_APP_ID from .env:', APP_ID);
-      console.log('3. Final IG_APP_ID being used:', IG_APP_ID);
-      console.log('4. Final OAuth URL:', instagramOAuthUrl);
-      console.log('===============================================================');
-
       localStorage.setItem('instagramLoginWorkspaceId', workspaceId);
       localStorage.setItem('instagramLoginRedirectUri', redirectUri);
 

@@ -499,7 +499,10 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
       },
       timeout: process.env.META_API_TIMEOUT || 15000 // Use configurable timeout
     });
+    // ✅ FIX: Moved the debug log to after the API call to fix the syntax error.
     console.log(`[IG DEBUG] 5. Meta API response received. Found ${accountsData.data?.length || 0} potential pages.`);
+    // 🚀 DEBUG: Check the granted scopes from Meta.
+    console.log('✅ [DEBUG] Permissions granted by user:', accountsData.data.map(p => p.tasks));
  
     if (!accountsData.data || accountsData.data.length === 0) {
       return res.status(404).json({ success: false, message: 'No Facebook Pages found for this account. An Instagram Business Account must be linked to a Facebook Page to connect.' });
@@ -814,7 +817,7 @@ exports.instagramConnectSelected = async (req, res) => {
     // ✅ FIX: Added all necessary fields (username, profilePictureUrl, pageToken) to ensure the frontend can display the connection status correctly and all features work.
     const instagramConfig = {
       instagramUserId: verificationResults.token.userId,
-      instagramBusinessAccountId: selected.accountId,
+      instagramBusinessAccountId: selected.accountId, // This is correct, selected.accountId is the instagramBusinessAccountId
       facebookPageId: selected.pageId,
       businessId: selected.businessId,
       accessToken: selected.pageToken || longLivedToken, // 🔥 FIX: Prioritize Page Token for page-specific actions.

@@ -181,8 +181,8 @@ exports.getRecentPosts = async (req, res) => {
     let selectedWorkspace = workspaceId !== 'main'
       ? user.workspaces?.find((workspace) => String(workspace._id) === String(workspaceId))
       : null;
-    let accessToken = selectedWorkspace?.instagramConfig?.accessToken || user.instagramConfig?.accessToken;
-    let accountId = selectedWorkspace?.instagramConfig?.instagramBusinessAccountId 
+    let accessToken = selectedWorkspace?.instagramConfig?.accessToken || user.instagramConfig?.accessToken; // ✅ FIX: Correctly find the access token for the active workspace or fallback to the main one.
+    let accountId = selectedWorkspace?.instagramConfig?.instagramBusinessAccountId
       || user.instagramConfig?.instagramBusinessAccountId;
     let source = selectedWorkspace ? `Workspace: ${selectedWorkspace.name}` : 'Main Config';
 
@@ -192,7 +192,7 @@ exports.getRecentPosts = async (req, res) => {
       if (ws) {
         selectedWorkspace = ws;
         accessToken = ws.instagramConfig.accessToken;
-        accountId = ws.instagramConfig.instagramBusinessAccountId || ws.instagramConfig.instagramAccountId;
+        accountId = ws.instagramConfig.instagramBusinessAccountId; // ✅ FIX: Only use the correct 'instagramBusinessAccountId' field.
         source = `Workspace: ${ws.name}`;
       }
     }

@@ -1123,11 +1123,11 @@ export default function Settings() {
                          )}
                          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3">
                            <div>
-                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace via Facebook" : "Connect via Facebook"} variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} /> {/* ✅ FIX: Pass variant */}
+                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace via Facebook" : "Connect via Facebook"} variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                              <p className="mt-1 text-[11px] text-gray-500">Facebook Page linked Instagram</p>
                            </div>
                            <div>
-                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} /> {/* ✅ FIX: Pass variant */}
+                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                              <p className="mt-1 text-[11px] text-gray-500">Instagram Professional account</p>
                            </div>
                          </div>

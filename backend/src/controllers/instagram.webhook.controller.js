@@ -178,6 +178,11 @@ exports.handleInstagramWebhook = async (req, res) => {
             if (event.read) {
               console.log(`[IG Webhook] Ignoring 'read' receipt event from ${event.sender.id}.`);
               continue; // Skip to the next event
+            } else if (event.message_edit) {
+              // 🚀 NEW: Handle message edit/unsend events from Instagram.
+              // This prevents crashes and logs the event, but doesn't trigger AI.
+              console.log(`[IG Webhook] Ignoring 'message_edit' or 'unsend' event from ${event.sender.id}.`);
+              continue; // Skip to the next event
             } else if (event.message && event.message.text) {
               
               const isEcho = event.message.is_echo;
