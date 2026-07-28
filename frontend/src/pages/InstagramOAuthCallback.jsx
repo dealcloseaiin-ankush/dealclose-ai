@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
+// ⚠️ This page ONLY handles the callback for the "Connect with Instagram Login"
+// button (variant="instagram" in MetaConnectButton.jsx). It must always POST to
+// /users/settings/instagram-basic-connect — never /users/settings/instagram-connect,
+// which belongs to the separate "Connect via Facebook" flow and expects a
+// Facebook Graph token, not an Instagram Login authorization code.
+
 // ✅ FIX: Check for parameters outside the component to set initial state correctly.
 // This avoids a cascading render and resolves the ESLint warning.
 const urlParams = new URLSearchParams(window.location.search);
@@ -26,7 +32,7 @@ export default function InstagramOAuthCallback() {
 
     // 🐛 FIX: The backend route for the Instagram Login (Basic Display) flow is 'instagram-basic-connect'.
     // ✅ FIX: Changed to call the correct backend route for Instagram Business Login flow.
-    api.post('/users/settings/instagram-connect', {
+    api.post('/users/settings/instagram-basic-connect', {
       authCode: codeFromUrl,
       workspaceId: storedWorkspaceIdFromStorage,
       redirectUri: correctRedirectUri, // Send the correct, hardcoded URI to the backend for validation.

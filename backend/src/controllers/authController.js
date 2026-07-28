@@ -15,6 +15,48 @@ const bcrypt = require('bcryptjs');
 const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
+
+/**
+ * ============================================================================
+ * ⚠️ ARCHITECTURE NOTE — TWO SEPARATE, NON-INTERCHANGEABLE INSTAGRAM FLOWS ⚠️
+ * ============================================================================
+ * This app has TWO independent Instagram connect buttons in Settings.jsx:
+ *
+ * BUTTON 1: "Connect via Facebook" (variant="facebook")
+ *   - Frontend: MetaConnectButton.jsx, uses window.FB.login() (Facebook JS SDK)
+ *   - Scopes: instagram_basic, instagram_content_publish, instagram_manage_comments,
+ *     instagram_manage_insights, instagram_manage_messages, business_management,
+ *     pages_show_list, pages_read_engagement, pages_manage_metadata, pages_messaging
+ *   - Backend: exports.instagramConnect (below) — requires a Facebook Page linked
+ *     to an Instagram Business Account. Uses graph.facebook.com for EVERYTHING.
+ *   - Route: POST /users/settings/instagram-connect
+ *   - Token type: Facebook Graph API long-lived token (fb_exchange_token)
+ *   - Followed by: exports.instagramConnectSelected (user picks which Page/IG
+ *     account from a list, since one FB login can have multiple Pages)
+ *
+ * BUTTON 2: "Connect with Instagram Login" (variant="instagram")
+ *   - Frontend: MetaConnectButton.jsx, does a FULL REDIRECT to
+ *     https://www.instagram.com/oauth/authorize (NOT the Facebook JS SDK)
+ *   - Scopes: ONLY these 5 exist for this product — never use any other scope name:
+ *     instagram_business_basic, instagram_business_content_publish,
+ *     instagram_business_manage_comments, instagram_business_manage_messages,
+ *     instagram_business_manage_insights
+ *   - No Facebook Page involved at all — this is Page-optional by design.
+ *   - Backend: exports.instagramBasicConnect (below) — uses api.instagram.com for
+ *     the code exchange and graph.instagram.com for EVERYTHING after (never
+ *     graph.facebook.com).
+ *   - Route: POST /users/settings/instagram-basic-connect
+ *   - Callback page: InstagramOAuthCallback.jsx posts to this exact route.
+ *
+ * 🚫 DO NOT merge these two functions, share scopes between them, or make one
+ * call the other's helper functions. They are different Meta products with
+ * different OAuth servers and different Graph API hosts. Mixing them causes
+ * silent failures like "Invalid platform app" or pages/chats not loading.
+ *
+ * If asked to add a feature to "Instagram connect", ALWAYS ask or infer which
+ * of the two buttons/flows it applies to before editing.
+ * ============================================================================
+ */
  
 // ✅ FIX: Use dedicated Instagram App secrets. Fallback to main secrets.
 const META_APP_SECRET = process.env.INSTAGRAM_META_APP_SECRET || process.env.META_APP_SECRET; // User confirmed INSTAGRAM_META_APP_SECRET
@@ -473,45 +515,46 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
  exports.instagramConnect = async (req, res) => {
   const { authCode, workspaceId } = req.body;
   const userId = req.user?._id || req.user?.id;
-
+ 
   if (!authCode || !workspaceId) {
     return res.status(400).json({ success: false, message: 'Authorization code and workspace ID are required.' });
   }
-
+ 
   try {
-    // Step 1: Exchange short-lived token for a long-lived one
     const { accessToken: longLivedToken, expiresIn } = await getLongLivedAccessToken(authCode).catch(e => {
       console.error("getLongLivedAccessToken (Facebook-linked) failed:", e.message);
-      return { accessToken: authCode, expiresIn: 3600 }; // Fallback to short-lived if exchange fails
+      return { accessToken: authCode, expiresIn: 3600 };
     });
-    // ✅ FIX: Safely calculate expiry. If expiresIn is undefined, set a default of 1 hour.
     const tokenExpiresAt = new Date(Date.now() + (expiresIn || 3600) * 1000);
  
     // Step 2: Get user's pages and their linked Instagram Business Accounts
     const accountsUrl = `https://graph.facebook.com/v19.0/me/accounts`;
-    const { data: accountsData } = await axios.get(accountsUrl, { 
-      params: { 
-        access_token: longLivedToken, 
-        // ✅ YAHAN BHI ADD KIYA HAI:
-        // Yeh backend se verify karta hai ki saari permissions (publishing, insights, messaging) mil gayi hain.
-        // In scopes ko add karne se hum yeh sunishchit karte hain ki user ne saari zaroori anumatiyan di hain.
-        // Iske bina, API tests aur features fail ho sakte hain.
-        fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}',
-        scope: 'business_management,instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,instagram_manage_messages,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_messaging'
-      },
-      timeout: process.env.META_API_TIMEOUT || 15000 // Use configurable timeout
-    });
-    // ✅ FIX: Moved the debug log to after the API call to fix the syntax error.
-    console.log(`[IG DEBUG] 5. Meta API response received. Found ${accountsData.data?.length || 0} potential pages.`);
-    // 🚀 DEBUG: Check the granted scopes from Meta.
-    console.log('✅ [DEBUG] Permissions granted by user:', accountsData.data.map(p => p.tasks));
- 
-    if (!accountsData.data || accountsData.data.length === 0) {
+    let allPages = [];
+    let nextUrl = accountsUrl;
+    let nextParams = {
+      access_token: longLivedToken,
+      fields: 'id,name,picture,access_token,instagram_business_account{id,username,profile_picture_url}',
+      limit: 100,
+    };
+
+    while (nextUrl) {
+      const { data: pageResponse } = await axios.get(nextUrl, {
+        params: nextParams,
+        timeout: process.env.META_API_TIMEOUT || 15000
+      });
+      allPages = allPages.concat(pageResponse.data || []);
+      nextUrl = pageResponse.paging?.next || null;
+      nextParams = undefined; // paging.next already includes all needed query params
+    }
+
+    console.log(`[IG DEBUG] 5. Meta API response received across all pages. Found ${allPages.length} total Facebook Pages.`);
+
+    if (allPages.length === 0) {
       return res.status(404).json({ success: false, message: 'No Facebook Pages found for this account. An Instagram Business Account must be linked to a Facebook Page to connect.' });
     }
- 
+
     const availableAccounts = [];
-    for (const page of accountsData.data) {
+    for (const page of allPages) {
       try {
         if (page.instagram_business_account) {
           availableAccounts.push({
@@ -573,6 +616,8 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
 const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
   // Strip the trailing "#_" fragment artifact that Instagram sometimes appends to the code
   const cleanCode = (authCode || '').replace(/#_$/, '');
+  console.log('[IG DEBUG] Exchanging short-lived code for token. Using App ID:', META_INSTAGRAM_LOGIN_APP_ID);
+  console.log('[IG DEBUG] Redirect URI being sent to Meta:', redirectUri);
 
   const form = new URLSearchParams();
   form.append('client_id', META_INSTAGRAM_LOGIN_APP_ID);
@@ -583,6 +628,9 @@ const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
 
   const { data } = await axios.post('https://api.instagram.com/oauth/access_token', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  }).catch(err => {
+    console.error('❌ [CRITICAL] Instagram short-lived token exchange failed:', err.response?.data || err.message);
+    throw err;
   });
 
   // Response shape can be flat or { data: [ {...} ] } depending on API version
@@ -699,7 +747,7 @@ const performInstagramBasicVerification = async (igUserId, accessToken) => {
 // 🚀 NEW: This is FLOW 2: Instagram Login (Basic Display API)
 // @desc    Connect Instagram via Instagram Login (Basic Display API)
 // @route   POST /api/users/settings/instagram-basic-connect
-exports.instagramBasicConnect = async (req, res) => {
+exports.instagramBasicConnect = async (req, res) => { // This function is now effectively replaced by the logic inside instagramConnect
   const { authCode, workspaceId, redirectUri } = req.body;
   const userId = req.user?._id || req.user?.id;
 
@@ -750,13 +798,18 @@ exports.instagramBasicConnect = async (req, res) => {
     await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
 
     // ⚠️ Webhook subscription: Instagram Login flow ke liye subscribe_apps endpoint 
-    // graph.instagram.com pe Business Account ID ke against hota hai, Page ID pe nahi.
     let webhookWarning;
-    // 🐛 FIX: Basic Display API does not support webhook subscriptions.
-    // Attempting to subscribe was causing an unnecessary error. This block is now removed.
-    // Webhooks are only available for Instagram Business accounts connected via Facebook Login.
-    webhookWarning = "Webhook subscription is not available for Instagram Basic Display connections. Real-time features like comment/DM replies will not work with this connection type.";
-    console.warn('⚠️ [Instagram Login] ' + webhookWarning);
+    try {
+      await axios.post(
+        `https://graph.instagram.com/v21.0/${profileInfo.instagramUserId}/subscribed_apps`,
+        null,
+        { params: { subscribed_fields: 'messages,comments', access_token: longLivedToken } }
+      );
+      console.log(`✅ [Instagram Login] Webhook subscription successful for @${profileInfo.username}`);
+    } catch (subErr) {
+      webhookWarning = subErr.response?.data?.error?.message || subErr.message;
+      console.warn('⚠️ [Instagram Login] Webhook subscription warning:', webhookWarning);
+    }
 
     res.status(200).json({
       success: true,

@@ -54,9 +54,27 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
     };
   }, [APP_ID]);
 
+  // ⚠️ ARCHITECTURE NOTE: This single function handles THREE different auth
+  // flows based on platform/variant props:
+  //   1. platform="whatsapp" → WhatsApp Embedded Signup (FB.login with config_id)
+  //   2. platform="instagram" variant="facebook" → Facebook Login for Business,
+  //      calls POST /users/settings/instagram-connect on the backend
+  //   3. platform="instagram" variant="instagram" → Instagram Login (direct
+  //      redirect to instagram.com), calls POST /users/settings/instagram-basic-connect
+  // Flow 2 and Flow 3 are NOT interchangeable — see the note in authController.js
+  // for why. Never copy scopes or logic from one into the other.
   const handleMetaLogin = () => {
     // 🚀 FLOW 2: Instagram API with Instagram Login — Facebook SDK use nahi hota, seedha redirect
     if (platform === 'instagram' && variant === 'instagram') {
+      const proceed = window.confirm(
+        "⚠️ Important: Make sure you are currently logged into Instagram " +
+        "(app or web) with the SAME account you want to connect to this branch.\n\n" +
+        "If a different Instagram account is logged in on this device, please log out " +
+        "of Instagram first, log in with the correct account, and then click Connect again.\n\n" +
+        "Click OK to continue to Instagram, or Cancel to go log in with the correct account first."
+      );
+      if (!proceed) return;
+
       if (!IG_APP_ID) {
         alert("Configuration Error: The VITE_INSTAGRAM_META_APP_ID or VITE_META_APP_ID is not set in your frontend hosting environment (e.g., Vercel). Please add it and redeploy.");
         return;
@@ -67,17 +85,21 @@ const MetaConnectButton = ({ buttonText = 'Connect', platform = 'whatsapp', work
       // This logic ensures that no matter where the app is running (localhost, vercel preview, production),
       // it always uses the one single, valid, hardcoded redirect URI that is registered in the Meta App.
       // This completely eliminates "Invalid redirect_uri" errors.
-      const origin = 'https://www.dealcloseai.in'; // Hardcoded for production stability
-      const redirectUri = `${origin}/instagram-oauth-callback`;
+      // 🚀 FIX: Use a single, consistent, whitelisted redirect URI for all environments.
+      // This prevents "Invalid redirect_uri" errors when testing on localhost or Vercel previews.
+      // This exact URL MUST be in your Meta App's "Valid OAuth Redirect URIs" list.
+      const redirectUri = 'https://www.dealcloseai.in/instagram-oauth-callback';
+
       // Instagram API with Instagram Login (Business Login) — these 5 scopes are 
       // the ONLY valid scopes for this product. Do NOT change to user_profile/
       // user_media (that is the deprecated Basic Display API and will break this 
       // flow with "Invalid platform app").
-      // ✅ FIX: Added all necessary business scopes to ensure all features and API tests work correctly.
       const scopes = [
-        'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments', 
-        'instagram_manage_insights', 'instagram_manage_messages', 'business_management',
-        'pages_show_list', 'pages_read_engagement'
+        'instagram_business_basic',
+        'instagram_business_content_publish',
+        'instagram_business_manage_comments',
+        'instagram_business_manage_messages',
+        'instagram_business_manage_insights'
       ].join(',');
       const instagramOAuthUrl = `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}`;
       localStorage.setItem('instagramLoginWorkspaceId', workspaceId);

@@ -48,82 +48,59 @@ const saveThreadState = async (threadKey, state) => {
 };
 
 // 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
-metaAdsService.sendInstagramDM = async (token, recipientId, text) => {
+metaAdsService.sendInstagramDM = async (token, recipientId, text, loginType = 'facebook_business') => {
   if (!token) {
     throw new Error("No Access Token found (Token is NULL)");
   }
-  
-  console.log(`\n▶️ [MEGA DEBUG: ID TRACKER FOR SENDING]`);
-  console.log(`    👉 Attempting to send to Meta Recipient ID: ${recipientId}`);
-  
+
+  const baseUrl = loginType === 'instagram_basic_display'
+    ? 'https://graph.instagram.com/v21.0/me/messages'
+    : 'https://graph.facebook.com/v19.0/me/messages';
+
+  console.log(`\n▶️ [MEGA DEBUG: ID TRACKER FOR SENDING] Host: ${baseUrl}, Recipient: ${recipientId}, loginType: ${loginType}`);
+
   try {
-    const response = await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
+    const response = await axios.post(baseUrl, {
       recipient: { id: recipientId },
       message: { text: text },
       messaging_type: "RESPONSE"
     }, { params: { access_token: token } });
-    
-    console.log(`    漏 [META API SUCCESS] Meta accepted the message for ID ${recipientId}. Message ID: ${response.data?.message_id}`);
+
+    console.log(`✅ [META API SUCCESS] Message ID: ${response.data?.message_id}`);
     return response;
   } catch (error) {
     const metaErr = error.response?.data?.error;
-    console.error(`    ❌ [META API REJECTED] Failed to send to ID ${recipientId}.`);
-    console.error(`    ⚠️ Reason from Meta: Code: ${metaErr?.code}, Subcode: ${metaErr?.error_subcode}, Message: ${metaErr?.message || error.message}`);
+    console.error(`❌ [META API REJECTED] Failed to send to ID ${recipientId} via ${baseUrl}. Reason:`, metaErr?.message || error.message);
     throw error;
   }
 };
 
-metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentId, text) => {
+metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentId, text, loginType = 'facebook_business') => {
   if (!token) {
     throw new Error("No Access Token found for private reply (Token is NULL)");
   }
-  if (!pageId) {
+
+  const url = loginType === 'instagram_basic_display'
+    ? `https://graph.instagram.com/v21.0/${commentId}/replies` // Instagram Login flow: no page-scoped private reply endpoint the same way; comment on the comment directly if private reply isn't supported for this product — verify against current Meta docs before finalizing this endpoint
+    : `https://graph.facebook.com/v19.0/${pageId}/messages`;
+
+  if (loginType === 'facebook_business' && !pageId) {
     throw new Error("No Facebook Page ID found for private reply (pageId is NULL)");
   }
 
-  console.log(`\n[PRIVATE REPLY DEBUG] Attempting private reply for pageId: ${pageId}, commentId: ${commentId}`);
-  console.log(`[PRIVATE REPLY DEBUG] Message preview: ${String(text || '').substring(0, 180)}`);
+  const payload = loginType === 'instagram_basic_display'
+    ? { message: text, access_token: token }
+    : { recipient: { comment_id: commentId }, message: { text }, messaging_type: "RESPONSE" };
 
   try {
-    const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${pageId}/messages`,
-      {
-        recipient: { comment_id: commentId },
-        message: { text },
-        messaging_type: "RESPONSE"
-      },
-      {
-        params: { access_token: token }
-      }
-    );
-    console.log("[PRIVATE REPLY SUCCESS] Meta accepted comment private reply:", response.data);
+    const response = loginType === 'instagram_basic_display'
+      ? await axios.post(url, payload)
+      : await axios.post(url, payload, { params: { access_token: token } });
+    console.log("[PRIVATE REPLY SUCCESS]", response.data);
     return response;
   } catch (error) {
     const metaErr = error.response?.data?.error;
-    console.error("[PRIVATE REPLY REJECTED] Meta rejected comment private reply.");
-    console.error("[PRIVATE REPLY REJECTED] Request debug:", {
-      pageId,
-      commentId,
-      tokenSnippet: token ? `${token.slice(0, 10)}...` : null
-    });
-    console.error("[PRIVATE REPLY REJECTED] Full response:", error.response?.data || error.message);
-    console.error(`[PRIVATE REPLY REJECTED] Code: ${metaErr?.code}, Subcode: ${metaErr?.error_subcode}, Message: ${metaErr?.message || error.message}`);
-
-    if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
-      try {
-        const appToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
-        const debugResponse = await axios.get(`https://graph.facebook.com/debug_token`, {
-          params: {
-            input_token: token,
-            access_token: appToken
-          }
-        });
-        console.error("[PRIVATE REPLY DEBUG_TOKEN]", debugResponse.data);
-      } catch (debugError) {
-        console.error("[PRIVATE REPLY DEBUG_TOKEN ERROR]", debugError.response?.data || debugError.message);
-      }
-    }
-
+    console.error("[PRIVATE REPLY REJECTED]", error.response?.data || error.message);
     throw error;
   }
 };
@@ -199,12 +176,12 @@ exports.handleInstagramWebhook = async (req, res) => {
               
               console.log(` [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
  
-              // ✅ CRITICAL FIX: Use 'instagramBusinessAccountId' which is the correct field name in the userModel schema.
-              // The old 'instagramAccountId' field does not exist, causing this query to always fail.
               let user = await User.findOne({
                 $or: [
                   { "instagramConfig.instagramBusinessAccountId": igAccountId },
-                  { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }
+                  { "instagramConfig.instagramUserId": igAccountId },
+                  { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId },
+                  { "workspaces.instagramConfig.instagramUserId": igAccountId },
                 ]
               }).lean();
               
@@ -262,7 +239,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 
                 if (matchedRule && matchedRule.fileUrl) {
                    const linkMsg = `Here is your requested link/file: ${matchedRule.fileUrl}\n\nLet me know if you need anything else!`;
-                   if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, linkMsg).catch(e => console.error(e));
+                   if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, linkMsg, loginType).catch(e => console.error(e));
                    
                    if (incomingWorkspaceId !== 'main') {
                      await User.updateOne(
@@ -343,12 +320,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                 return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
               };
 
-              const sendIGFlowMessage = async (text, nodeToPauseAt = null, flowIdToPauseAt = null) => {
+              const sendIGFlowMessage = async (text, nodeToPauseAt = null, flowIdToPauseAt = null, loginType) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = text;
                 try {
                     if (!igToken) throw new Error("IG Token is missing or invalid");
-                    await metaAdsService.sendInstagramDM(igToken, senderId, text);
+                    await metaAdsService.sendInstagramDM(igToken, senderId, text, loginType);
                 } catch (e) {
                     console.error("❌ [IG Flow DM Error]:", e.message);
                     deliveryStatus = 'failed';
@@ -434,13 +411,11 @@ exports.handleInstagramWebhook = async (req, res) => {
                        const currentFlowId = activeFlow._id.toString();
                        
                        if (nextNode.type === 'message') {
-                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                         await sendIGFlowMessage(msgText);
+                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);                         await sendIGFlowMessage(msgText, null, null, loginType);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
-                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         await sendIGFlowMessage(msgText, nextNode.id, currentFlowId);
+                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);                         await sendIGFlowMessage(msgText, nextNode.id, currentFlowId, loginType);
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -449,7 +424,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           await sendIGFlowMessage(msgText, nextNode.id, currentFlowId);
+                           await sendIGFlowMessage(msgText, nextNode.id, currentFlowId, loginType);
                          }
                          currNodeId = null; 
                        } else if (nextNode.type === 'add_tag' || nextNode.type === 'tag_lead') {
@@ -475,7 +450,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'ai_agent') {
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
-                         if (nextNode.data.message) await sendIGFlowMessage(formatFlowMsg(nextNode.data.message));
+                         if (nextNode.data.message) await sendIGFlowMessage(formatFlowMsg(nextNode.data.message), null, null, loginType);
                          currNodeId = null; 
                        } else { break; }
                      }
@@ -511,13 +486,11 @@ exports.handleInstagramWebhook = async (req, res) => {
                        const nextNode = nodes.find(n => n.id === currNodeId);
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
-                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
-                         await sendIGFlowMessage(msgText);
+                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);                         await sendIGFlowMessage(msgText, null, null, loginType);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
-                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
-                         await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString());
+                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);                         await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString(), loginType);
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -526,7 +499,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                            msgText += "\n";
                            options.forEach((opt, idx) => { msgText += `\n${idx+1}️⃣ ${opt}`; });
                            msgText += "\n\n(Type a number)";
-                           await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString());
+                           await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString(), loginType);
                          }
                          currNodeId = null; 
                        } else { break; }
@@ -547,13 +520,16 @@ exports.handleInstagramWebhook = async (req, res) => {
                 if (matchedAuto && matchedAuto.fileUrl) {
                   try {
                     if (matchedAuto.deliveryMode === 'button') {
-                      await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
+                      const quickReplyUrl = loginType === 'instagram_basic_display'
+                        ? 'https://graph.instagram.com/v21.0/me/messages'
+                        : 'https://graph.facebook.com/v19.0/me/messages';
+                      await axios.post(quickReplyUrl, {
                         recipient: { id: senderId },
                         message: {
                           text: `${matchedAuto.replyMessage}\n\nTap the button below to receive the file/link:`,
                           quick_replies: [{ content_type: "text", title: "Get Link 🔗", payload: `GET_AUTO_LINK_${matchedAuto.postId}` }]
                         }
-                      }, { params: { access_token: igToken }});
+                      }, { params: { access_token: igToken } });
                     } else {
                       const directLinkMsg = `${matchedAuto.replyMessage}\n\n📄 Link: ${matchedAuto.fileUrl}`;
                       if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, directLinkMsg);
@@ -598,7 +574,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = menuMessage;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, menuMessage);
+                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, menuMessage, loginType);
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -624,7 +600,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = collabMsg;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, collabMsg);
+                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, collabMsg, loginType);
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -650,7 +626,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = fanMsg;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, fanMsg);
+                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, fanMsg, loginType);
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -676,7 +652,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = generalMessage;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, generalMessage);
+                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, generalMessage, loginType);
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -761,7 +737,7 @@ with whatever information is available (leave budget field empty/null if not pro
                     let deliveryStatus = 'sent';
                     let displayMsg = responseMessage;
                     try {
-                      if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, responseMessage);
+                      if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, responseMessage, loginType);
                     } catch (sendErr) {
                       deliveryStatus = 'failed';
                       displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${sendErr.message}]`;
@@ -833,11 +809,12 @@ with whatever information is available (leave budget field empty/null if not pro
             console.error('Error during self-comment check:', e.message);
           }
 
-          // ✅ CRITICAL FIX: Use 'instagramBusinessAccountId' which is the correct field name in the userModel schema.
           let user = await User.findOne({
             $or: [
               { "instagramConfig.instagramBusinessAccountId": igAccountId },
-              { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }
+              { "instagramConfig.instagramUserId": igAccountId },
+              { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId },
+              { "workspaces.instagramConfig.instagramUserId": igAccountId },
             ]
           });
           
@@ -850,12 +827,14 @@ with whatever information is available (leave budget field empty/null if not pro
           let activeWorkspaceNode = null;
           let igToken = user.instagramConfig?.accessToken || user.igConfig?.accessToken;
           let igPageId = user.instagramConfig?.facebookPageId || user.igConfig?.facebookPageId || null;
+          let loginType = user.instagramConfig?.loginType || 'facebook_business';
           console.log("[COMMENT WEBHOOK DEBUG] initial pageId:", igPageId, "initial token present:", Boolean(igToken));
 
           if (user.workspaces && user.workspaces.length > 0) {
              activeWorkspaceNode = user.workspaces.find(w => w?.instagramConfig?.instagramBusinessAccountId === igAccountId);
              if (activeWorkspaceNode?.instagramConfig?.accessToken) {
                 igToken = activeWorkspaceNode.instagramConfig.accessToken;
+                loginType = activeWorkspaceNode.instagramConfig.loginType || 'facebook_business';
                 igPageId = activeWorkspaceNode.instagramConfig.facebookPageId || igPageId;
                 incomingWorkspaceId = activeWorkspaceNode._id ? activeWorkspaceNode._id.toString() : 'main';
              }
@@ -872,7 +851,7 @@ with whatever information is available (leave budget field empty/null if not pro
              
              try {
                if (igToken && igPageId) {
-                 await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, confirmMsg);
+                 await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, confirmMsg, loginType);
                }
              } catch (e) {
                console.error('Failed to send phone-confirmation DM:', e.message);
@@ -1000,27 +979,26 @@ with whatever information is available (leave budget field empty/null if not pro
 
              try {
                if (igToken) {
-                 if (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') {
+                 if (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') { // This is a DM
                     const compiledShortcutMsg = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
                     
                     console.log("\n====================================================");
                     console.log("🕵️‍♂️ [DIAGNOSIS ENGINE] RUNNING DIRECT USER_ID OVERRIDE");
                     console.log("👉 TARGET EXTRACTED USER NAME:", username);
                     console.log("👉 TARGET EXTRACTED USER ID (igUserId):", igUserId);
-                    console.log("👉 TARGET PAGE ID:", igPageId);
+                    console.log("👉 TARGET PAGE ID (for FB flow):", igPageId);
                     console.log("👉 IG TOKEN PRESENT:", Boolean(igToken));
                     console.log("====================================================");
                     
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg, loginType);
                     dmSentSuccessfully = true;
                  } 
-                 else if (matchedRule.deliveryMode === 'button') {
-                    const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText);
+                 else if (matchedRule.deliveryMode === 'button') { // This is a DM
+                    const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText, loginType);
                     dmSentSuccessfully = true;
                  }
-                 else {
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, finalReplyMsg);
+                 else { // This is a DM
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, finalReplyMsg, loginType);
                     dmSentSuccessfully = true;
                  }
                }
@@ -1036,10 +1014,13 @@ with whatever information is available (leave budget field empty/null if not pro
 
              if (dmSentSuccessfully) {
                try {
-                 await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
+                 const commentReplyUrl = loginType === 'instagram_basic_display'
+                    ? `https://graph.instagram.com/v21.0/${commentData.id}/replies`
+                    : `https://graph.facebook.com/v19.0/${commentData.id}/replies`;
+                 await axios.post(commentReplyUrl, {
                      message: matchedRule.publicReply || `Hey @${username}, we've sent you a DM with the details! 📩`,
                      access_token: igToken
-                 });
+                 }, { params: { access_token: igToken } });
                } catch (publicErr) {
                  console.error("❌ [Meta Public Reply Comment Error]:", publicErr.message);
                }
@@ -1099,10 +1080,13 @@ with whatever information is available (leave budget field empty/null if not pro
                    continue;
                  }
 
-                 const replyResponse = await axios.post(`https://graph.facebook.com/v19.0/${commentData.id}/replies`, {
+                 const commentReplyUrl = loginType === 'instagram_basic_display'
+                    ? `https://graph.instagram.com/v21.0/${commentData.id}/replies`
+                    : `https://graph.facebook.com/v19.0/${commentData.id}/replies`;
+                 const replyResponse = await axios.post(commentReplyUrl, {
                      message: aiReply,
                      access_token: igToken
-                 });
+                 }, { params: { access_token: igToken } });
 
                  const replyCommentId = replyResponse?.data?.id || null;
                  threadState.aiReplyCount = (threadState.aiReplyCount || 0) + 1;

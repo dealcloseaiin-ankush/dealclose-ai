@@ -96,27 +96,7 @@ export default function Settings() {
 
   // --- Google Sheets OAuth Handlers ---
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    if (code) {
-      setIsLoading(true);
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      const currentUri = `${window.location.origin}${window.location.pathname}`;
-      api.post('/settings/google/connect', { code, redirectUri: currentUri })
-        .then(() => {
-          alert('🎉 Google Sheets Connected Successfully! Auto-sync is now ACTIVE.');
-          fetchSettings();
-        })
-        .catch(err => {
-          const errMsg = err.response?.status === 404
-            ? 'Backend API Route Not Found (404).'
-            : (err.response?.data?.message || err.message);
-            
-          alert(`❌ Google Connection Failed: ${errMsg}`);
-          setIsLoading(false);
-        });
-    }
+    // const urlParams = new URLSearchParams(window.location.search); // This is now handled in a dedicated callback page
   }, []);
 
   const handleGoogleAuth = async () => {
@@ -793,6 +773,10 @@ export default function Settings() {
                         <div>
                           <MetaConnectButton variant="instagram" buttonText="Connect with Instagram Login" platform="instagram" workspaceId="main" onSuccess={(data) => openInstagramPicker(data, 'main')} />
                           <p className="text-xs text-gray-500 mt-2">For an Instagram Professional account not linked to a Facebook Page (limited features).</p>
+                          <p className="text-xs text-amber-500 mt-1">
+                            ⚠️ Requires a Professional (Business/Creator) Instagram account. Personal accounts won't work — 
+                            switch in Instagram app: Settings → Account type and tools → Switch to Professional Account.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1129,6 +1113,10 @@ export default function Settings() {
                            <div>
                              <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
                              <p className="mt-1 text-[11px] text-gray-500">Instagram Professional account</p>
+                             <p className="mt-1 text-[11px] text-amber-500">
+                               ⚠️ Requires a Professional (Business/Creator) Instagram account. Personal accounts won't work — 
+                               switch in Instagram app: Settings → Account type and tools → Switch to Professional Account.
+                             </p>
                            </div>
                          </div>
                        </>
