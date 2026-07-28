@@ -16,11 +16,13 @@ const Flow = require('../models/flowModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
  
-// ✅ FIX: Use dedicated Instagram App secrets. Fallback to main secrets for backward compatibility.
-const META_APP_SECRET = process.env.INSTAGRAM_META_APP_SECRET || process.env.META_APP_SECRET;
+// ✅ FIX: Use dedicated Instagram App secrets. Fallback to main secrets.
+const META_APP_SECRET = process.env.INSTAGRAM_META_APP_SECRET || process.env.META_APP_SECRET; // User confirmed INSTAGRAM_META_APP_SECRET
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
 // ✅ FIX: Use dedicated Instagram App ID. Fallback to main App ID.
-const META_INSTAGRAM_LOGIN_APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID;
+// ⚠️ IMPORTANT: This App ID must be correctly configured on Meta Developer Dashboard
+// with "Facebook Login" (for Graph API) and "Instagram Basic Display" products.
+const META_INSTAGRAM_LOGIN_APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID; // User confirmed INSTAGRAM_META_APP_ID
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
