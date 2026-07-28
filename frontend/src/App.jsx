@@ -1,54 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import api from './services/api';
 import MainLayout from './layouts/MainLayout';
-import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Onboarding from './pages/Onboarding';
-import ResultsPage from './pages/ResultsPage';
-import Catalog from './pages/Catalog';
-import OrderDispatch from './pages/OrderDispatch';
-import AIAgent from './pages/AIAgent';
-import Campaigns from './pages/Campaigns';
-import FlowBuilder from './pages/FlowBuilder';
-import MonthlyReport from './pages/MonthlyReport';
-import Automations from './pages/Automations';
-import TrackingAnalytics from './pages/TrackingAnalytics';
-import WhatsAppTemplates from './pages/WhatsAppTemplates';
-import Chats from './pages/Chats';
-import Contacts from './pages/Contacts';
-import Calls from './pages/Calls';
-import Wallet from './pages/Wallet';
-import Settings from './pages/Settings';
-import CrmPage from './pages/CrmPage';
-import StaffManagement from './pages/StaffManagement';
 import ProtectedRoute from './components/ProtectedRoute';
-import Forms from './pages/Forms';
-import InstagramAutomation from './pages/InstagramAutomation';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsAndConditions from './pages/TermsAndConditions';
-import AboutUs from './pages/AboutUs';
-import FAQ from './pages/FAQ';
-import Help from './pages/Help';
-import DataDeletion from './pages/DataDeletion';
-import DigitalCard from './pages/DigitalCard';
-import AIVideoLanding from './pages/AIVideoLanding';
-import ScanIQ from './pages/ScanIQ';
-import AIVideoDashboard from './pages/AIVideoDashboard';
-import WhatsAppRules from './pages/WhatsAppRules';
-import SuperAdmin from './pages/SuperAdmin';
-import PublishPost from './pages/PublishPost'; // 🚀 NEW: Publish Post Page
-import SolutionRecommender from './pages/SolutionRecommender';
-import Publisher from './pages/Publisher'; // 🚀 NEW: Publisher Page
-import AdminTemplates from './pages/AdminTemplates'; // 🚀 NEW: Admin Page
-import AutoMarketerDashboard from './pages/AutoMarketerDashboard'; // 🚀 NEW
-import InstagramOAuthCallback from './pages/InstagramOAuthCallback'; // ✅ FIX: Import the callback component
-import MetaAdsManager from './pages/MetaAdsManager'; // 🚀 NEW: Meta Ads Page
-import BillingPage from './pages/BillingPage'; // 🚀 NEW: Billing Page
 import { useAuth } from './hooks/useAuth';
+
+// 🚀 PERFORMANCE UPGRADE: Lazy load all pages to reduce initial bundle size
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const ResultsPage = lazy(() => import('./pages/ResultsPage'));
+const Catalog = lazy(() => import('./pages/Catalog'));
+const OrderDispatch = lazy(() => import('./pages/OrderDispatch'));
+const AIAgent = lazy(() => import('./pages/AIAgent'));
+const Campaigns = lazy(() => import('./pages/Campaigns'));
+const FlowBuilder = lazy(() => import('./pages/FlowBuilder'));
+const MonthlyReport = lazy(() => import('./pages/MonthlyReport'));
+const Automations = lazy(() => import('./pages/Automations'));
+const TrackingAnalytics = lazy(() => import('./pages/TrackingAnalytics'));
+const WhatsAppTemplates = lazy(() => import('./pages/WhatsAppTemplates'));
+const Chats = lazy(() => import('./pages/Chats'));
+const Contacts = lazy(() => import('./pages/Contacts'));
+const Calls = lazy(() => import('./pages/Calls'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+const Settings = lazy(() => import('./pages/Settings'));
+const CrmPage = lazy(() => import('./pages/CrmPage'));
+const StaffManagement = lazy(() => import('./pages/StaffManagement'));
+const Forms = lazy(() => import('./pages/Forms'));
+const InstagramAutomation = lazy(() => import('./pages/InstagramAutomation'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const AboutUs = lazy(() => import('./pages/AboutUs'));
+const FAQ = lazy(() => import('./pages/FAQ'));
+const Help = lazy(() => import('./pages/Help'));
+const DataDeletion = lazy(() => import('./pages/DataDeletion'));
+const DigitalCard = lazy(() => import('./pages/DigitalCard'));
+const AIVideoLanding = lazy(() => import('./pages/AIVideoLanding'));
+const ScanIQ = lazy(() => import('./pages/ScanIQ'));
+const AIVideoDashboard = lazy(() => import('./pages/AIVideoDashboard'));
+const WhatsAppRules = lazy(() => import('./pages/WhatsAppRules'));
+const SuperAdmin = lazy(() => import('./pages/SuperAdmin'));
+const PublishPost = lazy(() => import('./pages/PublishPost'));
+const SolutionRecommender = lazy(() => import('./pages/SolutionRecommender'));
+const Publisher = lazy(() => import('./pages/Publisher'));
+const AdminTemplates = lazy(() => import('./pages/AdminTemplates'));
+const AutoMarketerDashboard = lazy(() => import('./pages/AutoMarketerDashboard'));
+const InstagramOAuthCallback = lazy(() => import('./pages/InstagramOAuthCallback'));
+const MetaAdsManager = lazy(() => import('./pages/MetaAdsManager'));
+const BillingPage = lazy(() => import('./pages/BillingPage'));
 
 // Placeholder component for Change Password until we build the real one
 const ChangePasswordPlaceholder = () => <div className="p-10 text-white text-center"><h1 className="text-3xl font-bold text-blue-400">Change Password</h1><p className="mt-4 text-gray-400">This feature is currently under development. Coming soon!</p></div>;
@@ -168,72 +170,73 @@ export default function App() {
       <Toaster position="top-center" reverseOrder={false} />
       <GlobalNotification />
       <PWAInstallPopup />
-      <Routes>
-        <Route path="/" element={<RootRoute><LandingPage /></RootRoute>} />
-        <Route path="/home" element={<LandingPage />} /> {/* Extra route for logged in users to view landing page */}
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} /> {/* This was correct, no change needed */}
-        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-        <Route path="/about" element={<AboutUs />} />
-        <Route path="/faq" element={<FAQ />} />
-        <Route path="/help" element={<Help />} />
-        
-        {/* ✅ FIX: Add the route for the Instagram OAuth callback page */}
-        <Route path="/instagram-oauth-callback" element={<InstagramOAuthCallback />} />
-        <Route path="/delete-data" element={<DataDeletion />} />
-        
-        {/* Secondary Landing Page for AI Video Product */}
-        <Route path="/ai-video" element={<AIVideoLanding />} />
-        <Route path="/ai-video/dashboard" element={<AIVideoDashboard />} />
-        
-        {/* ScanIQ Public Shareable Results Page */}
-        <Route path="/scan/:scanId" element={<ResultsPage />} />
-        
-        {/* Public Digital Business Card (QR Code Destination) */}
-        <Route path="/card/:userId" element={<DigitalCard />} />
-        
-        {/* Onboarding Page (Replaces Setup) */}
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/discover" element={<SolutionRecommender />} />
-        <Route path="/setup" element={<Onboarding />} /> {/* Supabase ke purane redirects handle karne ke liye */}
-        
-        {/* Dashboard Layout Routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<MainLayout />}>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="ai-agent" element={<AIAgent />} />
-            <Route path="catalog" element={<Catalog />} />
-            <Route path="dispatch" element={<OrderDispatch />} />
-            <Route path="campaigns" element={<Campaigns />} />
-            <Route path="flow-builder" element={<FlowBuilder />} />
-            <Route path="monthly-report" element={<MonthlyReport />} />
-            <Route path="chats" element={<Chats />} />
-            <Route path="automations" element={<Automations />} />
-            <Route path="tracking-analytics" element={<TrackingAnalytics />} />
-            <Route path="templates" element={<WhatsAppTemplates />} />
-            <Route path="contacts" element={<Contacts />} />
-            <Route path="crm" element={<CrmPage />} />
-            <Route path="calls" element={<Calls />} />
-            <Route path="wallet" element={<Wallet />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="change-password" element={<ChangePasswordPlaceholder />} />
-            <Route path="staff" element={<StaffManagement />} />
-            <Route path="forms" element={<Forms />} />
-            <Route path="instagram-automation" element={<InstagramAutomation />} />
-            <Route path="whatsapp-rules" element={<WhatsAppRules />} />
-            <Route path="scaniq" element={<ScanIQ />} />
-            <Route path="super-admin" element={<SuperAdmin />} />
-            <Route path="publish-post" element={<PublishPost />} /> {/* 🚀 NEW: Publish Post Route */}
-            <Route path="publish" element={<PublishPost />} /> {/* Compatibility alias for older links */}
-            <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
-            <Route path="publisher" element={<Publisher />} /> {/* 🚀 NEW: Publisher Route */}
-            <Route path="/admin/templates" element={<AdminTemplates />} /> {/* 🚀 NEW: Admin Route */}
-            <Route path="meta-ads" element={<MetaAdsManager />} /> {/* 🚀 NEW: Meta Ads Route */}
-            <Route path="billing" element={<BillingPage />} /> {/* 🚀 NEW: Billing Page Route */}
+      <Suspense fallback={<div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>}>
+        <Routes>
+          <Route path="/" element={<RootRoute><LandingPage /></RootRoute>} />
+          <Route path="/home" element={<LandingPage />} /> {/* Extra route for logged in users to view landing page */}
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/help" element={<Help />} />
+          
+          <Route path="/instagram-oauth-callback" element={<InstagramOAuthCallback />} />
+          <Route path="/delete-data" element={<DataDeletion />} />
+          
+          {/* Secondary Landing Page for AI Video Product */}
+          <Route path="/ai-video" element={<AIVideoLanding />} />
+          <Route path="/ai-video/dashboard" element={<AIVideoDashboard />} />
+          
+          {/* ScanIQ Public Shareable Results Page */}
+          <Route path="/scan/:scanId" element={<ResultsPage />} />
+          
+          {/* Public Digital Business Card (QR Code Destination) */}
+          <Route path="/card/:userId" element={<DigitalCard />} />
+          
+          {/* Onboarding Page (Replaces Setup) */}
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/discover" element={<SolutionRecommender />} />
+          <Route path="/setup" element={<Onboarding />} /> {/* Supabase ke purane redirects handle karne ke liye */}
+          
+          {/* Dashboard Layout Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<MainLayout />}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="ai-agent" element={<AIAgent />} />
+              <Route path="catalog" element={<Catalog />} />
+              <Route path="dispatch" element={<OrderDispatch />} />
+              <Route path="campaigns" element={<Campaigns />} />
+              <Route path="flow-builder" element={<FlowBuilder />} />
+              <Route path="monthly-report" element={<MonthlyReport />} />
+              <Route path="chats" element={<Chats />} />
+              <Route path="automations" element={<Automations />} />
+              <Route path="tracking-analytics" element={<TrackingAnalytics />} />
+              <Route path="templates" element={<WhatsAppTemplates />} />
+              <Route path="contacts" element={<Contacts />} />
+              <Route path="crm" element={<CrmPage />} />
+              <Route path="calls" element={<Calls />} />
+              <Route path="wallet" element={<Wallet />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="change-password" element={<ChangePasswordPlaceholder />} />
+              <Route path="staff" element={<StaffManagement />} />
+              <Route path="forms" element={<Forms />} />
+              <Route path="instagram-automation" element={<InstagramAutomation />} />
+              <Route path="whatsapp-rules" element={<WhatsAppRules />} />
+              <Route path="scaniq" element={<ScanIQ />} />
+              <Route path="super-admin" element={<SuperAdmin />} />
+              <Route path="publish-post" element={<PublishPost />} />
+              <Route path="publish" element={<PublishPost />} />
+              <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
+              <Route path="publisher" element={<Publisher />} />
+              <Route path="/admin/templates" element={<AdminTemplates />} />
+              <Route path="meta-ads" element={<MetaAdsManager />} />
+              <Route path="billing" element={<BillingPage />} />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
