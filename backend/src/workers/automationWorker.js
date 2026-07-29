@@ -73,11 +73,13 @@ const automationWorker = new Worker('automationQueue', async job => {
       const platformPostIds = {};
       if (post.platforms.includes('instagram')) {
         console.log(`🚀 [WORKER DEBUG] 4a. Publishing to Instagram...`);
-        // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
+s        // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
         const igAccountId = config.instagramAccountId || config.instagramBusinessAccountId;
         if (!igAccountId) throw new Error('Instagram account is not connected for this workspace.');
         
-        const result = await instagramService.publishImagePost(igAccountId, config.accessToken, imageUrl, post.caption);
+        // 🐛 FIX: The service function is named `publishInstagramMedia`, not `publishImagePost`.
+        // This was causing the worker to crash with a TypeError.
+        const result = await instagramService.publishInstagramMedia(igAccountId, config.accessToken, imageUrl, 'IMAGE', post.caption);
         platformPostIds.instagram = result.postId;
         console.log(`✅ [WORKER DEBUG] 4b. Instagram publish success. Post ID: ${result.postId}`);
       }

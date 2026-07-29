@@ -210,10 +210,18 @@ exports.getRecentPosts = async (req, res) => {
 
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     const graphVersion = process.env.META_GRAPH_API_VERSION || 'v19.0';
+    const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType;
     
-    const url = `https://graph.facebook.com/${graphVersion}/${accountId}/media`;
+    // ✅ FIX: Use the correct API domain based on the connection type.
+    // 'instagram_business_login' uses graph.instagram.com, others use graph.facebook.com.
+    const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
+    const url = useInstagramDomain
+      ? `https://graph.instagram.com/${graphVersion}/${accountId}/media`
+      : `https://graph.facebook.com/${graphVersion}/${accountId}/media`;
+
     const response = await axios.get(url, {
       params: {
+        // ✅ FIX: The fields are slightly different for the two domains.
         fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
         limit: req.query.limit || 15,
         access_token: accessToken
@@ -354,7 +362,9 @@ exports.publishPost = async (req, res) => {
     }
 
     // 2. Publish using the new robust service
-    const result = await instagramService.publishImagePost(igAccountId, accessToken, imageUrl, caption);
+    // 🐛 FIX: The service function is named `publishInstagramMedia`, not `publishImagePost`.
+    // This was causing a TypeError on manual publish attempts.
+    const result = await instagramService.publishInstagramMedia(igAccountId, accessToken, imageUrl, 'IMAGE', caption);
 
     // 3. Get the permalink for the new post
     const permalinkResponse = await axios.get(`https://graph.facebook.com/v19.0/${result.postId}`, {

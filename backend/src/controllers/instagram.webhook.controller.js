@@ -197,7 +197,28 @@ exports.handleInstagramWebhook = async (req, res) => {
               // 🚀 NEW: Handle message edit/unsend events from Instagram.
               // This prevents crashes and logs the event, but doesn't trigger AI.
               console.log(`[IG Webhook] Ignoring 'message_edit' or 'unsend' event from ${event.sender.id}.`);
-              continue; // Skip to the next event
+              continue;
+            } else if (event.message && event.message.attachments) {
+              // 🚀 NEW: Handle shared posts, reels, stories, etc.
+              const attachment = event.message.attachments[0];
+              console.log(`[IG Webhook] Received an attachment of type: ${attachment.type}`);
+              
+              const senderId = event.sender.id;
+              const user = await User.findOne({ $or: [ { "instagramConfig.instagramBusinessAccountId": igAccountId }, { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId } ] }).lean();
+              if (!user) continue;
+
+              const workspace = user.workspaces?.find(w => w.instagramConfig?.instagramBusinessAccountId === igAccountId);
+              const igToken = workspace?.instagramConfig?.accessToken || user.instagramConfig?.accessToken;
+              const loginType = workspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business';
+
+              if (igToken) {
+                const replyText = "Thanks for sharing! Let me know if you have any questions about this.";
+                await metaAdsService.sendInstagramDM(igToken, senderId, replyText, loginType).catch(e => console.error("Failed to send attachment ack:", e.message));
+                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Customer shared a ${attachment.type}]`, direction: 'incoming', status: 'received', sentBy: 'customer', timestamp: new Date() });
+                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+              }
+              continue;
+
             } else if (event.message && event.message.text) {
               
               const isEcho = event.message.is_echo;
@@ -610,9 +631,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 ? activeWorkspace?.aiAgentEnabled === true
                 : user.aiAgentEnabled === true;
 
-              // 🐛 FIX: This block was causing duplicate replies. If a flow has already handled 'hi',
-              // this should not run. Added a check for `!flowReplyHandled`.
-              if (!flowReplyHandled && !isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
+              if (!isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
                 const menuMessage = isCreator 
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;
