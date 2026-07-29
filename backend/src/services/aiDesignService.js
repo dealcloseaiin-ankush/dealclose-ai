@@ -50,13 +50,17 @@ exports.generateDesignJson = async (prompt, businessContext) => {
   `;
 
   try {
-    const { content: rawJsonResponse, usage } = await aiService.generateAIResponse(prompt, systemPrompt, 'instagram-design');
-    const cleanedJson = rawJsonResponse.replace(/```json|```/g, '').trim();
+    // ✅ FIX: The `generateAIResponse` function now returns a direct string, not an object.
+    // The previous code was trying to destructure a `content` property, which caused
+    // a `TypeError: Cannot read properties of undefined (reading 'replace')`.
+    // We now correctly handle the string response and temporarily lose the 'usage' data from this path.
+    const rawJsonResponse = await aiService.generateAIResponse(prompt, systemPrompt, 'instagram-design');
+    const cleanedJson = (rawJsonResponse || '').replace(/```json|```/g, '').trim();
     const designSpec = JSON.parse(cleanedJson);
 
     // This service's only job is to generate. The orchestrator (aiTemplateService) will be responsible for validation.
     // This removes the duplicate validation call.
-    return { designJson: designSpec, usage };
+    return { designJson: designSpec, usage: null }; // Return null for usage for now
   } catch (error) {
     console.error("AI Design Service Error:", error);
     throw new Error("AI failed to generate a valid design. Please try a different prompt.");
