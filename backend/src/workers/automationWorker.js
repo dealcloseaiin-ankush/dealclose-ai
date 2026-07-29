@@ -55,31 +55,34 @@ const automationWorker = new Worker('automationQueue', async job => {
       console.log(`🚀 [WORKER DEBUG] 2. Post status is valid. Setting to 'publishing'.`);
       post.status = 'publishing';
       await post.save();
+      
+      // 🐛 FIX: Correctly find the user and the specific workspace config for this post.
       const user = await User.findById(post.userId).lean();
       if (!user) throw new Error('Post owner was not found.');
+      
       const workspace = post.workspaceId !== 'main'
         ? user.workspaces?.find(w => String(w._id) === String(post.workspaceId))
         : null;
-      // "main" can display posts from all workspaces. When its own connection
-      // is absent, use the connected workspace just like the Instagram dashboard.
+      
+      // ✅ FIX: Robust token and config lookup logic.
       const config = workspace?.instagramConfig
         || user.instagramConfig
         || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
+        
       const imageUrl = post.mediaUrls?.find(media => media.type === 'image')?.url;
       console.log(`🚀 [WORKER DEBUG] 3. Found User: ${user.email}, Image URL: ${imageUrl ? 'Yes' : 'No'}`);
       if (!imageUrl) throw new Error('A publishable image is required.');
       if (!config?.accessToken) throw new Error('Instagram/Facebook connection is missing for this workspace.');
-
       const platformPostIds = {};
       if (post.platforms.includes('instagram')) {
         console.log(`🚀 [WORKER DEBUG] 4a. Publishing to Instagram...`);
-s        // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
+        // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
         const igAccountId = config.instagramAccountId || config.instagramBusinessAccountId;
         if (!igAccountId) throw new Error('Instagram account is not connected for this workspace.');
         
-        // 🐛 FIX: The service function is named `publishInstagramMedia`, not `publishImagePost`.
+        // ✅ FIX: The service function is named `publishInstagramMedia`, not `publishImagePost`.
         // This was causing the worker to crash with a TypeError.
-        const result = await instagramService.publishInstagramMedia(igAccountId, config.accessToken, imageUrl, 'IMAGE', post.caption);
+        const result = await instagramService.publishInstagramMedia(igAccountId, config.accessToken, imageUrl, 'IMAGE', post.caption, config.loginType);
         platformPostIds.instagram = result.postId;
         console.log(`✅ [WORKER DEBUG] 4b. Instagram publish success. Post ID: ${result.postId}`);
       }

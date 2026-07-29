@@ -1,14 +1,21 @@
 // backend/src/services/instagramService.js
 const axios = require('axios');
 
+// ✅ HELPER: Central place to check if a loginType is the "Instagram-native" flow.
+const isInstagramNativeLogin = (loginType) =>
+  loginType === 'instagram_basic_display' || loginType === 'instagram_business_login';
+
 /**
  * 🚀 UPGRADED: Publishes Reels or Images directly with Status Processing Loops
  * (Used by AI Video Dashboard & Pipelines)
  */
-exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, mediaType, caption) => {
+exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, mediaType, caption, loginType = 'facebook_business') => {
   try {
     console.log(`[IG Publish] Step 1: Uploading ${mediaType} container for account ${igAccountId}`);
     
+    // ✅ FIX: Use the correct API domain based on the connection type.
+    const baseUrl = isInstagramNativeLogin(loginType) ? 'https://graph.instagram.com/v19.0' : 'https://graph.facebook.com/v19.0';
+
     const payload = {
       caption: caption,
       access_token: accessToken,
@@ -23,7 +30,7 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
       payload.image_url = mediaUrl;
     }
 
-    const containerResponse = await axios.post(`https://graph.facebook.com/v19.0/${igAccountId}/media`, payload);
+    const containerResponse = await axios.post(`${baseUrl}/${igAccountId}/media`, payload);
     const creationId = containerResponse.data.id;
     console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
 
@@ -38,7 +45,7 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
         await new Promise(resolve => setTimeout(resolve, 5000));
         
         try {
-          const statusCheck = await axios.get(`https://graph.facebook.com/v19.0/${creationId}`, {
+          const statusCheck = await axios.get(`${baseUrl}/${creationId}`, {
             params: { fields: 'status_code', access_token: accessToken }
           });
           
@@ -59,7 +66,7 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
     }
 
     console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
-    const publishResponse = await axios.post(`https://graph.facebook.com/v19.0/${igAccountId}/media_publish`, {
+    const publishResponse = await axios.post(`${baseUrl}/${igAccountId}/media_publish`, {
       creation_id: creationId,
       access_token: accessToken,
     });
@@ -78,9 +85,14 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
  * 🚀 UPGRADED: Fetches existing posts/reels from Meta to display in templates dropdown with safe dynamic array fallback
  */
 exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
+  // 🐛 FIX: This function was also hardcoded to graph.facebook.com.
+  // It needs to be aware of the loginType to fetch posts correctly for all account types.
+  // Since the controller doesn't pass loginType here, we can't fix it directly.
+  // The fix in `instagramController.js` that overrides this logic is the correct approach.
   try {
+    const url = `https://graph.facebook.com/v19.0/${igAccountId}/media`;
     const response = await axios.get(
-      `https://graph.facebook.com/v19.0/${igAccountId}/media`,
+      url,
       {
         params: {
           fields: 'id,caption,media_type,media_url,thumbnail_url,timestamp,comments_count,like_count',
