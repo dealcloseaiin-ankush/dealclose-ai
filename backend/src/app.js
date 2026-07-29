@@ -141,13 +141,13 @@ app.post('/api/webhooks/data-deletion', (req, res) => {
 // -------------------------------------------------------------------
 // 1. Serve static files (JS, CSS, images) from the frontend's build folder.
 app.use(express.static(path.join(__dirname, '../../frontend/dist')));
-
+ 
 // 2. For any other route that is NOT an API route, send the index.html file.
 //    This allows React Router to handle frontend routing (e.g., /dashboard, /settings).
-app.get('*', (req, res) => {
-  if (!req.originalUrl.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '../../frontend/dist', 'index.html'));
-  }
+// 🚀 FIX: The `if` condition was inside the handler, causing a routing error.
+// This new structure ensures that only non-API GET requests are handled by this catch-all route.
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../frontend/dist', 'index.html'));
 });
-
+ 
 module.exports = app;
