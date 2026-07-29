@@ -570,7 +570,15 @@ export default function PublishPost() {
               {isAiWorking && <div className="self-start p-2.5 bg-[#2a2a2a] rounded-xl"><Loader2 size={16} className="animate-spin text-blue-400" /></div>}
             </div>
             <form onSubmit={handleAiChat} className="flex gap-2">
-              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="e.g., 'Diwali sale post'" className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
+              {/* ✅ FIX: Added onPaste handler to prevent the global paste listener from interfering.
+                  This allows users to paste text into Fabric.js text objects on the canvas
+                  without it being accidentally captured by the AI chat input. */}
+              <input
+                type="text"
+                value={chatInput}
+                onPaste={(e) => setChatInput(e.clipboardData.getData('text'))}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="e.g., 'Diwali sale post'" className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" />
               <button type="submit" disabled={isAiWorking} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 rounded-lg transition-all disabled:opacity-50 flex items-center">
                 <Sparkles size={14} />
               </button>
