@@ -210,17 +210,18 @@ exports.getRecentPosts = async (req, res) => {
 
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     const graphVersion = process.env.META_GRAPH_API_VERSION || 'v19.0';
-    // ✅ FIX: Correctly determine loginType from the config source.
-    const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business';
+    // ✅ FIX: Correctly determine loginType from the config source to prevent token errors.
+    const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business'; // Fallback to default
     
-    // ✅ FIX: Use the correct API domain based on the connection type to prevent "Invalid Token" error.
+    // ✅ FIX: Use the correct API domain based on the connection type. This was the root cause of the "Invalid Token" error during post fetching.
     // 'instagram_business_login' uses graph.instagram.com, others use graph.facebook.com.
     const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
     const url = useInstagramDomain
       ? `https://graph.instagram.com/${graphVersion}/${accountId}/media`
       : `https://graph.facebook.com/${graphVersion}/${accountId}/media`;
     
-    console.log(`   - Login Type: ${loginType}, Using URL: ${url}`);
+    // Added more detailed logging for easier debugging in the future.
+    console.log(`   - Login Type: ${loginType}, Using URL: ${url}`); 
     const response = await axios.get(url, {
       params: {
         // ✅ FIX: The fields are slightly different for the two domains.

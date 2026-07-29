@@ -471,16 +471,26 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
   try {
     // 1. Verify Token & Permissions (/debug_token)
     const debugTokenUrl = `https://graph.facebook.com/debug_token`;
+    console.log(`[Meta Verification] 1. Checking token permissions...`);
     const { data: tokenData } = await axios.get(debugTokenUrl, { params: { input_token: accessToken, access_token: `${APP_ID}|${META_APP_SECRET}` } });
     verificationResults.token = { isValid: tokenData.data.is_valid, scopes: tokenData.data.scopes, userId: tokenData.data.user_id };
+    
+    // 🚀 DEBUG: Explicitly log all granted permissions
+    const grantedScopes = tokenData.data.scopes || [];
+    console.log(`[Meta Verification]    - Granted Scopes: [${grantedScopes.join(', ')}]`);
+    const hasPublishPermission = grantedScopes.includes('instagram_content_publish');
+    console.log(`[Meta Verification]    - Has 'instagram_content_publish'?: ${hasPublishPermission ? '✅ Yes' : '❌ NO'}`);
+
     if (!tokenData.data.is_valid) throw new Error('Access Token is invalid.');
 
     // 2. Trigger "Content Publish" test (read operation)
+    console.log(`[Meta Verification] 2. Triggering 'Content Publish' API test...`);
     const mediaUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/media`;
     await axios.get(mediaUrl, { params: { access_token: accessToken, limit: 1 } });
     verificationResults.contentPublish = 'OK';
 
     // 3. Trigger "Insights" test (read operation)
+    console.log(`[Meta Verification] 3. Triggering 'Insights' API test...`);
     const insightsUrl = `https://graph.facebook.com/v19.0/${igBusinessAccountId}/insights`;
     // ✅ FIX: The 'profile_views' metric now requires 'metric_type=total_value' as per Meta API updates.
     // This was causing the verification step to fail.
@@ -495,6 +505,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     verificationResults.insights = 'OK';
 
     // 4. Trigger "Comments" test (read operation)
+    console.log(`[Meta Verification] 4. Triggering 'Comments' API test...`);
     const { data: mediaData } = await axios.get(mediaUrl, { params: { access_token: accessToken, limit: 1, fields: 'id' } });
     if (mediaData.data && mediaData.data.length > 0) {
       const mediaId = mediaData.data[0].id;
@@ -504,6 +515,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     verificationResults.comments = 'OK';
 
     // 5. Trigger "Messaging" test (read operation)
+    console.log(`[Meta Verification] 5. Triggering 'Messaging' API test...`);
     // 🚀 FIX: 'conversations' endpoint ke liye Advanced Access chahiye.
     // Development mode mein, yeh call non-tester users ke liye fail ho jaati hai, jisse (#3) error aata hai.
     // Ise try-catch mein daalne se, agar yeh test fail bhi ho, toh bhi connection process safal hoga.
@@ -521,6 +533,7 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
     return verificationResults;
 
   } catch (error) {
+    console.error(`❌ [Meta Verification] A test failed. Details:`, error.response?.data?.error || error.message);
     console.error('❌ Verification Error:', error.response?.data || error.message);
     if (!verificationResults.token?.isValid) {
       throw new Error('Token verification failed. Cannot proceed.');
