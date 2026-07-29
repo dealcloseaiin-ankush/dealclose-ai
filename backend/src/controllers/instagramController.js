@@ -211,7 +211,7 @@ exports.getRecentPosts = async (req, res) => {
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     const graphVersion = process.env.META_GRAPH_API_VERSION || 'v19.0';
     const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business'; // Fallback to default
-    
+
     // ✅ CRITICAL FIX: The "Invalid OAuth access token" error was caused by always calling graph.facebook.com.
     // This now correctly checks the `loginType` to determine if the Instagram-native domain (`graph.instagram.com`)
     // should be used, which is required for accounts connected via the "Connect with Instagram Login" button.
@@ -219,9 +219,9 @@ exports.getRecentPosts = async (req, res) => {
     const url = useInstagramDomain
       ? `https://graph.instagram.com/${graphVersion}/${accountId}/media`
       : `https://graph.facebook.com/${graphVersion}/${accountId}/media`;
-    
+
     // Added more detailed logging for easier debugging in the future.
-    console.log(`   - Login Type: ${loginType}, Using URL: ${url}`); 
+    console.log(`   - Login Type: ${loginType}, Using URL: ${url}`);
     const response = await axios.get(url, {
       params: {
         // ✅ FIX: The fields are slightly different for the two domains.

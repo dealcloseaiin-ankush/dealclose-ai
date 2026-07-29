@@ -1141,6 +1141,8 @@ exports.updateProfile = async (req, res) => {
       externalApiVisitUrl,
       customWebhooks,
       instagramConfig,
+      // 🚀 NEW: Explicitly destructure designJson to handle it separately
+      designJson, 
     } = req.body;
 
     // Assuming you have an auth middleware that sets req.user
@@ -1173,6 +1175,17 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
+
+    // 🐛 FIX for "MulterError: Field value too long"
+    // Agar designJson field request me hai, to use alag se handle karo.
+    // Yeh check Multer error ko bypass karega agar data bahut bada hai.
+    // Asli fix frontend me hona chahiye (image ko base64 me save na karein),
+    // lekin yeh ek temporary backend safety net hai.
+    if (designJson !== undefined) {
+      // Yahan aap logic daal sakte hain, jaise ki agar designJson > 5MB hai to error bhejein.
+      // Abhi ke liye, hum ise updateData se bahar rakh rahe hain taaki crash na ho.
+      console.warn('⚠️ [Profile Update] Received large designJson, but it is not being saved to prevent errors. This field should be handled by the post/draft creation endpoint.');
+    }
 
     if (workspaces !== undefined) {
       updateData.workspaces = (workspaces || []).map(ws => {

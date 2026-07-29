@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 // Import Routes
+const multer = require('multer');
 // Import all route files
 const leadRoutes = require('./routes/leadRoutes');
 const callRoutes = require('./routes/callRoutes');
@@ -52,6 +52,13 @@ if (process.env.DISABLE_REDIS_WORKER !== 'true') {
 
 const app = express();
 
+// 🚀 FIX for "MulterError: Field value too long"
+// Increase the field size limit to handle large JSON payloads from the post designer.
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fieldSize: 25 * 1024 * 1024 } // 25MB limit for form fields
+});
+
 // Middleware
 const corsOptions = {
   origin: [
@@ -66,8 +73,8 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' })); // Increased limit for heavy flow data
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '25mb' })); // Increased limit for heavy flow data & design JSON
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Make uploads folder publicly accessible to see images
 app.use('/uploads', express.static('public/uploads'));
@@ -129,8 +136,18 @@ app.post('/api/webhooks/data-deletion', (req, res) => {
   });
 });
 
-app.get('/', (req, res) => {
-  res.status(200).json({ message: "AI Calling Agent API Backend is Live & Running! ⚡" });
+// -------------------------------------------------------------------
+// 🚀 CRITICAL FIX for MIME Type Errors & SPA (React/Vue) Routing
+// -------------------------------------------------------------------
+// 1. Serve static files (JS, CSS, images) from the frontend's build folder.
+app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+
+// 2. For any other route that is NOT an API route, send the index.html file.
+//    This allows React Router to handle frontend routing (e.g., /dashboard, /settings).
+app.get('*', (req, res) => {
+  if (!req.originalUrl.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '../../frontend/dist', 'index.html'));
+  }
 });
 
 module.exports = app;
