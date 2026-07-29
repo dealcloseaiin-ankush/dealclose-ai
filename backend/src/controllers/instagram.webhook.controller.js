@@ -610,7 +610,9 @@ exports.handleInstagramWebhook = async (req, res) => {
                 ? activeWorkspace?.aiAgentEnabled === true
                 : user.aiAgentEnabled === true;
 
-              if (!isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
+              // 🐛 FIX: This block was causing duplicate replies. If a flow has already handled 'hi',
+              // this should not run. Added a check for `!flowReplyHandled`.
+              if (!flowReplyHandled && !isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
                 const menuMessage = isCreator 
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;

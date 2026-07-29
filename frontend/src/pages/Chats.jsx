@@ -413,14 +413,38 @@ export default function Chats() {
   };
   
   // WhatsApp style message status
-  const getMessageStatusIcon = (status) => {
-    switch(status) {
-      case 'sent': return <Check size={12} className="text-gray-400" />;
-      case 'delivered': return <CheckCheck size={12} className="text-gray-400" />;
-      case 'read': return <CheckCheck size={12} className="text-blue-400" />;
-      case 'failed': return <span className="text-red-400 text-[10px]">⚠️</span>;
-      default: return <span className="text-gray-500 text-[10px]">🕒</span>;
-    }
+  // 🚀 UPGRADED: Now a component that shows a tooltip with detailed timestamps on hover.
+  const MessageStatus = ({ msg }) => {
+    const { status, sentAt, deliveredAt, readAt } = msg;
+
+    const formatStatusTime = (isoString) => {
+      if (!isoString) return 'Pending...';
+      return new Date(isoString).toLocaleString('en-IN', { day: 'short', month: 'short', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const getIcon = () => {
+      switch(status) {
+        case 'sent': return <Check size={16} className="text-gray-400" />;
+        case 'delivered': return <CheckCheck size={16} className="text-gray-400" />;
+        case 'read': return <CheckCheck size={16} className="text-blue-400" />;
+        case 'failed': return <span className="text-red-400 text-lg">⚠️</span>;
+        default: return <span className="text-gray-500 text-lg">🕒</span>; // Pending/Queued
+      }
+    };
+
+    return (
+      <div className="relative group flex items-center">
+        {getIcon()}
+        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-black border border-gray-700 text-white text-xs rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
+          <ul className="space-y-1">
+            {sentAt && <li className="flex justify-between"><span>Sent:</span> <span>{formatStatusTime(sentAt)}</span></li>}
+            {deliveredAt && <li className="flex justify-between"><span>Delivered:</span> <span>{formatStatusTime(deliveredAt)}</span></li>}
+            {readAt && <li className="flex justify-between"><span>Read:</span> <span>{formatStatusTime(readAt)}</span></li>}
+          </ul>
+          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black"></div>
+        </div>
+      </div>
+    );
   };
 
   const activeCustomerData = customerDetails?.find(c => c.phone === activeCustomer) || null;
@@ -703,7 +727,7 @@ export default function Chats() {
                           <span className="text-[10px] font-medium opacity-80">{formatSender(msg.sentBy, msg.direction)}</span>
                           <span className="text-[10px] opacity-70 flex items-center gap-1">
                             {formatTime(msg.timestamp || msg.createdAt)}
-                            {msg.direction === 'outgoing' && getMessageStatusIcon(msg.status)}
+                            {msg.direction === 'outgoing' && <MessageStatus msg={msg} />}
                           </span>
                         </div>
                       </div>

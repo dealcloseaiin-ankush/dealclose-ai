@@ -75,7 +75,11 @@ exports.getChats = async (req, res) => {
         customerCity: leadDataMap[msg.customerPhone]?.city || '',
         workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main',
         isAiPaused: leadDataMap[msg.customerPhone]?.isAiPaused || false,
-        aiPausedUntil: leadDataMap[msg.customerPhone]?.aiPausedUntil || null
+        aiPausedUntil: leadDataMap[msg.customerPhone]?.aiPausedUntil || null,
+        // 🚀 NEW: Pass detailed timestamps for delivery status tooltips
+        sentAt: msg.timestamp || msg.createdAt,
+        deliveredAt: msg.deliveredAt,
+        readAt: msg.readAt
       };
     });
 

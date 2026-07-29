@@ -249,7 +249,8 @@ exports.importInstagramPosts = async (req, res) => {
       }
     }
 
-    const igAccountId = igConfig?.instagramAccountId || igConfig?.accountId;
+    // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
+    const igAccountId = igConfig?.instagramAccountId || igConfig?.instagramBusinessAccountId;
 
     if (!igConfig?.accessToken || !igAccountId) {
       return res.status(400).json({ success: false, message: 'Instagram account not connected.' });

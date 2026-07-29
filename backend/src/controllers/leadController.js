@@ -627,10 +627,13 @@ exports.bulkImportLeads = async (req, res) => {
       if (existingPhoneSet.has(last10)) { skippedDuplicate++; continue; }
       existingPhoneSet.add(last10);
 
+      // 🚀 FIX: Generate a unique name if it's missing, instead of 'Unknown Business'.
+      const leadName = lead.name || `Lead #${cleanPhone.slice(-4)}`;
+
       toInsert.push({
         userId,
         createdBy: userId,
-        name: lead.name || 'Unknown Business',
+        name: leadName,
         phoneNumber: cleanPhone,
         status: 'new',
         source: source || 'Lead Extractor (Google Maps)',
