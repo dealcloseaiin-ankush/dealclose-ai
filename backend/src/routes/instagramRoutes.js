@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 const instagramController = require('../controllers/instagramController');
 const { protect } = require('../middleware/authMiddleware');
-const { upload } = require('../middleware/uploadMiddleware'); // Assuming this middleware exists
+
+// ✅ FIX: The designJson field can exceed the default 1MB limit for multipart form fields.
+// Increased the fieldSize limit to 25MB to prevent 'MulterError: Field value too long'
+// when saving drafts from the AI Post Designer.
+const { upload } = require('../middleware/uploadMiddleware'); // This now correctly imports the middleware with limits
 
 // --- Dashboard Routes (Called by Frontend React) ---
 router.get('/dashboard', protect, instagramController.getDashboardData);

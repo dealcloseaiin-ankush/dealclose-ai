@@ -6,7 +6,9 @@ exports.generateDesignJson = async (prompt, businessContext) => {
     You are a world-class graphic designer and social media expert, similar to Canva's Magic Design AI.
     Your task is to generate a complete, professional Instagram post design based on a user's prompt and their business context.
     The output MUST be a single, valid JSON object representing the design specification for a 1080x1080 canvas.
-
+    
+    **CRITICAL INSTRUCTION FOR CAPTION:** The Call-to-Action (CTA) in the caption MUST explicitly ask the user to send a Direct Message (DM). For example, instead of "Click the link in bio", you MUST write "DM us 'INFO' to learn more!" or "DM us the keyword 'DEAL' to get a special discount!". This is essential for driving engagement and leads directly through Instagram DMs.
+    
     BUSINESS CONTEXT: ${JSON.stringify(businessContext) || 'A generic local business.'}
 
     **Your output MUST be a single, valid JSON object matching this exact structure:**

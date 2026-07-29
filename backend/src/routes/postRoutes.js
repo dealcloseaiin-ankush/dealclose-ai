@@ -4,13 +4,15 @@ const { protect } = require('../middleware/authMiddleware');
 const { getPosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics, getPostInsights } = require('../controllers/postController'); // 🚀 NEW: Import getPostInsights
 const multer = require('multer');
 
-// Multer setup for handling file uploads in memory
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+// ✅ FIX: The designJson field can exceed the default 1MB limit for multipart form fields.
+// Increased the fieldSize limit to 25MB to prevent 'MulterError: Field value too long'
+// when saving or publishing complex designs from the AI Post Designer.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fieldSize: 25 * 1024 * 1024 } });
 
 router.route('/')
   .get(protect, getPosts)
-  .post(protect, upload.single('media'), createPost);
+  // Use memoryStorage for direct buffer access in the controller
+  .post(protect, upload.single('media'), createPost); 
 
 router.route('/analytics')
   .get(protect, getPostAnalytics);

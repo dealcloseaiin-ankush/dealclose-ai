@@ -262,11 +262,12 @@ export default function PublishPost() {
     const containerWidth = container.offsetWidth - 80;
     const containerHeight = container.offsetHeight - 100;
     const scale = Math.min(containerWidth / 1080, containerHeight / 1080);
-    // 🚀 FIX: Only auto-zoom if the canvas isn't already zoomed in by the user
-    if (zoom <= 1) {
-      handleZoom(scale);
-    }
-  }, [fabricCanvas, handleZoom, zoom]);
+    // ✅ FIX: The previous logic prevented auto-fitting if the user had zoomed in.
+    // This was incorrect. The "Fit to Screen" button should always work.
+    handleZoom(scale);
+    // ✅ ESLINT FIX: Removed 'zoom' from the dependency array as it's not used inside this callback,
+    // resolving the 'react-hooks/exhaustive-deps' warning.
+  }, [fabricCanvas, handleZoom]);
 
   useEffect(() => {
     api.get('/instagram/drafts', { params: { workspaceId: activeWorkspace } })
@@ -381,8 +382,14 @@ export default function PublishPost() {
   // ✅ FIX: Keyboard shortcuts for Undo/Redo
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
-      if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); }
+      // ✅ CRITICAL FIX: Prevent shortcuts from firing when typing in an input field.
+      // This was the root cause of the paste (Ctrl+V) issue on the canvas.
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        return;
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+      if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);

@@ -210,11 +210,11 @@ exports.getRecentPosts = async (req, res) => {
 
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
     const graphVersion = process.env.META_GRAPH_API_VERSION || 'v19.0';
-    // ✅ FIX: Correctly determine loginType from the config source to prevent token errors.
     const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business'; // Fallback to default
     
-    // ✅ FIX: Use the correct API domain based on the connection type. This was the root cause of the "Invalid Token" error during post fetching.
-    // 'instagram_business_login' uses graph.instagram.com, others use graph.facebook.com.
+    // ✅ CRITICAL FIX: The "Invalid OAuth access token" error was caused by always calling graph.facebook.com.
+    // This now correctly checks the `loginType` to determine if the Instagram-native domain (`graph.instagram.com`)
+    // should be used, which is required for accounts connected via the "Connect with Instagram Login" button.
     const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
     const url = useInstagramDomain
       ? `https://graph.instagram.com/${graphVersion}/${accountId}/media`
@@ -457,6 +457,12 @@ exports.generateAiPost = async (req, res) => {
       normalizedExistingDesign
     );
     console.log("✅ [DEBUG] 5. Received design JSON and usage data from service.");
+
+    // ✅ FIX: The AI-generated caption and hashtags were not being extracted and sent back.
+    // This ensures that when a new design is created, the caption field in the UI is also populated.
+    if (designJson?.caption) {
+      designJson.caption = [designJson.caption, designJson.hashtags].filter(Boolean).join('\n\n');
+    }
 
     // The AI now provides the conversational reply within the JSON
     const aiReply = "I've created a new design for you! You can now edit it on the canvas.";
