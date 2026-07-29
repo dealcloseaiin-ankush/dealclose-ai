@@ -3,6 +3,7 @@ const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Lead = require('../models/leadModel'); 
 const Flow = require('../models/flowModel'); 
+const metaService = require('../services/metaAdsService');
 const metaAdsService = require('../services/metaAdsService');
 const axios = require('axios'); 
 const googleSheetsController = require('./googleSheetsController');
@@ -13,6 +14,12 @@ const IORedis = require('ioredis');
 const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
 redis.on && redis.on('error', (e) => console.error('⚠️ [Redis] Connection error in IG webhook controller:', e.message));
 const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
+
+// ✅ HELPER: Central place to check if a loginType is the "Instagram-native" flow
+// (Business Login for Instagram, using graph.instagram.com endpoints).
+// Anything else falls back to the Facebook-linked flow (graph.facebook.com).
+const isInstagramNativeLogin = (loginType) =>
+  loginType === 'instagram_basic_display' || loginType === 'instagram_business_login';
 
 const loadThreadState = async (threadKey) => {
   try {
@@ -48,12 +55,40 @@ const saveThreadState = async (threadKey, state) => {
 };
 
 // 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
+metaService.getInstagramProfile = async (token, userId, loginType = 'facebook_business') => {
+  if (!token) {
+    throw new Error("No Access Token found for profile fetch (Token is NULL)");
+  }
+
+  const isBasicDisplay = isInstagramNativeLogin(loginType);
+
+  const url = isBasicDisplay
+    ? `https://graph.instagram.com/v21.0/${userId}`
+    : `https://graph.facebook.com/v19.0/${userId}`;
+
+  const params = isBasicDisplay
+    ? { fields: 'id,username,name,profile_picture_url', access_token: token }
+    : { fields: 'name,profile_pic', access_token: token };
+
+  try {
+    const response = await axios.get(url, { params });
+    // Normalize the response to match the expected structure
+    return isBasicDisplay ? response.data : { name: response.data.name, username: response.data.name, profile_pic: response.data.profile_pic };
+  } catch (error) {
+    const metaErr = error.response?.data?.error;
+    console.error(`❌ [META API PROFILE FETCH REJECTED] Failed to fetch profile for ID ${userId} via ${url}. Reason:`, metaErr?.message || error.message);
+    throw error;
+  }
+};
+
+// 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
 metaAdsService.sendInstagramDM = async (token, recipientId, text, loginType = 'facebook_business') => {
   if (!token) {
     throw new Error("No Access Token found (Token is NULL)");
   }
 
-  const baseUrl = loginType === 'instagram_basic_display'
+  // ✅ FIX 1: Now checks both 'instagram_basic_display' AND 'instagram_business_login'
+  const baseUrl = isInstagramNativeLogin(loginType)
     ? 'https://graph.instagram.com/v21.0/me/messages'
     : 'https://graph.facebook.com/v19.0/me/messages';
 
@@ -80,20 +115,23 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentI
     throw new Error("No Access Token found for private reply (Token is NULL)");
   }
 
-  const url = loginType === 'instagram_basic_display'
-    ? `https://graph.instagram.com/v21.0/${commentId}/replies` // Instagram Login flow: no page-scoped private reply endpoint the same way; comment on the comment directly if private reply isn't supported for this product — verify against current Meta docs before finalizing this endpoint
+  // ✅ FIX 2: Now checks both 'instagram_basic_display' AND 'instagram_business_login'
+  const useNativeFlow = isInstagramNativeLogin(loginType);
+
+  const url = useNativeFlow
+    ? `https://graph.instagram.com/v21.0/${commentId}/replies` // Instagram-native flow: verify against current Meta docs before finalizing this endpoint if private-reply-to-DM isn't supported
     : `https://graph.facebook.com/v19.0/${pageId}/messages`;
 
-  if (loginType === 'facebook_business' && !pageId) {
+  if (!useNativeFlow && !pageId) {
     throw new Error("No Facebook Page ID found for private reply (pageId is NULL)");
   }
 
-  const payload = loginType === 'instagram_basic_display'
+  const payload = useNativeFlow
     ? { message: text, access_token: token }
     : { recipient: { comment_id: commentId }, message: { text }, messaging_type: "RESPONSE" };
 
   try {
-    const response = loginType === 'instagram_basic_display'
+    const response = useNativeFlow
       ? await axios.post(url, payload)
       : await axios.post(url, payload, { params: { access_token: token } });
     console.log("[PRIVATE REPLY SUCCESS]", response.data);
@@ -221,7 +259,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               let realName = `IG User ${senderId.slice(-4)}`;
               if (igToken) {
                 try {
-                  const profile = await metaAdsService.getInstagramProfile(igToken, senderId);
+                  const profile = await metaService.getInstagramProfile(igToken, senderId, loginType);
                   if (profile && (profile.name || profile.username)) {
                     realName = profile.name || profile.username;
                   }
@@ -320,12 +358,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                 return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
               };
 
-              const sendIGFlowMessage = async (text, nodeToPauseAt = null, flowIdToPauseAt = null, loginType) => {
+              const sendIGFlowMessage = async (text, nodeToPauseAt = null, flowIdToPauseAt = null, loginTypeParam) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = text;
                 try {
                     if (!igToken) throw new Error("IG Token is missing or invalid");
-                    await metaAdsService.sendInstagramDM(igToken, senderId, text, loginType);
+                    await metaAdsService.sendInstagramDM(igToken, senderId, text, loginTypeParam || loginType);
                 } catch (e) {
                     console.error("❌ [IG Flow DM Error]:", e.message);
                     deliveryStatus = 'failed';
@@ -411,11 +449,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                        const currentFlowId = activeFlow._id.toString();
                        
                        if (nextNode.type === 'message') {
-                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);                         await sendIGFlowMessage(msgText, null, null, loginType);
+                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
+                         await sendIGFlowMessage(msgText, null, null, loginType);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
-                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);                         await sendIGFlowMessage(msgText, nextNode.id, currentFlowId, loginType);
+                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
+                         await sendIGFlowMessage(msgText, nextNode.id, currentFlowId, loginType);
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -486,11 +526,13 @@ exports.handleInstagramWebhook = async (req, res) => {
                        const nextNode = nodes.find(n => n.id === currNodeId);
                        if (!nextNode) break;
                        if (nextNode.type === 'message') {
-                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);                         await sendIGFlowMessage(msgText, null, null, loginType);
+                         const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
+                         await sendIGFlowMessage(msgText, null, null, loginType);
                          let nextE = edges.find(e => e.source === nextNode.id);
                          currNodeId = nextE ? nextE.target : null;
                        } else if (nextNode.type === 'askQuestion') {
-                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);                         await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString(), loginType);
+                         const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
+                         await sendIGFlowMessage(msgText, nextNode.id, flow._id.toString(), loginType);
                          currNodeId = null; 
                        } else if (nextNode.type === 'menu') {
                          let msgText = formatFlowMsg(nextNode.data.message || "Please choose an option:");
@@ -520,7 +562,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                 if (matchedAuto && matchedAuto.fileUrl) {
                   try {
                     if (matchedAuto.deliveryMode === 'button') {
-                      const quickReplyUrl = loginType === 'instagram_basic_display'
+                      // ✅ FIX 5: quick reply URL now checks both native-login values
+                      const quickReplyUrl = isInstagramNativeLogin(loginType)
                         ? 'https://graph.instagram.com/v21.0/me/messages'
                         : 'https://graph.facebook.com/v19.0/me/messages';
                       await axios.post(quickReplyUrl, {
@@ -532,7 +575,8 @@ exports.handleInstagramWebhook = async (req, res) => {
                       }, { params: { access_token: igToken } });
                     } else {
                       const directLinkMsg = `${matchedAuto.replyMessage}\n\n📄 Link: ${matchedAuto.fileUrl}`;
-                      if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, directLinkMsg);
+                      // ✅ FIX 4: loginType was missing here before, causing default 'facebook_business' to be used
+                      if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, directLinkMsg, loginType);
                       if (incomingWorkspaceId !== 'main') {
                         await User.updateOne(
                           { _id: user._id, "workspaces._id": incomingWorkspaceId },
@@ -809,6 +853,19 @@ with whatever information is available (leave budget field empty/null if not pro
             console.error('Error during self-comment check:', e.message);
           }
 
+          // ====== DEDUPLICATION: prevent processing same comment twice ======
+          const dedupKey = `processed_comment:${commentData.id}`;
+          try {
+            const already = await redis.get(dedupKey);
+            if (already) {
+              console.log('Skipped: duplicate comment (already processed within TTL)');
+              continue;
+            }
+            await redis.set(dedupKey, '1', 'EX', 24 * 60 * 60);
+          } catch (e) {
+            console.error('⚠️ [Redis Dedup] Error checking/setting dedup key:', e.message);
+          }
+
           let user = await User.findOne({
             $or: [
               { "instagramConfig.instagramBusinessAccountId": igAccountId },
@@ -850,7 +907,7 @@ with whatever information is available (leave budget field empty/null if not pro
              const confirmMsg = `Hi! Thanks for sharing your number. Could you please confirm your Name, City, and the WhatsApp number you'd like us to contact you on? 😊`;
              
              try {
-               if (igToken && igPageId) {
+               if (igToken && (igPageId || isInstagramNativeLogin(loginType))) {
                  await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, confirmMsg, loginType);
                }
              } catch (e) {
@@ -891,7 +948,7 @@ with whatever information is available (leave budget field empty/null if not pro
           if (user.workspaces && user.workspaces.length > 0) {
             console.log("AVAILABLE WORKSPACES IN DB =");
             user.workspaces.forEach(w => {
-              console.log(`   - Name: ${w.name} | ID: ${w._id} | IG Account: ${w.instagramConfig?.instagramAccountId || 'N/A'}`);
+              console.log(`   - Name: ${w.name} | ID: ${w._id} | IG Account: ${w.instagramConfig?.instagramBusinessAccountId || 'N/A'}`);
               console.log(`     Rules Count: ${w.postAutomations?.length || 0}`);
               if (w.postAutomations && w.postAutomations.length > 0) {
                 console.log("     Rules Array:", w.postAutomations.map(r => ({ postId: r.postId, trigger: r.triggerWord, delivery: r.deliveryMode, url: r.fileUrl })));
@@ -988,13 +1045,15 @@ with whatever information is available (leave budget field empty/null if not pro
                     console.log("👉 TARGET EXTRACTED USER ID (igUserId):", igUserId);
                     console.log("👉 TARGET PAGE ID (for FB flow):", igPageId);
                     console.log("👉 IG TOKEN PRESENT:", Boolean(igToken));
+                    console.log("👉 LOGIN TYPE:", loginType);
                     console.log("====================================================");
                     
                     await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg, loginType);
                     dmSentSuccessfully = true;
                  } 
                  else if (matchedRule.deliveryMode === 'button') { // This is a DM
-                    const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText, loginType);
+                    const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText, loginType);
                     dmSentSuccessfully = true;
                  }
                  else { // This is a DM
@@ -1014,7 +1073,8 @@ with whatever information is available (leave budget field empty/null if not pro
 
              if (dmSentSuccessfully) {
                try {
-                 const commentReplyUrl = loginType === 'instagram_basic_display'
+                 // ✅ FIX 3a: matched-rule public comment reply now checks both native-login values
+                 const commentReplyUrl = isInstagramNativeLogin(loginType)
                     ? `https://graph.instagram.com/v21.0/${commentData.id}/replies`
                     : `https://graph.facebook.com/v19.0/${commentData.id}/replies`;
                  await axios.post(commentReplyUrl, {
@@ -1080,7 +1140,8 @@ with whatever information is available (leave budget field empty/null if not pro
                    continue;
                  }
 
-                 const commentReplyUrl = loginType === 'instagram_basic_display'
+                 // ✅ FIX 3b: AI comment reply now checks both native-login values
+                 const commentReplyUrl = isInstagramNativeLogin(loginType)
                     ? `https://graph.instagram.com/v21.0/${commentData.id}/replies`
                     : `https://graph.facebook.com/v19.0/${commentData.id}/replies`;
                  const replyResponse = await axios.post(commentReplyUrl, {

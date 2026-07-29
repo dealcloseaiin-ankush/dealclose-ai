@@ -31,6 +31,10 @@ const axios = require('axios');
  *     to an Instagram Business Account. Uses graph.facebook.com for EVERYTHING.
  *   - Route: POST /users/settings/instagram-connect
  *   - Token type: Facebook Graph API long-lived token (fb_exchange_token)
+ *   - Uses META_APP_ID / META_APP_SECRET (the MAIN Facebook App credentials) —
+ *     NEVER the Instagram-specific App ID/Secret. window.FB.init() on the
+ *     frontend uses META_APP_ID, so the backend token exchange MUST use the
+ *     same App ID or Meta will reject the token as "invalid app".
  *   - Followed by: exports.instagramConnectSelected (user picks which Page/IG
  *     account from a list, since one FB login can have multiple Pages)
  *
@@ -45,27 +49,37 @@ const axios = require('axios');
  *   - Backend: exports.instagramBasicConnect (below) — uses api.instagram.com for
  *     the code exchange and graph.instagram.com for EVERYTHING after (never
  *     graph.facebook.com).
+ *   - Uses META_INSTAGRAM_LOGIN_APP_ID / META_INSTAGRAM_APP_SECRET (the SEPARATE
+ *     Instagram App credentials) — NEVER the main Facebook App credentials.
  *   - Route: POST /users/settings/instagram-basic-connect
  *   - Callback page: InstagramOAuthCallback.jsx posts to this exact route.
  *
- * 🚫 DO NOT merge these two functions, share scopes between them, or make one
- * call the other's helper functions. They are different Meta products with
- * different OAuth servers and different Graph API hosts. Mixing them causes
- * silent failures like "Invalid platform app" or pages/chats not loading.
+ * 🚫 DO NOT merge these two functions, share scopes between them, share App
+ * ID/Secret constants between them, or make one call the other's helper
+ * functions. They are different Meta products with different OAuth servers,
+ * different Graph API hosts, AND different App credentials. Mixing them
+ * causes silent failures like "Invalid platform app", "Invalid App ID", or
+ * pages/chats not loading.
  *
  * If asked to add a feature to "Instagram connect", ALWAYS ask or infer which
  * of the two buttons/flows it applies to before editing.
  * ============================================================================
  */
- 
-// ✅ FIX: Use dedicated Instagram App secrets. Fallback to main secrets.
-const META_APP_SECRET = process.env.INSTAGRAM_META_APP_SECRET || process.env.META_APP_SECRET; // User confirmed INSTAGRAM_META_APP_SECRET
+
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
-// ✅ FIX: Use dedicated Instagram App ID. Fallback to main App ID.
-// ⚠️ IMPORTANT: This App ID must be correctly configured on Meta Developer Dashboard
-// with "Facebook Login" (for Graph API) and "Instagram Basic Display" products.
-const META_INSTAGRAM_LOGIN_APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID; // User confirmed INSTAGRAM_META_APP_ID
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
+
+// ✅ FIX: FLOW 1 (Facebook Login for Business) credentials — the MAIN Facebook App.
+// window.FB.init() on the frontend uses META_APP_ID, so every backend call in the
+// Facebook-linked flow MUST use these same two constants, never the Instagram ones.
+const META_APP_ID = process.env.META_APP_ID;
+const META_APP_SECRET = process.env.META_APP_SECRET;
+
+// ✅ FIX: FLOW 2 (Instagram Login) credentials — the SEPARATE Instagram App.
+// Falls back to the main Facebook App credentials only if dedicated Instagram
+// credentials were never configured.
+const META_INSTAGRAM_LOGIN_APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID; // ✅ FIX: Corrected env var name
+const META_INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_META_APP_SECRET || process.env.META_APP_SECRET; // ✅ FIX: Corrected env var name
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
 
@@ -402,12 +416,17 @@ exports.whatsappConnect = async (req, res) => {
 
 /**
  * Exchanges a short-lived access token for a long-lived one.
+ * ⚠️ FLOW 1 ONLY (Facebook Login for Business) — always uses META_APP_ID /
+ * META_APP_SECRET, never the Instagram-specific credentials.
  */
 const getLongLivedAccessToken = async (shortLivedToken) => {
   const url = `https://graph.facebook.com/v19.0/oauth/access_token`;
   const params = {
-    grant_type: 'fb_exchange_token', // ✅ FIX: Use the correct App ID for the exchange.
-    client_id: process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID,
+    grant_type: 'fb_exchange_token',
+    // ✅ FIX: Must match the App ID used by window.FB.init() on the frontend
+    // (META_APP_ID), NOT the Instagram-specific App ID. Using the wrong App ID
+    // here causes Meta to reject the token exchange.
+    client_id: META_APP_ID,
     client_secret: META_APP_SECRET,
     fb_exchange_token: shortLivedToken,
   };
@@ -441,10 +460,13 @@ const getInstagramBusinessAccount = async (pageId, accessToken) => {
 
 /**
  * Verifies token, permissions, and runs lightweight API calls to trigger Meta's test cases.
+ * ⚠️ FLOW 1 ONLY (Facebook Login for Business) — always uses META_APP_ID /
+ * META_APP_SECRET, never the Instagram-specific credentials.
  */
 const performVerificationAndTriggerAPITests = async (igBusinessAccountId, accessToken) => {
   const verificationResults = {};
-  const APP_ID = process.env.INSTAGRAM_META_APP_ID || process.env.META_APP_ID;
+  // ✅ FIX: Must be the main Facebook App ID, not the Instagram-specific one.
+  const APP_ID = META_APP_ID;
 
   try {
     // 1. Verify Token & Permissions (/debug_token)
@@ -612,6 +634,8 @@ const performVerificationAndTriggerAPITests = async (igBusinessAccountId, access
  
 /**
  * FLOW 2 helpers — Instagram API with Instagram Login
+ * ⚠️ Always uses META_INSTAGRAM_LOGIN_APP_ID / META_INSTAGRAM_APP_SECRET —
+ * never the main Facebook App credentials.
  */
 const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
   // Strip the trailing "#_" fragment artifact that Instagram sometimes appends to the code
@@ -619,13 +643,15 @@ const getInstagramBasicShortLivedToken = async (authCode, redirectUri) => {
   // 🚀 DEBUG: Add detailed logging to trace the exact values being sent to Meta.
   console.log('\n[IG TOKEN EXCHANGE DEBUG] 1. Preparing to exchange code for token.');
   console.log(`   - App ID Used: ${META_INSTAGRAM_LOGIN_APP_ID ? 'Present ✅' : 'MISSING ❌'}`);
-  console.log(`   - App Secret Used: ${META_APP_SECRET ? 'Present ✅' : 'MISSING ❌'}`);
+  console.log(`   - App Secret Used: ${META_INSTAGRAM_APP_SECRET ? 'Present ✅' : 'MISSING ❌'}`);
   console.log(`   - Redirect URI Sent to Meta: ${redirectUri}`);
   console.log(`   - Auth Code Received: ${cleanCode ? 'Present ✅' : 'MISSING ❌'}`);
 
   const form = new URLSearchParams();
   form.append('client_id', META_INSTAGRAM_LOGIN_APP_ID);
-  form.append('client_secret', META_APP_SECRET);
+  // ✅ FIX: Was using the shared META_APP_SECRET before (which is now Flow-1-only).
+  // Must use the dedicated Instagram App Secret here.
+  form.append('client_secret', META_INSTAGRAM_APP_SECRET);
   form.append('grant_type', 'authorization_code');
   form.append('redirect_uri', redirectUri);
   form.append('code', cleanCode);
@@ -656,7 +682,9 @@ const getInstagramBasicLongLivedToken = async (shortLivedToken) => {
   const { data } = await axios.get('https://graph.instagram.com/access_token', {
     params: {
       grant_type: 'ig_exchange_token',
-      client_secret: META_APP_SECRET,
+      // ✅ FIX: Was using the shared META_APP_SECRET before (which is now Flow-1-only).
+      // Must use the dedicated Instagram App Secret here.
+      client_secret: META_INSTAGRAM_APP_SECRET,
       access_token: shortLivedToken,
     }
   });
@@ -752,10 +780,10 @@ const performInstagramBasicVerification = async (igUserId, accessToken) => {
   return results;
 };
 
-// 🚀 NEW: This is FLOW 2: Instagram Login (Basic Display API)
-// @desc    Connect Instagram via Instagram Login (Basic Display API)
+// 🚀 NEW: This is FLOW 2: Instagram Login (Business Login for Instagram)
+// @desc    Connect Instagram via Instagram Login
 // @route   POST /api/users/settings/instagram-basic-connect
-exports.instagramBasicConnect = async (req, res) => { // This function is now effectively replaced by the logic inside instagramConnect
+exports.instagramBasicConnect = async (req, res) => {
   const { authCode, workspaceId, redirectUri } = req.body;
   const userId = req.user?._id || req.user?.id;
 
@@ -781,12 +809,12 @@ exports.instagramBasicConnect = async (req, res) => { // This function is now ef
 
     // Step 4: Perform basic verification (just token validity)
     const verificationResults = await performInstagramBasicVerification(igUserId, longLivedToken);
-    console.log('✅ [Meta Verification - Basic Display] API tests triggered:', verificationResults);
+    console.log('✅ [Meta Verification - Instagram Login] API tests triggered:', verificationResults);
 
     // Step 5: Prepare the configuration object to be saved
     const instagramConfig = {
       instagramUserId: profileInfo.instagramUserId,
-      instagramBusinessAccountId: profileInfo.instagramUserId, // For Basic Display, this is the same as userId
+      instagramBusinessAccountId: profileInfo.instagramUserId, // For this flow, this is the same as userId
       facebookPageId: null, // No Facebook Page involved in this flow
       businessId: null,
       accessToken: longLivedToken,
@@ -794,9 +822,12 @@ exports.instagramBasicConnect = async (req, res) => { // This function is now ef
       tokenExpiresAt: tokenExpiresAt,
       grantedPermissions: verificationResults.token.scopes || [],
       username: profileInfo.username,
-      profilePictureUrl: profileInfo.profilePictureUrl, // This will be null from Basic Display API
+      profilePictureUrl: profileInfo.profilePictureUrl,
       lastVerifiedAt: new Date(),
-      loginType: 'instagram_basic_display', // 🚀 NEW: Set login type
+      // ✅ Kept as 'instagram_basic_display' string value for DB continuity with earlier
+      // saved records — webhook controller's isInstagramNativeLogin() helper already
+      // treats this the same as 'instagram_business_login'.
+      loginType: 'instagram_basic_display',
     };
 
     // Step 6: Save the connection details to the correct workspace
@@ -807,7 +838,7 @@ exports.instagramBasicConnect = async (req, res) => { // This function is now ef
 
     await User.updateOne(filter, update);
 
-    // Step 6: Clear pending connection state (if any)
+    // Step 7: Clear pending connection state (if any)
     await User.updateOne({ _id: userId }, { $unset: { pendingInstagramConnection: '' } });
 
     // ⚠️ Webhook subscription: Instagram Login flow ke liye subscribe_apps endpoint 
