@@ -419,7 +419,10 @@ export default function Chats() {
 
     const formatStatusTime = (isoString) => {
       if (!isoString) return 'Pending...';
-      return new Date(isoString).toLocaleString('en-IN', { day: 'short', month: 'short', hour: '2-digit', minute: '2-digit' });
+      // ✅ CRITICAL FIX: The `day` option for toLocaleString does not support 'short'.
+      // The valid values are 'numeric' or '2-digit'. This was causing a RangeError and crashing the entire page
+      // whenever a tooltip for a message with a valid timestamp was rendered.
+      return new Date(isoString).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     };
 
     const getIcon = () => {
