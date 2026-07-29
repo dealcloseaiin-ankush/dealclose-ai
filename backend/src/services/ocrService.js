@@ -4,9 +4,10 @@ const aiUsageTracker = require('./aiUsageTracker');
 
 // 🌊 ULTRA COST-EFFECTIVE MODELS FOR VISION / OCR
 const VISION_MODELS = {
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',             // Priority 3 (Final Fallback)
+  // ✅ FIX: Removed deprecated 'gemini-1.5-flash' which was causing 404 errors.
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 1 (Latest, Cheapest & Fast)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 2 (Backup Gemini)
+  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3 (Final Fallback)
 };
 
 /**
@@ -52,7 +53,7 @@ exports.extractTextFromImage = async (imageBuffer, mimeType, userId = null) => {
         console.log(`✅ [OCR AI] Successfully extracted text using model: ${modelUsed}`);
         return extractedText;
       } catch (gemini3Error) {
-        console.warn(`⚠️ [OCR AI] ${VISION_MODELS.GEMINI_3_1_LITE} failed or busy: ${gemini3Error.message}. Trying ${VISION_MODELS.GEMINI_2_5_LITE}...`);
+        console.warn(`⚠️ [OCR AI] ${VISION_MODELS.GEMINI_3_1_LITE} failed or busy: ${gemini3Error.message}. Trying ${VISION_MODELS.GEMINI_2_5_LITE || 'OpenAI'}...`);
       }
 
       // Priority 2: Try Gemini 2.5 Flash Light (Vision Supported)

@@ -10,9 +10,9 @@ const whatsappService = require('../services/whatsappService');
 
 // 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
 const MODELS = {
-  GEMINI_1_5_FLASH: 'gemini-1.5-flash',       // Priority 1 (Highly Available Standard Fallback King)
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 2 (Latest Cheapest Lite String)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 3 (Backup Gemini)
+  // ✅ FIX: Removed deprecated 'gemini-1.5-flash' which was causing 404 errors.
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 1 (Latest Cheapest Lite String)
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 2 (Backup Gemini)
   OPENAI_MINI: 'gpt-4o-mini',                 // Priority 4 (Final AI Fallback Loop)
 };
 
@@ -504,19 +504,7 @@ exports.generateFlow = async (req, res) => {
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
 
-      // Level 1: Try Gemini 1.5 Flash (Global King - Avoids 403 Forbidden Restrictions)
-      try {
-        console.log(`[Flow Gen] 🤖 Requesting stable model: ${MODELS.GEMINI_1_5_FLASH}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
-        const result = await model.generateContent([systemPrompt, prompt]);
-        console.log(`✅ [Flow Gen] Responded using model: ${MODELS.GEMINI_1_5_FLASH}`);
-        rawResponse = result.response.text();
-        flowGenSuccess = true;
-      } catch (gemini15Err) {
-        console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_1_5_FLASH} failed, trying ${MODELS.GEMINI_3_1_LITE}...`);
-      }
-
-      // Level 2: Try Gemini 3.1 Flash Lite
+      // Level 1: Try Gemini 3.1 Flash Lite
       if (!flowGenSuccess) {
         try {
           console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LITE}`);
@@ -531,7 +519,7 @@ exports.generateFlow = async (req, res) => {
       }
     }
 
-    // Level 3: Final Fallback to OpenAI gpt-4o-mini
+    // Level 2: Final Fallback to OpenAI gpt-4o-mini
     if (!flowGenSuccess && hasOpenAI) {
       console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.OPENAI_MINI}`);
       const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

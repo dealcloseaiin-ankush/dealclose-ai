@@ -3,7 +3,7 @@ const axios = require('axios');
 exports.sendTextMessage = async (accessToken, phoneNumberId, to, text) => {
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: to,
@@ -27,7 +27,7 @@ exports.sendTextMessage = async (accessToken, phoneNumberId, to, text) => {
 exports.sendTemplateMessage = async (accessToken, phoneNumberId, to, templateName, language, components) => {
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: to,
@@ -55,7 +55,7 @@ exports.sendTemplateMessage = async (accessToken, phoneNumberId, to, templateNam
 exports.sendMediaMessage = async (accessToken, phoneNumberId, to, mediaId, caption = "") => {
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: to,
@@ -83,7 +83,7 @@ exports.downloadMedia = async (accessToken, mediaId) => {
   try {
     // 1. Get media URL from Meta Graph API
     const urlResponse = await axios.get(
-      `https://graph.facebook.com/v18.0/${mediaId}`,
+      `https://graph.facebook.com/v19.0/${mediaId}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const mediaUrl = urlResponse.data.url;
@@ -105,7 +105,7 @@ exports.downloadMedia = async (accessToken, mediaId) => {
 exports.sendInteractiveMessage = async (accessToken, phoneNumberId, to, interactiveObj) => {
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: to,

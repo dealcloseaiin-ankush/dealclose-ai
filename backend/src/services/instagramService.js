@@ -11,7 +11,7 @@ const isInstagramNativeLogin = (loginType) =>
  */
 exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, mediaType, caption, loginType = 'facebook_business') => {
   try {
-    console.log(`[IG Publish] Step 1: Uploading ${mediaType} container for account ${igAccountId}`);
+    console.log(`\n🚀 [IG PUBLISH ENGINE] Step 1: Uploading ${mediaType} container for account ${igAccountId}`);
     
     // ✅ FIX: Use the correct API domain based on the connection type.
     const baseUrl = isInstagramNativeLogin(loginType) ? 'https://graph.instagram.com/v19.0' : 'https://graph.facebook.com/v19.0';
@@ -32,11 +32,11 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
 
     const containerResponse = await axios.post(`${baseUrl}/${igAccountId}/media`, payload);
     const creationId = containerResponse.data.id;
-    console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
+    console.log(`✅ [IG PUBLISH ENGINE] Step 1 Success: Got container ID: ${creationId}`);
 
     // ✅ FIX: Poll status for images too, not just videos.
     // Native Instagram login processes image containers asynchronously.
-    console.log(`⏳ [IG Publish] Checking container processing status...`);
+    console.log(`⏳ [IG PUBLISH ENGINE] Step 2: Polling container status...`);
     let isReady = false;
     let retries = 0;
     const maxRetries = isVideo ? 12 : 6; // Videos need more time
@@ -48,7 +48,7 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
         const statusCheck = await axios.get(`${baseUrl}/${creationId}`, {
           params: { fields: 'status_code', access_token: accessToken }
         });
-        const status = statusCheck.data?.status_code;
+        const status = statusCheck.data?.status_code || 'UNKNOWN';
         console.log(`   👉 Container ${creationId} Status: ${status}`);
         if (status === 'FINISHED') {
           isReady = true;
@@ -61,18 +61,18 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
       retries++;
     }
 
-    console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
+    console.log(`🚀 [IG PUBLISH ENGINE] Step 3: Publishing container ${creationId}`);
     const publishResponse = await axios.post(`${baseUrl}/${igAccountId}/media_publish`, {
       creation_id: creationId,
       access_token: accessToken,
     });
     
-    console.log(`[IG Publish] Step 2 Success: Media published with ID: ${publishResponse.data.id}`);
+    console.log(`✅ [IG PUBLISH ENGINE] Step 3 Success: Media published with ID: ${publishResponse.data.id}`);
     return { success: true, postId: publishResponse.data.id };
 
   } catch (error) {
     const errorMessage = error.response?.data?.error?.message || error.message;
-    console.error(`[IG Publish] Error publishing media:`, errorMessage);
+    console.error(`❌ [IG PUBLISH ENGINE] Error publishing media:`, errorMessage);
     throw new Error(errorMessage);
   }
 };

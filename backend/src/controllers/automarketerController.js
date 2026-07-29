@@ -8,6 +8,7 @@ const OpenAI = require('openai');
 
 // 🌊 ULTRA COST-EFFECTIVE MODELS FOR AUTOMARKETER
 const MODELS = {
+  // ✅ FIX: Removed deprecated 'gemini-1.5-flash' which was causing 404 errors.
   GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
   GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
   OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
