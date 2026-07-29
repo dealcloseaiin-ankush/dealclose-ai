@@ -77,12 +77,13 @@ exports.getChats = async (req, res) => {
         isAiPaused: leadDataMap[msg.customerPhone]?.isAiPaused || false,
         aiPausedUntil: leadDataMap[msg.customerPhone]?.aiPausedUntil || null,
         // 🚀 NEW: Pass detailed timestamps for delivery status tooltips
-        // ✅ FIX: Prevent frontend crash `RangeError: Value short out of range for Date`
-        // by ensuring `sentAt` is never null or undefined. If both timestamp and createdAt
-        // are missing, fall back to the current date to avoid sending an invalid date.
+        // ✅ CRITICAL FIX v2: The frontend crashes with a `RangeError` if `deliveredAt` or `readAt`
+        // are `null`. By using `|| undefined`, we ensure that if these fields are falsy (null, undefined),
+        // they are passed as `undefined`. The frontend can safely handle `new Date(undefined)`
+        // which results in an "Invalid Date", preventing the crash that `new Date(null)` would cause.
         sentAt: msg.timestamp || msg.createdAt || new Date(),
-        deliveredAt: msg.deliveredAt,
-        readAt: msg.readAt
+        deliveredAt: msg.deliveredAt || undefined,
+        readAt: msg.readAt || undefined
       };
     });
 
