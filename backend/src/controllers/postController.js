@@ -319,6 +319,32 @@ exports.importInstagramPosts = async (req, res) => {
 };
 
 /**
+ * @desc    Download a post's media
+ * @route   GET /api/posts/:id/download
+ */
+exports.downloadPostMedia = async (req, res) => {
+  try {
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user?._id }).lean();
+    if (!post || !post.mediaUrls || post.mediaUrls.length === 0) {
+      return res.status(404).json({ success: false, message: 'Post or media not found.' });
+    }
+
+    const mediaUrl = post.mediaUrls[0].url;
+    const response = await require('axios')({
+      url: mediaUrl,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    res.setHeader('Content-Disposition', `attachment; filename="post_${post._id}.jpg"`);
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Download Post Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to download media.' });
+  }
+};
+
+/**
  * @desc    Get aggregated analytics for all posts
  * @route   GET /api/posts/analytics
  * @access  Private

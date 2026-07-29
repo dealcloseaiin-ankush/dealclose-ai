@@ -34,35 +34,31 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
     const creationId = containerResponse.data.id;
     console.log(`[IG Publish] Step 1 Success: Got container ID: ${creationId}`);
 
-    // 🚀 CRITICAL REELS BUG FIX: Video container processing status check pool loop
-    if (isVideo) {
-      console.log(`⏳ [IG Publish] Video detected. Checking container processing status before publishing...`);
-      let isReady = false;
-      let retries = 0;
-      
-      while (!isReady && retries < 10) {
-        // Wait 5 seconds between every status request check
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        try {
-          const statusCheck = await axios.get(`${baseUrl}/${creationId}`, {
-            params: { fields: 'status_code', access_token: accessToken }
-          });
-          
-          const status = statusCheck.data?.status_code;
-          console.log(`   👉 Container ${creationId} Current Processing Status: ${status}`);
-          
-          if (status === 'FINISHED') {
-            isReady = true;
-            console.log(`✅ [IG Publish] Container is completely ready for publishing!`);
-          } else if (status === 'ERROR') {
-            throw new Error("Meta processing failed with ERROR state inside media container.");
-          }
-        } catch (statusErr) {
-          console.warn("⚠️ Retrying status polling check...", statusErr.message);
+    // ✅ FIX: Poll status for images too, not just videos.
+    // Native Instagram login processes image containers asynchronously.
+    console.log(`⏳ [IG Publish] Checking container processing status...`);
+    let isReady = false;
+    let retries = 0;
+    const maxRetries = isVideo ? 12 : 6; // Videos need more time
+    const pollInterval = isVideo ? 5000 : 3000; // 5s for video, 3s for image
+
+    while (!isReady && retries < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      try {
+        const statusCheck = await axios.get(`${baseUrl}/${creationId}`, {
+          params: { fields: 'status_code', access_token: accessToken }
+        });
+        const status = statusCheck.data?.status_code;
+        console.log(`   👉 Container ${creationId} Status: ${status}`);
+        if (status === 'FINISHED') {
+          isReady = true;
+        } else if (status === 'ERROR') {
+          throw new Error("Meta processing failed with ERROR state inside media container.");
         }
-        retries++;
+      } catch (statusErr) {
+        console.warn("⚠️ Retrying status polling check...", statusErr.message);
       }
+      retries++;
     }
 
     console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
