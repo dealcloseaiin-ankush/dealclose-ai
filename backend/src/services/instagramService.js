@@ -80,13 +80,14 @@ exports.publishInstagramMedia = async (igAccountId, accessToken, mediaUrl, media
 /**
  * 🚀 UPGRADED: Fetches existing posts/reels from Meta to display in templates dropdown with safe dynamic array fallback
  */
-exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
-  // 🐛 FIX: This function was also hardcoded to graph.facebook.com.
-  // It needs to be aware of the loginType to fetch posts correctly for all account types.
-  // Since the controller doesn't pass loginType here, we can't fix it directly.
-  // The fix in `instagramController.js` that overrides this logic is the correct approach.
+exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  // This was a root cause of the "Invalid OAuth access token" error during post import.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
   try {
-    const url = `https://graph.facebook.com/v19.0/${igAccountId}/media`;
+    const url = `${baseUrl}/${igAccountId}/media`;
     const response = await axios.get(
       url,
       {
@@ -105,9 +106,15 @@ exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12) => {
 };
 
 /** Fetches public comments for one Instagram media item. */
-exports.getCommentsForPost = async (mediaId, accessToken) => {
+exports.getCommentsForPost = async (mediaId, accessToken, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
+
   try {
-    const response = await axios.get(`https://graph.facebook.com/v19.0/${mediaId}/comments`, {
+    const url = `${baseUrl}/${mediaId}/comments`;
+    const response = await axios.get(url, {
       params: {
         fields: 'id,text,username,timestamp,like_count,replies{id,text,username,timestamp}',
         access_token: accessToken,
@@ -120,10 +127,14 @@ exports.getCommentsForPost = async (mediaId, accessToken) => {
 };
 
 /** Replies publicly to an Instagram comment. */
-exports.replyToComment = async (commentId, accessToken, message) => {
+exports.replyToComment = async (commentId, accessToken, message, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
   try {
-    const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${commentId}/replies`,
+    const url = `${baseUrl}/${commentId}/replies`;
+    const response = await axios.post(url,
       { message, access_token: accessToken }
     );
     return response.data;
@@ -133,9 +144,14 @@ exports.replyToComment = async (commentId, accessToken, message) => {
 };
 
 /** Deletes a comment on media owned by the connected Instagram account. */
-exports.deleteComment = async (commentId, accessToken) => {
+exports.deleteComment = async (commentId, accessToken, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
   try {
-    const response = await axios.delete(`https://graph.facebook.com/v19.0/${commentId}`, {
+    const url = `${baseUrl}/${commentId}`;
+    const response = await axios.delete(url, {
       params: { access_token: accessToken },
     });
     return response.data;
@@ -145,9 +161,14 @@ exports.deleteComment = async (commentId, accessToken) => {
 };
 
 /** Deletes an Instagram media item owned by the connected account. */
-exports.deleteMedia = async (mediaId, accessToken) => {
+exports.deleteMedia = async (mediaId, accessToken, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
   try {
-    const response = await axios.delete(`https://graph.facebook.com/v19.0/${mediaId}`, {
+    const url = `${baseUrl}/${mediaId}`;
+    const response = await axios.delete(url, {
       params: { access_token: accessToken },
     });
     return response.data;
@@ -187,10 +208,15 @@ exports.sendDirectMessage = async (recipientId, message, pageAccessToken) => {
  * @param {string} accessToken - The user's Instagram access token.
  * @returns {Promise<object>} - An object containing the insights data.
  */
-exports.getBusinessInsights = async (igAccountId, accessToken) => {
+exports.getBusinessInsights = async (igAccountId, accessToken, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
+
   try {
     const dailyMetrics = 'reach,impressions,profile_views,website_clicks,accounts_engaged';
-    const insightsUrl = `https://graph.facebook.com/v19.0/${igAccountId}/insights`;
+    const insightsUrl = `${baseUrl}/${igAccountId}/insights`;
     const [dailyResponse, lifetimeResponse] = await Promise.all([
       axios.get(insightsUrl, {
         params: { 
@@ -228,11 +254,16 @@ exports.getBusinessInsights = async (igAccountId, accessToken) => {
 /**
  * @deprecated hardcoded to graph.facebook.com, no loginType support — use publishInstagramMedia instead
  */
-exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, caption) => {
+exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, caption, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
+
   try {
     console.log(`[IG Publish] Step 1: Creating media container for image.`);
     const containerResponse = await axios.post(
-      `https://graph.facebook.com/v19.0/${igAccountId}/media`,
+      `${baseUrl}/${igAccountId}/media`,
       { image_url: imageUrl, caption: caption, access_token: accessToken }
     );
 
@@ -245,7 +276,7 @@ exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, captio
     let isReady = false;
     for (let i = 0; i < 10; i++) { // Retry up to 10 times (50 seconds)
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      const statusCheck = await axios.get(`https://graph.facebook.com/v19.0/${creationId}`, {
+      const statusCheck = await axios.get(`${baseUrl}/${creationId}`, {
         params: { fields: 'status_code', access_token: accessToken }
       });
       const status = statusCheck.data?.status_code;
@@ -261,7 +292,7 @@ exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, captio
 
     console.log(`[IG Publish] Step 2: Publishing container ${creationId}`);
     const publishResponse = await axios.post(
-      `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`,
+      `${baseUrl}/${igAccountId}/media_publish`,
       { creation_id: creationId, access_token: accessToken }
     );
     
@@ -299,11 +330,16 @@ exports.publishFacebookPhoto = async (pageId, accessToken, imageUrl, caption) =>
  * @param {string} accessToken - The user's Instagram access token.
  * @returns {Promise<object>} - An object containing the insights data.
  */
-exports.getPostInsights = async (mediaId, accessToken) => {
+exports.getPostInsights = async (mediaId, accessToken, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
+
   try {
     const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
-    const url = `https://graph.facebook.com/v19.0/${mediaId}/insights`;
-
+    const url = `${baseUrl}/${mediaId}/insights`;
+    
     const response = await axios.get(url, {
       params: { metric: metrics, access_token: accessToken },
     });
@@ -318,26 +354,6 @@ exports.getPostInsights = async (mediaId, accessToken) => {
   } catch (error) {
     throw new Error(error.response?.data?.error?.message || error.message);
   }
-};
-
-/**
- * Fetches a fresh, non-expired media_url / thumbnail_url for a given
- * Instagram media ID. Meta's CDN URLs are signed and time-limited, so this
- * must be called again whenever the previously stored URL is stale.
- */
-exports.getFreshMediaUrl = async (mediaId, accessToken) => {
-  const { data } = await axios.get(`https://graph.instagram.com/${mediaId}`, {
-    params: {
-      fields: 'media_type,media_url,thumbnail_url',
-      access_token: accessToken,
-    },
-  });
-
-  const isVideo = data.media_type?.toLowerCase() === 'video';
-  return {
-    url: isVideo ? (data.thumbnail_url || data.media_url) : data.media_url,
-    type: isVideo ? 'video' : 'image',
-  };
 };
 
 /**

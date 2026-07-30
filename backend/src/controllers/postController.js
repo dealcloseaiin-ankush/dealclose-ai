@@ -283,10 +283,10 @@ exports.deletePost = async (req, res) => {
         
         if (!igConfig?.accessToken) {
           instagramDeletionSuccess = false;
-          instagramDeletionMessage = 'Instagram not connected. Post deleted from dashboard, but may remain on Instagram.';
+          instagramDeletionMessage = 'Instagram not connected for this workspace. Post deleted from dashboard, but may remain on Instagram.';
           console.warn(`⚠️ [Delete Post] Instagram token missing for post ${post._id}. Not attempting Instagram deletion.`);
         } else {
-          await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken);
+          await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken, igConfig.loginType);
           instagramDeletionMessage = 'Post deleted successfully from Instagram and the dashboard.';
         }
       } catch (igDeleteError) {
@@ -368,7 +368,7 @@ exports.importInstagramPosts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram account not connected for the selected workspace or main business.' });
     }
 
-    const recentPosts = await instagramService.fetchRecentPosts(igAccountId, igConfig.accessToken, 100);
+    const recentPosts = await instagramService.fetchRecentPosts(igAccountId, igConfig.accessToken, 100, igConfig.loginType);
 
     let importedCount = 0;
     let updatedCount = 0;
@@ -379,7 +379,7 @@ exports.importInstagramPosts = async (req, res) => {
       let liveInsights = null;
       if (refreshInsights && index < 20) {
         try {
-          liveInsights = await instagramService.getPostInsights(post.id, igConfig.accessToken);
+          liveInsights = await instagramService.getPostInsights(post.id, igConfig.accessToken, igConfig.loginType);
         } catch (error) {
           console.warn(`[Instagram sync] Insights unavailable for ${post.id}: ${error.message}`);
         }
@@ -559,7 +559,7 @@ exports.getPostInsights = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram not connected for this workspace.' });
     }
 
-    const insights = await instagramService.getPostInsights(platformPostId, igConfig.accessToken);
+    const insights = await instagramService.getPostInsights(platformPostId, igConfig.accessToken, igConfig.loginType);
 
     // Update the post in our database with the fresh analytics
     await Post.updateOne(
