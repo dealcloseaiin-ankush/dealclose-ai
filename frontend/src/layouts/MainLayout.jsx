@@ -3,9 +3,9 @@ import { Outlet } from 'react-router-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom'; // 🚀 FIX: Import hooks
 import { useAuth } from '../hooks/useAuth'; // 🚀 FIX: Import useAuth
 import useWorkspaceStore from '../store/workspaceStore';
-// 🚀 FIX: The 'Instagram' icon is not exported from the main entry point in this version of lucide-react.
-// It must be imported directly from its own file to resolve the build error.
-import { Home, MessageSquare, Phone, Settings, LogOut, Bot, BarChart2, Users, FileText, Wallet, Zap, Menu, X, LayoutDashboard, Briefcase, PlusCircle, Instagram } from 'lucide-react';
+// ✅ FIX: The 'Instagram' icon is not exported from lucide-react. Using react-icons instead.
+import { Home, MessageSquare, Phone, Settings, LogOut, Bot, BarChart2, Users, FileText, Wallet, Zap, Menu, X, LayoutDashboard, Briefcase, PlusCircle } from 'lucide-react';
+import { FaInstagram } from 'react-icons/fa6';
 import Navbar from '../components/Navbar'; // 🚀 FIX: Import Navbar
 
 const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
@@ -32,7 +32,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
 
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { name: 'Publisher', icon: Instagram, path: '/publisher' },
+    { name: 'Publisher', icon: FaInstagram, path: '/publisher' },
     { name: 'Auto-Marketer', icon: Zap, path: '/auto-marketer' },
     { name: 'Inbox', icon: MessageSquare, path: '/chats', badge: hasUnread },
     { name: 'CRM', icon: Users, path: '/crm' },
