@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const mediaSchema = new mongoose.Schema({
   type: { type: String, enum: ['image', 'video'], required: true },
   url: { type: String, required: true },
+  // ✅ NEW FIELD — add this
+  refreshedAt: { type: Date, default: Date.now },
 });
 
 const postSchema = new mongoose.Schema({

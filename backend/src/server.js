@@ -15,6 +15,7 @@ const mongoose = require('mongoose');
 
 // 🚀 NEW: Schedule background jobs like trash cleanup
 require('../jobs/trashCleanup'); // Cron job ko start karne ke liye
+const { scheduleTokenRefreshJob } = require('./workers/tokenRefreshWorker');
 const app = require('./app');
 const http = require('http');
 const WebSocket = require('ws');
@@ -112,3 +113,6 @@ mongoose.connect(process.env.MONGO_URI, {
 }).catch(err => {
   console.error('Database connection error:', err);
 });
+
+// Schedule the new token refresh job
+scheduleTokenRefreshJob();

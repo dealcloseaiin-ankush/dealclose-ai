@@ -15,6 +15,7 @@ const instagramConfigSchema = new Schema({
   accessToken: { type: String },
   tokenType: { type: String, default: 'bearer' },
   tokenExpiresAt: { type: Date }, // ✅ FIX: Renamed 'expiresAt' to 'tokenExpiresAt' to match the object being saved in authController.js. This was the critical bug preventing the token expiry from being saved.
+  needsReconnect: { type: Boolean, default: false },
   grantedPermissions: [{ type: String }],
 
   // Metadata

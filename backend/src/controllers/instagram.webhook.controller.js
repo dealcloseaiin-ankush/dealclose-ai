@@ -1079,7 +1079,7 @@ with whatever information is available (leave budget field empty/null if not pro
                     console.log("👉 LOGIN TYPE:", loginType);
                     console.log("====================================================");
                     
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg, loginType);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg, loginType); // ✅ FIX: Pass loginType
                     dmSentSuccessfully = true;
                  } 
                  else if (matchedRule.deliveryMode === 'button') { // This is a DM

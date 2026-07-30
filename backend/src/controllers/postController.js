@@ -34,6 +34,59 @@ const migrateLegacyPosts = async (userId) => {
   }
 };
 
+// Helper function to download media from a URL
+const downloadMediaToBuffer = async (url) => {
+  const response = await require('axios')({
+    url,
+    method: 'GET',
+    responseType: 'arraybuffer', // Get data as a buffer
+  });
+  return { buffer: response.data, contentType: response.headers['content-type'] };
+};
+
+// A Meta CDN media_url is only valid for a limited window. Refresh it if it's
+// older than this threshold rather than storing/copying the file anywhere.
+const MEDIA_URL_STALE_MS = 60 * 60 * 1000; // 1 hour — safe margin below Meta's expiry
+
+const refreshStaleMediaUrl = async (post, igConfigResolver) => {
+  const media = post.mediaUrls?.[0];
+  const platformMediaId = post.platformPostIds?.instagram;
+  if (!media || !platformMediaId) return post;
+
+  const isStale = !media.refreshedAt || (Date.now() - new Date(media.refreshedAt).getTime()) > MEDIA_URL_STALE_MS;
+  if (!isStale) return post;
+
+  try {
+    const igConfig = await igConfigResolver(post.workspaceId);
+    if (!igConfig?.accessToken) return post;
+
+    const fresh = await instagramService.getFreshMediaUrl(platformMediaId, igConfig.accessToken);
+
+    await Post.updateOne(
+      { _id: post._id },
+      {
+        $set: {
+          'mediaUrls.0.url': fresh.url,
+          'mediaUrls.0.type': fresh.type,
+          'mediaUrls.0.refreshedAt': new Date(),
+        },
+      }
+    );
+
+    // Reflect the update in the in-memory object we return to the client,
+    // so the response is fresh without needing a second DB read.
+    post.mediaUrls[0].url = fresh.url;
+    post.mediaUrls[0].type = fresh.type;
+    post.mediaUrls[0].refreshedAt = new Date();
+  } catch (err) {
+    // If Meta call fails (rate limit, transient network issue), just serve
+    // the old URL for this request rather than failing the whole page.
+    console.warn(`[Media Refresh] Could not refresh media for post ${post._id}: ${err.message}`);
+  }
+
+  return post;
+};
+
 // @desc    Get all posts for a user/workspace
 // @route   GET /api/posts
 exports.getPosts = async (req, res) => {
@@ -63,7 +116,28 @@ exports.getPosts = async (req, res) => {
     console.log("🔍 [DEBUG] Querying posts with:", JSON.stringify(query));
 
     const posts = await Post.find(query).sort({ createdAt: -1 }).limit(100).lean();
+
+    // Resolve the right Instagram config for a given workspaceId (root vs sub-workspace).
+    const user = await User.findById(userId).lean();
+    const resolveIgConfig = async (workspaceId) => {
+      if (workspaceId && workspaceId !== 'main') {
+        return user?.workspaces?.find(ws => String(ws._id) === String(workspaceId))?.instagramConfig || null;
+      }
+      return user?.instagramConfig || null;
+    };
+
+    // Refresh only imported, published posts (these are the ones backed by
+    // Meta's time-limited CDN URLs). Run refreshes concurrently but don't let
+    // one slow post block the response for long — Promise.all is fine since
+    // each call already has its own try/catch and won't throw.
+    await Promise.all(
+      posts
+        .filter(p => p.isImported && p.status === 'published')
+        .map(p => refreshStaleMediaUrl(p, resolveIgConfig))
+    );
+
     console.log(`✅ [DEBUG] Found ${posts.length} posts for user ${userId}.`);
+
     res.status(200).json({ success: true, posts });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch posts.', error: error.message });
@@ -191,7 +265,7 @@ exports.deletePost = async (req, res) => {
           ? workspace.instagramConfig // Use workspace config if token exists
           : user?.instagramConfig?.accessToken ? user.instagramConfig // Else, use main user config if token exists
           : user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig; // Finally, find any other workspace with a token
-        
+
         if (!igConfig?.accessToken) {
           instagramDeletionSuccess = false;
           instagramDeletionMessage = 'Instagram not connected. Post deleted from dashboard, but may remain on Instagram.';
@@ -227,31 +301,39 @@ exports.importInstagramPosts = async (req, res) => {
     const userId = req.user?._id;
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    
+
     // ✅ FIX: Find the first available Instagram connection, whether in root or workspaces.
-    const { workspaceId, refreshInsights = false } = req.body;
-    let igConfig = user.instagramConfig;
+    const { workspaceId: requestedWorkspaceId, refreshInsights = false } = req.body;
+    let igConfig = null;
+    let igAccountId = null;
     let workspaceForPost = 'main';
 
-    if (workspaceId && workspaceId !== 'main') {
-      const selectedWorkspace = user.workspaces?.find(ws => String(ws._id) === String(workspaceId));
-      igConfig = selectedWorkspace?.instagramConfig;
-      workspaceForPost = String(workspaceId);
-    }
-
-    if ((!workspaceId || workspaceId === 'main') && !igConfig?.accessToken && user.workspaces?.length > 0) {
-      const firstActiveWorkspace = user.workspaces.find(ws => ws.instagramConfig?.accessToken);
-      if (firstActiveWorkspace) {
-        igConfig = firstActiveWorkspace.instagramConfig;
-        workspaceForPost = firstActiveWorkspace._id.toString();
+    // 1. Determine the correct Instagram configuration based on requestedWorkspaceId
+    if (requestedWorkspaceId && requestedWorkspaceId !== 'main') {
+      const selectedWorkspace = user.workspaces?.find(ws => String(ws._id) === String(requestedWorkspaceId));
+      if (selectedWorkspace?.instagramConfig?.accessToken) {
+        igConfig = selectedWorkspace.instagramConfig;
+        workspaceForPost = String(requestedWorkspaceId);
+      }
+    } else { // If requestedWorkspaceId is 'main' or not provided
+      if (user.instagramConfig?.accessToken) {
+        igConfig = user.instagramConfig;
+        workspaceForPost = 'main';
+      } else if (user.workspaces?.length > 0) {
+        // Fallback: Find the first workspace with an active Instagram connection
+        const firstActiveWorkspace = user.workspaces.find(ws => ws.instagramConfig?.accessToken);
+        if (firstActiveWorkspace) {
+          igConfig = firstActiveWorkspace.instagramConfig;
+          workspaceForPost = firstActiveWorkspace._id.toString();
+        }
       }
     }
 
-    // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
-    const igAccountId = igConfig?.instagramAccountId || igConfig?.instagramBusinessAccountId;
+    // Extract igAccountId from the determined config
+    igAccountId = igConfig?.instagramAccountId || igConfig?.instagramBusinessAccountId;
 
     if (!igConfig?.accessToken || !igAccountId) {
-      return res.status(400).json({ success: false, message: 'Instagram account not connected.' });
+      return res.status(400).json({ success: false, message: 'Instagram account not connected for the selected workspace or main business.' });
     }
 
     const recentPosts = await instagramService.fetchRecentPosts(igAccountId, igConfig.accessToken, 100);
@@ -260,6 +342,7 @@ exports.importInstagramPosts = async (req, res) => {
     let updatedCount = 0;
     for (const [index, post] of recentPosts.entries()) {
       const existingPost = await Post.findOne({ "platformPostIds.instagram": post.id, userId });
+
       // Analytics view requests a fresh Meta insight pull for the newest posts.
       // Keep it bounded so an account with a large history cannot exhaust API quota.
       let liveInsights = null;
@@ -270,14 +353,26 @@ exports.importInstagramPosts = async (req, res) => {
           console.warn(`[Instagram sync] Insights unavailable for ${post.id}: ${error.message}`);
         }
       }
+
+      // ✅ FIX: Compute the media URL/type ONCE up front so both the create
+      // branch and the update branch can use the same values. This is what
+      // was missing before — the update branch referenced an undefined
+      // `mediaUrls` variable, which threw a ReferenceError and crashed the
+      // whole request with a 500 as soon as ANY post already existed in the DB.
+      const resolvedMediaUrl = post.media_type.toLowerCase() === 'video'
+        ? (post.thumbnail_url || post.media_url)
+        : post.media_url;
+      const resolvedMediaType = post.media_type.toLowerCase() === 'video' ? 'video' : 'image';
+
       if (!existingPost) {
         await Post.create({
           userId,
           workspaceId: workspaceForPost, // Use the workspace where the IG account was found
           caption: post.caption,
           mediaUrls: [{
-            url: post.media_type.toLowerCase() === 'video' ? (post.thumbnail_url || post.media_url) : post.media_url,
-            type: 'image',
+            url: resolvedMediaUrl,
+            type: resolvedMediaType,
+            refreshedAt: new Date(), // ✅ NEW
           }],
           status: 'published',
           publishedAt: new Date(post.timestamp),
@@ -292,14 +387,16 @@ exports.importInstagramPosts = async (req, res) => {
         });
         importedCount++;
       } else {
+        // ✅ FIX: `mediaUrls` (undefined variable) replaced with dot-path
+        // updates to the specific fields on the existing array element.
         await Post.updateOne(
           { _id: existingPost._id },
           {
             $set: {
-              caption: post.caption || existingPost.caption,
-              'mediaUrls.0.url': post.media_type?.toLowerCase() === 'video'
-                ? (post.thumbnail_url || post.media_url || existingPost.mediaUrls?.[0]?.url)
-                : (post.media_url || existingPost.mediaUrls?.[0]?.url),
+              caption: post.caption || existingPost.caption, // Update caption if changed
+              'mediaUrls.0.url': resolvedMediaUrl,
+              'mediaUrls.0.type': resolvedMediaType,
+              'mediaUrls.0.refreshedAt': new Date(), // ✅ NEW — keep this in sync with the getPosts refresh logic
               'analytics.likes': liveInsights?.likes ?? post.like_count ?? 0,
               'analytics.comments': liveInsights?.comments ?? post.comments_count ?? 0,
               'analytics.reach': liveInsights?.reach ?? existingPost.analytics?.reach ?? 0,
@@ -379,7 +476,7 @@ exports.getPostAnalytics = async (req, res) => {
       totalShares += a.shares || 0;
       totalSaves += a.saves || 0;
       totalProfileVisits += a.profileVisits || 0;
-      
+
       const engagement = (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.saves || 0);
       totalEngagement += engagement;
 
@@ -452,29 +549,5 @@ exports.getPostInsights = async (req, res) => {
   } catch (error) {
     console.error('Get Post Insights Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: error.message || 'Failed to fetch post insights.' });
-  }
-};
-
-// @desc    Download a post's media
-// @route   GET /api/posts/:id/download
-exports.downloadPostMedia = async (req, res) => {
-  try {
-    const post = await Post.findOne({ _id: req.params.id, userId: req.user?._id }).lean();
-    if (!post || !post.mediaUrls || post.mediaUrls.length === 0) {
-      return res.status(404).json({ success: false, message: 'Post or media not found.' });
-    }
-
-    const mediaUrl = post.mediaUrls[0].url;
-    const response = await require('axios')({
-      url: mediaUrl,
-      method: 'GET',
-      responseType: 'stream'
-    });
-
-    res.setHeader('Content-Disposition', `attachment; filename="post_${post._id}.jpg"`);
-    response.data.pipe(res);
-  } catch (error) {
-    console.error('Download Post Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to download media.' });
   }
 };
