@@ -3,13 +3,13 @@ import toast from 'react-hot-toast';
 import { Phone, PhoneOff, Mic, Settings, PlayCircle, History, Bot, Volume2, Activity, Database, FileText, Link as LinkIcon, Clock, Radio, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../hooks/useAuth'; // 🚀 FIX: Import useAuth
-import useWorkspaceStore from '../stores/workspaceStore'; // 🚀 NEW: Import global workspace store
+import { useAuth } from '../hooks/useAuth';
+import useWorkspaceStore from '../store/workspaceStore'; // 🚀 FIX: Corrected import path from 'stores' to 'store'
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function Calls() {
   const { user } = useAuth() || {};
-  const { activeWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global state
+  const { activeWorkspaceId } = useWorkspaceStore();
   const [aiCredits, setAiCredits] = useState(0);
   
   const [callMode, setCallMode] = useState('web'); // 'web', 'phone', 'bulk'

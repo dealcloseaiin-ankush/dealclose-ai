@@ -36,7 +36,7 @@ export default function MonthlyReport() {
       setLoading(true);
       try {
         const { data } = await api.get('/leads/analytics', {
-          params: { workspaceId: activeWorkspace, month: selectedMonth }
+          params: { workspaceId: activeWorkspaceId, month: selectedMonth }
         });
         setStats({
           totalLeads: data.stats?.totalLeads || 0,
@@ -55,24 +55,13 @@ export default function MonthlyReport() {
       }
     };
     fetchReportData();
-  }, [activeWorkspace, selectedMonth]);
+  }, [activeWorkspaceId, selectedMonth]);
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <div className="flex flex-wrap items-center gap-4 mb-2">
-            <h1 className="text-3xl font-extrabold text-white">Monthly Performance & Retargeting</h1>
-            <select 
-              value={activeWorkspace} 
-              onChange={(e) => setActiveWorkspace(e.target.value)} 
-              className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 cursor-pointer shadow-sm"
-            >
-              {workspaces.map(ws => (
-                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
-              ))}
-            </select>
-          </div>
+          <h1 className="text-3xl font-extrabold text-white">Monthly Performance & Retargeting</h1>
           <p className="text-gray-400">Analyze your leads, sources, and plan retargeting strategies for dropped customers.</p>
         </div>
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-[#111] border border-gray-800 text-white px-4 py-2 rounded-lg font-bold">

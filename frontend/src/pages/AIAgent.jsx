@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // 🚀 FIX: Import Link
+import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import global workspace store
 
 export default function AIAgent() {
   const [queries, setQueries] = useState([]);
   const [trainingText, setTrainingText] = useState("");
-  const [workspaces, setWorkspaces] = useState([]);
-  const [selectedBrain, setSelectedBrain] = useState('main');
+  const { activeWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global state
   const [mainRules, setMainRules] = useState('');
   const [mainBusinessName, setMainBusinessName] = useState('Main Business');
   const [aiCredits, setAiCredits] = useState(0);
@@ -20,7 +20,6 @@ export default function AIAgent() {
       try {
         const { data } = await api.get('/ai/training-data');
         setQueries(Array.isArray(data.data) ? data.data : []);
-        setWorkspaces(data.workspaces || []);
         setMainRules(data.aiRules || '');
         setMainBusinessName(data.businessName || 'Main Business');
         setAiCredits(data.aiCredits || 0);
@@ -56,20 +55,10 @@ export default function AIAgent() {
     }
   };
 
-  const handleBrainSwitch = (wsId) => {
-    setSelectedBrain(wsId);
-    if (wsId === 'main') {
-      setTrainingText(mainRules);
-    } else {
-      const ws = workspaces.find(w => w._id === wsId);
-      setTrainingText(ws?.aiRules || '');
-    }
-  };
-
   const handleSaveKnowledge = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/ai/train', { aiRules: trainingText, workspaceId: selectedBrain });
+      await api.post('/ai/train', { aiRules: trainingText, workspaceId: activeWorkspaceId });
       toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
     } catch (error) {
       console.error("Failed to save knowledge:", error);
@@ -115,20 +104,6 @@ export default function AIAgent() {
         <div className="relative z-10">
           <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">📚 Train AI (Knowledge Base)</h2>
           <p className="text-gray-400 text-sm mb-6">Type your business rules, return policies, or paste text data here. AI will memorize this to answer customers.</p>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">Select Business to Train</label>
-            <select 
-              value={selectedBrain} 
-              onChange={(e) => handleBrainSwitch(e.target.value)} 
-              className="w-full md:w-1/2 bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg p-3 outline-none focus:border-purple-500 cursor-pointer"
-            >
-              <option value="main">🏢 {mainBusinessName || 'Main Business'} (Default)</option>
-              {workspaces.map((ws) => (
-                <option key={ws._id} value={ws._id}>{ws.name || 'Workspace'}</option>
-              ))}
-            </select>
-          </div>
 
           <form onSubmit={handleSaveKnowledge}>
             <textarea 
