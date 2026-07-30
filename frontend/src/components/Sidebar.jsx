@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
 import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import useWorkspaceStore
 import { useInboxStore } from '../store/inboxStore';
-import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, Instagram, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code } from 'lucide-react'; // 🚀 NEW: More icons for new pages
+import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home } from 'lucide-react'; // 🚀 FIX: Removed 'Instagram', added 'Calendar' and 'Home'
 import { FaInstagram, FaFacebookF } from 'react-icons/fa'; // For Instagram/Facebook specific icons
 
 export default function Sidebar() {
@@ -44,7 +44,7 @@ export default function Sidebar() {
       items: [
         { name: 'Flow Builder', path: '/flow-builder', icon: <Bot size={18} /> },
         { name: 'Automations', path: '/automations', icon: <Repeat size={18} /> },
-        { name: 'Instagram', path: '/instagram-automation', icon: <Instagram size={18} /> },
+        { name: 'Instagram', path: '/instagram-automation', icon: <FaInstagram size={18} /> }, // 🚀 FIX: Use FaInstagram from react-icons
         { name: 'Auto-Marketer', path: '/auto-marketer', icon: <TrendingUp size={18} /> },
         { name: 'Publish Post', path: '/publish-post', icon: <FileText size={18} /> },
         { name: 'Publisher', path: '/publisher', icon: <Calendar size={18} /> }
