@@ -226,6 +226,7 @@ export default function App() {
               <Route path="whatsapp-rules" element={<WhatsAppRules />} />
               <Route path="scaniq" element={<ScanIQ />} />
               <Route path="super-admin" element={<SuperAdmin />} />
+              <Route path="change-password" element={<ChangePasswordPlaceholder />} /> {/* 🚀 NEW: Add route for Change Password */}
               <Route path="publish-post" element={<PublishPost />} />
               <Route path="publish" element={<PublishPost />} />
               <Route path="auto-marketer" element={<AutoMarketerDashboard />} />

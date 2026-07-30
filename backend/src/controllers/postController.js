@@ -91,17 +91,22 @@ const refreshStaleMediaUrl = async (post, igConfigResolver) => {
 // @route   GET /api/posts
 exports.getPosts = async (req, res) => {
   try {
-    console.log("\n🚀 [DEBUG] getPosts controller hit!");
+    console.log("\n\n🚀 [POST DEBUGGER] ==============================================");
+    console.log("🚀 [POST DEBUGGER] 1. 'getPosts' controller hit!");
     const userId = req.user?._id;
     const { workspaceId, status } = req.query;
     await migrateLegacyPosts(userId);
+    
+    console.log(`🚀 [POST DEBUGGER] 2. Frontend requested Workspace ID: '${workspaceId}', Status Filter: '${status}'`);
 
     const query = { userId };
     if (workspaceId && workspaceId !== 'main') {
       query.workspaceId = workspaceId;
+      console.log("   -> Filtering for a specific sub-branch.");
     } else {
       // ✅ FIX: When 'main' is selected, explicitly fetch posts for the main workspace.
       query.workspaceId = 'main';
+      console.log("   -> Filtering for the 'Main Business' workspace.");
     }
 
     if (status && status !== 'all') {
@@ -109,11 +114,13 @@ exports.getPosts = async (req, res) => {
       if (status === 'live') {
         query.status = 'published';
         query['platformPostIds.instagram'] = { $exists: true, $nin: [null, ''] };
+        console.log("   -> Applying 'Live on Instagram' filter.");
       } else {
         query.status = status;
+        console.log(`   -> Applying status filter: '${status}'.`);
       }
     }
-    console.log("🔍 [DEBUG] Querying posts with:", JSON.stringify(query));
+    console.log("🔍 [POST DEBUGGER] 3. Final MongoDB query being executed:", JSON.stringify(query));
 
     const posts = await Post.find(query).sort({ createdAt: -1 }).limit(100).lean();
 
@@ -136,7 +143,8 @@ exports.getPosts = async (req, res) => {
         .map(p => refreshStaleMediaUrl(p, resolveIgConfig))
     );
 
-    console.log(`✅ [DEBUG] Found ${posts.length} posts for user ${userId}.`);
+    console.log(`✅ [POST DEBUGGER] 4. Found ${posts.length} posts in the database for this query.`);
+    console.log("🚀 [POST DEBUGGER] ==============================================\n");
 
     res.status(200).json({ success: true, posts });
   } catch (error) {
@@ -265,7 +273,7 @@ exports.deletePost = async (req, res) => {
           ? workspace.instagramConfig // Use workspace config if token exists
           : user?.instagramConfig?.accessToken ? user.instagramConfig // Else, use main user config if token exists
           : user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig; // Finally, find any other workspace with a token
-
+        
         if (!igConfig?.accessToken) {
           instagramDeletionSuccess = false;
           instagramDeletionMessage = 'Instagram not connected. Post deleted from dashboard, but may remain on Instagram.';
@@ -297,42 +305,59 @@ exports.deletePost = async (req, res) => {
 // @desc    Import existing posts from Instagram
 // @route   POST /api/posts/import-instagram
 exports.importInstagramPosts = async (req, res) => {
+  console.log("\n\n🚀 [IMPORT DEBUGGER] =============================================");
+  console.log("🚀 [IMPORT DEBUGGER] 1. 'importInstagramPosts' controller hit!");
+
   try {
     const userId = req.user?._id;
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-
+    
     // ✅ FIX: Find the first available Instagram connection, whether in root or workspaces.
     const { workspaceId: requestedWorkspaceId, refreshInsights = false } = req.body;
     let igConfig = null;
     let igAccountId = null;
     let workspaceForPost = 'main';
 
+    console.log(`🚀 [IMPORT DEBUGGER] 2. Frontend requested import for Workspace ID: '${requestedWorkspaceId}'`);
+
     // 1. Determine the correct Instagram configuration based on requestedWorkspaceId
     if (requestedWorkspaceId && requestedWorkspaceId !== 'main') {
+      console.log("   -> Attempting to find config in the specified sub-branch...");
       const selectedWorkspace = user.workspaces?.find(ws => String(ws._id) === String(requestedWorkspaceId));
       if (selectedWorkspace?.instagramConfig?.accessToken) {
         igConfig = selectedWorkspace.instagramConfig;
         workspaceForPost = String(requestedWorkspaceId);
+        console.log("   -> ✅ Success! Found active Instagram config in the sub-branch.");
       }
     } else { // If requestedWorkspaceId is 'main' or not provided
+      console.log("   -> Attempting to find config in the 'Main Business' account...");
       if (user.instagramConfig?.accessToken) {
         igConfig = user.instagramConfig;
         workspaceForPost = 'main';
+        console.log("   -> ✅ Success! Found active Instagram config in the main account.");
       } else if (user.workspaces?.length > 0) {
+        console.log("   -> Main account has no config. Searching for a fallback in other workspaces...");
         // Fallback: Find the first workspace with an active Instagram connection
         const firstActiveWorkspace = user.workspaces.find(ws => ws.instagramConfig?.accessToken);
         if (firstActiveWorkspace) {
           igConfig = firstActiveWorkspace.instagramConfig;
           workspaceForPost = firstActiveWorkspace._id.toString();
+          console.log(`   -> ✅ Success! Found fallback config in workspace: '${firstActiveWorkspace.name}'`);
         }
       }
     }
 
     // Extract igAccountId from the determined config
     igAccountId = igConfig?.instagramAccountId || igConfig?.instagramBusinessAccountId;
+    
+    console.log("🚀 [IMPORT DEBUGGER] 3. Final Credentials Check:");
+    console.log(`   - Instagram Account ID to use: ${igAccountId || '❌ NOT FOUND'}`);
+    console.log(`   - Access Token to use: ${igConfig?.accessToken ? '✅ PRESENT' : '❌ NOT FOUND'}`);
 
     if (!igConfig?.accessToken || !igAccountId) {
+      console.log("   -> ❌ FAILED. Cannot proceed with import.");
+      console.log("🚀 [IMPORT DEBUGGER] =============================================\n");
       return res.status(400).json({ success: false, message: 'Instagram account not connected for the selected workspace or main business.' });
     }
 
@@ -342,7 +367,6 @@ exports.importInstagramPosts = async (req, res) => {
     let updatedCount = 0;
     for (const [index, post] of recentPosts.entries()) {
       const existingPost = await Post.findOne({ "platformPostIds.instagram": post.id, userId });
-
       // Analytics view requests a fresh Meta insight pull for the newest posts.
       // Keep it bounded so an account with a large history cannot exhaust API quota.
       let liveInsights = null;
@@ -354,14 +378,8 @@ exports.importInstagramPosts = async (req, res) => {
         }
       }
 
-      // ✅ FIX: Compute the media URL/type ONCE up front so both the create
-      // branch and the update branch can use the same values. This is what
-      // was missing before — the update branch referenced an undefined
-      // `mediaUrls` variable, which threw a ReferenceError and crashed the
-      // whole request with a 500 as soon as ANY post already existed in the DB.
-      const resolvedMediaUrl = post.media_type.toLowerCase() === 'video'
-        ? (post.thumbnail_url || post.media_url)
-        : post.media_url;
+      // Determine the media URL and type from the Instagram post data
+      const resolvedMediaUrl = post.media_type.toLowerCase() === 'video' ? (post.thumbnail_url || post.media_url) : post.media_url;
       const resolvedMediaType = post.media_type.toLowerCase() === 'video' ? 'video' : 'image';
 
       if (!existingPost) {
@@ -387,8 +405,7 @@ exports.importInstagramPosts = async (req, res) => {
         });
         importedCount++;
       } else {
-        // ✅ FIX: `mediaUrls` (undefined variable) replaced with dot-path
-        // updates to the specific fields on the existing array element.
+        // ✅ FIX: Define mediaUrls object before using it to prevent ReferenceError
         await Post.updateOne(
           { _id: existingPost._id },
           {
@@ -407,8 +424,12 @@ exports.importInstagramPosts = async (req, res) => {
       }
     }
 
+    console.log(`✅ [IMPORT DEBUGGER] 4. Sync complete. Imported: ${importedCount}, Updated: ${updatedCount}.`);
+    console.log("🚀 [IMPORT DEBUGGER] =============================================\n");
+
     res.status(200).json({ success: true, message: `${importedCount} new posts imported and ${updatedCount} existing posts refreshed.`, importedCount, updatedCount });
   } catch (error) {
+    console.error("❌ [IMPORT DEBUGGER] CRITICAL ERROR:", error.message);
     res.status(500).json({ success: false, message: error.message || 'Failed to import posts.' });
   }
 };
@@ -476,7 +497,7 @@ exports.getPostAnalytics = async (req, res) => {
       totalShares += a.shares || 0;
       totalSaves += a.saves || 0;
       totalProfileVisits += a.profileVisits || 0;
-
+      
       const engagement = (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.saves || 0);
       totalEngagement += engagement;
 
@@ -549,5 +570,29 @@ exports.getPostInsights = async (req, res) => {
   } catch (error) {
     console.error('Get Post Insights Error:', error.response?.data || error.message);
     res.status(500).json({ success: false, message: error.message || 'Failed to fetch post insights.' });
+  }
+};
+
+// @desc    Download a post's media
+// @route   GET /api/posts/:id/download
+exports.downloadPostMedia = async (req, res) => {
+  try {
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user?._id }).lean();
+    if (!post || !post.mediaUrls || post.mediaUrls.length === 0) {
+      return res.status(404).json({ success: false, message: 'Post or media not found.' });
+    }
+
+    const mediaUrl = post.mediaUrls[0].url;
+    const response = await require('axios')({
+      url: mediaUrl,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    res.setHeader('Content-Disposition', `attachment; filename="post_${post._id}.jpg"`);
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Download Post Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to download media.' });
   }
 };

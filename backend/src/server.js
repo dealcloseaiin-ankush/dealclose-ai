@@ -116,3 +116,6 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Schedule the new token refresh job
 scheduleTokenRefreshJob();
+
+// Schedule the new token refresh job
+scheduleTokenRefreshJob();

@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
+import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import useWorkspaceStore
 import { useInboxStore } from '../store/inboxStore';
-import { ChevronLeft, Menu } from 'lucide-react';
+import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, Instagram, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code } from 'lucide-react'; // 🚀 NEW: More icons for new pages
+import { FaInstagram, FaFacebookF } from 'react-icons/fa'; // For Instagram/Facebook specific icons
 
 export default function Sidebar() {
   const location = useLocation();
@@ -10,15 +12,12 @@ export default function Sidebar() {
   const isOwner = user?.role === 'owner' || user?.role === 'superadmin';
   const { unreadCount } = useInboxStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  
-  // Real Workspaces Data from Auth Context
-  const workspaces = useMemo(() => {
+  const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global workspace state
+  const workspaces = useMemo(() => { // 🚀 NEW: Derive workspaces from user data
     const mainBusiness = { _id: 'main_business', name: (user?.businessName && user.businessName !== 'Main Business') ? user.businessName : 'DealClose AI (Main)' };
     const otherWorkspaces = user?.workspaces || [];
     return [mainBusiness, ...otherWorkspaces];
   }, [user]);
-
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState(workspaces[0]?._id);
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -30,44 +29,48 @@ export default function Sidebar() {
     {
       title: 'MAIN',
       items: [
-        { name: 'Website Home', path: '/home', icon: '🏠' },
-        { name: 'Dashboard', path: '/dashboard', icon: '📊' },
-        { name: 'Inbox (Chats)', path: '/chats', icon: '💬', badge: unreadCount },
-        { name: 'Contacts', path: '/contacts', icon: '👥' },
-        { name: 'Catalog', path: '/catalog', icon: '🛍️' },
-        { name: 'CRM', path: '/crm', icon: '🗂️' },
-        { name: 'Campaigns', path: '/campaigns', icon: '📢' },
-        { name: 'Templates', path: '/templates', icon: '📄' }
+        { name: 'Website Home', path: '/home', icon: <Home size={18} /> },
+        { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={18} /> },
+        { name: 'Inbox (Chats)', path: '/chats', icon: <MessageSquare size={18} />, badge: unreadCount },
+        { name: 'Contacts', path: '/contacts', icon: <Users size={18} /> },
+        { name: 'Catalog', path: '/catalog', icon: <ShoppingBag size={18} /> },
+        { name: 'CRM', path: '/crm', icon: <Briefcase size={18} /> },
+        { name: 'Campaigns', path: '/campaigns', icon: <Megaphone size={18} /> },
+        { name: 'Templates', path: '/templates', icon: <FileText size={18} /> }
       ]
     },
     {
       title: 'AUTOMATION',
       items: [
-        { name: 'Flow Builder', path: '/flow-builder', icon: '🤖' },
-        { name: 'Automations', path: '/automations', icon: '🔁' },
-        { name: 'Instagram', path: '/instagram-automation', icon: '📸' },
-        { name: 'Auto-Marketer', path: '/auto-marketer', icon: '🚀' },
-        { name: 'Publish Post', path: '/publish-post', icon: '✍️' },
-        { name: 'Publisher', path: '/publisher', icon: '🗓️' } // 🚀 NEW: Publisher Link
+        { name: 'Flow Builder', path: '/flow-builder', icon: <Bot size={18} /> },
+        { name: 'Automations', path: '/automations', icon: <Repeat size={18} /> },
+        { name: 'Instagram', path: '/instagram-automation', icon: <Instagram size={18} /> },
+        { name: 'Auto-Marketer', path: '/auto-marketer', icon: <TrendingUp size={18} /> },
+        { name: 'Publish Post', path: '/publish-post', icon: <FileText size={18} /> },
+        { name: 'Publisher', path: '/publisher', icon: <Calendar size={18} /> }
       ]
     },
     {
       title: 'INTELLIGENCE',
       items: [
-        { name: 'AI Agent', path: '/ai-agent', icon: '🧠' },
-        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: '📈' },
-        { name: 'Order Dispatch', path: '/dispatch', icon: '📦' },
-        { name: 'Calls', path: '/calls', icon: '📞' },
-        { name: 'Analytics', path: '/monthly-report', icon: '📈' }
+        { name: 'AI Agent', path: '/ai-agent', icon: <Bot size={18} /> },
+        { name: 'ScanIQ', path: '/scaniq', icon: <ScanEye size={18} /> }, // 🚀 NEW
+        { name: 'Meta Ads', path: '/meta-ads', icon: <FaFacebookF size={18} /> }, // 🚀 NEW
+        { name: 'Pixel Analytics', path: '/tracking-analytics', icon: <BarChart2 size={18} /> },
+        { name: 'Order Dispatch', path: '/dispatch', icon: <Package size={18} /> },
+        { name: 'Calls', path: '/calls', icon: <Phone size={18} /> },
+        { name: 'Analytics', path: '/monthly-report', icon: <BarChart2 size={18} /> }
       ]
     },
     {
       title: 'TOOLS',
       items: [
-        { name: 'Staff & Team', path: '/staff', icon: '👨‍💼' }, // 'requireOwner' hata diya, ab sabko dikhega
-        { name: 'Forms', path: '/forms', icon: '📋' },
-        { name: 'Wallet', path: '/wallet', icon: '💰', requireOwner: true },
-        { name: 'Settings', path: '/settings', icon: '⚙️' }
+        { name: 'Staff & Team', path: '/staff', icon: <UserCog size={18} /> },
+        { name: 'Forms', path: '/forms', icon: <Clipboard size={18} /> },
+        { name: 'Wallet', path: '/wallet', icon: <Wallet size={18} />, requireOwner: true },
+        { name: 'Billing', path: '/billing', icon: <CreditCard size={18} />, requireOwner: true }, // 🚀 NEW
+        { name: 'Settings', path: '/settings', icon: <Settings size={18} /> },
+        { name: 'Change Password', path: '/change-password', icon: <Lock size={18} /> } // 🚀 NEW
       ]
     },
     // 🚀 NEW: Admin-only section
@@ -75,7 +78,9 @@ export default function Sidebar() {
       title: 'ADMIN',
       requireSuperAdmin: true,
       items: [
-        { name: 'Template Manager', path: '/admin/templates', icon: '📚' }
+        { name: 'Template Manager', path: '/admin/templates', icon: <FileText size={18} /> },
+        { name: 'Super Admin', path: '/super-admin', icon: <Shield size={18} /> }, // 🚀 NEW
+        { name: 'WhatsApp Rules', path: '/whatsapp-rules', icon: <Code size={18} /> } // 🚀 NEW
       ]
     }
   ];
@@ -135,7 +140,7 @@ export default function Sidebar() {
                     to={item.comingSoon ? '#' : item.path}
                     title={isCollapsed ? item.name : ""}
                     className={`relative flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-4 py-2.5 rounded-xl transition-all duration-200 ${
-                      isActive && !item.comingSoon
+                      isActive && !item.comingSoon && location.pathname.startsWith(item.path) // 🚀 FIX: Ensure active state is based on path prefix for nested routes
                         ? 'bg-gradient-to-r from-purple-500/10 to-transparent text-purple-400 font-bold border border-purple-500/20' 
                         : 'text-gray-400 hover:bg-gray-900 hover:text-gray-100 font-medium'
                     } ${item.comingSoon ? 'opacity-50 cursor-default' : ''} ${isCollapsed ? 'px-0 h-11 w-11 mx-auto' : ''}`}
