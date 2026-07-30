@@ -235,16 +235,15 @@ exports.handleInstagramWebhook = async (req, res) => {
               
               console.log(` [Meta DM (IG/FB)] ${isEcho ? 'Owner App Reply to' : 'Received from'} ${senderId}: ${incomingText}`);
  
-              // ✅ FIX: The query was not checking for the user ID (`instagramUserId`) from the newer "Instagram Login" flow.
-              // This now correctly checks all possible ID fields across the main config and all workspaces to ensure a match.
+              // ✅ FIX: The query was not checking for the user ID (`instagramUserId`) from the newer
+              // "Instagram Login" flow, causing DMs to those accounts to fail with "No matching account found".
+              // This now checks all possible ID fields across the main config and workspaces.
               let user = await User.findOne({
                 $or: [
                   { "instagramConfig.instagramBusinessAccountId": igAccountId },
                   { "instagramConfig.instagramUserId": igAccountId },
                   { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId },
                   { "workspaces.instagramConfig.instagramUserId": igAccountId },
-                  // 🚀 FIX: Also check the root-level igConfig for legacy connections
-                  { "igConfig.instagramBusinessAccountId": igAccountId },
                 ]
               }).lean();
               
@@ -895,13 +894,13 @@ with whatever information is available (leave budget field empty/null if not pro
           // "Instagram Login" flow, causing comment replies for those accounts to fail.
           // This now checks all possible ID fields across the main config and workspaces.
           let user = await User.findOne({
-            $or: [
-              { "instagramConfig.instagramBusinessAccountId": igAccountId }, // New schema
-              { "instagramConfig.instagramUserId": igAccountId },          // New schema (native login)
-              { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }, // New schema in workspace
-              { "workspaces.instagramConfig.instagramUserId": igAccountId },          // New schema in workspace (native login)
-              { "igConfig.instagramBusinessAccountId": igAccountId }, // 🚀 FIX: Check legacy igConfig field
-            ]
+             $or: [
+               { "instagramConfig.instagramBusinessAccountId": igAccountId }, // New schema
+               { "instagramConfig.instagramUserId": igAccountId },          // New schema (native login)
+               { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }, // New schema in workspace
+               { "workspaces.instagramConfig.instagramUserId": igAccountId },          // New schema in workspace (native login)
+               { "igConfig.instagramBusinessAccountId": igAccountId }, // 🚀 FIX: Check legacy igConfig field
+             ]
           });
           
           if (!user) {

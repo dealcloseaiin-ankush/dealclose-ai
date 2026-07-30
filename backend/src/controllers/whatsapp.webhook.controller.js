@@ -295,15 +295,17 @@ exports.handleWhatsApp = async (req, res) => {
                 if (postToApprove) {
                   try {
                     // Handle Model naming variations (instagramConfig vs 
-                    const igSettings = user.instagramConfig || user.igConfig || {};
-                    const igAccountId = igSettings.instagramAccountId || igSettings.accountId;
+                    const igSettings = user.instagramConfig || user.igConfig || {}; // Legacy fallback
+                    // 🚀 FIX: Use the correct account ID priority order.
+                    const igAccountId = igSettings?.instagramBusinessAccountId || igSettings?.instagramAccountId || igSettings?.accountId;
+                    const loginType = igSettings?.loginType || 'facebook_business';
                     
                     if (!igAccountId || !igSettings.accessToken) {
                       await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `❌ Instagram account is not connected properly. Please reconnect from your Dashboard Settings.`);
                       continue;
                     }
 
-                    await instagramService.publishInstagramPost(igAccountId, igSettings.accessToken, postToApprove.imageUrl, postToApprove.caption);
+                    await instagramService.publishInstagramMedia(igAccountId, igSettings.accessToken, postToApprove.imageUrl, 'IMAGE', postToApprove.caption, loginType);
 
                     postToApprove.status = 'posted';
                     postToApprove.postedAt = new Date();

@@ -1,8 +1,7 @@
 {
   "scripts": {
-    "start": "node backend/src/server.js"
-  },
-  "dependencies": {
-    "node-cron": "^3.0.3"
+    "start": "node backend/src/server.js",
+    "dev": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build"
   }
 }

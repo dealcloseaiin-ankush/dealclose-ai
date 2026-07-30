@@ -173,10 +173,12 @@ exports.approvePost = async (req, res) => {
 
     const user = await User.findById(req.user._id);
     const igSettings = user.instagramConfig || user.igConfig || {};
-    const igAccountId = igSettings.instagramAccountId || igSettings.accountId;
+    // 🚀 FIX: Use the correct account ID priority order.
+    const igAccountId = igSettings?.instagramBusinessAccountId || igSettings?.instagramAccountId || igSettings?.accountId;
+    const loginType = igSettings?.loginType || 'facebook_business';
 
     if (!igAccountId || !igSettings.accessToken) {
-      return res.status(400).json({ success: false, message: 'Instagram account is not connected properly. Please go to Settings and connect your page.' });
+      return res.status(400).json({ success: false, message: 'Instagram account is not connected properly. Please go to Settings and connect your account.' });
     }
 
     // 🚀 UPGRADE: Check if it's a carousel or single post
@@ -185,13 +187,13 @@ exports.approvePost = async (req, res) => {
       // For now, we'll just post the first image as a single post to prevent errors.
       // In a future step, we will implement `publishCarouselPost`.
       console.warn(`[Auto-Marketer] Carousel post detected, but only single image publishing is supported for now. Publishing first image.`);
-      if (post.media[0]?.url) {
-        await instagramService.publishImagePost(igAccountId, igSettings.accessToken, post.media[0].url, post.caption);
-      } else {
+      const mediaUrl = post.media[0]?.url;
+      if (!mediaUrl) {
         throw new Error("Carousel media is missing a valid URL for the first image.");
       }
+      await instagramService.publishInstagramMedia(igAccountId, igSettings.accessToken, mediaUrl, 'IMAGE', post.caption, loginType);
     } else {
-      await instagramService.publishImagePost(igAccountId, igSettings.accessToken, post.media[0].url, post.caption);
+      await instagramService.publishInstagramMedia(igAccountId, igSettings.accessToken, post.media[0].url, 'IMAGE', post.caption, loginType);
     }
 
     post.status = 'posted';

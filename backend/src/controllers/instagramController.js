@@ -209,16 +209,16 @@ exports.getRecentPosts = async (req, res) => {
     }
 
     console.log(`📡 3. Calling Meta Graph API for Account ID: ${accountId}...`);
-    const graphVersion = process.env.META_GRAPH_API_VERSION || 'v19.0';
     const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business'; // Fallback to default
 
     // ✅ CRITICAL FIX: The "Invalid OAuth access token" error was caused by always calling graph.facebook.com.
     // This now correctly checks the `loginType` to determine if the Instagram-native domain (`graph.instagram.com`)
     // should be used, which is required for accounts connected via the "Connect with Instagram Login" button.
     const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
-    const url = useInstagramDomain
-      ? `https://graph.instagram.com/${graphVersion}/${accountId}/media`
-      : `https://graph.facebook.com/${graphVersion}/${accountId}/media`;
+    // 🚀 FIX: Use the correct API domain based on the connection type.
+    // Hardcoding graph.facebook.com was causing post fetching to fail for native Instagram connections.
+    const baseUrl = useInstagramDomain ? 'https://graph.instagram.com/v19.0' : 'https://graph.facebook.com/v19.0';
+    const url = `${baseUrl}/${accountId}/media`;
 
     // Added more detailed logging for easier debugging in the future.
     console.log(`   - Login Type: ${loginType}, Using URL: ${url}`);
@@ -344,8 +344,10 @@ exports.publishPost = async (req, res) => {
       : null;
     const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
     const accessToken = igConfig?.accessToken;
-    const igAccountId = igConfig?.instagramAccountId || igConfig?.accountId;
-
+    // 🚀 FIX: Use the correct account ID field for publishing.
+    const igAccountId = igConfig?.instagramBusinessAccountId || igConfig?.instagramAccountId || igConfig?.accountId; // This was already correct, ensuring it stays.
+    // 🚀 FIX: Extract loginType to use the correct API domain.
+    const loginType = igConfig?.loginType || 'facebook_business';
     if (!accessToken || !igAccountId) {
       return res.status(400).json({ success: false, message: 'Instagram is not connected for this workspace.' });
     }
@@ -367,12 +369,21 @@ exports.publishPost = async (req, res) => {
     // 2. Publish using the new robust service
     // 🐛 FIX: The service function is named `publishInstagramMedia`, not `publishImagePost`.
     // This was causing a TypeError on manual publish attempts.
-    const result = await instagramService.publishInstagramMedia(igAccountId, accessToken, imageUrl, 'IMAGE', caption);
+    // ✅ FIX: Pass the loginType to the service function.
+    const result = await instagramService.publishInstagramMedia(igAccountId, accessToken, imageUrl, 'IMAGE', caption, loginType);
 
+    // 🚀 FIX: Use the correct domain to fetch the permalink based on login type.
+    // Hardcoding graph.facebook.com fails for native Instagram connections.
+    const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
+    const permalinkUrl = useInstagramDomain
+      ? `https://graph.instagram.com/v19.0/${result.postId}`
+      : `https://graph.facebook.com/v19.0/${result.postId}`;
+    
     // 3. Get the permalink for the new post
-    const permalinkResponse = await axios.get(`https://graph.facebook.com/v19.0/${result.postId}`, {
+    const permalinkResponse = await axios.get(permalinkUrl, {
       params: { fields: 'permalink', access_token: accessToken }
     });
+
 
     res.status(201).json({ success: true, message: 'Post published successfully!', postUrl: permalinkResponse.data.permalink });
 
@@ -765,15 +776,18 @@ exports.publishMedia = async (req, res) => {
     const user = await User.findById(userId).lean();
     
     const workspace = workspaceId && workspaceId !== 'main' ? user.workspaces?.find(w => w._id.toString() === workspaceId) : null;
-    const igSettings = workspace ? workspace.instagramConfig : user.instagramConfig;
-    const igToken = igSettings?.accessToken;
-    const igAccountId = igSettings?.instagramAccountId || igSettings?.accountId;
+    const igConfig = workspace ? workspace.instagramConfig : user.instagramConfig;
+    const igToken = igConfig?.accessToken;
+    // 🚀 FIX: Use the correct account ID priority order.
+    const igAccountId = igConfig?.instagramBusinessAccountId || igConfig?.instagramAccountId || igConfig?.accountId;
+    // 🚀 FIX: Extract and pass the loginType.
+    const loginType = igConfig?.loginType || 'facebook_business';
 
     if (!igToken || !igAccountId) {
        return res.status(400).json({ success: false, message: 'Instagram not connected.' });
     }
 
-    const result = await instagramService.publishInstagramMedia(igAccountId, igToken, mediaUrl, mediaType, caption);
+    const result = await instagramService.publishInstagramMedia(igAccountId, igToken, mediaUrl, mediaType, caption, loginType);
     res.status(200).json(result);
   } catch (error) {
      res.status(500).json({ success: false, message: error.message });

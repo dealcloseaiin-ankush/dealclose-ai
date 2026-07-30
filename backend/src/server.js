@@ -20,11 +20,18 @@ const http = require('http');
 const WebSocket = require('ws');
 
 // 🔍 GLOBAL DEBUGGER: Track every request that comes to the backend
+// This now only logs errors or slow requests in production to reduce I/O overhead.
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[🤖 SYSTEM MONITOR] ${req.method} ${req.originalUrl} | Status: ${res.statusCode} | Time: ${duration}ms`);
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isError = res.statusCode >= 400;
+    const isSlow = duration > 1000;
+
+    if (!isProduction || isError || isSlow) {
+      console.log(`[🤖 SYSTEM MONITOR] ${req.method} ${req.originalUrl} | Status: ${res.statusCode} | Time: ${duration}ms`);
+    }
   });
   next();
 });

@@ -132,7 +132,9 @@ const automationWorker = new Worker('automationQueue', async job => {
       });
 
       for (const { workspaceId, config } of accounts) {
-        const accountId = config.instagramAccountId || config.accountId;
+        // instagramBusinessAccountId is the canonical field — without this priority,
+        // Instagram Business Login accounts were silently skipped and never got an insights snapshot.
+        const accountId = config.instagramBusinessAccountId || config.instagramAccountId || config.accountId;
         if (!accountId) continue;
         try {
           const insights = await instagramService.getBusinessInsights(accountId, config.accessToken);

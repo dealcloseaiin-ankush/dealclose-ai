@@ -72,6 +72,7 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200
 };
+const helmet = require('helmet'); // NEW: Import helmet for security headers
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '25mb' })); // Increased limit for heavy flow data & design JSON
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
@@ -79,6 +80,7 @@ app.use(express.urlencoded({ limit: '25mb', extended: true }));
 // Make uploads folder publicly accessible to see images
 app.use('/uploads', express.static('public/uploads'));
 
+app.use(helmet()); // NEW: Apply helmet middleware for security headers
 // API Routes
 // Link all routes to the Main App
 app.use('/api/settings', settingsRoutes); // 🔥 Fixed settings routes mount

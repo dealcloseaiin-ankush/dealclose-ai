@@ -225,6 +225,9 @@ exports.getBusinessInsights = async (igAccountId, accessToken) => {
  * @param {string} caption - The caption for the post.
  * @returns {Promise<object>} - An object containing the success status and post ID.
  */
+/**
+ * @deprecated hardcoded to graph.facebook.com, no loginType support — use publishInstagramMedia instead
+ */
 exports.publishInstagramPost = async (igAccountId, accessToken, imageUrl, caption) => {
   try {
     console.log(`[IG Publish] Step 1: Creating media container for image.`);

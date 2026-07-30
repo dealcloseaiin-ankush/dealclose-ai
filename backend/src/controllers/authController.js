@@ -66,7 +66,10 @@ const axios = require('axios');
  * ============================================================================
  */
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey123';
+if (!process.env.JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET environment variable is not set. Server will not start without it.');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 const BCRYPT_HASH_PATTERN = /^\$2[aby]\$/;
 
 // ✅ FIX: FLOW 1 (Facebook Login for Business) credentials — the MAIN Facebook App.
