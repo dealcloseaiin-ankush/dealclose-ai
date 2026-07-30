@@ -57,10 +57,17 @@ const refreshStaleMediaUrl = async (post, igConfigResolver) => {
   if (!isStale) return post;
 
   try {
+    // 🚀 FIX: Pass loginType to getFreshMediaUrl for correct API endpoint selection.
     const igConfig = await igConfigResolver(post.workspaceId);
     if (!igConfig?.accessToken) return post;
 
-    const fresh = await instagramService.getFreshMediaUrl(platformMediaId, igConfig.accessToken);
+    // ✅ FIX: Pass the loginType to the service. The service now correctly
+    // uses graph.instagram.com for native logins and graph.facebook.com for others.
+    const fresh = await instagramService.getFreshMediaUrl(
+      platformMediaId,
+      igConfig.accessToken,
+      igConfig.loginType // Pass the loginType
+    );
 
     await Post.updateOne(
       { _id: post._id },

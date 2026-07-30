@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
+import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import workspace store
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function MonthlyReport() {
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
+  const { activeWorkspaceId } = useWorkspaceStore(); // 🚀 FIX: Get activeWorkspaceId from global store
   const [activeWorkspace, setActiveWorkspace] = useState('main');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalLeads: 0, contacted: 0, positive: 0, dropped: 0 });

@@ -3,6 +3,7 @@ import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, D
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
+import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import workspace store
 import toast from 'react-hot-toast';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -18,7 +19,7 @@ export default function Publisher() {
   // 🚀 NEW: Workspace states
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }]);
-  const [activeWorkspace, setActiveWorkspace] = useState('main');
+  const { activeWorkspaceId: activeWorkspace, setActiveWorkspaceId: setActiveWorkspace } = useWorkspaceStore(); // 🚀 FIX: Use global workspace state
 
   // 🚀 NEW: State for the Comments Modal
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);

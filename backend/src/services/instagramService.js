@@ -345,8 +345,15 @@ exports.getFreshMediaUrl = async (mediaId, accessToken) => {
  * Instagram media ID. Meta's CDN URLs are signed and time-limited, so this
  * must be called again whenever the previously stored URL is stale.
  */
-exports.getFreshMediaUrl = async (mediaId, accessToken) => {
-  const { data } = await axios.get(`https://graph.instagram.com/${mediaId}`, {
+exports.getFreshMediaUrl = async (mediaId, accessToken, loginType = 'facebook_business') => {
+  // ✅ FIX: Use the correct API domain based on the connection type.
+  // This was the root cause of the "Invalid OAuth access token" error during media refresh.
+  const baseUrl = isInstagramNativeLogin(loginType)
+    ? 'https://graph.instagram.com/v19.0'
+    : 'https://graph.facebook.com/v19.0';
+
+  const url = `${baseUrl}/${mediaId}`;
+  const { data } = await axios.get(url, {
     params: {
       fields: 'media_type,media_url,thumbnail_url',
       access_token: accessToken,
