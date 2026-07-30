@@ -13,10 +13,7 @@ export default function AIAgent() {
   const [aiCredits, setAiCredits] = useState(0);
 
   // 🚀 NEW: Trending queries state for 1-Click Auto Flow
-  const [trendingQueries, setTrendingQueries] = useState([
-    { id: 1, keyword: "location", question: "What is your shop location?", aiReply: "We are located at 123 Main Street, New Delhi.", count: 12 },
-    { id: 2, keyword: "timing", question: "When does your shop open?", aiReply: "We are open from 9 AM to 9 PM, Monday to Saturday.", count: 10 }
-  ]);
+  const [trendingQueries, setTrendingQueries] = useState([]);
 
   useEffect(() => {
     const fetchQueries = async () => {
@@ -142,7 +139,7 @@ export default function AIAgent() {
               className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-4 text-white focus:border-purple-500 outline-none mb-4"
             ></textarea>
             <div className="flex gap-3">
-              <button type="button" className="px-6 py-2 bg-[#1a1a1a] hover:bg-gray-800 border border-gray-700 rounded-xl font-bold transition-colors">📄 Upload PDF / Doc</button>
+              <button type="button" disabled title="Coming Soon" className="px-6 py-2 bg-[#1a1a1a] border border-gray-700 rounded-xl font-bold transition-colors cursor-not-allowed opacity-50">📄 Upload PDF / Doc</button>
               <button type="submit" className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-colors shadow-lg shadow-purple-500/20">Save & Train AI</button>
             </div>
           </form>
@@ -216,25 +213,11 @@ export default function AIAgent() {
       {/* Bottom Section: AI Insights */}
       <div>
         <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">📊 Performance Insights</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link to="/chats" className="block bg-[#111] p-6 rounded-2xl border border-orange-500/30 shadow-lg hover:border-orange-500 transition-colors cursor-pointer group">
-            <h3 className="text-orange-400 font-bold mb-2 flex items-center gap-2">🔥 Trending Query</h3>
-            <p className="text-white font-medium mb-4 group-hover:text-orange-200 transition-colors">"75% of users asked about 'Cash on Delivery' today."</p>
-            <p className="text-sm text-gray-400">AI Advice: Consider adding a clear COD policy message to your welcome menu.</p>
-          </Link>
-
-          <Link to="/crm" className="block bg-[#111] p-6 rounded-2xl border border-green-500/30 shadow-lg hover:border-green-500 transition-colors cursor-pointer group">
-            <h3 className="text-green-400 font-bold mb-2 flex items-center gap-2">📈 High Intent Lead</h3>
-            <p className="text-white font-medium mb-4 group-hover:text-green-200 transition-colors">"The product 'Summer Collection Tshirt' is getting high attention."</p>
-            <p className="text-sm text-gray-400">AI Advice: Run a promotional WhatsApp campaign for this item to close pending leads.</p>
-          </Link>
-          
-          <div className="bg-gradient-to-br from-[#1a1120] to-[#111] p-6 rounded-2xl border border-pink-500/30 shadow-lg">
-            <h3 className="text-pink-400 font-bold mb-2 flex items-center gap-2">📸 IG Growth Audit</h3>
-            <p className="text-white font-medium mb-4">Your Instagram bio lacks a strong Call-To-Action (CTA).</p>
-            <button onClick={copyDataForChatGPT} className="w-full bg-pink-600/20 border border-pink-500/50 hover:bg-pink-600 text-pink-300 hover:text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors mt-2">
-              Export Deep Analysis
-            </button>
+        <div className="grid grid-cols-1">
+          <div className="bg-[#111] p-8 rounded-2xl border border-dashed border-gray-800 text-center text-gray-500">
+            <p className="text-3xl mb-2">✨</p>
+            <h3 className="text-lg font-bold text-gray-300">AI-generated insights are coming soon.</h3>
+            <p className="text-sm mt-1">Check back after your AI has processed more customer conversations.</p>
           </div>
         </div>
       </div>

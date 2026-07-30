@@ -3,13 +3,13 @@ import toast from 'react-hot-toast';
 import { Phone, PhoneOff, Mic, Settings, PlayCircle, History, Bot, Volume2, Activity, Database, FileText, Link as LinkIcon, Clock, Radio, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth'; // 🚀 FIX: Import useAuth
+import useWorkspaceStore from '../stores/workspaceStore'; // 🚀 NEW: Import global workspace store
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function Calls() {
   const { user } = useAuth() || {};
-  const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
-  const [activeWorkspace, setActiveWorkspace] = useState('main');
+  const { activeWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global state
   const [aiCredits, setAiCredits] = useState(0);
   
   const [callMode, setCallMode] = useState('web'); // 'web', 'phone', 'bulk'
@@ -31,14 +31,6 @@ export default function Calls() {
   const streamRef = useRef(null);
 
   useEffect(() => {
-    api.get('/users/profile').then(res => {
-      const u = res.data.user || res.data;
-      if (u) {
-         setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
-         setAiCredits(u.aiCredits || 0);
-      }
-    }).catch(console.error);
-    
     api.get('/crm/pipeline').then(res => {
        const allContacts = [];
        if (res.data && res.data.data) {
@@ -97,8 +89,8 @@ export default function Calls() {
         // 🚀 FULL PAYLOAD (Workspace & CRM Link)
         ws.send(JSON.stringify({ 
           event: 'start',
-          targetNumber,
-          workspaceId: activeWorkspace,
+          targetNumber: targetNumber,
+          workspaceId: activeWorkspaceId,
           callGoal
         }));
 
@@ -208,17 +200,6 @@ export default function Calls() {
     setStatus(reason);
     addLog(reason);
     
-    // Mocking post-call CRM extraction after call ends
-    if (reason !== "Failed to start call") {
-      setTimeout(() => {
-        setCrmResult({
-          summary: "Customer was interested in the premium plan.",
-          actionTaken: "Lead status updated to 'Hot'. Email captured.",
-          confidence: "High"
-        });
-        toast.success("Call ended. AI has updated the CRM notes!");
-      }, 1500);
-    }
   };
 
   return (
@@ -230,9 +211,6 @@ export default function Calls() {
             <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
               AI Voice Studio & Web Caller
             </h1>
-            <select value={activeWorkspace} onChange={(e) => setActiveWorkspace(e.target.value)} className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-green-500 cursor-pointer shadow-sm">
-              {workspaces.map(ws => (<option key={ws._id} value={ws._id}>🏢 {ws.name}</option>))}
-            </select>
           </div>
           <p className="text-gray-400">Make free internet calls to your CRM leads and train your AI Agent.</p>
         </div>

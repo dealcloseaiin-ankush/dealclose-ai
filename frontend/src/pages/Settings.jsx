@@ -1068,7 +1068,7 @@ export default function Settings() {
                       <input type="text" value={activeWs.instagramConfig?.instagramBusinessAccountId || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'instagramConfig', { ...activeWs.instagramConfig, instagramBusinessAccountId: e.target.value })} placeholder="Target IG Account ID" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-xs outline-none" readOnly />
                     </div>
                   </div>
-                  
+
                   {/* FIXED UI CONNECTION BUTTON ZONE FOR SUB-BRANCH */}
                   <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-800 relative z-10 items-center">
                      {activeWs?._id ? (
@@ -1095,30 +1095,29 @@ export default function Settings() {
                               Logout WhatsApp
                             </button>
                          )}
-
-                         {/* Instagram Conditional Layout */}
+                         
+                         {/* 🚀 FIX: Correctly check for accessToken to show Disconnect button */}
                          {activeWs.instagramConfig?.accessToken && (
                             <button type="button"
                               onClick={() => disconnectInstagram(activeWs?._id)}
                               className="px-5 py-2.5 bg-red-600/20 text-red-400 text-sm font-bold rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition-all shadow-md"
                             >
                               Disconnect Instagram
-                            </button>
+                            </button> 
                          )}
-                         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3">
-                           <div>
-                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace via Facebook" : "Connect via Facebook"} variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
-                             <p className="mt-1 text-[11px] text-gray-500">Facebook Page linked Instagram</p>
+                         {!activeWs.instagramConfig?.accessToken && (
+                           <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3">
+                             <div>
+                               <MetaConnectButton buttonText="Connect via Facebook" variant="facebook" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                               <p className="mt-1 text-[11px] text-gray-500">Facebook Page linked Instagram</p>
+                             </div>
+                             <div>
+                               <MetaConnectButton buttonText="Connect with Instagram Login" variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
+                               <p className="mt-1 text-[11px] text-gray-500">Instagram Professional account</p>
+                               <p className="mt-1 text-[11px] text-amber-500">⚠️ Requires a Professional (Business/Creator) Instagram account. Personal accounts won't work — switch in Instagram app: Settings → Account type and tools → Switch to Professional Account.</p>
+                             </div>
                            </div>
-                           <div>
-                             <MetaConnectButton buttonText={activeWs.instagramConfig?.accessToken ? "Replace with Instagram Login" : "Connect with Instagram Login"} variant="instagram" platform="instagram" workspaceId={activeWs?._id} onSuccess={(data) => openInstagramPicker(data, activeWs?._id)} />
-                             <p className="mt-1 text-[11px] text-gray-500">Instagram Professional account</p>
-                             <p className="mt-1 text-[11px] text-amber-500">
-                               ⚠️ Requires a Professional (Business/Creator) Instagram account. Personal accounts won't work — 
-                               switch in Instagram app: Settings → Account type and tools → Switch to Professional Account.
-                             </p>
-                           </div>
-                         </div>
+                         )}
                        </>
                      ) : (
                        <div className="w-full bg-orange-500/10 p-4 rounded-xl border border-orange-500/30 text-sm text-orange-400 font-bold flex items-center gap-2">

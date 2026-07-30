@@ -345,11 +345,16 @@ export default function Publisher() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {posts.map(post => (
               <div key={post._id} className="bg-[#111] border border-gray-800 rounded-2xl p-4 flex flex-col gap-3 group hover:border-blue-500/50 transition-all relative">
-                {post.mediaUrls && post.mediaUrls.length > 0 && (
+                {/* 🚀 FIX: Handle both new `mediaUrls` (object array) and old `media` (string array) structures */}
+                {(() => {
+                  const mediaUrl = post.mediaUrls?.[0]?.url || post.media?.[0];
+                  if (!mediaUrl) return null;
+                  return (
                   <div className="aspect-square bg-black rounded-lg overflow-hidden">
-                    <img src={post.mediaUrls[0].url} alt="Post media" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={mediaUrl} alt="Post media" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   </div>
-                )}
+                  );
+                })()}
                 <p className="text-xs text-gray-400 line-clamp-2 flex-1">{post.caption}</p>
                 
                 {/* 🚀 NEW: Live Post Stats Display */}

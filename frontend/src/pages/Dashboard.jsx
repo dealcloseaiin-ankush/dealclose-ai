@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import useWorkspaceStore from '../store/workspaceStore'; // 🚀 FIX: Corrected import path
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line, AreaChart, Area } from 'recharts';
 import DashboardAIAssistant from '../components/DashboardAIAssistant'; // Import the AI Chat Assistant
 
@@ -38,15 +39,15 @@ export default function Dashboard() {
   const [clients, setClients] = useState([]);
   const [adminStats, setAdminStats] = useState(null);
   const [messageStats, setMessageStats] = useState({ sent: 0, delivered: 0, read: 0 });
+  const { activeWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global state
   const [workspaces, setWorkspaces] = useState([]);
-  const [activeBusinessId, setActiveBusinessId] = useState('main');
   const [platformFilter, setPlatformFilter] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await api.get('/leads/analytics', { params: { workspaceId: activeBusinessId, platform: platformFilter } });
+        const response = await api.get('/leads/analytics', { params: { workspaceId: activeWorkspaceId, platform: platformFilter } });
         setData(response.data);
         if (response.data.messageStats) {
           setMessageStats(response.data.messageStats);
@@ -86,7 +87,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, [activeBusinessId, platformFilter]);
+  }, [activeWorkspaceId, platformFilter]); // 🚀 NEW: Refetch when global workspace changes
 
   if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
 
@@ -102,11 +103,6 @@ export default function Dashboard() {
               Overview Dashboard
             </span>
             </h1>
-            <select value={activeBusinessId} onChange={(e) => setActiveBusinessId(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
-              {workspaces.map(ws => (
-                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
-              ))}
-            </select>
             <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500 cursor-pointer">
               <option value="all">🌍 All Platforms</option>
               <option value="whatsapp">🟩 WhatsApp</option>

@@ -192,13 +192,16 @@ exports.handleInstagramWebhook = async (req, res) => {
             // on events that don't have a `message` object (e.g., read receipts).
             if (event.read) {
               console.log(`[IG Webhook] Ignoring 'read' receipt event from ${event.sender.id}.`);
-              continue; // Skip to the next event
+                continue;
             } else if (event.message_edit) {
               // 🚀 NEW: Handle message edit/unsend events from Instagram.
               // This prevents crashes and logs the event, but doesn't trigger AI.
               console.log(`[IG Webhook] Ignoring 'message_edit' or 'unsend' event from ${event.sender.id}.`);
               continue;
-            } else if (event.message && event.message.attachments) {
+              } else if (event.message && event.message.is_echo) {
+                console.log(`[IG Webhook] Ignoring echo message from app ID: ${event.message.app_id}.`);
+                continue;
+              } else if (event.message && event.message.attachments) {
               // 🚀 NEW: Handle shared posts, reels, stories, etc.
               const attachment = event.message.attachments[0];
               console.log(`[IG Webhook] Received an attachment of type: ${attachment.type}`);
