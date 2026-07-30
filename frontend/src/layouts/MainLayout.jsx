@@ -5,8 +5,7 @@ import { useAuth } from '../hooks/useAuth'; // 🚀 FIX: Import useAuth
 import useWorkspaceStore from '../store/workspaceStore';
 // 🚀 FIX: The 'Instagram' icon is not exported from the main entry point in this version of lucide-react.
 // It must be imported directly from its own file to resolve the build error.
-import { Home, MessageSquare, Phone, Settings, LogOut, Bot, BarChart2, Users, FileText, Wallet, Zap, Menu, X, LayoutDashboard, Briefcase, PlusCircle } from 'lucide-react';
-import { Instagram } from 'lucide-react';
+import { Home, MessageSquare, Phone, Settings, LogOut, Bot, BarChart2, Users, FileText, Wallet, Zap, Menu, X, LayoutDashboard, Briefcase, PlusCircle, Instagram } from 'lucide-react';
 import Navbar from '../components/Navbar'; // 🚀 FIX: Import Navbar
 
 const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
