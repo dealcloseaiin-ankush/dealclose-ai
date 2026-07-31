@@ -301,11 +301,11 @@ export default function Chats() {
 
     // Optimistic UI update
     setAllMessages(prev => {
-      const updated = prev.map(m => m._id === messageId ? { ...m, isDeleted: true } : m);
-      allMessagesRef.current = updated; // 🚀 keep ref in sync
+      // Instead of just marking as deleted, we filter it out from the main state
+      const updated = prev.filter(m => m._id !== messageId);
+      allMessagesRef.current = updated;
       return updated;
     });
-
     try {
       await api.delete(`/chats/${messageId}`);
       toast.success("Message deleted.");
@@ -313,9 +313,7 @@ export default function Chats() {
       toast.error(error.response?.data?.message || "Failed to delete message.");
       // Re-fetch to revert UI state on failure
       const { data } = await api.get('/chats');
-      const messages = Array.isArray(data) ? data : data.data || [];
-      setAllMessages(messages);
-      allMessagesRef.current = messages; // 🚀 keep ref in sync
+      setAllMessages(Array.isArray(data) ? data : data.data || []);
     }
   };
 
@@ -325,8 +323,8 @@ export default function Chats() {
 
     // Optimistic UI update
     setAllMessages(prev => {
-      const updated = prev.map(m => m.customerPhone === customerPhone ? { ...m, isDeleted: true } : m);
-      allMessagesRef.current = updated; // keep ref in sync
+      const updated = prev.filter(m => m.customerPhone !== customerPhone);
+      allMessagesRef.current = updated;
       return updated;
     });
     // If the active chat is the one being deleted, clear the view

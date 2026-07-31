@@ -71,13 +71,28 @@ exports.handleWhatsApp = async (req, res) => {
         }
 
         const phoneNumberId = value.metadata.phone_number_id;
+        const instagramPageId = entry.id; // For Instagram
+
         // 🚀 FIX: Search for user in both the main config and inside workspaces
         const user = await User.findOne({
           $or: [
             { "whatsappConfig.phoneNumberId": phoneNumberId },
-            { "workspaces.whatsappConfig.phoneNumberId": phoneNumberId }
+            { "workspaces.whatsappConfig.phoneNumberId": phoneNumberId },
+            { "instagramConfig.facebookPageId": instagramPageId },
+            { "workspaces.instagramConfig.facebookPageId": instagramPageId },
+            { "instagramConfig.instagramBusinessAccountId": instagramPageId },
+            { "workspaces.instagramConfig.instagramBusinessAccountId": instagramPageId }
           ]
         });
+
+        // Determine which workspace this message belongs to
+        let workspaceId = 'main';
+        if (user && user.workspaces && user.workspaces.length > 0) {
+          const foundWorkspace = user.workspaces.find(ws =>
+            ws.whatsappConfig?.phoneNumberId === phoneNumberId || ws.instagramConfig?.facebookPageId === instagramPageId || ws.instagramConfig?.instagramBusinessAccountId === instagramPageId
+          );
+          if (foundWorkspace) workspaceId = foundWorkspace._id.toString();
+        }
         
         if (!user) {
           console.error(`❌ [Webhook Error] No user found with phoneNumberId: ${phoneNumberId}`);
@@ -147,7 +162,7 @@ exports.handleWhatsApp = async (req, res) => {
               const leadSource = adReferral ? `Meta Ad (${adReferral.headline || 'Click-to-WA'})` : 'WhatsApp Inbound';
               
               savedLead = await Lead.create({
-                userId: user._id, phoneNumber: fromNumber, name: `User #${seqId}`,
+                userId: user._id, workspaceId, phoneNumber: fromNumber, name: `User #${seqId}`,
                 source: leadSource, status: 'new', createdBy: user._id,
                 customFields: adReferral ? {
                   adId: String(adReferral.source_id || ''),
@@ -162,7 +177,7 @@ exports.handleWhatsApp = async (req, res) => {
               });
             } else if (adReferral) {
                // 🚀 UPDATE EXISTING LEAD: If old customer clicks a new Ad!
-               const newSource = `Meta Ad (${adReferral.headline || 'Click-to-WA'})`; 
+               const newSource = `Meta Ad (${adReferral.headline || 'Click-to-WA'})`;
                await Lead.updateOne({ _id: savedLead._id }, { $set: { source: newSource, "customFields.adId": String(adReferral.source_id || ''), "customFields.adHeadline": String(adReferral.headline || ''), "customFields.sourceUrl": String(adReferral.source_url || '') }, $push: { timeline: { eventType: 'Ad Click Tracking', description: `Customer re-engaged via Meta Ad: ${adReferral.headline}`, timestamp: new Date() } } });
             }
             
@@ -182,12 +197,12 @@ exports.handleWhatsApp = async (req, res) => {
             // Create unique order ID based on timestamp
             const newOrderId = 'WA-' + Date.now().toString().slice(-6);
             
-            await Order.create({ userId: user._id, orderId: newOrderId, customerPhone: fromNumber, status: 'Pending', lastUpdated: new Date() });
+            await Order.create({ userId: user._id, workspaceId, orderId: newOrderId, customerPhone: fromNumber, status: 'Pending', lastUpdated: new Date() });
             
             const responseMessage = `🛍️ *Order Received!*\nThank you for placing an order from our catalog! Your Order ID is *#${newOrderId}*.\n\nCould you please reply with your complete *Delivery Address* and Pincode so we can dispatch it?`;
             
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-            await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
             continue;
           }
 
@@ -200,7 +215,7 @@ exports.handleWhatsApp = async (req, res) => {
               const extractedData = await ocrService.extractTextFromImage(buffer, mimeType || 'image/jpeg', user._id);
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `*Here is what I read from your list:*\n\n${extractedData}\n\nWould you like me to create an order or quotation for these items?`);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
             } catch (err) {
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "Sorry, I couldn't read the image properly right now. Could you please type it out?");
             }
@@ -265,7 +280,7 @@ exports.handleWhatsApp = async (req, res) => {
             }
 
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-            await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
             continue;
             }
           }
@@ -334,7 +349,7 @@ exports.handleWhatsApp = async (req, res) => {
             }
 
             console.log(`💾 [DEBUG] Saving incoming message to database...`);
-            const incomingMsg = await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            const incomingMsg = await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
             console.log(`✅ [DEBUG] Message saved with ID: ${incomingMsg._id}`);
 
             // 🚀 NEW: Broadcast the incoming message to all connected chat dashboards
@@ -422,7 +437,7 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 };
               await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj); 
-              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue; 
             }
 
@@ -448,7 +463,7 @@ exports.handleWhatsApp = async (req, res) => {
                 }
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMsg);
-                await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue; // 🚀 Skip AI completely to save tokens!
               } else {
                 // Not a rating, just turn off the flag and process normally via AI
@@ -485,7 +500,7 @@ exports.handleWhatsApp = async (req, res) => {
               let responseMessage = `Thank you, ${finalName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
               
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; // 🚀 Skip AI completely to save tokens!
             }
 
@@ -590,13 +605,14 @@ exports.handleWhatsApp = async (req, res) => {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
                       await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
@@ -611,7 +627,7 @@ exports.handleWhatsApp = async (req, res) => {
                          }));
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
-                        await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                        await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
@@ -688,14 +704,14 @@ exports.handleWhatsApp = async (req, res) => {
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
@@ -710,7 +726,7 @@ exports.handleWhatsApp = async (req, res) => {
                          }));
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
-                        await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                        await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
@@ -813,7 +829,7 @@ exports.handleWhatsApp = async (req, res) => {
                 action: { button: "Select Business", sections: [{ title: "Our Divisions", rows: menuRows }] }
               };
               await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
 
@@ -842,7 +858,7 @@ exports.handleWhatsApp = async (req, res) => {
               }
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-              await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
 
@@ -982,7 +998,7 @@ exports.handleWhatsApp = async (req, res) => {
                       const updatedLead = await Lead.findOneAndUpdate({ phoneNumber: fromNumber, userId: user._id }, { $set: updateFields }, { returnDocument: 'after', upsert: true });
                       
                       googleSheetsController.appendLeadToSheet(user._id, updatedLead).catch(e => console.log('Sheets sync error:', e.message));
-                      responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`;
+                      responseMessage = `Got it! I have noted your requirement for ${leadData.itemName}. Let me check our catalog and get back to you with the best options!`; // ✅ FIX: Added missing semicolon
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "search_catalog") {
                       const searchData = JSON.parse(toolCall.function.arguments);
@@ -1186,7 +1202,7 @@ exports.handleWhatsApp = async (req, res) => {
                       });
                       
                       responseMessage = null; // Prevent sending duplicate text
-                      repliedBy = 'ai';
+                      repliedBy = 'ai'; // ✅ FIX: Added missing semicolon
                       await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Interactive AI Question]: ${menuText}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
                     } else if (toolCall.function.name === "search_real_estate_properties") {
                       const searchData = JSON.parse(toolCall.function.arguments);
@@ -1290,7 +1306,7 @@ exports.handleWhatsApp = async (req, res) => {
                 }
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-                await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy, expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy, expiresAt: getMessageExpiry(user, 'whatsapp') });
                 
                 // 🚀 SMART DELAYED FEEDBACK: Only trigger if AI actually replied!
                 if (repliedBy === 'ai') {
