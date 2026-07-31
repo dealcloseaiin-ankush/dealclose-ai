@@ -1,2 +1,3 @@
-# Render.com SPA Fallback Rule
+# Serve static files normally so hashed JS/CSS chunks keep their correct MIME type
+/assets/*    /assets/:splat   200
 /*    /index.html   200

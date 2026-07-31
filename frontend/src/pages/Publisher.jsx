@@ -44,7 +44,12 @@ export default function Publisher() {
       const params = { ... (filter === 'all' ? {} : { status: filter }), workspaceId: activeWorkspace };
       const { data } = await api.get('/posts', { params });
       if (data.success) {
-        setPosts(data.posts);
+        const nextPosts = [...(data.posts || [])].sort((a, b) => {
+          const aDate = new Date(a.publishedAt || a.scheduledAt || a.createdAt || 0).getTime();
+          const bDate = new Date(b.publishedAt || b.scheduledAt || b.createdAt || 0).getTime();
+          return bDate - aDate;
+        });
+        setPosts(nextPosts);
       }
     } catch (error) {
       toast.error('Failed to fetch posts.');

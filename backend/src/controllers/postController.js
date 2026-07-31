@@ -133,7 +133,12 @@ exports.getPosts = async (req, res) => {
     }
     console.log("🔍 [POST DEBUGGER] 3. Final MongoDB query being executed:", JSON.stringify(query));
 
-    const posts = await Post.find(query).sort({ createdAt: -1 }).limit(100).lean();
+    const posts = await Post.find(query).limit(100).lean();
+    posts.sort((a, b) => {
+      const aDate = new Date(a.publishedAt || a.scheduledAt || a.createdAt || 0).getTime();
+      const bDate = new Date(b.publishedAt || b.scheduledAt || b.createdAt || 0).getTime();
+      return bDate - aDate;
+    });
 
     // Resolve the right Instagram config for a given workspaceId (root vs sub-workspace).
     const user = await User.findById(userId).lean();
