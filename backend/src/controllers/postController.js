@@ -133,7 +133,9 @@ exports.getPosts = async (req, res) => {
     }
     console.log("🔍 [POST DEBUGGER] 3. Final MongoDB query being executed:", JSON.stringify(query));
 
-    const posts = await Post.find(query).limit(100).lean();
+    // ✅ PERFORMANCE FIX: Limit the number of posts fetched at once to prevent overload.
+    // Changed limit from 100 to 20. We can add full pagination later if needed.
+    const posts = await Post.find(query).limit(20).lean();
     posts.sort((a, b) => {
       const aDate = new Date(a.publishedAt || a.scheduledAt || a.createdAt || 0).getTime();
       const bDate = new Date(b.publishedAt || b.scheduledAt || b.createdAt || 0).getTime();

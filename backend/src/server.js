@@ -12,6 +12,7 @@ if (!process.env.OPENAI_API_KEY) {
 // Firebase ko temporarily comment kar diya hai taaki server bina error start ho sake
 // require('./config/firebase'); 
 const mongoose = require('mongoose');
+const compression = require('compression'); // 🚀 NEW: Import compression
 
 // 🚀 NEW: Schedule background jobs like trash cleanup
 require('../jobs/trashCleanup'); // Cron job ko start karne ke liye
@@ -19,6 +20,7 @@ const { scheduleTokenRefreshJob } = require('./workers/tokenRefreshWorker');
 const app = require('./app');
 const http = require('http');
 const WebSocket = require('ws');
+app.use(compression()); // 🚀 NEW: Compress all API responses
 
 // 🔍 GLOBAL DEBUGGER: Track every request that comes to the backend
 // This now only logs errors or slow requests in production to reduce I/O overhead.

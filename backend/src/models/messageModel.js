@@ -35,6 +35,11 @@ const messageSchema = new Schema({
   archiveUrl: { type: String } // Link to the chat file in Cold Storage
 });
 
+// --- Indexes for Performance ---
+messageSchema.index({ userId: 1, customerPhone: 1 });
+messageSchema.index({ userId: 1, workspaceId: 1, timestamp: -1 });
+messageSchema.index({ wamid: 1 });
+
 const Message = mongoose.model('Message', messageSchema);
 
 module.exports = Message;

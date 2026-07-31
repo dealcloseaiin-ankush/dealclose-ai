@@ -20,5 +20,9 @@ const generatedPostSchema = new mongoose.Schema({
   feedback: { type: String } // User ne reject kiya toh uska reason
 }, { timestamps: true });
 
+// --- Indexes for Performance ---
+generatedPostSchema.index({ userId: 1, workspaceId: 1, status: 1 });
+generatedPostSchema.index({ status: 1, postedAt: 1 });
+
 const GeneratedPost = mongoose.model('GeneratedPost', generatedPostSchema);
 module.exports = GeneratedPost;
