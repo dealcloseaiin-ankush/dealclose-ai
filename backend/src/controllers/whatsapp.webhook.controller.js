@@ -1,6 +1,5 @@
 const axios = require('axios'); // 🛠️ BUG FIX: axios was used in many places below (search_external_catalog, real-estate tools, publish_blog, etc.) but was never imported. This caused a silent ReferenceError crash on every one of those AI tool calls.
 const aiService = require('../services/aiService');
-const whatsappService = require('../services/whatsappService');
 const ocrService = require('../services/ocrService');
 const Lead = require('../models/leadModel');
 const User = require('../models/userModel');
@@ -73,13 +72,16 @@ exports.handleWhatsApp = async (req, res) => {
         const phoneNumberId = value.metadata.phone_number_id;
         const instagramPageId = entry.id; // For Instagram
 
-        // 🚀 FIX: Search for user in both the main config and inside workspaces
+        // 🚀 FIX: Search for user in both the main config and inside workspaces for all possible IDs.
+        // This was the source of the bug where IG messages were not being routed correctly.
         const user = await User.findOne({
           $or: [
             { "whatsappConfig.phoneNumberId": phoneNumberId },
             { "workspaces.whatsappConfig.phoneNumberId": phoneNumberId },
             { "instagramConfig.facebookPageId": instagramPageId },
+            { "igConfig.facebookPageId": instagramPageId }, // Legacy
             { "workspaces.instagramConfig.facebookPageId": instagramPageId },
+            { "workspaces.igConfig.facebookPageId": instagramPageId }, // Legacy
             { "instagramConfig.instagramBusinessAccountId": instagramPageId },
             { "workspaces.instagramConfig.instagramBusinessAccountId": instagramPageId }
           ]
@@ -899,7 +901,7 @@ exports.handleWhatsApp = async (req, res) => {
                 responseMessage = "Thank you for reaching out! Our support team is currently reviewing your request and will assist you shortly. ⏳" + autoLinks;
                 repliedBy = 'system';
               } else {
-              
+              // 🚀 FIX: Wrap the entire AI logic in a try-catch block.
               try {
                 // Har SaaS User ka apna personal AI context! 
                 let businessInfo = user.businessDescription || "a modern business";
@@ -1294,7 +1296,7 @@ exports.handleWhatsApp = async (req, res) => {
                 console.error("❌ [AI API Error]:", aiError.message || aiError);
                 responseMessage = "🙏 Maafi chahenge, abhi humara AI system thoda busy hai ya network issue hai. Hum jald hi aapse contact karenge!";
                 repliedBy = 'system';
-              }
+              } // End of AI try-catch block
               } 
             }
 

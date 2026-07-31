@@ -88,7 +88,7 @@ exports.getChats = async (req, res) => {
         platform, // Added Platform Tag for Frontend Filters
         customerName: leadDataMap[msg.customerPhone]?.name || (platform !== 'whatsapp' ? String(msg.customerPhone).replace('IG_', '@') : 'Unknown'),
         customerCity: leadDataMap[msg.customerPhone]?.city || '',
-        workspaceId: leadDataMap[msg.customerPhone]?.workspaceId || 'main',
+        workspaceId: msg.workspaceId || leadDataMap[msg.customerPhone]?.workspaceId || 'main',
         isAiPaused: leadDataMap[msg.customerPhone]?.isAiPaused || false,
         aiPausedUntil: leadDataMap[msg.customerPhone]?.aiPausedUntil || null,
         // 🚀 NEW: Pass detailed timestamps for delivery status tooltips
@@ -160,9 +160,11 @@ exports.sendManualMessage = async (req, res) => {
       // .lean() is REQUIRED to read fields bypassing Mongoose strict schema
       const user = await User.findById(userId).lean();
       
-      // 🚀 FIX: Find the exact workspace this lead belongs to
-      const leadForIg = await Lead.findOne({ phoneNumber: customerPhone, userId: userId }).lean();
-      const wsIdIg = leadForIg?.lastSelectedWorkspaceId || 'main';
+      // ✅ BUG FIX: Don't use Lead.lastSelectedWorkspaceId for IG. Instead, find the
+      // last message in this conversation to reliably get the correct workspace context.
+      const lastMessage = await Message.findOne({ customerPhone, userId }).sort({ timestamp: -1 }).lean();
+      const wsIdIg = lastMessage?.workspaceId || 'main';
+      console.log(`[Manual IG Reply] Determined workspace context: '${wsIdIg}' from last message.`);
       
       // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents 'Cannot read properties of undefined' crashes)
       let igToken = null;

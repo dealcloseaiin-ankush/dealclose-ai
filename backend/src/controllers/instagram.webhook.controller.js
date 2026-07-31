@@ -1,7 +1,6 @@
 const aiService = require('../services/aiService');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
-const Lead = require('../models/leadModel'); 
 const Flow = require('../models/flowModel'); 
 const metaService = require('../services/metaAdsService');
 const metaAdsService = require('../services/metaAdsService');
@@ -376,6 +375,18 @@ exports.handleInstagramWebhook = async (req, res) => {
                 });
               }
               let currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
+              if (!currentLeadCheck) {
+                currentLeadCheck = await Lead.create({
+                  userId: user._id,
+                  workspaceId: incomingWorkspaceId, // ✅ FIX: Save workspaceId on lead creation
+                  phoneNumber: `IG_${senderId}`,
+                  name: realName,
+                  source: 'Instagram DM',
+                  status: 'new',
+                  createdBy: user._id,
+                  timeline: [{ eventType: 'Lead Created', description: 'Lead auto-captured from Instagram DM', timestamp: new Date() }]
+                });
+              }
               
               if (isEcho) {
                  await Message.create({
