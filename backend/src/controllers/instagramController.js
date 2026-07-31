@@ -1132,13 +1132,21 @@ exports.getCommentsForPost = async (req, res) => {
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
+    // ✅ BUG FIX: The logic to find the correct access token was flawed. It didn't
+    // reliably find the token for the specific workspace the post belongs to.
+    // This new logic first finds the post in the DB to get its actual workspaceId,
+    // then uses that to get the correct token, ensuring the right credentials are always used.
+    const post = await Post.findOne({ "platformPostIds.instagram": mediaId, userId }).lean();
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found in your database.' });
+
+    const postWorkspaceId = post.workspaceId || 'main';
     const selectedWorkspace = workspaceId && workspaceId !== 'main'
-      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))
       : null;
     const igConfig = selectedWorkspace?.instagramConfig
       || user.instagramConfig
       || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
-    const accessToken = igConfig?.accessToken;
+    const accessToken = igConfig?.accessToken; // Use the resolved config's token
 
     if (!accessToken) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
@@ -1168,13 +1176,21 @@ exports.replyToComment = async (req, res) => {
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
+    // ✅ BUG FIX: The logic to find the correct access token was flawed. It didn't
+    // reliably find the token for the specific workspace the post belongs to.
+    // This new logic first finds the post in the DB to get its actual workspaceId,
+    // then uses that to get the correct token, ensuring the right credentials are always used.
+    const post = await Post.findOne({ "platformPostIds.instagram": mediaId, userId }).lean();
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found in your database.' });
+
+    const postWorkspaceId = post.workspaceId || 'main';
     const selectedWorkspace = workspaceId && workspaceId !== 'main'
-      ? user.workspaces?.find(w => String(w._id) === String(workspaceId))
+      ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))
       : null;
     const igConfig = selectedWorkspace?.instagramConfig
       || user.instagramConfig
       || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
-    const accessToken = igConfig?.accessToken;
+    const accessToken = igConfig?.accessToken; // Use the resolved config's token
 
     if (!accessToken) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });

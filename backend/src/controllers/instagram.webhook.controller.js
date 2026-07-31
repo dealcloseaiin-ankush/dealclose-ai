@@ -946,9 +946,10 @@ with whatever information is available (leave budget field empty/null if not pro
              $or: [
                { "instagramConfig.instagramBusinessAccountId": igAccountId }, // New schema
                { "instagramConfig.instagramUserId": igAccountId },          // New schema (native login)
+               { "igConfig.instagramBusinessAccountId": igAccountId }, // Legacy
                { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId }, // New schema in workspace
                { "workspaces.instagramConfig.instagramUserId": igAccountId },          // New schema in workspace (native login)
-               { "igConfig.instagramBusinessAccountId": igAccountId }, // 🚀 FIX: Check legacy igConfig field
+               { "workspaces.igConfig.instagramBusinessAccountId": igAccountId }, // Legacy
              ]
           });
           
