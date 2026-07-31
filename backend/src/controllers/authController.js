@@ -788,9 +788,9 @@ const performInstagramBasicVerification = async (igUserId, accessToken) => {
   results.token.scopes = [
     'instagram_business_basic',
     'instagram_business_content_publish',
-    'instagram_business_manage_comments',
     'instagram_business_manage_messages',
-    'instagram_business_manage_insights'
+    'instagram_business_manage_insights',
+    'instagram_manage_comments' // ✅ FIX: Added the missing permission to read/manage comments.
   ];
 
   return results;
@@ -844,6 +844,7 @@ exports.instagramBasicConnect = async (req, res) => {
       // ✅ Kept as 'instagram_basic_display' string value for DB continuity with earlier
       // saved records — webhook controller's isInstagramNativeLogin() helper already
       // treats this the same as 'instagram_business_login'.
+      // treats this the same as 'instagram_business_login'. // ✅ FIX: Added loginType to the saved config.
       loginType: 'instagram_basic_display',
     };
 

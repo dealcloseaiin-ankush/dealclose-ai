@@ -1167,30 +1167,27 @@ exports.getCommentsForPost = async (req, res) => {
 // @route   POST /api/instagram/comments/:id/reply
 exports.replyToComment = async (req, res) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?._id || req.user?.id;
     const { id: commentId } = req.params;
-    const { message, workspaceId } = req.body;
+    const { message, postId } = req.body; // ✅ FIX: Use postId from frontend request body
 
     if (!message) return res.status(400).json({ success: false, message: 'Reply message is required.' });
+    if (!postId) return res.status(400).json({ success: false, message: 'Post ID is required to determine context.' });
 
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
-    // ✅ BUG FIX: The logic to find the correct access token was flawed. It didn't
-    // reliably find the token for the specific workspace the post belongs to.
-    // This new logic first finds the post in the DB to get its actual workspaceId,
-    // then uses that to get the correct token, ensuring the right credentials are always used.
-    const post = await Post.findOne({ "platformPostIds.instagram": mediaId, userId }).lean();
+    // ✅ SIMPLIFIED & CORRECTED LOGIC: Use the postId from the frontend to directly find the post in our DB.
+    // This avoids the extra API call and the "chicken-and-egg" token problem.
+    const post = await Post.findOne({ _id: postId, userId }).lean();
     if (!post) return res.status(404).json({ success: false, message: 'Post not found in your database.' });
 
+    // Now, use the correct workspace ID from the post to get the final, correct access token.
     const postWorkspaceId = post.workspaceId || 'main';
-    const selectedWorkspace = workspaceId && workspaceId !== 'main'
-      ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))
-      : null;
-    const igConfig = selectedWorkspace?.instagramConfig
-      || user.instagramConfig
-      || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
-    const accessToken = igConfig?.accessToken; // Use the resolved config's token
+    const igConfig = postWorkspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))?.instagramConfig
+      : user.instagramConfig;
+    const accessToken = igConfig?.accessToken; // This is the correct token for the reply.
 
     if (!accessToken) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
