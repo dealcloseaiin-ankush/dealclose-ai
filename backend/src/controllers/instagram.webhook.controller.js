@@ -207,18 +207,32 @@ exports.handleInstagramWebhook = async (req, res) => {
               console.log(`[IG Webhook] Received an attachment of type: ${attachment.type}`);
               
               const senderId = event.sender.id;
-              const user = await User.findOne({ $or: [ { "instagramConfig.instagramBusinessAccountId": igAccountId }, { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId } ] }).lean();
+              let user = await User.findOne({
+                $or: [
+                  { "instagramConfig.instagramBusinessAccountId": igAccountId },
+                  { "instagramConfig.instagramUserId": igAccountId },
+                  { "instagramConfig.facebookPageId": igAccountId },
+                  { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId },
+                  { "workspaces.instagramConfig.instagramUserId": igAccountId },
+                  { "workspaces.instagramConfig.facebookPageId": igAccountId },
+                ]
+              }).lean();
               if (!user) continue;
 
-              const workspace = user.workspaces?.find(w => w.instagramConfig?.instagramBusinessAccountId === igAccountId);
+              const workspace = user.workspaces?.find(w =>
+                w.instagramConfig?.instagramBusinessAccountId === igAccountId ||
+                w.instagramConfig?.instagramUserId === igAccountId ||
+                w.instagramConfig?.facebookPageId === igAccountId
+              );
+              const incomingWorkspaceId = workspace?._id ? workspace._id.toString() : 'main';
               const igToken = workspace?.instagramConfig?.accessToken || user.instagramConfig?.accessToken;
               const loginType = workspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business';
 
               if (igToken) {
                 const replyText = "Thanks for sharing! Let me know if you have any questions about this.";
                 await metaAdsService.sendInstagramDM(igToken, senderId, replyText, loginType).catch(e => console.error("Failed to send attachment ack:", e.message));
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Customer shared a ${attachment.type}]`, direction: 'incoming', status: 'received', sentBy: 'customer', timestamp: new Date() });
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Customer shared a ${attachment.type}]`, direction: 'incoming', status: 'received', sentBy: 'customer', timestamp: new Date() });
+                await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
               }
               continue;
 
@@ -245,8 +259,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                 $or: [
                   { "instagramConfig.instagramBusinessAccountId": igAccountId },
                   { "instagramConfig.instagramUserId": igAccountId },
+                  { "instagramConfig.facebookPageId": igAccountId },
                   { "workspaces.instagramConfig.instagramBusinessAccountId": igAccountId },
                   { "workspaces.instagramConfig.instagramUserId": igAccountId },
+                  { "workspaces.instagramConfig.facebookPageId": igAccountId },
                 ]
               }).lean();
               
@@ -266,7 +282,11 @@ exports.handleInstagramWebhook = async (req, res) => {
               let activeWorkspace = null;
               
               if (user && user.workspaces && user.workspaces.length > 0) {
-                  activeWorkspace = user.workspaces.find(w => w?.instagramConfig?.instagramBusinessAccountId === igAccountId);
+                  activeWorkspace = user.workspaces.find(w =>
+                    w?.instagramConfig?.instagramBusinessAccountId === igAccountId ||
+                    w?.instagramConfig?.instagramUserId === igAccountId ||
+                    w?.instagramConfig?.facebookPageId === igAccountId
+                  );
                   const workspaceInstagram = activeWorkspace?.instagramConfig;
                   if (workspaceInstagram?.accessToken) {
                      igToken = workspaceInstagram.accessToken;
@@ -334,6 +354,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (!isEcho) {
                 await Message.create({
                   userId: user._id,
+                  workspaceId: incomingWorkspaceId,
                   customerPhone: `IG_${senderId}`, 
                   channel: 'instagram_dm',
                   messageText: incomingText,
@@ -349,6 +370,7 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (isEcho) {
                  await Message.create({
                    userId: user._id,
+                   workspaceId: incomingWorkspaceId,
                    customerPhone: `IG_${senderId}`,
                    channel: 'instagram_dm',
                    messageText: incomingText,
@@ -396,7 +418,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                     deliveryStatus = 'failed';
                     displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${e.message}]`;
                 }
-                await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
+                await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: displayMsg, direction: 'outgoing', status: deliveryStatus, sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
                 if (nodeToPauseAt && flowIdToPauseAt) {
                     if (!currentLeadCheck) {
                         currentLeadCheck = await Lead.findOneAndUpdate(
@@ -624,7 +646,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                     } else {
                       await User.updateOne({ _id: user._id, "postAutomations.postId": matchedAuto.postId }, { $inc: { "postAutomations.$.stats.sentCount": 1 } });
                     }
-                    await Message.create({ userId: user._id, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Button Sent] ${matchedAuto.replyMessage}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
+                    await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Button Sent] ${matchedAuto.replyMessage}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
                   } catch(e) {
                     console.error("Quick Reply DM Error:", e.response?.data || e.message);
                   }
@@ -816,6 +838,7 @@ with whatever information is available (leave budget field empty/null if not pro
                     
                     await Message.create({
                       userId: user._id,
+                      workspaceId: incomingWorkspaceId,
                       customerPhone: `IG_${senderId}`,
                       messageText: displayMsg,
                       direction: 'outgoing',
@@ -831,6 +854,7 @@ with whatever information is available (leave budget field empty/null if not pro
                   console.error("❌ [Instagram AI Error]:", aiErr.message);
                   await Message.create({
                     userId: user._id,
+                    workspaceId: incomingWorkspaceId,
                     customerPhone: `IG_${senderId}`,
                     messageText: `[⚠️ AI System Alert: Failed to generate reply.]`,
                     direction: 'outgoing',
