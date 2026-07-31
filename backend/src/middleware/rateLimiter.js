@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 
 /**
  * Creates an Express rate limiter middleware.
@@ -17,7 +18,13 @@ const createRateLimiter = (maxRequests, windowMinutes, message) => {
     },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false,  // Disable the `X-RateLimit-*` headers
-    keyGenerator: (req) => req.headers['x-forwarded-for'] || req.ip, // Use X-Forwarded-For for proxies
+    keyGenerator: (req) => {
+      const forwardedFor = req.headers['x-forwarded-for'];
+      if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+        return ipKeyGenerator(req);
+      }
+      return ipKeyGenerator(req);
+    },
   });
 };
 

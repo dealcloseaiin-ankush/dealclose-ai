@@ -5,6 +5,9 @@ const instagramService = require('../services/instagramService');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const { automationQueue } = require('../workers/automationWorker'); // 🚀 NEW: Import BullMQ queue
 
+const normalizeWorkspaceId = (workspaceId) => (workspaceId === 'main_business' ? 'main' : workspaceId);
+const isMainWorkspaceId = (workspaceId) => !workspaceId || workspaceId === 'main' || workspaceId === 'main_business';
+
 const migrateLegacyPosts = async (userId) => {
   const legacyPosts = await SocialPost.find({ userId }).lean();
   for (const legacy of legacyPosts) {
@@ -101,14 +104,15 @@ exports.getPosts = async (req, res) => {
     console.log("\n\n🚀 [POST DEBUGGER] ==============================================");
     console.log("🚀 [POST DEBUGGER] 1. 'getPosts' controller hit!");
     const userId = req.user?._id;
-    const { workspaceId, status } = req.query;
+    const requestedWorkspaceId = normalizeWorkspaceId(req.query.workspaceId);
+    const { status } = req.query;
     await migrateLegacyPosts(userId);
     
-    console.log(`🚀 [POST DEBUGGER] 2. Frontend requested Workspace ID: '${workspaceId}', Status Filter: '${status}'`);
+    console.log(`🚀 [POST DEBUGGER] 2. Frontend requested Workspace ID: '${requestedWorkspaceId}', Status Filter: '${status}'`);
 
     const query = { userId };
-    if (workspaceId && workspaceId !== 'main') {
-      query.workspaceId = workspaceId;
+    if (requestedWorkspaceId && !isMainWorkspaceId(requestedWorkspaceId)) {
+      query.workspaceId = requestedWorkspaceId;
       console.log("   -> Filtering for a specific sub-branch.");
     } else {
       // ✅ FIX: When 'main' is selected, explicitly fetch posts for the main workspace.
@@ -321,7 +325,8 @@ exports.importInstagramPosts = async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
     
     // ✅ FIX: Find the first available Instagram connection, whether in root or workspaces.
-    const { workspaceId: requestedWorkspaceId, refreshInsights = false } = req.body;
+    const requestedWorkspaceId = normalizeWorkspaceId(req.body.workspaceId);
+    const { refreshInsights = false } = req.body;
     let igConfig = null;
     let igAccountId = null;
     let workspaceForPost = 'main';
@@ -329,7 +334,7 @@ exports.importInstagramPosts = async (req, res) => {
     console.log(`🚀 [IMPORT DEBUGGER] 2. Frontend requested import for Workspace ID: '${requestedWorkspaceId}'`);
 
     // 1. Determine the correct Instagram configuration based on requestedWorkspaceId
-    if (requestedWorkspaceId && requestedWorkspaceId !== 'main') {
+    if (requestedWorkspaceId && !isMainWorkspaceId(requestedWorkspaceId)) {
       console.log("   -> Attempting to find config in the specified sub-branch...");
       const selectedWorkspace = user.workspaces?.find(ws => String(ws._id) === String(requestedWorkspaceId));
       if (selectedWorkspace?.instagramConfig?.accessToken) {
@@ -343,15 +348,6 @@ exports.importInstagramPosts = async (req, res) => {
         igConfig = user.instagramConfig;
         workspaceForPost = 'main';
         console.log("   -> ✅ Success! Found active Instagram config in the main account.");
-      } else if (user.workspaces?.length > 0) {
-        console.log("   -> Main account has no config. Searching for a fallback in other workspaces...");
-        // Fallback: Find the first workspace with an active Instagram connection
-        const firstActiveWorkspace = user.workspaces.find(ws => ws.instagramConfig?.accessToken);
-        if (firstActiveWorkspace) {
-          igConfig = firstActiveWorkspace.instagramConfig;
-          workspaceForPost = firstActiveWorkspace._id.toString();
-          console.log(`   -> ✅ Success! Found fallback config in workspace: '${firstActiveWorkspace.name}'`);
-        }
       }
     }
 
@@ -475,7 +471,7 @@ exports.downloadPostMedia = async (req, res) => {
 exports.getPostAnalytics = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { workspaceId } = req.query;
+    const requestedWorkspaceId = normalizeWorkspaceId(req.query.workspaceId);
 
     // Publisher analytics are for posts that actually exist on Instagram.
     const query = {
@@ -483,8 +479,10 @@ exports.getPostAnalytics = async (req, res) => {
       status: 'published',
       'platformPostIds.instagram': { $exists: true, $nin: [null, ''] },
     };
-    if (workspaceId && workspaceId !== 'main') {
-      query.workspaceId = workspaceId;
+    if (requestedWorkspaceId && !isMainWorkspaceId(requestedWorkspaceId)) {
+      query.workspaceId = requestedWorkspaceId;
+    } else {
+      query.workspaceId = 'main';
     }
 
     const posts = await Post.find(query).sort({ 'analytics.engagement': -1 }).lean();

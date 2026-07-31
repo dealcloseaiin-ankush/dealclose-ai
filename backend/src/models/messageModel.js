@@ -3,6 +3,7 @@ const Schema = mongoose.Schema;
 
 const messageSchema = new Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // SaaS User ID
+  workspaceId: { type: String, default: 'main', index: true },
   customerPhone: { type: String, required: true },
   messageText: { type: String },
   direction: { type: String, enum: ['incoming', 'outgoing'], required: true }, // Chat aayi ya gayi

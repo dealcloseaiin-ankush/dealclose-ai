@@ -10,9 +10,24 @@ exports.getChats = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized. Please login again.' });
     
-    const { search, platform } = req.query;
+    const { search, platform, workspaceId: requestedWorkspaceId } = req.query;
+    const normalizedWorkspaceId = requestedWorkspaceId === 'main_business' ? 'main' : requestedWorkspaceId;
 
-    const messages = await Message.find({ userId, isDeleted: { $ne: true } }).lean().sort({ timestamp: 1 });
+    const messageQuery = { userId, isDeleted: { $ne: true } };
+    if (normalizedWorkspaceId && normalizedWorkspaceId !== 'all') {
+      if (normalizedWorkspaceId === 'main') {
+        messageQuery.$or = [
+          { workspaceId: 'main' },
+          { workspaceId: { $exists: false } },
+          { workspaceId: null },
+          { workspaceId: 'default' }
+        ];
+      } else {
+        messageQuery.workspaceId = normalizedWorkspaceId;
+      }
+    }
+
+    const messages = await Message.find(messageQuery).lean().sort({ timestamp: 1 });
 
     const leads = await Lead.find({ userId }).lean();
     const leadDataMap = {};
@@ -171,11 +186,12 @@ exports.sendManualMessage = async (req, res) => {
       }
 
       const newMsg = await Message.create({
-        userId, 
-        customerPhone: customerPhone, 
-        messageText, 
-        direction: 'outgoing', 
-        status: 'sent', 
+        userId,
+        workspaceId: wsIdIg,
+        customerPhone: customerPhone,
+        messageText,
+        direction: 'outgoing',
+        status: 'sent',
         sentBy: 'staff',
         timestamp: new Date()
       });

@@ -14,7 +14,7 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global workspace state
   const workspaces = useMemo(() => { // 🚀 NEW: Derive workspaces from user data
-    const mainBusiness = { _id: 'main_business', name: (user?.businessName && user.businessName !== 'Main Business') ? user.businessName : 'DealClose AI (Main)' };
+    const mainBusiness = { _id: 'main', name: (user?.businessName && user.businessName !== 'Main Business') ? user.businessName : 'DealClose AI (Main)' };
     const otherWorkspaces = user?.workspaces || [];
     return [mainBusiness, ...otherWorkspaces];
   }, [user]);

@@ -59,7 +59,7 @@ export default function Chats() {
           if (u && isMounted) setWorkspaces([{ _id: 'main', name: u.businessName || 'Main Business' }, ...(u.workspaces || [])]);
         }
 
-        const { data } = await api.get('/chats');
+        const { data } = await api.get('/chats', { params: { workspaceId: activeWorkspace } });
         const messages = Array.isArray(data) ? data : data.data || [];
 
         if (!isMounted) return;
