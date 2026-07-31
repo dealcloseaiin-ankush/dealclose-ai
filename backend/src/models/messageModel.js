@@ -6,9 +6,9 @@ const messageSchema = new Schema({
   workspaceId: { type: String, default: 'main', index: true },
   customerPhone: { type: String, required: true },
   messageText: { type: String },
-  direction: { type: String, enum: ['incoming', 'outgoing'], required: true }, // Chat aayi ya gayi
+  direction: { type: String, enum: ['incoming', 'outgoing'], required: true },
   status: { type: String, enum: ['sent', 'delivered', 'read', 'received', 'failed'], default: 'sent' },
-  wamid: { type: String, index: true }, // Meta's WhatsApp Message ID for status tracking
+  wamid: { type: String }, // Meta's WhatsApp Message ID for status tracking
   // 🚀 FIX: Added the 'channel' field to distinguish between message sources.
   // This was a critical missing field. Without it, the retention policy couldn't
   // apply different TTLs for WhatsApp vs. Instagram, and the data was inconsistent.

@@ -1140,13 +1140,14 @@ exports.getCommentsForPost = async (req, res) => {
     if (!post) return res.status(404).json({ success: false, message: 'Post not found in your database.' });
 
     const postWorkspaceId = post.workspaceId || 'main';
-    const selectedWorkspace = workspaceId && workspaceId !== 'main'
-      ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))
-      : null;
-    const igConfig = selectedWorkspace?.instagramConfig
-      || user.instagramConfig
-      || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
-    const accessToken = igConfig?.accessToken; // Use the resolved config's token
+    
+    // ✅ SIMPLIFIED & CORRECTED TOKEN LOGIC: Find the correct config based on the post's actual workspace.
+    const igConfig = postWorkspaceId !== 'main'
+      ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))?.instagramConfig
+      : user.instagramConfig;
+    const accessToken = igConfig?.accessToken;
+    // ✅ CRITICAL FIX: We must also get the loginType to call the correct Meta API endpoint.
+    const loginType = igConfig?.loginType || 'facebook_business';
 
     if (!accessToken) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
@@ -1155,7 +1156,7 @@ exports.getCommentsForPost = async (req, res) => {
     // 🚀 FIX: Explicitly request the 'replies' field for each comment.
     // Without this, the API only returns top-level comments, and we can't show the nested replies in the UI.
     // We also ask for the username for each reply.
-    const comments = await instagramService.getCommentsForPost(mediaId, accessToken, 'id,text,username,timestamp,replies{id,text,username,timestamp}');
+    const comments = await instagramService.getCommentsForPost(mediaId, accessToken, 'id,text,username,timestamp,replies{id,text,username,timestamp}', loginType);
     res.status(200).json({ success: true, comments });
 
   } catch (error) {
