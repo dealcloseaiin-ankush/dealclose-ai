@@ -426,6 +426,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                             {
                                 $setOnInsert: {
                                     name: realName,
+                                    workspaceId: incomingWorkspaceId,
                                     source: 'Instagram DM',
                                     status: 'visitor',
                                     createdBy: user._id
@@ -971,6 +972,7 @@ with whatever information is available (leave budget field empty/null if not pro
              
              await Message.create({
                userId: user._id,
+               workspaceId: incomingWorkspaceId,
                customerPhone: `IG_${igUserId}`, 
                channel: 'instagram_comment',
                messageText: `[💬 IG Comment - Phone Detected, awaiting confirmation]: ${commentText}`,
@@ -1147,6 +1149,7 @@ with whatever information is available (leave budget field empty/null if not pro
              
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming') });
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_dm', messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
+
           } else {
              const accountAiEnabled = incomingWorkspaceId !== 'main'
                ? activeWorkspaceNode?.aiAgentEnabled !== false
@@ -1211,7 +1214,7 @@ with whatever information is available (leave budget field empty/null if not pro
                  await saveThreadState(threadKey, threadState);
 
                  await Message.create({ // Log the public AI reply
-                   userId: user._id, customerPhone: `IG_${igUserId}`,
+                   userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`,
                    channel: 'instagram_comment',
                    messageText: `[Public AI Reply]: ${aiReply}`,
                    direction: 'outgoing', status: 'sent', sentBy: 'ai',
@@ -1223,6 +1226,7 @@ with whatever information is available (leave budget field empty/null if not pro
              
              await Message.create({
                userId: user._id,
+               workspaceId: incomingWorkspaceId,
                customerPhone: `IG_${igUserId}`,
                channel: 'instagram_comment',
                messageText: `[💬 IG Comment - Unhandled]: ${commentText}`,

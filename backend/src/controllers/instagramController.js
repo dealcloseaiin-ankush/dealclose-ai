@@ -214,9 +214,9 @@ exports.getRecentPosts = async (req, res) => {
     // ✅ CRITICAL FIX: The "Invalid OAuth access token" error was caused by always calling graph.facebook.com.
     // This now correctly checks the `loginType` to determine if the Instagram-native domain (`graph.instagram.com`)
     // should be used, which is required for accounts connected via the "Connect with Instagram Login" button.
-    const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
     // 🚀 FIX: Use the correct API domain based on the connection type.
     // Hardcoding graph.facebook.com was causing post fetching to fail for native Instagram connections.
+    const useInstagramDomain = loginType === 'instagram_business_login' || loginType === 'instagram_basic_display';
     const baseUrl = useInstagramDomain ? 'https://graph.instagram.com/v19.0' : 'https://graph.facebook.com/v19.0';
     const url = `${baseUrl}/${accountId}/media`;
 
