@@ -23,9 +23,12 @@ const instagramConfigSchema = new Schema({
   profilePictureUrl: { type: String },
   lastVerifiedAt: { type: Date },
   // ✅ FIX: Added 'instagram_basic_display' to the enum list.
-  // This was causing a critical `ValidationError` when saving a user document
-  // with an Instagram account connected via the "Instagram Login" flow,
-  // which silently broke other database save operations for that user.
+  // This was a critical `ValidationError` when saving a user document with an
+  // Instagram account connected via the "Instagram Login" flow, which
+  // silently broke other database save operations for that user.
+  // 🚀 FIX: Added 'instagram_basic_display' to the enum list. This was causing a
+  // critical `ValidationError` when saving a user document with an Instagram
+  // account connected via the "Instagram Login" flow.
   loginType: { 
     type: String, enum: ['facebook_business', 'instagram_business_login', 'instagram_basic_display'], default: 'facebook_business' 
   }, // 🚀 NEW: To differentiate OAuth flows

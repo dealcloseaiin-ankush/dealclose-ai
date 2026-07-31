@@ -199,27 +199,26 @@ exports.sendManualMessage = async (req, res) => {
       // Dispatch IG message via Meta Graph API
       try {
         let recipientId = customerPhone.replace('IG_', '');
+        const loginType = (user.instagramConfig || user.igConfig)?.loginType || 'facebook_business';
           
           console.log(`\n================== [MANUAL REPLY MEGA DEBUG] ==================`);
           console.log(`Sending manual reply to IG ID: ${recipientId}`);
+          console.log(`Using loginType: ${loginType}`);
           
-          const response = await require('axios').post(`https://graph.facebook.com/v19.0/me/messages`, {
-             recipient: { id: recipientId },
-             message: { text: messageText },
-             messaging_type: "RESPONSE"
-          }, { params: { access_token: igToken } });
+          // ✅ FIX: Use the centralized, loginType-aware service instead of a raw axios call.
+          // This was the source of the "Invalid OAuth access token" error for native IG connections.
+          const response = await metaAdsService.sendInstagramDM(igToken, recipientId, messageText, loginType);
           
           console.log(`✅ META RETURNED SUCCESS (200 OK)! Response:`, JSON.stringify(response.data));
           console.log(`⚠️ IF THIS IS INVISIBLE IN IG APP, CHECK MESSAGE REQUESTS FOLDER OR META APP MODE.`);
           console.log(`===============================================================\n`);
-          newMsg.wamid = response.data.message_id;
+          newMsg.wamid = response.data?.message_id;
           await newMsg.save();
       } catch (igError) {
         console.error(`❌ META REJECTED MANUAL REPLY:`, igError.response?.data || igError.message);
         newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
         newMsg.status = 'failed'; // Update status to failed
         await newMsg.save();
-        console.error(`❌ [DEBUG Chat Flow] Error sending IG DM:`, igError.response?.data || igError.message);
       }
 
       // 🚀 NEW: Broadcast the new message to all connected chat dashboards

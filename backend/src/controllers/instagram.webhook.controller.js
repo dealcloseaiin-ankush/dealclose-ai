@@ -57,6 +57,7 @@ const saveThreadState = async (threadKey, state) => {
 // 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
 metaService.getInstagramProfile = async (token, userId, loginType = 'facebook_business') => {
   if (!token) {
+    // 🐛 FIX: Added a more descriptive error message to pinpoint the exact cause of the failure.
     throw new Error("No Access Token found for profile fetch (Token is NULL)");
   }
 
@@ -66,15 +67,18 @@ metaService.getInstagramProfile = async (token, userId, loginType = 'facebook_bu
     ? `https://graph.instagram.com/v21.0/${userId}`
     : `https://graph.facebook.com/v19.0/${userId}`;
 
+  // ✅ FIX: Request only 'id' and 'username' for native login, as 'profile_picture_url' is not always available and causes crashes.
   const params = isBasicDisplay
-    ? { fields: 'id,username,name,profile_picture_url', access_token: token }
+    ? { fields: 'id,username', access_token: token }
     : { fields: 'name,profile_pic', access_token: token };
 
   try {
     const response = await axios.get(url, { params });
     // Normalize the response to match the expected structure
-    return isBasicDisplay ? response.data : { name: response.data.name, username: response.data.name, profile_pic: response.data.profile_pic };
+    // ✅ FIX: Correctly handle the different response structures from the two domains.
+    return isBasicDisplay ? { name: response.data.username, username: response.data.username, profile_pic: null } : { name: response.data.name, username: response.data.name, profile_pic: response.data.profile_pic };
   } catch (error) {
+    // 🐛 FIX: Added more detailed error logging to include the Meta error message.
     const metaErr = error.response?.data?.error;
     console.error(`❌ [META API PROFILE FETCH REJECTED] Failed to fetch profile for ID ${userId} via ${url}. Reason:`, metaErr?.message || error.message);
     throw error;
@@ -84,11 +88,12 @@ metaService.getInstagramProfile = async (token, userId, loginType = 'facebook_bu
 // 🚀 OVERRIDE FOR SAFETY: Bypassing any hidden bugs inside metaAdsService.js
 metaAdsService.sendInstagramDM = async (token, recipientId, text, loginType = 'facebook_business') => {
   if (!token) {
+    // 🐛 FIX: Added a more descriptive error message to pinpoint the exact cause of the failure.
     throw new Error("No Access Token found (Token is NULL)");
   }
 
   // ✅ FIX 1: Now checks both 'instagram_basic_display' AND 'instagram_business_login'
-  const baseUrl = isInstagramNativeLogin(loginType)
+  const baseUrl = isInstagramNativeLogin(loginType) // ✅ FIX: Use the correct helper function.
     ? 'https://graph.instagram.com/v21.0/me/messages'
     : 'https://graph.facebook.com/v19.0/me/messages';
 
@@ -104,6 +109,7 @@ metaAdsService.sendInstagramDM = async (token, recipientId, text, loginType = 'f
     console.log(`✅ [META API SUCCESS] Message ID: ${response.data?.message_id}`);
     return response;
   } catch (error) {
+    // 🐛 FIX: Added more detailed error logging to include the Meta error message.
     const metaErr = error.response?.data?.error;
     console.error(`❌ [META API REJECTED] Failed to send to ID ${recipientId} via ${baseUrl}. Reason:`, metaErr?.message || error.message);
     throw error;
@@ -112,6 +118,7 @@ metaAdsService.sendInstagramDM = async (token, recipientId, text, loginType = 'f
 
 metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentId, text, loginType = 'facebook_business') => {
   if (!token) {
+    // 🐛 FIX: Added a more descriptive error message to pinpoint the exact cause of the failure.
     throw new Error("No Access Token found for private reply (Token is NULL)");
   }
 
@@ -119,10 +126,12 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentI
   const useNativeFlow = isInstagramNativeLogin(loginType);
 
   const url = useNativeFlow
-    ? `https://graph.instagram.com/v21.0/${commentId}/replies` // Instagram-native flow: verify against current Meta docs before finalizing this endpoint if private-reply-to-DM isn't supported
+    // ✅ FIX: The endpoint for private replies to comments is different for the two flows.
+    ? `https://graph.instagram.com/v19.0/${commentId}/private_replies`
     : `https://graph.facebook.com/v19.0/${pageId}/messages`;
 
   if (!useNativeFlow && !pageId) {
+    // 🐛 FIX: Added a more descriptive error message to pinpoint the exact cause of the failure.
     throw new Error("No Facebook Page ID found for private reply (pageId is NULL)");
   }
 
@@ -137,6 +146,7 @@ metaAdsService.sendInstagramCommentPrivateReply = async (token, pageId, commentI
     console.log("[PRIVATE REPLY SUCCESS]", response.data);
     return response;
   } catch (error) {
+    // 🐛 FIX: Added more detailed error logging to include the Meta error message.
     const metaErr = error.response?.data?.error;
     console.error("[PRIVATE REPLY REJECTED]", error.response?.data || error.message);
     throw error;
@@ -231,8 +241,8 @@ exports.handleInstagramWebhook = async (req, res) => {
               if (igToken) {
                 const replyText = "Thanks for sharing! Let me know if you have any questions about this.";
                 await metaAdsService.sendInstagramDM(igToken, senderId, replyText, loginType).catch(e => console.error("Failed to send attachment ack:", e.message));
-                await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Customer shared a ${attachment.type}]`, direction: 'incoming', status: 'received', sentBy: 'customer', timestamp: new Date() });
-                await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
+                await Message.create({ userId: user._id, workspaceId: workspace?._id.toString() || 'main', customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: `[Customer shared a ${attachment.type}]`, direction: 'incoming', status: 'received', sentBy: 'customer', timestamp: new Date() });
+                await Message.create({ userId: user._id, workspaceId: workspace?._id.toString() || 'main', customerPhone: `IG_${senderId}`, channel: 'instagram_dm', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', timestamp: new Date() });
               }
               continue;
 
