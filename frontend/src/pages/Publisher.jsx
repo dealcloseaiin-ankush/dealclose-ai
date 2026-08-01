@@ -451,34 +451,37 @@ export default function Publisher() {
             </div>
 
             {/* Top Posts */}
-            <div>
-              <h3 className="text-lg font-bold text-white mb-4">Top Performing Posts</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs text-gray-500 uppercase border-b border-gray-800">
-                      <th className="p-2">Post</th>
-                      <th className="p-2 text-center">Reach</th>
-                      <th className="p-2 text-center">Likes</th>
-                      <th className="p-2 text-center">Comments</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.topPosts.map(p => (
-                      <tr key={p._id} className="border-b border-gray-800 hover:bg-gray-900/50">
-                        <td className="p-2 flex items-center gap-3">
-                          <img src={p.mediaUrl} className="w-10 h-10 rounded-md object-cover bg-black"/>
-                          <span className="text-xs text-gray-300 line-clamp-1">{p.caption}</span>
-                        </td>
-                        <td className="p-2 text-center font-bold">{p.reach?.toLocaleString()}</td>
-                        <td className="p-2 text-center font-bold">{p.likes?.toLocaleString()}</td>
-                        <td className="p-2 text-center font-bold">{p.comments?.toLocaleString()}</td>
+            {/* ✅ FIX: Render the top posts table only if there are posts to show. */}
+            {analytics.topPosts && analytics.topPosts.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-white mb-4">Top Performing Posts</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-xs text-gray-500 uppercase border-b border-gray-800">
+                        <th className="p-2">Post</th>
+                        <th className="p-2 text-center">Reach</th>
+                        <th className="p-2 text-center">Likes</th>
+                        <th className="p-2 text-center">Comments</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {analytics.topPosts.map(p => (
+                        <tr key={p._id} className="border-b border-gray-800 hover:bg-gray-900/50">
+                          <td className="p-2 flex items-center gap-3">
+                            <img src={p.mediaUrl} className="w-10 h-10 rounded-md object-cover bg-black" alt="Post thumbnail"/>
+                            <span className="text-xs text-gray-300 line-clamp-1">{p.caption}</span>
+                          </td>
+                          <td className="p-2 text-center font-bold">{p.reach?.toLocaleString()}</td>
+                          <td className="p-2 text-center font-bold">{p.likes?.toLocaleString()}</td>
+                          <td className="p-2 text-center font-bold">{p.comments?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-20 bg-[#111] border border-dashed border-gray-800 rounded-2xl">

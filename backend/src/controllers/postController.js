@@ -297,7 +297,12 @@ exports.deletePost = async (req, res) => {
           instagramDeletionMessage = 'Instagram not connected for this workspace. Post deleted from dashboard, but may remain on Instagram.';
           console.warn(`⚠️ [Delete Post] Instagram token missing for post ${post._id}. Not attempting Instagram deletion.`);
         } else {
-          await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken, igConfig.loginType);
+          // ✅ CRITICAL FIX: Pass the correct loginType to the deleteMedia service.
+          // The service was defaulting to 'facebook_business', causing deletions to fail
+          // for accounts connected via the native Instagram login flow.
+          const loginType = igConfig.loginType || 'facebook_business';
+          console.log(`[Delete Post] Attempting deletion for media ${post.platformPostIds.instagram} using loginType: ${loginType}`);
+          await instagramService.deleteMedia(post.platformPostIds.instagram, igConfig.accessToken, loginType);
           instagramDeletionMessage = 'Post deleted successfully from Instagram and the dashboard.';
         }
       } catch (igDeleteError) {
@@ -307,7 +312,18 @@ exports.deletePost = async (req, res) => {
       }
     }
 
-    // If this post was migrated from the legacy collection, delete the original as well.
+    // ✅ CRITICAL FIX: Prevent re-importing of deleted posts.
+    // If the post was imported, we don't delete it from Instagram. Instead, we mark it
+    // as 'soft-deleted' in our database so the sync process knows to ignore it in the future.
+    // This stops deleted posts from reappearing on refresh.
+    if (post.isImported) {
+      await Post.updateOne(
+        { _id: post._id },
+        { $set: { status: 'archived', isDeleted: true } }
+      );
+      instagramDeletionMessage = 'Post has been hidden from your dashboard. It will not be re-imported. It still exists on Instagram.';
+    }
+
     if (post.legacySocialPostId) {
       await SocialPost.findByIdAndDelete(post.legacySocialPostId);
     }
