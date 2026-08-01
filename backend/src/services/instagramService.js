@@ -338,11 +338,16 @@ exports.getPostInsights = async (mediaId, accessToken, loginType = 'facebook_bus
     : 'https://graph.facebook.com/v19.0';
 
   try {
-    const metrics = 'impressions,reach,saved,video_views,likes,comments,shares';
+    // 🚀 UPGRADE: Fetch all available and useful metrics for a comprehensive analysis.
+    // This includes engagement, reach, saves, and video-specific metrics.
+    const metrics = 'engagement,impressions,reach,saved,video_views,plays,shares,total_interactions';
     const url = `${baseUrl}/${mediaId}/insights`;
     
     const response = await axios.get(url, {
-      params: { metric: metrics, access_token: accessToken },
+      params: { 
+        metric: metrics, 
+        access_token: accessToken 
+      },
     });
 
     const insights = {};

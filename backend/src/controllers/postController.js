@@ -411,6 +411,9 @@ exports.importInstagramPosts = async (req, res) => {
             likes: liveInsights?.likes ?? post.like_count ?? 0,
             comments: liveInsights?.comments ?? post.comments_count ?? 0,
             reach: liveInsights?.reach ?? 0,
+            impressions: liveInsights?.impressions ?? 0,
+            saves: liveInsights?.saved ?? 0,
+            shares: liveInsights?.shares ?? 0,
           }
         });
         importedCount++;
@@ -427,6 +430,9 @@ exports.importInstagramPosts = async (req, res) => {
               'analytics.likes': liveInsights?.likes ?? post.like_count ?? 0,
               'analytics.comments': liveInsights?.comments ?? post.comments_count ?? 0,
               'analytics.reach': liveInsights?.reach ?? existingPost.analytics?.reach ?? 0,
+              'analytics.impressions': liveInsights?.impressions ?? existingPost.analytics?.impressions ?? 0,
+              'analytics.saves': liveInsights?.saved ?? existingPost.analytics?.saves ?? 0,
+              'analytics.shares': liveInsights?.shares ?? existingPost.analytics?.shares ?? 0,
             },
           }
         );
