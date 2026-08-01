@@ -7,6 +7,7 @@ const Lead = require('../models/leadModel');
 const Post = require('../models/postModel');
 const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const whatsappService = require('../services/whatsappService');
+const { automationQueue } = require('../workers/automationWorker');
 
 // 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
 const MODELS = {
@@ -169,6 +170,125 @@ exports.answerTrainingQuestion = async (req, res) => {
 
 // @desc    Handle Dashboard Setup Assistant Chat
 // @route   POST /api/ai/dashboard-assistant
+const parsePlannerScheduleLines = (plannerResponse = '') => {
+  const lines = plannerResponse
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const items = [];
+  const dayMap = {
+    mon: 1,
+    monday: 1,
+    tue: 2,
+    tuesday: 2,
+    wed: 3,
+    wednesday: 3,
+    thu: 4,
+    thursday: 4,
+    fri: 5,
+    friday: 5,
+    sat: 6,
+    saturday: 6,
+    sun: 0,
+    sunday: 0,
+  };
+
+  for (const line of lines) {
+    const normalized = line.toLowerCase();
+    const dayMatch = Object.keys(dayMap).find(day => normalized.startsWith(day));
+    if (!dayMatch) continue;
+
+    const dayIndex = dayMap[dayMatch];
+    const content = line.replace(/^\s*\w+\s*[:\-–]?\s*/i, '').trim();
+    if (!content) continue;
+
+    items.push({ dayIndex, content });
+  }
+
+  return items;
+};
+
+const getNextDateForWeekday = (weekdayIndex, offsetWeeks = 0) => {
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dayOffset = (weekdayIndex - startOfToday.getDay() + 7) % 7;
+  const scheduledDate = new Date(startOfToday);
+  scheduledDate.setDate(startOfToday.getDate() + dayOffset + (offsetWeeks * 7));
+  scheduledDate.setHours(10, 0, 0, 0);
+  return scheduledDate;
+};
+
+exports.generateContentPlanSchedule = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { plannerPrompt, plannerResponse, workspaceId } = req.body;
+
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!plannerResponse || !plannerResponse.trim()) {
+      return res.status(400).json({ success: false, message: 'plannerResponse is required' });
+    }
+
+    const parsedItems = parsePlannerScheduleLines(plannerResponse);
+    if (parsedItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'No scheduleable dates were found in the AI response.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const fallbackTemplateQuery = Post.findOne({
+      userId,
+      isDeleted: { $ne: true },
+      workspaceId: workspaceId || 'main',
+      mediaUrls: { $exists: true, $ne: [] },
+    }).sort({ createdAt: -1 });
+
+    const fallbackTemplatePost = await (fallbackTemplateQuery.lean ? fallbackTemplateQuery.lean() : fallbackTemplateQuery);
+
+    const scheduledItems = [];
+    for (const [index, item] of parsedItems.entries()) {
+      const scheduledAt = getNextDateForWeekday(item.dayIndex, Math.floor(index / 5));
+      const mediaUrls = fallbackTemplatePost?.mediaUrls?.length
+        ? fallbackTemplatePost.mediaUrls
+        : [{ url: 'https://placehold.co/1200x1200/1f2937/ffffff?text=AI+Content+Plan', type: 'image' }];
+
+      const post = await Post.create({
+        userId,
+        workspaceId: workspaceId || 'main',
+        caption: `${item.content}`.trim(),
+        mediaUrls,
+        platforms: ['instagram'],
+        status: 'scheduled',
+        scheduledAt,
+        designedBy: 'ai-planner',
+        isImported: false,
+        failureReason: '',
+      });
+
+      const delay = Math.max(0, scheduledAt.getTime() - Date.now());
+      await automationQueue.add('publish_scheduled_post', { postId: post._id }, { delay });
+
+      scheduledItems.push({
+        postId: post._id,
+        caption: item.content,
+        scheduledAt: scheduledAt.toISOString(),
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      scheduledPosts: scheduledItems.length,
+      message: `Successfully queued ${scheduledItems.length} AI-planned posts for automatic publishing.`,
+      scheduledItems,
+      plannerPrompt,
+    });
+  } catch (error) {
+    console.error('AI Content Plan Scheduler Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to schedule AI content plan.', error: error.message });
+  }
+};
+
 exports.handleDashboardAssistant = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -189,7 +309,7 @@ exports.handleDashboardAssistant = async (req, res) => {
     // recommend a next post without guessing or exposing raw customer data.
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const [recentPosts, insightHistory] = await Promise.all([
-      Post.find({ userId, status: 'published', publishedAt: { $gte: thirtyDaysAgo } })
+      Post.find({ userId, isDeleted: { $ne: true }, status: 'published', publishedAt: { $gte: thirtyDaysAgo } })
         .select('caption publishedAt analytics').lean(),
       InstagramInsightSnapshot.find({ userId, date: { $gte: thirtyDaysAgo } })
         .select('date followerCount reach impressions profileViews websiteClicks accountsEngaged').sort({ date: 1 }).lean(),

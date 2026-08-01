@@ -6,15 +6,20 @@ import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get u
 import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import workspace store
 import toast from 'react-hot-toast';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
 export default function Publisher() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('list'); // list, analytics
+  const [view, setView] = useState('list'); // list, analytics, planner
   const [filter, setFilter] = useState('all'); // all, scheduled, published, drafts, failed
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [plannerPrompt, setPlannerPrompt] = useState('Create a 4-week Instagram content plan for my business. Suggest 3 posts per week, ideal posting days, and how to improve the caption angle for better engagement.');
+  const [plannerResponse, setPlannerResponse] = useState('');
+  const [plannerLoading, setPlannerLoading] = useState(false);
+  const [plannerScheduleLoading, setPlannerScheduleLoading] = useState(false);
   
   // 🚀 NEW: Workspace states
   const { user } = useAuth() || {};
@@ -276,6 +281,59 @@ export default function Publisher() {
     }
   };
 
+  const handleGeneratePlanner = async () => {
+    if (!plannerPrompt.trim()) {
+      toast.error('Please describe your content plan goal first.');
+      return;
+    }
+
+    setPlannerLoading(true);
+    try {
+      const { data } = await api.post('/ai/dashboard-assistant', {
+        message: plannerPrompt,
+        history: [],
+      });
+
+      if (data.success) {
+        setPlannerResponse(data.reply || 'No AI planning response received.');
+        toast.success('AI content plan generated.');
+      } else {
+        throw new Error(data.message || 'Unable to generate AI plan.');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to generate content plan.');
+    } finally {
+      setPlannerLoading(false);
+    }
+  };
+
+  const handleSchedulePlanner = async () => {
+    if (!plannerResponse.trim()) {
+      toast.error('Generate the AI plan first before scheduling it.');
+      return;
+    }
+
+    setPlannerScheduleLoading(true);
+    try {
+      const { data } = await api.post('/ai/generate-content-plan-schedule', {
+        plannerPrompt,
+        plannerResponse,
+        workspaceId: activeWorkspace,
+      });
+
+      if (data.success) {
+        toast.success(data.message || 'AI content plan scheduled successfully.');
+      } else {
+        throw new Error(data.message || 'Unable to schedule AI plan.');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to schedule content plan.');
+    } finally {
+      setPlannerScheduleLoading(false);
+    }
+  };
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -287,6 +345,19 @@ export default function Publisher() {
         return <Edit className="text-gray-400" size={14} />;
     }
   };
+
+  const analyticsSummary = analytics ? (() => {
+    const totalPosts = Math.max(analytics.topPosts?.length || 0, 1);
+    const avgReach = Math.round((analytics.totalReach || 0) / totalPosts);
+    const avgEngagement = analytics.totalReach ? ((analytics.totalLikes + analytics.totalComments + analytics.totalShares + analytics.totalSaves) / analytics.totalReach * 100).toFixed(2) : 0;
+    const bestPost = analytics.topPosts?.[0];
+
+    return {
+      avgReach,
+      avgEngagement,
+      bestPost,
+    };
+  })() : null;
 
   return (
     <div className="p-6 md:p-10 bg-[#050505] min-h-screen text-gray-100 font-sans relative">
@@ -330,6 +401,7 @@ export default function Publisher() {
         <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-gray-800 pb-4">
           <button onClick={() => setView('list')} className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 border ${view === 'list' ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900'}`}><Calendar size={16}/> Content</button>
           <button onClick={() => setView('analytics')} className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 border ${view === 'analytics' ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900'}`}><BarChart2 size={16}/> Analytics</button>
+          <button onClick={() => setView('planner')} className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 border ${view === 'planner' ? 'bg-purple-500/10 text-purple-300 border-purple-500/30' : 'bg-[#111] border-gray-800 text-gray-400 hover:bg-gray-900'}`}><Sparkles size={16}/> AI Planner</button>
           <div className="w-px h-6 bg-gray-700 mx-2 hidden sm:block"></div>
           {view === 'list' && ['all', 'live', 'scheduled', 'draft', 'failed'].map(status => (
               <button
@@ -347,6 +419,60 @@ export default function Publisher() {
         </div>
 
         {/* Content Area */}
+        {view === 'planner' && (
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
+            <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
+              <h3 className="text-xl font-bold text-white mb-2">AI Content Planner</h3>
+              <p className="text-sm text-gray-400 mb-4">Weekly or monthly content plan create karne ke liye goal, cadence aur content pillars describe karein. AI se plan generate hoga.</p>
+              <textarea
+                value={plannerPrompt}
+                onChange={(e) => setPlannerPrompt(e.target.value)}
+                rows={8}
+                className="w-full bg-[#0a0a0a] border border-gray-700 text-white rounded-xl p-4 outline-none focus:border-purple-500"
+                placeholder="Example: Create a 4-week Instagram content calendar for our business. Suggest 3 posts every week, the best days to publish, and a CTA for each post."
+              />
+              <div className="mt-4 flex gap-3 flex-wrap">
+                <button
+                  onClick={handleGeneratePlanner}
+                  disabled={plannerLoading}
+                  className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl"
+                >
+                  {plannerLoading ? 'Generating...' : 'Generate AI Plan'}
+                </button>
+                <button
+                  onClick={handleSchedulePlanner}
+                  disabled={plannerScheduleLoading || !plannerResponse.trim()}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl disabled:opacity-50"
+                >
+                  {plannerScheduleLoading ? 'Scheduling...' : 'Schedule AI Plan'}
+                </button>
+                <button
+                  onClick={() => setPlannerPrompt('Create a 4-week Instagram content calendar for my business. Suggest 3 posts per week, the best posting days, and optimization ideas for better engagement.')}
+                  className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700"
+                >
+                  Reset Prompt
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
+              <h3 className="text-xl font-bold text-white mb-2">Smart Content Roadmap</h3>
+              <p className="text-sm text-gray-400 mb-4">AI generated schedule ko yahan clear roadmap ke roop me dekhna easy hoga.</p>
+              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                {plannerResponse ? plannerResponse.split('\n').filter(Boolean).map((item, idx) => (
+                  <div key={idx} className="bg-[#0d0d0d] border border-gray-800 rounded-xl p-3 text-sm text-gray-300">
+                    {item}
+                  </div>
+                )) : (
+                  <div className="bg-[#0d0d0d] border border-dashed border-gray-800 rounded-xl p-6 text-center text-gray-500 text-sm">
+                    AI plan generate karne ke liye prompt fill kijiye.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {view === 'list' && (loading ? (
           <div className="text-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
@@ -433,26 +559,57 @@ export default function Publisher() {
           <div className="text-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto"></div></div>
         ) : analytics ? (
           <div className="space-y-8 animate-fade-in">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Reach</p><p className="text-2xl font-bold text-white">{analytics.totalReach.toLocaleString()}</p></div>
-              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Likes</p><p className="text-2xl font-bold text-white">{analytics.totalLikes.toLocaleString()}</p></div>
-              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Comments</p><p className="text-2xl font-bold text-white">{analytics.totalComments.toLocaleString()}</p></div>
-              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Shares</p><p className="text-2xl font-bold text-white">{analytics.totalShares.toLocaleString()}</p></div>
-              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Saves</p><p className="text-2xl font-bold text-white">{analytics.totalSaves.toLocaleString()}</p></div>
-              <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Profile Visits</p><p className="text-2xl font-bold text-white">{analytics.totalProfileVisits.toLocaleString()}</p></div>
-              <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/30 text-center"><p className="text-xs text-purple-300">Engagement Rate</p><p className="text-2xl font-bold text-white">{analytics.engagementRate}%</p></div>
+            <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_0.7fr] gap-6">
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-6 rounded-2xl border border-blue-500/20">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-2">Performance Snapshot</h3>
+                      <p className="text-sm text-blue-200">{analytics.aiRecommendation}</p>
+                      <p className="text-xs text-purple-300 mt-3 font-bold">Best time to post: {analytics.bestTimeToPost}</p>
+                    </div>
+                    <div className="bg-black/30 px-4 py-3 rounded-xl border border-white/10">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Best post</p>
+                      <p className="text-sm font-bold text-white mt-1 line-clamp-1">{analyticsSummary?.bestPost?.caption || 'No live post yet'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Reach</p><p className="text-2xl font-bold text-white">{analytics.totalReach.toLocaleString()}</p></div>
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Likes</p><p className="text-2xl font-bold text-white">{analytics.totalLikes.toLocaleString()}</p></div>
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Comments</p><p className="text-2xl font-bold text-white">{analytics.totalComments.toLocaleString()}</p></div>
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Shares</p><p className="text-2xl font-bold text-white">{analytics.totalShares.toLocaleString()}</p></div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Saves</p><p className="text-2xl font-bold text-white">{analytics.totalSaves.toLocaleString()}</p></div>
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Profile Visits</p><p className="text-2xl font-bold text-white">{analytics.totalProfileVisits.toLocaleString()}</p></div>
+                  <div className="bg-[#111] p-4 rounded-xl border border-gray-800 text-center"><p className="text-xs text-gray-400">Avg Reach / Post</p><p className="text-2xl font-bold text-white">{analyticsSummary?.avgReach?.toLocaleString()}</p></div>
+                  <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/30 text-center"><p className="text-xs text-purple-300">Engagement Rate</p><p className="text-2xl font-bold text-white">{analytics.engagementRate}%</p></div>
+                </div>
+              </div>
+
+              <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
+                <h3 className="text-lg font-bold text-white mb-3">What to improve next</h3>
+                <div className="space-y-3 text-sm text-gray-300">
+                  <div className="bg-gray-900/70 p-3 rounded-xl border border-gray-800">
+                    <p className="font-semibold text-blue-300">1. Hook faster</p>
+                    <p className="text-gray-400 mt-1">If reach is high but saves/shares are low, your opening line needs more curiosity.</p>
+                  </div>
+                  <div className="bg-gray-900/70 p-3 rounded-xl border border-gray-800">
+                    <p className="font-semibold text-purple-300">2. Stronger CTA</p>
+                    <p className="text-gray-400 mt-1">Add a clear CTA like “Comment YES”, “Save this post”, or “DM us for pricing”.</p>
+                  </div>
+                  <div className="bg-gray-900/70 p-3 rounded-xl border border-gray-800">
+                    <p className="font-semibold text-green-300">3. Reuse winning angles</p>
+                    <p className="text-gray-400 mt-1">Use your best-performing post caption style and content format for the next 2–3 posts.</p>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2">Tip: Ask the AI assistant on this page for optimization suggestions based on these live metrics.</div>
+                </div>
+              </div>
             </div>
 
-            {/* AI Recommendations */}
-            <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-6 rounded-2xl border border-blue-500/20">
-              <h3 className="text-lg font-bold text-white mb-2">AI Recommendations</h3>
-              <p className="text-sm text-blue-200">{analytics.aiRecommendation}</p>
-              <p className="text-xs text-purple-300 mt-3 font-bold">Best time to post: {analytics.bestTimeToPost}</p>
-            </div>
-
-            {/* Top Posts */}
-            {/* ✅ FIX: Render the top posts table only if there are posts to show. */}
             {analytics.topPosts && analytics.topPosts.length > 0 && (
               <div>
                 <h3 className="text-lg font-bold text-white mb-4">Top Performing Posts</h3>
@@ -464,6 +621,8 @@ export default function Publisher() {
                         <th className="p-2 text-center">Reach</th>
                         <th className="p-2 text-center">Likes</th>
                         <th className="p-2 text-center">Comments</th>
+                        <th className="p-2 text-center">Shares</th>
+                        <th className="p-2 text-center">Saves</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -476,6 +635,8 @@ export default function Publisher() {
                           <td className="p-2 text-center font-bold">{p.reach?.toLocaleString()}</td>
                           <td className="p-2 text-center font-bold">{p.likes?.toLocaleString()}</td>
                           <td className="p-2 text-center font-bold">{p.comments?.toLocaleString()}</td>
+                          <td className="p-2 text-center font-bold">{p.shares?.toLocaleString()}</td>
+                          <td className="p-2 text-center font-bold">{p.saves?.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -491,6 +652,8 @@ export default function Publisher() {
           </div>
         ))}
       </div>
+
+      <DashboardAIAssistant />
 
       {/* Comments Modal */}
       {isCommentModalOpen && selectedPostForComments && (

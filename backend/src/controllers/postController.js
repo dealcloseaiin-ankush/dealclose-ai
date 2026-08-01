@@ -522,16 +522,58 @@ exports.getPostAnalytics = async (req, res) => {
       query.workspaceId = 'main';
     }
 
-    const posts = await Post.find(query).sort({ 'analytics.engagement': -1 }).lean();
+    const posts = await Post.find(query).sort({ publishedAt: -1, createdAt: -1 }).lean();
 
     if (posts.length === 0) {
       return res.status(200).json({ success: true, analytics: { totalReach: 0, totalLikes: 0, totalComments: 0, totalSaves: 0, totalProfileVisits: 0, engagementRate: 0, topPosts: [], bestTimeToPost: 'N/A', aiRecommendation: 'Not enough data to generate recommendations. Publish more posts to get insights.' } });
     }
 
-    let totalReach = 0, totalLikes = 0, totalComments = 0, totalShares = 0, totalSaves = 0, totalProfileVisits = 0, totalEngagement = 0;
-    const timeMap = {}; // { 'day-hour': { count: x, engagement: y } }
+    const user = await User.findById(userId).lean();
+    const resolveIgConfig = async (workspaceId) => {
+      if (workspaceId && workspaceId !== 'main') {
+        return user?.workspaces?.find(ws => String(ws._id) === String(workspaceId))?.instagramConfig || null;
+      }
+      return user?.instagramConfig || null;
+    };
 
-    posts.forEach(post => {
+    const livePosts = await Promise.all(posts.map(async (post) => {
+      const platformPostId = post.platformPostIds?.instagram;
+      if (!platformPostId) return post;
+
+      try {
+        const igConfig = await resolveIgConfig(post.workspaceId);
+        if (!igConfig?.accessToken) return post;
+
+        const insights = await instagramService.getPostInsights(platformPostId, igConfig.accessToken, igConfig.loginType);
+        const normalizedInsights = {
+          likes: insights.likes ?? 0,
+          comments: insights.comments ?? 0,
+          reach: insights.reach ?? 0,
+          impressions: insights.impressions ?? 0,
+          saves: insights.saved ?? insights.saves ?? 0,
+          shares: insights.shares ?? 0,
+          profileVisits: insights.profile_visits ?? insights.profileVisits ?? 0,
+          videoViews: insights.video_views ?? insights.videoViews ?? 0,
+          engagement: (insights.likes ?? 0) + (insights.comments ?? 0) + (insights.shares ?? 0) + (insights.saved ?? insights.saves ?? 0),
+        };
+
+        return {
+          ...post,
+          analytics: {
+            ...(post.analytics || {}),
+            ...normalizedInsights,
+          },
+        };
+      } catch (error) {
+        console.warn(`[Analytics Refresh] Failed to fetch live insights for post ${platformPostId}: ${error.message}`);
+        return post;
+      }
+    }));
+
+    let totalReach = 0, totalLikes = 0, totalComments = 0, totalShares = 0, totalSaves = 0, totalProfileVisits = 0, totalEngagement = 0;
+    const timeMap = {};
+
+    livePosts.forEach(post => {
       const a = post.analytics || {};
       totalReach += a.reach || 0;
       totalLikes += a.likes || 0;
@@ -539,7 +581,7 @@ exports.getPostAnalytics = async (req, res) => {
       totalShares += a.shares || 0;
       totalSaves += a.saves || 0;
       totalProfileVisits += a.profileVisits || 0;
-      
+
       const engagement = (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.saves || 0);
       totalEngagement += engagement;
 
@@ -556,15 +598,39 @@ exports.getPostAnalytics = async (req, res) => {
 
     const engagementRate = totalReach > 0 ? ((totalEngagement / totalReach) * 100).toFixed(2) : 0;
 
-    const topPosts = posts.slice(0, 5).map(p => ({ _id: p._id, caption: p.caption, mediaUrl: p.mediaUrls?.[0]?.url, ...p.analytics }));
-    const bestTimeToPost = 'N/A'; // Placeholder for now
-    const aiRecommendation = `Your top post about "${topPosts[0]?.caption.substring(0, 30)}..." received high engagement. Try creating more content with similar themes.`;
+    const topPosts = livePosts
+      .slice(0, 5)
+      .map(p => ({
+        _id: p._id,
+        caption: p.caption,
+        mediaUrl: p.mediaUrls?.[0]?.url,
+        publishedAt: p.publishedAt,
+        status: p.status,
+        ...p.analytics,
+      }));
+
+    const bestTimeToPost = timeMap && Object.keys(timeMap).length > 0
+      ? Object.entries(timeMap)
+        .sort(([, a], [, b]) => b.engagement - a.engagement)[0][0]
+      : 'N/A';
+
+    const aiRecommendation = `Your top post about "${topPosts[0]?.caption?.substring(0, 30) || 'recent content'}..." received high engagement. Try creating more content with similar themes.`;
 
     res.status(200).json({
       success: true,
-      analytics: { totalReach, totalLikes, totalComments, totalShares, totalSaves, totalProfileVisits, engagementRate, topPosts, bestTimeToPost, aiRecommendation }
+      analytics: {
+        totalReach,
+        totalLikes,
+        totalComments,
+        totalShares,
+        totalSaves,
+        totalProfileVisits,
+        engagementRate,
+        topPosts,
+        bestTimeToPost,
+        aiRecommendation,
+      },
     });
-
   } catch (error) {
     console.error('Error fetching post analytics:', error);
     res.status(500).json({ success: false, message: 'Server error while fetching analytics.' });

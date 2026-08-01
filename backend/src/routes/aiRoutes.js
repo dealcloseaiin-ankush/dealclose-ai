@@ -18,6 +18,9 @@ router.put('/training-data/:id/answer', protect, aiController.answerTrainingQues
 // Handle Dashboard Setup Assistant Chat
 router.post('/dashboard-assistant', protect, aiController.handleDashboardAssistant);
 
+// Turn the AI content-plan output into actual scheduled posts via the queue
+router.post('/generate-content-plan-schedule', protect, aiController.generateContentPlanSchedule);
+
 // Generate ReactFlow logic using AI Assistant
 router.post('/generate-flow', aiController.generateFlow);
 
