@@ -110,7 +110,7 @@ exports.getPosts = async (req, res) => {
     
     console.log(`🚀 [POST DEBUGGER] 2. Frontend requested Workspace ID: '${requestedWorkspaceId}', Status Filter: '${status}'`);
 
-    const query = { userId };
+    const query = { userId, isDeleted: { $ne: true } };
     if (requestedWorkspaceId && !isMainWorkspaceId(requestedWorkspaceId)) {
       query.workspaceId = requestedWorkspaceId;
       console.log("   -> Filtering for a specific sub-branch.");
@@ -174,7 +174,7 @@ exports.getPosts = async (req, res) => {
 // @route   GET /api/posts/:id
 exports.getPostById = async (req, res) => {
   try {
-    const post = await Post.findOne({ _id: req.params.id, userId: req.user?._id }).lean();
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user?._id, isDeleted: { $ne: true } }).lean();
     if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found.' });
     }
@@ -512,6 +512,7 @@ exports.getPostAnalytics = async (req, res) => {
     // Publisher analytics are for posts that actually exist on Instagram.
     const query = {
       userId,
+      isDeleted: { $ne: true },
       status: 'published',
       'platformPostIds.instagram': { $exists: true, $nin: [null, ''] },
     };

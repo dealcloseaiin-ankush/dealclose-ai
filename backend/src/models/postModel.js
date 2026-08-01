@@ -38,6 +38,8 @@ const postSchema = new mongoose.Schema({
   designJson: { type: Object }, // For fabric.js designs
   isImported: { type: Boolean, default: false }, // To identify posts imported from Instagram
   legacySocialPostId: { type: mongoose.Schema.Types.ObjectId, index: true },
+  // ✅ NEW: Soft delete flag to prevent re-importing of deleted posts
+  isDeleted: { type: Boolean, default: false, index: true },
   analytics: {
     likes: { type: Number, default: 0 },
     comments: { type: Number, default: 0 },
