@@ -200,9 +200,13 @@ export default function Publisher() {
         params: { workspaceId: activeWorkspace }
       });
       if (data.success) {
+        // 🚀 DEBUG: Log the raw data received from the Meta API to the browser console.
+        // This will show exactly what fields are available for each comment (like 'from' and 'username').
+        console.log('[DEBUG] Comments data from Meta:', data.comments);
         setComments(data.comments);
       } else {
-        toast.error('Failed to load comments.');
+        // Don't show toast on polling failures, it's annoying.
+        if (!isCommentModalOpen) toast.error('Failed to load comments.');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not fetch comments.');
