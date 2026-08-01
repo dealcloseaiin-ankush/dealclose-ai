@@ -219,7 +219,8 @@ export default function Publisher() {
     try {
       const { data } = await api.post(`/instagram/comments/${commentId}/reply`, {
         message: messageToPost,
-        workspaceId: activeWorkspace
+        workspaceId: activeWorkspace,
+        postId: selectedPostForComments._id // ✅ FIX: Send the MongoDB Post ID to the backend
       });
       if (data.success) {
         toast.success('Reply posted!', { id: toastId });
@@ -357,7 +358,7 @@ export default function Publisher() {
                   if (!mediaUrl) return null;
                   return (
                   <div className="aspect-square bg-black rounded-lg overflow-hidden">
-                      <img src={mediaUrl} alt="Post media" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={mediaUrl} alt="Post media" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                   </div>
                   );
                 })()}
@@ -384,7 +385,8 @@ export default function Publisher() {
                     {getStatusIcon(post.status)}
                     <span className="capitalize">{post.status}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  {/* ✅ FIX: Added 'flex-wrap' and 'justify-end' to prevent buttons from overflowing on smaller card sizes. */}
+                  <div className="flex items-center flex-wrap justify-end gap-2">
                     {post.isImported && !post.designJson && (
                       <button onClick={() => handleEnhanceWithAI(post._id)} className="p-1.5 text-purple-400 bg-purple-500/10 rounded-md hover:bg-purple-500/20" title="Enhance with AI">
                         <Sparkles size={14} />

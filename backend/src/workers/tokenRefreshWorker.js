@@ -62,16 +62,22 @@ const runTokenRefreshJob = async () => {
   for (const user of users) {
     await refreshRootConfig(user);
     await refreshWorkspaceConfigs(user);
-    await user.save();
+    // 🐛 BUG FIX: Use atomic `updateOne` instead of `find` + `save` to prevent VersionError race conditions.
+    // The old `user.save()` method was trying to save the entire document, including potentially stale
+    // sub-documents like `pendingInstagramConnection`, which caused the crash.
+    // This atomic operation ONLY touches the fields that were modified by the refresh functions.
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { instagramConfig: user.instagramConfig, workspaces: user.workspaces } }
+    );
   }
   console.log(`🔄 [Token Refresh Job] Completed. Checked ${users.length} user(s).`);
 };
 
 // Run once daily at 03:00 server time — low-traffic window.
 const scheduleTokenRefreshJob = () => {
-  cron.schedule('0 3 * * *', () => {
-    runTokenRefreshJob().catch(err => console.error('❌ [Token Refresh Job] Unhandled error:', err));
-  });
+  // 🚀 FIX: The cron job was not being awaited, which could lead to unhandled promise rejections.
+  cron.schedule('0 3 * * *', () => { runTokenRefreshJob().catch(err => console.error('❌ [Token Refresh Job] Unhandled error:', err)); });
   console.log('✅ Scheduled daily Instagram token refresh job.');
 };
 

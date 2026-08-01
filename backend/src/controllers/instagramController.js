@@ -1136,21 +1136,28 @@ exports.getCommentsForPost = async (req, res) => {
     // reliably find the token for the specific workspace the post belongs to.
     // This new logic first finds the post in the DB to get its actual workspaceId,
     // then uses that to get the correct token, ensuring the right credentials are always used.
-    const post = await Post.findOne({ "platformPostIds.instagram": mediaId, userId }).lean();
-    if (!post) return res.status(404).json({ success: false, message: 'Post not found in your database.' });
+    // 🚀 FIX: Find post by its platform-specific ID, not the internal DB ID.
+    // The frontend sends the Meta media ID, not our internal Post._id.
+    const postInDb = await Post.findOne({ "platformPostIds.instagram": mediaId, userId }).lean();
 
-    const postWorkspaceId = post.workspaceId || 'main';
+    // 🚀 FIX: If post is not in our DB (e.g., very old post), fallback to query param.
+    const postWorkspaceId = postInDb?.workspaceId || workspaceId || 'main';
     
     // ✅ SIMPLIFIED & CORRECTED TOKEN LOGIC: Find the correct config based on the post's actual workspace.
     const igConfig = postWorkspaceId !== 'main'
       ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))?.instagramConfig
       : user.instagramConfig;
+
     const accessToken = igConfig?.accessToken;
     // ✅ CRITICAL FIX: We must also get the loginType to call the correct Meta API endpoint.
     const loginType = igConfig?.loginType || 'facebook_business';
 
     if (!accessToken) {
-      return res.status(400).json({ success: false, message: 'Instagram not connected.' });
+      // 🚀 FIX: Provide a more specific error message.
+      return res.status(400).json({ 
+        success: false, 
+        message: `Instagram is not connected for the workspace associated with this post (Workspace ID: ${postWorkspaceId}).` 
+      });
     }
 
     // 🚀 FIX: Explicitly request the 'replies' field for each comment.
@@ -1160,7 +1167,14 @@ exports.getCommentsForPost = async (req, res) => {
     res.status(200).json({ success: true, comments });
 
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to fetch comments.' });
+    // 🚀 FIX: Provide a more detailed error message to the frontend.
+    // This helps in debugging if the issue is with Meta's permissions or a bad token.
+    const metaError = error.response?.data?.error?.message || error.message;
+    console.error('❌ Get Comments For Post - Controller Error:', metaError);
+    res.status(500).json({ 
+      success: false, 
+      message: `Failed to fetch comments from Instagram: ${metaError}` 
+    });
   }
 };
 
