@@ -1162,8 +1162,12 @@ exports.getCommentsForPost = async (req, res) => {
 
     // 🚀 FIX: Explicitly request the 'replies' field for each comment.
     // Without this, the API only returns top-level comments, and we can't show the nested replies in the UI.
-    // We also ask for the username for each reply.
-    const comments = await instagramService.getCommentsForPost(mediaId, accessToken, 'id,text,username,timestamp,replies{id,text,username,timestamp}', loginType);
+    // ✅ FIX: Request 'from{id,username}' which is more reliable than the top-level 'username'.
+    // The 'profile_picture_url' is NOT a valid field for the 'from' object in the comments edge.
+    const fields = 'id,text,username,timestamp,from{id,username},replies.limit(10){id,text,username,timestamp,from{id,username}}';
+
+    const comments = await instagramService.getCommentsForPost(mediaId, accessToken, fields, loginType);
+
     res.status(200).json({ success: true, comments });
 
   } catch (error) {

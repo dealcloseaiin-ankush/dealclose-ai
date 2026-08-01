@@ -185,10 +185,14 @@ export default function Publisher() {
 
   // 🚀 NEW: Open comments modal and fetch comments
   const handleOpenComments = useCallback(async (post) => {
-    setSelectedPostForComments(post);
-    setIsCommentModalOpen(true);
-    setComments([]); // Clear old comments
-    setReplyTexts({}); // ✅ FIX: Clear all reply inputs when opening modal
+    // ✅ FIX: Only set state on initial open, not on subsequent polling calls.
+    // This prevents the modal from re-rendering and the comments from "blinking".
+    if (!isCommentModalOpen) {
+      setSelectedPostForComments(post);
+      setIsCommentModalOpen(true);
+      setComments([]); // Clear old comments from previous modal
+      setReplyTexts({});
+    }
     try {
       const instagramPostId = post.platformPostIds?.instagram;
       if (!instagramPostId) throw new Error('This post is not available on Instagram yet.');
@@ -203,7 +207,7 @@ export default function Publisher() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not fetch comments.');
     }
-  }, [activeWorkspace]); // 🚀 FIX: Add dependency for useCallback
+  }, [activeWorkspace, isCommentModalOpen]); // ✅ FIX: Add isCommentModalOpen to dependency array
 
   useEffect(() => {
     if (!isCommentModalOpen || !selectedPostForComments) return undefined;
@@ -495,23 +499,29 @@ export default function Publisher() {
                 comments.map(comment => (
                   <div key={comment.id} className="text-sm">
                     <div className="flex gap-3 items-start">
+                      {/* Fallback gradient avatar */}
                       <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 shrink-0"></div>
                       <div className="flex-1">
+                        {/* Comment Header: Username, Text, and Delete Button */}
                         <div className="flex items-start justify-between gap-3">
-                          <p><span className="font-bold text-white">{comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
+                          <p><span className="font-bold text-white">{comment.from?.username || comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
                           <button type="button" onClick={() => handleDeleteComment(comment.id)} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete comment">
                             <Trash2 size={14} />
                           </button>
                         </div>
-                        {/* 🚀 NEW: Render replies nested under the parent comment */}
+
+                        {/* ✅ FIX: Replies block is now a SIBLING to the header, not inside it. */}
+                        {/* ✅ FIX: Added safety check for comment.replies and comment.replies.data to prevent crashes. */}
                         {comment.replies && comment.replies.data && comment.replies.data.length > 0 && (
                           <div className="mt-3 pl-6 border-l-2 border-gray-800 space-y-3">
                             {comment.replies.data.map(reply => (
                               <div key={reply.id} className="flex gap-3 items-start">
+                                {/* Fallback gradient avatar for replies */}
                                 <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 shrink-0"></div>
                                 <div className="flex-1">
                                   <div className="flex items-start justify-between gap-3">
-                                    <p><span className="font-bold text-white">{reply.username}</span> <span className="text-gray-400">{reply.text}</span></p>
+                                    {/* ✅ FIX: Use fallback pattern for reply username as well. */}
+                                    <p><span className="font-bold text-white">{reply.from?.username || reply.username}</span> <span className="text-gray-400">{reply.text}</span></p>
                                     <button type="button" onClick={() => handleDeleteComment(reply.id)} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete reply">
                                       <Trash2 size={14} />
                                     </button>
@@ -521,11 +531,12 @@ export default function Publisher() {
                             ))}
                           </div>
                         )}
-                        {/* Reply form for each comment */}
+
+                        {/* Reply form is also a sibling, at the bottom of the comment body */}
                         <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(comment.id); }} className="flex gap-2 mt-2">
                           <input // ✅ FIX: Input is now controlled by the specific comment's state
                             type="text"
-                            value={replyTexts[comment.id] || ''}
+                            value={replyTexts[comment.id] || ''} // ✅ FIX: Use individual state for each reply input
                             onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
                             placeholder={`Reply to @${comment.username}...`} 
                             className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2 text-white text-xs focus:border-blue-500 outline-none"

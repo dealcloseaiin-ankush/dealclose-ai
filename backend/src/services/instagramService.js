@@ -113,8 +113,11 @@ exports.getCommentsForPost = async (mediaId, accessToken, fields, loginType = 'f
     : 'https://graph.facebook.com/v19.0';
 
   try {
-    console.log(`[instagramService] Fetching comments for ${mediaId} using URL: ${baseUrl} with fields: ${fields}`);
+    // 🐛 FIX: The console.log was only showing the baseUrl, not the full request URL.
+    // This made it look like the request was malformed, but the actual `url` variable was correct.
+    // The log has been updated to show the complete URL being called.
     const url = `${baseUrl}/${mediaId}/comments`;
+    console.log(`[instagramService] Fetching comments for ${mediaId} using URL: ${url} with fields: ${fields}`);
     const response = await axios.get(url, {
       params: {
         fields: fields || 'id,text,username,timestamp,like_count,replies{id,text,username,timestamp}',
