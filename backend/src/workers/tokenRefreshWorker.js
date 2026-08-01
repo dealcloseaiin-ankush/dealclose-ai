@@ -4,12 +4,25 @@ const User = require('../models/userModel');
 
 const REFRESH_MARGIN_MS = 10 * 24 * 60 * 60 * 1000; // refresh if <10 days left
 
-const refreshToken = async (currentAccessToken) => {
-  const { data } = await axios.get('https://graph.instagram.com/refresh_access_token', {
-    params: {
-      grant_type: 'ig_refresh_token',
-      access_token: currentAccessToken,
-    },
+/**
+ * 🚀 CRITICAL FIX: The token refresh logic was hardcoded to use graph.instagram.com,
+ * which corrupted tokens for users connected via the Facebook Business flow.
+ * This function now checks the loginType and uses the correct Meta API endpoint.
+ */
+const refreshToken = async (config) => {
+  const { accessToken, loginType = 'facebook_business' } = config;
+
+  // "Connect with Instagram Login" flow uses graph.instagram.com
+  if (loginType === 'instagram_business_login' || loginType === 'instagram_basic_display') {
+    const { data } = await axios.get('https://graph.instagram.com/refresh_access_token', {
+      params: { grant_type: 'ig_refresh_token', access_token: accessToken },
+    });
+    return data;
+  }
+
+  // "Connect via Facebook" flow uses graph.facebook.com
+  const { data } = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
+    params: { grant_type: 'fb_exchange_token', client_id: process.env.META_APP_ID, client_secret: process.env.META_APP_SECRET, fb_exchange_token: accessToken },
   });
   return data; // { access_token, expires_in, token_type }
 };
@@ -20,7 +33,7 @@ const refreshRootConfig = async (user) => {
   if (expiresAt - Date.now() > REFRESH_MARGIN_MS) return; // not due yet
 
   try {
-    const { access_token, expires_in } = await refreshToken(user.instagramConfig.accessToken); // API call
+    const { access_token, expires_in } = await refreshToken(user.instagramConfig); // API call
     const newExpiry = new Date(Date.now() + expires_in * 1000);
     // Perform atomic update directly
     await User.updateOne(
@@ -47,7 +60,7 @@ const refreshWorkspaceConfigs = async (user) => {
     if (expiresAt - Date.now() > REFRESH_MARGIN_MS) continue;
 
     try {
-      const { access_token, expires_in } = await refreshToken(ws.instagramConfig.accessToken); // API call
+      const { access_token, expires_in } = await refreshToken(ws.instagramConfig); // API call
       const newExpiry = new Date(Date.now() + expires_in * 1000);
       // 🚀 FUTURE-PROOFING: Use positional operator '$' to update only the matched workspace sub-document.
       // This prevents overwriting the entire array and avoids race conditions if another workspace is added/removed concurrently.

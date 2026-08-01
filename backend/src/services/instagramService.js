@@ -106,17 +106,18 @@ exports.fetchRecentPosts = async (igAccountId, accessToken, limit = 12, loginTyp
 };
 
 /** Fetches public comments for one Instagram media item. */
-exports.getCommentsForPost = async (mediaId, accessToken, loginType = 'facebook_business') => {
+exports.getCommentsForPost = async (mediaId, accessToken, fields, loginType = 'facebook_business') => {
   // ✅ FIX: Use the correct API domain based on the connection type.
   const baseUrl = isInstagramNativeLogin(loginType)
     ? 'https://graph.instagram.com/v19.0'
     : 'https://graph.facebook.com/v19.0';
 
   try {
+    console.log(`[instagramService] Fetching comments for ${mediaId} using URL: ${baseUrl} with fields: ${fields}`);
     const url = `${baseUrl}/${mediaId}/comments`;
     const response = await axios.get(url, {
       params: {
-        fields: 'id,text,username,timestamp,like_count,replies{id,text,username,timestamp}',
+        fields: fields || 'id,text,username,timestamp,like_count,replies{id,text,username,timestamp}',
         access_token: accessToken,
       },
     });
