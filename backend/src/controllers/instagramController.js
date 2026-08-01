@@ -1167,13 +1167,12 @@ exports.getCommentsForPost = async (req, res) => {
     res.status(200).json({ success: true, comments });
 
   } catch (error) {
-    // 🚀 FIX: Provide a more detailed error message to the frontend.
-    // This helps in debugging if the issue is with Meta's permissions or a bad token.
     const metaError = error.response?.data?.error?.message || error.message;
     console.error('❌ Get Comments For Post - Controller Error:', metaError);
     res.status(500).json({ 
       success: false, 
-      message: `Failed to fetch comments from Instagram: ${metaError}` 
+      // This helps in debugging if the issue is with Meta's permissions or a bad token.
+      message: `Failed to fetch comments from Instagram: ${metaError}`
     });
   }
 };

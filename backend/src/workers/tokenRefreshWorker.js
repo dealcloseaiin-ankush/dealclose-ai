@@ -20,14 +20,22 @@ const refreshRootConfig = async (user) => {
   if (expiresAt - Date.now() > REFRESH_MARGIN_MS) return; // not due yet
 
   try {
-    const { access_token, expires_in } = await refreshToken(user.instagramConfig.accessToken);
-    user.instagramConfig.accessToken = access_token;
-    user.instagramConfig.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
-    console.log(`✅ [Token Refresh] Root Instagram token refreshed for user ${user._id}`);
+    const { access_token, expires_in } = await refreshToken(user.instagramConfig.accessToken); // API call
+    const newExpiry = new Date(Date.now() + expires_in * 1000);
+    // Perform atomic update directly
+    await User.updateOne(
+      { _id: user._id },
+      { $set: {
+          "instagramConfig.accessToken": access_token,
+          "instagramConfig.tokenExpiresAt": newExpiry,
+          "instagramConfig.needsReconnect": false // Reset flag on success
+      }}
+    );
+    console.log(`✅ [Token Refresh] Root Instagram token refreshed for user ${user.email}`);
   } catch (err) {
-    console.error(`❌ [Token Refresh] Failed for user ${user._id} (root):`, err.response?.data || err.message);
+    console.error(`❌ [Token Refresh] Failed for user ${user.email} (root):`, err.response?.data || err.message);
     // Token is likely already dead — flag for manual reconnect rather than retrying forever.
-    user.instagramConfig.needsReconnect = true;
+    await User.updateOne({ _id: user._id }, { $set: { "instagramConfig.needsReconnect": true } });
   }
 };
 
@@ -39,13 +47,22 @@ const refreshWorkspaceConfigs = async (user) => {
     if (expiresAt - Date.now() > REFRESH_MARGIN_MS) continue;
 
     try {
-      const { access_token, expires_in } = await refreshToken(ws.instagramConfig.accessToken);
-      ws.instagramConfig.accessToken = access_token;
-      ws.instagramConfig.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
-      console.log(`✅ [Token Refresh] Workspace "${ws.name || ws._id}" Instagram token refreshed for user ${user._id}`);
+      const { access_token, expires_in } = await refreshToken(ws.instagramConfig.accessToken); // API call
+      const newExpiry = new Date(Date.now() + expires_in * 1000);
+      // 🚀 FUTURE-PROOFING: Use positional operator '$' to update only the matched workspace sub-document.
+      // This prevents overwriting the entire array and avoids race conditions if another workspace is added/removed concurrently.
+      await User.updateOne(
+        { _id: user._id, "workspaces._id": ws._id },
+        { $set: {
+            "workspaces.$.instagramConfig.accessToken": access_token,
+            "workspaces.$.instagramConfig.tokenExpiresAt": newExpiry,
+            "workspaces.$.instagramConfig.needsReconnect": false // Reset flag
+        }}
+      );
+      console.log(`✅ [Token Refresh] Workspace "${ws.name || ws._id}" token refreshed for user ${user.email}`);
     } catch (err) {
-      console.error(`❌ [Token Refresh] Failed for user ${user._id}, workspace ${ws._id}:`, err.response?.data || err.message);
-      ws.instagramConfig.needsReconnect = true;
+      console.error(`❌ [Token Refresh] Failed for user ${user.email}, workspace ${ws._id}:`, err.response?.data || err.message);
+      await User.updateOne({ _id: user._id, "workspaces._id": ws._id }, { $set: { "workspaces.$.instagramConfig.needsReconnect": true } });
     }
   }
 };
@@ -62,14 +79,6 @@ const runTokenRefreshJob = async () => {
   for (const user of users) {
     await refreshRootConfig(user);
     await refreshWorkspaceConfigs(user);
-    // 🐛 BUG FIX: Use atomic `updateOne` instead of `find` + `save` to prevent VersionError race conditions.
-    // The old `user.save()` method was trying to save the entire document, including potentially stale
-    // sub-documents like `pendingInstagramConnection`, which caused the crash.
-    // This atomic operation ONLY touches the fields that were modified by the refresh functions.
-    await User.updateOne(
-      { _id: user._id },
-      { $set: { instagramConfig: user.instagramConfig, workspaces: user.workspaces } }
-    );
   }
   console.log(`🔄 [Token Refresh Job] Completed. Checked ${users.length} user(s).`);
 };
