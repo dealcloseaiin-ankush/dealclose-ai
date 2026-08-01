@@ -374,7 +374,8 @@ export default function Publisher() {
                 
                 {/* 🚀 NEW: Live Post Stats Display */}
                 {post.status === 'published' && (
-                  <div className="flex items-center justify-end gap-4 text-xs text-gray-400 pt-2">
+                  // ✅ FIX: Added 'flex-wrap' and 'justify-end' to ensure stats wrap on smaller cards instead of overflowing.
+                  <div className="flex items-center justify-end flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 pt-2">
                     <div className="flex items-center gap-1.5" title="Likes"><Heart size={12} className="text-red-500/80"/> {post.analytics?.likes?.toLocaleString() || 0}</div>
                     <div className="flex items-center gap-1.5" title="Comments"><MessageSquare size={12} className="text-blue-400/80"/> {post.analytics?.comments?.toLocaleString() || 0}</div>
                     <div className="flex items-center gap-1.5" title="Shares"><Share2 size={12} className="text-purple-400/80"/> {post.analytics?.shares?.toLocaleString() || 0}</div>

@@ -312,22 +312,22 @@ exports.deletePost = async (req, res) => {
       }
     }
 
-    // ✅ CRITICAL FIX: Prevent re-importing of deleted posts.
-    // If the post was imported, we don't delete it from Instagram. Instead, we mark it
-    // as 'soft-deleted' in our database so the sync process knows to ignore it in the future.
-    // This stops deleted posts from reappearing on refresh.
+    // ✅ CRITICAL FIX: ALWAYS soft-delete the post from our DB instead of hard-deleting.
+    // This ensures that whether the post was imported or created in-app, the sync
+    // process will see the `isDeleted: true` flag and know not to re-import it.
+    // This permanently solves the "deleted post reappearing on refresh" bug.
+    await Post.updateOne(
+      { _id: post._id },
+      { $set: { status: 'archived', isDeleted: true, failureReason: 'User deleted' } }
+    );
+
     if (post.isImported) {
-      await Post.updateOne(
-        { _id: post._id },
-        { $set: { status: 'archived', isDeleted: true } }
-      );
       instagramDeletionMessage = 'Post has been hidden from your dashboard. It will not be re-imported. It still exists on Instagram.';
     }
 
     if (post.legacySocialPostId) {
       await SocialPost.findByIdAndDelete(post.legacySocialPostId);
     }
-    await post.deleteOne();
 
     res.status(200).json({ success: true, message: instagramDeletionMessage });
   } catch (error) {
@@ -393,6 +393,13 @@ exports.importInstagramPosts = async (req, res) => {
     let updatedCount = 0;
     for (const [index, post] of recentPosts.entries()) {
       const existingPost = await Post.findOne({ "platformPostIds.instagram": post.id, userId });
+
+      // ✅ CRITICAL FIX: If the post was manually deleted from the dashboard,
+      // do not re-import or update it. This prevents deleted posts from reappearing.
+      if (existingPost && existingPost.isDeleted) {
+        continue; // Skip this post and move to the next one
+      }
+
       // Analytics view requests a fresh Meta insight pull for the newest posts.
       // Keep it bounded so an account with a large history cannot exhaust API quota.
       let liveInsights = null;
