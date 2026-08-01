@@ -17,6 +17,7 @@ const compression = require('compression'); // 🚀 NEW: Import compression
 // 🚀 NEW: Schedule background jobs like trash cleanup
 require('../jobs/trashCleanup'); // Cron job ko start karne ke liye
 const { scheduleTokenRefreshJob } = require('./workers/tokenRefreshWorker');
+const { createMetaReviewerAccount } = require('./controllers/authController'); // 🚀 NEW: Import reviewer account creator
 const app = require('./app');
 const http = require('http');
 const WebSocket = require('ws');
@@ -110,8 +111,10 @@ server.listen(port, '0.0.0.0', () => {
 
 mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 5000 // 5 second timeout taaki app jaldi error throw kare aur hang na ho
-}).then(() => {
+}).then(async () => { // ✅ Make this async
   console.log('Connected to MongoDB');
+  // ✅ NEW: Create Meta Reviewer account on startup if it doesn't exist.
+  await createMetaReviewerAccount();
 }).catch(err => {
   console.error('Database connection error:', err);
 });

@@ -159,6 +159,35 @@ const autoCreateDefaultFlow = async (userId, businessDescription, businessName) 
     }
 };
 
+/**
+ * @desc    Creates a dedicated test account for Meta App Review, if it doesn't already exist.
+ *          This function is called once on server startup.
+ */
+exports.createMetaReviewerAccount = async () => {
+  const reviewerEmail = 'dealcloseaireviewer@gmail.com';
+  const reviewerPassword = 'review@2026';
+
+  try {
+    const existingReviewer = await User.findOne({ email: reviewerEmail });
+    if (existingReviewer) {
+      console.log('✅ [Meta Reviewer] Test account already exists.');
+      return;
+    }
+
+    console.log('⏳ [Meta Reviewer] Creating dedicated test account...');
+    await User.create({
+      email: reviewerEmail,
+      password: reviewerPassword, // The pre-save hook will hash this automatically
+      fullName: 'Meta Reviewer',
+      businessName: 'Meta Review Business',
+      role: 'owner', // Give them owner role to test all features
+    });
+    console.log('✅ [Meta Reviewer] Test account created successfully!');
+  } catch (error) {
+    console.error('❌ [Meta Reviewer] Failed to create test account:', error.message);
+  }
+};
+
 // @desc    Sync Supabase User with MongoDB
 // @route   POST /api/users/supabase-auth
 exports.supabaseAuth = async (req, res) => {
