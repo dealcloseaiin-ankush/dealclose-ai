@@ -1205,13 +1205,17 @@ exports.replyToComment = async (req, res) => {
     const igConfig = postWorkspaceId !== 'main'
       ? user.workspaces?.find(w => String(w._id) === String(postWorkspaceId))?.instagramConfig
       : user.instagramConfig;
-    const accessToken = igConfig?.accessToken; // This is the correct token for the reply.
+    
+    // ✅ CRITICAL FIX: We must pass BOTH the accessToken AND the loginType to the service.
+    // The service needs the loginType to determine whether to call graph.facebook.com or graph.instagram.com.
+    const accessToken = igConfig?.accessToken;
+    const loginType = igConfig?.loginType || 'facebook_business';
 
     if (!accessToken) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
     }
 
-    const reply = await instagramService.replyToComment(commentId, accessToken, message);
+    const reply = await instagramService.replyToComment(commentId, accessToken, message, loginType);
     res.status(201).json({ success: true, reply });
 
   } catch (error) {

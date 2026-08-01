@@ -137,9 +137,13 @@ exports.replyToComment = async (commentId, accessToken, message, loginType = 'fa
     ? 'https://graph.instagram.com/v19.0'
     : 'https://graph.facebook.com/v19.0';
   try {
+    // 🚀 DEBUG: Log the exact URL and payload being sent to Meta for easier debugging.
+    console.log(`[instagramService] Replying to comment ${commentId} via ${baseUrl}`);
     const url = `${baseUrl}/${commentId}/replies`;
+    // ✅ FIX: The access_token should be sent as a query parameter, not in the POST body for this endpoint.
     const response = await axios.post(url,
-      { message, access_token: accessToken }
+      { message }, // Only the message goes in the body
+      { params: { access_token: accessToken } } // Token goes in params
     );
     return response.data;
   } catch (error) {
