@@ -60,10 +60,13 @@ export default function CrmPage() {
   const fetchPipeline = async () => {
     try {
       const res = await api.get('/crm/pipeline');
-      setPipelineData(res.data.data);
-      // Flatten data for list view
+      const pipelineData = res.data?.data || {};
+      setPipelineData(pipelineData);
+      // Flatten data for list view — guard against null/undefined
       const allContacts = [];
-      Object.values(res.data.data).forEach(arr => allContacts.push(...arr));
+      Object.values(pipelineData).forEach(arr => {
+        if (Array.isArray(arr)) allContacts.push(...arr);
+      });
       setFlatContacts(allContacts);
     } catch (error) {
       // 401 is handled globally by api.js interceptor (redirects to /login)

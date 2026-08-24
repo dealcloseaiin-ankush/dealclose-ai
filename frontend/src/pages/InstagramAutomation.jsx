@@ -239,8 +239,10 @@ export default function InstagramAutomation() {
         if (data.config) setConfig(data.config);
         if (data.igLeads) setIgLeads(Array.isArray(data.igLeads) ? data.igLeads : []);
         if (data.commentGroups) setCommentGroups(Array.isArray(data.commentGroups) ? data.commentGroups : []);
-        api.get('/instagram/business/insights', { params: { workspaceId: activeWorkspace } }).then(res => setInsights(res.data.insights)).catch(err => console.error("Failed to fetch business insights", err));
-        api.get('/instagram/business/insights/history', { params: { workspaceId: activeWorkspace, days: 30 } }).then(res => setInsightHistory(res.data.snapshots || [])).catch(err => console.error("Failed to fetch analytics history", err));
+        api.get('/instagram/business/insights', { params: { workspaceId: activeWorkspace } }).then(res => {
+          if (res.data?.insights) setInsights(prev => ({ ...prev, ...res.data.insights }));
+        }).catch(err => console.error("Failed to fetch business insights", err));
+        api.get('/instagram/business/insights/history', { params: { workspaceId: activeWorkspace, days: 30 } }).then(res => setInsightHistory(res.data?.snapshots || [])).catch(err => console.error("Failed to fetch analytics history", err));
 
         const [postsRes, automationsRes] = await Promise.all([
           api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } }),
