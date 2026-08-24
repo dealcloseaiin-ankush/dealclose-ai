@@ -164,7 +164,16 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  const value = { user, login, register, logout, loading };
+  const resetPassword = async (email, password) => {
+    const { data } = await api.post('/users/reset-password', { email, password });
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+    return data.user;
+  };
+
+  const value = { user, login, register, resetPassword, logout, loading };
   
   return (
     <AuthContext.Provider value={value}>

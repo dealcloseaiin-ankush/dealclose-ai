@@ -1129,18 +1129,48 @@ exports.changePassword = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // 🐛 FIX: Replaced user.save() with findByIdAndUpdate for a more robust and direct update.
-    // The pre-save hook in the User model will automatically hash the new password
-    // because we are updating the 'password' field. This is safer than loading the
-    // entire document and calling .save().
-    // This function does not check the oldPassword, allowing a user logged in via
-    // Google to set a new password for their account.
-    await User.findByIdAndUpdate(userId, { password: newPassword });
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await User.findByIdAndUpdate(userId, { password: hashedPassword });
 
     res.status(200).json({ success: true, message: 'Password changed successfully!' });
   } catch (error) {
     console.error('Change Password Error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Direct Reset Password / Set Password for existing email
+// @route   POST /api/users/reset-password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with this email. Please register.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await User.updateOne({ _id: user._id }, { $set: { password: hashedPassword } });
+
+    const updatedUser = await User.findById(user._id);
+    const token = jwt.sign({ id: updatedUser._id }, JWT_SECRET, { expiresIn: '30d' });
+
+    console.log(`✅ [Password Reset] Password updated successfully for: ${email}`);
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful! Logging you in...',
+      token,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset password. Please try again.' });
   }
 };
 

@@ -15,6 +15,7 @@ const verifyOtpLimiter = createRateLimiter(10, 15, 'Too many OTP verification at
 // Standard Email/Password Auth
 router.post('/register', registerLimiter, authController.register);
 router.post('/login', loginLimiter, authController.login);
+router.post('/reset-password', loginLimiter, authController.resetPassword);
 router.post('/change-password', protect, changePasswordLimiter, authController.changePassword);
 router.post('/supabase-auth', authController.supabaseAuth); // Google Login ke liye
 
