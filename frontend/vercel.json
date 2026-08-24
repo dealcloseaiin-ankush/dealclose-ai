@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://dealclose-ai.onrender.com/api/:path*"
+    },
+    {
       "source": "/(.*\\.(?:html|css|js|png|jpg|jpeg|gif|svg|ico|xml|txt|json|webp|woff2?|ttf|map))$",
       "destination": "/$1"
     },

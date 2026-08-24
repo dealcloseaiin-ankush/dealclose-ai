@@ -1073,44 +1073,57 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     console.log(`[DEBUG] 2. User found in DB? ${user ? '✅ Yes' : '❌ No'}`);
 
-    if (!user) return res.status(404).json({ success: false, message: 'User not found. Please register first.' });
-
-    // Agar purana user hai jisme role add nahi tha, usko Auto-update kar do
-    if (!user.role) {
-      // 🐛 FIX: Use updateOne to set the role without triggering the pre-save hook on the entire document.
-      // This prevents the user's password from being re-hashed and corrupted during login.
-      await User.updateOne({ _id: user._id }, { $set: { role: 'owner' } });
-      user.role = 'owner';
-    }
-
-    // Handles current bcrypt hashes, legacy bcrypt variants, and old plain-text records.
-    const isMatch = await compareLoginPassword(password, user.password);
-    console.log(`[DEBUG] 3. Password match result: ${isMatch ? '✅ Success' : '❌ Failed'}`);
-
-    if (!isMatch) {
-      // 🐛 FIX: Refined logic to detect Google-only accounts.
-      // This now correctly identifies users who signed up via Google and *never* set a manual password.
-      // The old logic could incorrectly block users who signed up with Google and later added a password.
-      const isGoogleAccount = !!user.supabaseId;
-      // 🐛 FIX: More specific check for dummy password to avoid false positives.
-      const hasDummyPassword = user.password.includes('google-oauth-dummy') || user.password === user.supabaseId;
-
-      return res.status(401).json({
-        success: false,
-        message: (isGoogleAccount && hasDummyPassword)
-          ? 'This email is connected with Google login. Please use "Continue with Google" or reset your password.'
-          : 'Invalid Password. Please try again.',
+    let activeUser = user;
+    if (!activeUser) {
+      // 🚀 UNIVERSAL SMART AUTH: Auto-create account if user logs in with new email
+      console.log(`[Smart Auth] New user detected on login, auto-registering: ${email}`);
+      const hashedPassword = await bcrypt.hash(password, 10);
+      activeUser = await User.create({
+        email,
+        fullName: email.split('@')[0],
+        password: hashedPassword,
+        role: 'owner'
       });
+      await autoCreateDefaultFlow(activeUser._id, "", activeUser.fullName)
+        .catch(err => console.log("Default Flow Auto-Create:", err.message));
+    } else {
+      // Agar purana user hai jisme role add nahi tha, usko Auto-update kar do
+      if (!activeUser.role) {
+        await User.updateOne({ _id: activeUser._id }, { $set: { role: 'owner' } });
+        activeUser.role = 'owner';
+      }
+
+      // Handles current bcrypt hashes, legacy bcrypt variants, and old plain-text records.
+      const isMatch = await compareLoginPassword(password, activeUser.password);
+      console.log(`[DEBUG] 3. Password match result: ${isMatch ? '✅ Success' : '❌ Failed'}`);
+
+      if (!isMatch) {
+        const isGoogleAccount = !!activeUser.supabaseId;
+        const hasDummyPassword = !isBcryptHash(activeUser.password) || activeUser.password.includes('google-oauth-dummy') || activeUser.password === activeUser.supabaseId;
+
+        if (isGoogleAccount && hasDummyPassword) {
+          // ✨ SMART AUTO-LINK: User previously joined with Google and is now setting a password for the first time
+          console.log(`[Smart Auth] ✨ Auto-linking password for Google-origin user: ${email}`);
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await User.updateOne({ _id: activeUser._id }, { $set: { password: hashedPassword } });
+          activeUser.password = hashedPassword;
+        } else {
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid Password. Please check your credentials or click "Forgot / Set Password".',
+          });
+        }
+      }
     }
 
     console.log(`[DEBUG] 4. Login successful. Generating JWT token...`);
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: activeUser._id }, JWT_SECRET, { expiresIn: '30d' });
 
-    // 🔥 RETROACTIVE MAGIC ONBOARDING: Create flow for old users if missing (runs silently in background)
-    autoCreateDefaultFlow(user._id, user.businessDescription, user.businessName)
+    // 🔥 RETROACTIVE MAGIC ONBOARDING: Create flow for old users if missing
+    autoCreateDefaultFlow(activeUser._id, activeUser.businessDescription, activeUser.businessName)
         .catch(err => console.log("Retroactive Flow Check:", err.message));
 
-    res.status(200).json({ success: true, token, user });
+    res.status(200).json({ success: true, token, user: activeUser });
   } catch (error) {
     console.error('❌ [DEBUG] CRITICAL CRASH in login:', error);
     res.status(500).json({ success: false, message: 'Server error during login' });
