@@ -76,7 +76,22 @@ const leadSchema = new Schema({
     type: Map,
     of: String,
   },
-  // --- Call AI Tracking ---
+  // --- Call AI & Telephony 5-Bucket Tracking ---
+  callingBucket: {
+    type: String,
+    enum: ['fresh_pool', 'today_queue', 'scheduled_followup', 'busy_retry', 'lost_archive'],
+    default: 'fresh_pool'
+  },
+  followUpDate: { type: Date, default: null },
+  followUpNotes: { type: String, default: '' },
+  callAttempts: { type: Number, default: 0 },
+  lastCallOutcome: {
+    type: String,
+    enum: ['connected', 'no_answer', 'busy', 'callback_scheduled', 'not_interested', 'wrong_number', null],
+    default: null
+  },
+  lastCallerType: { type: String, enum: ['ai', 'staff', null], default: null },
+  lastCallerName: { type: String, default: '' },
   lastCallSummary: { type: String },
   lastCallActionTaken: { type: String },
   lastCallDate: { type: Date },
