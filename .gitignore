@@ -8,8 +8,8 @@ backend/node_modules/
 .env.local
 .env.example
 
-# Production builds
-dist/
+# Production builds — backend only (frontend/dist is committed for Render deployment)
+backend/dist/
 build/
 dist-ssr/
 
