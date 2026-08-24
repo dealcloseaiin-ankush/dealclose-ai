@@ -11,8 +11,11 @@ const twilioWebhookController = require('../controllers/twilio.webhook.controlle
 router.post('/voice', exotelController.handleIncomingVoice);
 router.post('/voice/respond', exotelController.handleVoiceRespond);
 
-// Twilio (Fast Voice Streams)
+// Twilio (Fast Voice Streams & IVR)
 router.post('/twilio/voice', twilioWebhookController.handleTwilioVoice);
+router.post('/twilio/ivr', twilioWebhookController.handleTwilioIVR);
+router.post('/twilio/ivr-gather', twilioWebhookController.handleTwilioIVRGather);
+router.post('/twilio/whisper', twilioWebhookController.handleTwilioWhisper);
 
 // WhatsApp (Meta)
 router.get('/whatsapp', whatsappController.verifyWhatsAppWebhook);

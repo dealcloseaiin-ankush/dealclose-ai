@@ -95,8 +95,10 @@ exports.handleTwilioIVRGather = async (req, res) => {
         if (option.action === 'connect_to_ai') {
           twiml.connect().stream({ url: `wss://${host}/api/webhooks/twilio/stream` });
         } else if (option.action === 'forward_to_human' && option.targetPhone) {
-          twiml.say({ voice: 'alice' }, "Forwarding your call to our human representative.");
-          twiml.dial(option.targetPhone);
+          twiml.say({ voice: 'alice' }, "Please hold while we connect you to our sales representative.");
+          const dial = twiml.dial({ timeout: 20 });
+          const whisperUrl = `https://${host}/api/webhooks/twilio/whisper?campaignName=${encodeURIComponent(campaign.name || 'DealClose Inbound Lead')}`;
+          dial.number({ url: whisperUrl }, option.targetPhone);
         } else if (option.action === 'play_message' && option.replyAudioUrl) {
           twiml.play(option.replyAudioUrl);
           twiml.hangup();
@@ -118,4 +120,13 @@ exports.handleTwilioIVRGather = async (req, res) => {
     twiml.hangup();
     res.type('text/xml').send(twiml.toString());
   }
+};
+
+// 🎧 @desc    Handle Private Agent Call Whisper (Plays private 2-sec audio exclusively to staff before bridge)
+// @route   POST /api/webhooks/twilio/whisper
+exports.handleTwilioWhisper = (req, res) => {
+  const twiml = new VoiceResponse();
+  const campaignName = req.query.campaignName || 'DealClose Hot Lead';
+  twiml.say({ voice: 'alice' }, `DealClose Inbound Lead for ${campaignName}. Connecting now.`);
+  res.type('text/xml').send(twiml.toString());
 };
