@@ -293,8 +293,21 @@ module.exports = function (ws) {
         if (activeLeadId || activePhone) {
            const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
            await Lead.findOneAndUpdate(query, {
-              $set: { lastCallSummary: callSummary, lastCallDate: new Date() },
-              $push: { timeline: { eventType: 'Follow-up Completed', description: 'Voice Call session ended. Analytics logged.', timestamp: new Date() } }
+              $set: {
+                lastCallSummary: callSummary,
+                lastCallDate: new Date(),
+                lastCallerType: 'ai',
+                lastCallerName: 'AI Voice Bot',
+                callingBucket: 'today_queue'
+              },
+              $inc: { callAttempts: 1 },
+              $push: {
+                timeline: {
+                  eventType: 'AI Call Completed',
+                  description: `🤖 AI Voice Bot completed call session. Niskoor (Summary): ${callSummary}`,
+                  timestamp: new Date()
+                }
+              }
            }).exec().catch(() => {});
         }
       } catch (e) { 

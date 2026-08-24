@@ -250,8 +250,21 @@ module.exports = function (ws) {
         if (callDoc && (callDoc.leadId || callDoc.to)) {
            const query = callDoc.leadId ? { _id: callDoc.leadId } : { phoneNumber: { $regex: new RegExp(callDoc.to.replace(/\D/g, '').slice(-10) + '$') } };
            await Lead.findOneAndUpdate(query, {
-              $set: { lastCallSummary: callSummary, lastCallDate: new Date() },
-              $push: { timeline: { eventType: 'Call Completed', description: `Voice session ended. Summary: ${callSummary}`, timestamp: new Date() } }
+              $set: {
+                lastCallSummary: callSummary,
+                lastCallDate: new Date(),
+                lastCallerType: 'ai',
+                lastCallerName: 'AI Voice Bot (Twilio)',
+                callingBucket: 'today_queue'
+              },
+              $inc: { callAttempts: 1 },
+              $push: {
+                timeline: {
+                  eventType: 'AI Call Completed',
+                  description: `🤖 AI Voice Bot (Twilio) completed call session. Niskoor (Summary): ${callSummary}`,
+                  timestamp: new Date()
+                }
+              }
            }).exec().catch(() => {});
         }
       } catch (e) {

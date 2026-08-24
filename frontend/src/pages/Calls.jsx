@@ -459,6 +459,103 @@ export default function Calls() {
           </div>
         </div>
       )}
+
+      {/* 3-Channel Call Pathway Selection Modal */}
+      {activeDialLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111] border border-gray-800 rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative">
+            <button
+              onClick={() => setActiveDialLead(null)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white p-1 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Phone size={24} />
+              </div>
+              <h2 className="text-xl font-bold text-white">Call {activeDialLead.name}</h2>
+              <p className="text-xs text-gray-400 font-mono mt-1">{activeDialLead.phoneNumber || activeDialLead.phone}</p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Option 1: Office Phone / SIM (Staff Calls Directly) */}
+              <button
+                onClick={() => {
+                  const num = activeDialLead.phoneNumber || activeDialLead.phone;
+                  const leadToLog = activeDialLead;
+                  setActiveDialLead(null);
+                  if (num) window.location.href = `tel:${num}`;
+                  handleOpenLogModal(leadToLog);
+                }}
+                className="w-full p-4 bg-[#1a1a1a] hover:bg-[#222] border border-gray-700 hover:border-emerald-500 rounded-2xl flex items-center gap-4 transition-all text-left group"
+              >
+                <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Smartphone size={20} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-white flex items-center justify-between">
+                    📱 Office Phone / SIM (Staff Call)
+                    <ArrowRight size={14} className="text-gray-500 group-hover:text-emerald-400" />
+                  </h4>
+                  <p className="text-xs text-gray-400">Call from your mobile/office phone and write notes manually.</p>
+                </div>
+              </button>
+
+              {/* Option 2: AI Voice Bot (Web Mic / Browser) */}
+              <button
+                onClick={() => {
+                  toast.success(`🤖 AI Voice Assistant starting call with ${activeDialLead.name}...`);
+                  setActiveDialLead(null);
+                }}
+                className="w-full p-4 bg-[#1a1a1a] hover:bg-[#222] border border-gray-700 hover:border-indigo-500 rounded-2xl flex items-center gap-4 transition-all text-left group"
+              >
+                <div className="w-10 h-10 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Bot size={20} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-white flex items-center justify-between">
+                    🤖 AI Voice Bot (Auto-Transcribe & Niskoor)
+                    <ArrowRight size={14} className="text-gray-500 group-hover:text-indigo-400" />
+                  </h4>
+                  <p className="text-xs text-gray-400">AI speaks, qualifies lead, and auto-writes the summary & follow-up.</p>
+                </div>
+              </button>
+
+              {/* Option 3: System Twilio / Exotel Outbound API */}
+              <button
+                onClick={async () => {
+                  const toastId = toast.loading('Initiating Cloud Outbound Call...');
+                  try {
+                    await api.post('/calls/dial', {
+                      phoneNumber: activeDialLead.phoneNumber || activeDialLead.phone,
+                      leadId: activeDialLead._id || activeDialLead.id
+                    });
+                    toast.success('Cloud Outbound Call Connected via Twilio/Exotel! 📡', { id: toastId });
+                    setActiveDialLead(null);
+                    fetchBuckets();
+                  } catch (err) {
+                    toast.error(err.response?.data?.message || 'Failed to trigger cloud call.', { id: toastId });
+                  }
+                }}
+                className="w-full p-4 bg-[#1a1a1a] hover:bg-[#222] border border-gray-700 hover:border-blue-500 rounded-2xl flex items-center gap-4 transition-all text-left group"
+              >
+                <div className="w-10 h-10 bg-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Radio size={20} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-white flex items-center justify-between">
+                    📡 Twilio / Exotel Cloud Call
+                    <ArrowRight size={14} className="text-gray-500 group-hover:text-blue-400" />
+                  </h4>
+                  <p className="text-xs text-gray-400">System dials virtual number and connects directly to AI/Staff.</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
