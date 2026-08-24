@@ -9,8 +9,9 @@ exports.handleUniversalData = async (req, res) => {
   try {
     const { apiKey, platformName, eventType, customerPhone, data } = req.body;
     
+    if (!apiKey) return res.status(401).json({ success: false, message: "API Key is required" });
     const user = await User.findOne({ apiKey: apiKey });
-    if (!user && !apiKey) return res.status(401).json({ message: "Invalid or missing API Key" });
+    if (!user) return res.status(401).json({ success: false, message: "Invalid API Key" });
 
     console.log(`[Universal Webhook] Received ${eventType} from ${platformName}`);
 

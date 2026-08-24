@@ -72,11 +72,13 @@ export default function Calls() {
       setLogs([]); // Clear previous logs
       addLog("Initializing Audio & WebSocket...");
       
-      // 🚀 FIX: Redirect WebSocket directly to the Backend (Render) instead of the Frontend host
-      const backendBase = import.meta.env.VITE_API_URL || 'https://dealclose-ai.onrender.com/api';
-      const wsUrl = import.meta.env.MODE === 'development' 
-        ? 'ws://localhost:5000/api/webhooks/mobile/stream' 
-        : backendBase.replace('http', 'ws').replace('/api', '') + '/api/webhooks/mobile/stream';
+      const getWsUrl = () => {
+        if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+        if (import.meta.env.DEV) return 'ws://localhost:5000/api/webhooks/mobile/stream';
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${window.location.host}/api/webhooks/mobile/stream`;
+      };
+      const wsUrl = getWsUrl();
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -107,6 +109,9 @@ export default function Calls() {
         
         // 🔊 2. SETUP AUDIO CONTEXT (For 16000Hz PCM required by Deepgram)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
         audioCtxRef.current = audioCtx;
 
         const source = audioCtx.createMediaStreamSource(stream);

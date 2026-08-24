@@ -380,7 +380,7 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                   await user.save();
                   try {
-                    await billing.deductAICost(user._id, 'OPENAI_GPT_4', 1);
+                    await billing.deductAICost(user._id, 'OPENAI_GPT_4O_MINI', 1);
                   } catch (billingErr) {
                     console.error("Billing deduction error:", billingErr.message);
                   }

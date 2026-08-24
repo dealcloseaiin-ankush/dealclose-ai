@@ -114,6 +114,7 @@ app.use('/api/backup', backupRoutes); // 🚀 NEW: Google Drive Backup
 app.use('/api/upload', uploadRoutes);
 
 app.use('/api/wallet', walletRoutes);
+app.use('/api/users/wallet', walletRoutes); // 🚀 FIX: Support /api/users/wallet route alias
 app.use('/api/contacts', contactRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/dispatch', dispatchRoutes);

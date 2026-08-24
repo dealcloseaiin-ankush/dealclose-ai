@@ -24,6 +24,6 @@ const aiUsageLogSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-const AiUsageLog = mongoose.model('AiUsageLog', aiUsageLogSchema);
+const AiUsageLog = mongoose.models.AiUsageLog || mongoose.model('AiUsageLog', aiUsageLogSchema);
 
 module.exports = AiUsageLog;

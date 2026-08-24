@@ -1,11 +1,12 @@
 // File: c:\Users\Lenovo1\Desktop\ai-calling-agent\backend\src\controllers\authController.test.js
 
+process.env.JWT_SECRET = 'test_jwt_secret_key_for_jest_12345';
+
 // Sabse pehle, jin cheezon ko mock karna hai, unhe import karein
 const User = require('../models/userModel');
 const Flow = require('../models/flowModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { register, login, supabaseAuth } = require('./authController'); // Apne controller function ko import karein
 
 // 'jest.mock()' ka istemaal karke hum models ko mock kar rahe hain
 // Isse asli database calls nahi honge
@@ -13,16 +14,14 @@ jest.mock('../models/userModel');
 jest.mock('../models/flowModel');
 jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
+const { register, login, supabaseAuth } = require('./authController');
 
 describe('Auth Controller - Register', () => {
-
-  // Har test se pehle mocks ko reset karein
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('should register a new user successfully', async () => {
-    // 1. Test ke liye nakli data taiyaar karein
     const mockReq = {
       body: {
         fullName: 'Test User',

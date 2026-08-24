@@ -195,5 +195,7 @@ module.exports = {
   getFlows,
   deleteFlow,
   renameFlow,
-  reassignFlow
+  reassignFlow,
+  buildFlowSaveQuery,
+  buildFlowListQuery
 };

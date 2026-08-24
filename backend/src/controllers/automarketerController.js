@@ -6,12 +6,12 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Replicate = require('replicate'); // 🚀 NEW: For AI Image Generation
 const OpenAI = require('openai');
 
-// 🌊 ULTRA COST-EFFECTIVE MODELS FOR AUTOMARKETER
+// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS FOR AUTOMARKETER
 const MODELS = {
-  // ✅ FIX: Removed deprecated 'gemini-1.5-flash' which was causing 404 errors.
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Model
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Flash-Lite Model
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Flash-Lite Model
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Cheapest Model Fallback
 };
 
 // 🚀 NEW: Replicate client for image generation
@@ -67,30 +67,23 @@ exports.generatePost = async (req, res) => {
     // 🚀 MULTI-MODEL DYNAMIC CHAIN FOR CONTENT SCRIPT GENERATION
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
+      const geminiOrder = [
+        MODELS.GEMINI_3_5_LITE,
+        MODELS.GEMINI_3_1_LITE,
+        MODELS.GEMINI_2_5_LITE,
+      ];
 
-      // Level 1: Try Gemini 3.1 Flash Light
-      try {
-        console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.GEMINI_3_1_LITE}`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
-        const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
-        console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
-        rawAiResponse = result.response.text();
-        aiSuccess = true;
-      } catch (gemini3Err) {
-        console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_3_1_LITE} busy/failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
-      }
-
-      // Level 2: Try Gemini 2.5 Flash Light
-      if (!aiSuccess) {
+      for (const modelName of geminiOrder) {
+        if (aiSuccess) break;
         try {
-          console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.GEMINI_2_5_LITE}`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
+          console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${modelName}`);
+          const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
-          console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.GEMINI_2_5_LITE}`);
+          console.log(`✅ [Auto-Marketer] Responded using model: ${modelName}`);
           rawAiResponse = result.response.text();
           aiSuccess = true;
-        } catch (gemini2Err) {
-          console.warn(`⚠️ [Auto-Marketer] ${MODELS.GEMINI_2_5_LITE} failed, falling back to OpenAI...`);
+        } catch (geminiErr) {
+          console.warn(`⚠️ [Auto-Marketer] ${modelName} busy/failed, trying next fallback...`);
         }
       }
     }

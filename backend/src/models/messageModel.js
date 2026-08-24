@@ -40,6 +40,6 @@ messageSchema.index({ userId: 1, customerPhone: 1 });
 messageSchema.index({ userId: 1, workspaceId: 1, timestamp: -1 });
 messageSchema.index({ wamid: 1 });
 
-const Message = mongoose.model('Message', messageSchema);
+const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
 
 module.exports = Message;

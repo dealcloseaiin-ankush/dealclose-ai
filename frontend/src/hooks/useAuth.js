@@ -107,6 +107,24 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          try {
+            api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+            const { data } = await api.get('/users/profile');
+            const verifiedUser = data.user || data.data || data;
+            if (verifiedUser) {
+              setUser(verifiedUser);
+              localStorage.setItem('user', JSON.stringify(verifiedUser));
+            }
+          } catch (profileErr) {
+            if (profileErr.response?.status === 401) {
+              console.warn('Stored JWT session expired. Clearing local auth.');
+              clearLocalAuth();
+            }
+          }
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           await syncSupabaseSession(session);
@@ -127,7 +145,6 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data } = await api.post('/users/login', { email, password });
     localStorage.setItem('token', data.token);
-    // 🐛 FIX: Response se 'user' object ko use karein, na ki root 'data' ko
     const storedUser = data.user;
     if (storedUser) {
       localStorage.setItem('user', JSON.stringify(storedUser));

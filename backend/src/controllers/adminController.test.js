@@ -1,20 +1,25 @@
-// File: c:/Users/Lenovo1/Desktop/ai-calling-agent/backend/src/controllers/adminController.test.js
+jest.mock('../models/userModel', () => ({
+  findById: jest.fn(),
+  countDocuments: jest.fn(),
+  find: jest.fn(),
+}));
+jest.mock('../models/leadModel', () => ({
+  countDocuments: jest.fn(),
+}));
+jest.mock('../models/messageModel', () => ({
+  countDocuments: jest.fn(),
+}));
+jest.mock('../models/aiUsageLogModel', () => ({
+  aggregate: jest.fn(),
+}));
 
 const User = require('../models/userModel');
 const Lead = require('../models/leadModel');
 const Message = require('../models/messageModel');
 const AiUsageLog = require('../models/aiUsageLogModel');
-
-// Mock all the models used in the controller
-jest.mock('../models/userModel');
-jest.mock('../models/leadModel');
-jest.mock('../models/messageModel');
-jest.mock('../models/aiUsageLogModel');
+const { getSystemStats } = require('./adminController');
 
 describe('Admin Controller - getSystemStats', () => {
-  // 🚀 FIX: Import the controller *after* all mocks are defined.
-  const { getSystemStats } = require('./adminController');
-
   let mockReq, mockRes;
 
   beforeEach(() => {

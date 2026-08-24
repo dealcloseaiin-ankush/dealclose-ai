@@ -6,9 +6,11 @@ const CALL_RATE_PER_MINUTE = 3.0; // Example rate: ₹3 per minute as per prompt
 const WHATSAPP_RATE_PER_MESSAGE = 0.05; // Example rate: $0.05 per message
 
 const RATES = {
-  OPENAI_GPT_3_5: 0.002, // Cents per 1k tokens
+  GEMINI_FLASH: 0.0001,      // Ultra low rate per query
+  OPENAI_GPT_4O_MINI: 0.0002, // Ultra low rate per query
+  OPENAI_GPT_3_5: 0.002,     // Cents per 1k tokens
   OPENAI_GPT_4: 0.03,
-  TWILIO_VOICE: 0.015, // Per minute
+  TWILIO_VOICE: 0.015,       // Per minute
 };
 
 /**

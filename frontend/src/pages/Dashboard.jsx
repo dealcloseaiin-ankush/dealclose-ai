@@ -89,7 +89,30 @@ export default function Dashboard() {
     fetchData();
   }, [activeWorkspaceId, platformFilter]); // 🚀 NEW: Refetch when global workspace changes
 
-  if (loading || !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
+  if (loading && !data) return <div className="p-10 text-white flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
+
+  const defaultStats = {
+    totalLeads: 0,
+    conversionRate: '0.00',
+    costPerLead: 0,
+    hotLeads: 0,
+    warmLeads: 0,
+    coldLeads: 0,
+    existingLeads: 0,
+    vipLeads: 0,
+    followUpsToday: 0
+  };
+
+  const safeData = data || {
+    stats: defaultStats,
+    smartCrmData: {},
+    graphData: [{ name: 'No Data', value: 1 }],
+    sourceData: [],
+    statusData: [],
+    recentLeads: []
+  };
+
+  const stats = safeData.stats || defaultStats;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-[#050505] text-gray-100 font-sans relative">
@@ -120,21 +143,21 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         <StatCard 
           title="Total Leads CRM" 
-          value={data.stats.totalLeads} 
+          value={stats.totalLeads} 
           trend="+14.5%" trendUp={true} icon="👥" color="from-blue-500/20 to-blue-500/5" 
           linkTo="/crm"
           subtitle="Click to view all leads in CRM"
         />
         <StatCard 
           title="Lead Conversion Rate" 
-          value={`${data.stats.conversionRate}%`} 
+          value={`${stats.conversionRate}%`} 
           trend="+22.4%" trendUp={true} icon="📞" color="from-green-500/20 to-green-500/5" 
           linkTo="/crm"
           subtitle="Linked to Kanban 'Converted' stage"
         />
         <StatCard 
           title="Est. Cost / Lead" 
-          value={`₹${data.stats.costPerLead}`} 
+          value={`₹${stats.costPerLead}`} 
           trend="+8.2%" trendUp={false} icon="🔥" color="from-purple-500/20 to-purple-500/5" 
           linkTo="/whatsapp-rules"
           subtitle="⚠️ Est. based on outgoing templates. Does not include 24-hr free replies."
@@ -151,29 +174,29 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 text-center">
           <Link to="/crm?status=new" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
-            <p className="text-2xl font-black text-blue-400">{data.smartCrmData?.new || 0}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">New Leads</p>
+            <p className="text-2xl font-black text-blue-400">{safeData.smartCrmData?.new || 0}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">New Leads</p>
           </Link>
           <Link to="/crm?status=hot" className="block bg-red-500/10 p-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-            <p className="text-2xl font-black text-red-500">{data.smartCrmData?.hot || 0}</p><p className="text-[10px] text-red-400 font-bold uppercase tracking-wide mt-1">Hot 🔥</p>
+            <p className="text-2xl font-black text-red-500">{safeData.smartCrmData?.hot || 0}</p><p className="text-[10px] text-red-400 font-bold uppercase tracking-wide mt-1">Hot 🔥</p>
           </Link>
           <Link to="/crm?status=warm" className="block bg-orange-500/10 p-4 rounded-xl border border-orange-500/20 hover:bg-orange-500/20 transition">
-            <p className="text-2xl font-black text-orange-400">{data.smartCrmData?.warm || 0}</p><p className="text-[10px] text-orange-400 font-bold uppercase tracking-wide mt-1">Warm 🌟</p>
+            <p className="text-2xl font-black text-orange-400">{safeData.smartCrmData?.warm || 0}</p><p className="text-[10px] text-orange-400 font-bold uppercase tracking-wide mt-1">Warm 🌟</p>
           </Link>
           <Link to="/crm?status=cold" className="block bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition">
-            <p className="text-2xl font-black text-blue-300">{data.smartCrmData?.cold || 0}</p><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wide mt-1">Cold ❄️</p>
+            <p className="text-2xl font-black text-blue-300">{safeData.smartCrmData?.cold || 0}</p><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wide mt-1">Cold ❄️</p>
           </Link>
           <Link to="/crm?status=existing" className="block bg-green-500/10 p-4 rounded-xl border border-green-500/20 hover:bg-green-500/20 transition">
-            <p className="text-2xl font-black text-green-400">{data.smartCrmData?.existing || 0}</p><p className="text-[10px] text-green-400 font-bold uppercase tracking-wide mt-1">Existing 💼</p>
+            <p className="text-2xl font-black text-green-400">{safeData.smartCrmData?.existing || 0}</p><p className="text-[10px] text-green-400 font-bold uppercase tracking-wide mt-1">Existing 💼</p>
           </Link>
           <Link to="/crm?status=vip" className="block bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 hover:bg-purple-500/20 transition">
-            <p className="text-2xl font-black text-purple-400">{data.smartCrmData?.vip || 0}</p><p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide mt-1">VIP 👑</p>
+            <p className="text-2xl font-black text-purple-400">{safeData.smartCrmData?.vip || 0}</p><p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide mt-1">VIP 👑</p>
           </Link>
           <Link to="/crm?status=lost" className="block bg-gray-800/40 p-4 rounded-xl border border-gray-700/50 hover:bg-gray-700/40 transition">
-            <p className="text-2xl font-black text-gray-400">{data.smartCrmData?.lost || 0}</p><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide mt-1">Lost 💔</p>
+            <p className="text-2xl font-black text-gray-400">{safeData.smartCrmData?.lost || 0}</p><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide mt-1">Lost 💔</p>
           </Link>
           <Link to="/crm?status=followup" className="block bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/20 transition relative">
-            {data.smartCrmData?.followUpsToday > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{data.smartCrmData.followUpsToday} Due</span>}
-            <p className="text-2xl font-black text-yellow-400">{data.smartCrmData?.followUpsToday || 0}</p><p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wide mt-1">Follow-ups</p>
+            {safeData.smartCrmData?.followUpsToday > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{safeData.smartCrmData.followUpsToday} Due</span>}
+            <p className="text-2xl font-black text-yellow-400">{safeData.smartCrmData?.followUpsToday || 0}</p><p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wide mt-1">Follow-ups</p>
           </Link>
         </div>
       </div>
@@ -214,8 +237,8 @@ export default function Dashboard() {
           <div className="w-full pt-4 relative z-10">
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={data.graphData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={false}>
-                  {data.graphData.map((entry, index) => (
+                <Pie data={safeData.graphData || []} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={false}>
+                  {(safeData.graphData || []).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
@@ -232,7 +255,7 @@ export default function Dashboard() {
           <h3 className="text-lg font-bold text-white mb-6">New Leads (Last 7 Days)</h3>
           <div className="w-full pt-4 relative z-10">
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={data.dailyLeads} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <AreaChart data={safeData.dailyLeads || []} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                 <defs>
                   <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
@@ -255,7 +278,7 @@ export default function Dashboard() {
           <h3 className="text-lg font-bold text-white mb-6">Lead Sources Breakdown</h3>
           <div className="w-full pt-4 relative z-10">
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={data.leadsBySource} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <BarChart data={safeData.leadsBySource || []} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
                 <XAxis dataKey="name" stroke="#888" fontSize={12} />
                 <YAxis stroke="#888" fontSize={12} />
@@ -274,8 +297,8 @@ export default function Dashboard() {
           </div>
           
           <div className="space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
-            {data.recentActivity && data.recentActivity.length > 0 ? (
-              data.recentActivity.map((log, i) => (
+            {safeData.recentActivity && safeData.recentActivity.length > 0 ? (
+              safeData.recentActivity.map((log, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 bg-[#1a1a1a] rounded-xl border border-gray-800 hover:border-gray-700 transition-colors">
                   <div className="text-2xl mt-1 opacity-90">{log.status === 'converted' ? '🏆' : log.status === 'interested' ? '🔥' : log.status === 'lost' ? '💔' : '👤'}</div>
                   <div className="flex-1 min-w-0">

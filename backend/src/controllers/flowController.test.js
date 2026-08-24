@@ -18,11 +18,16 @@ describe('flow query builders', () => {
 
   it('filters main workspace flows correctly while preserving platform scoping', () => {
     expect(buildFlowListQuery({ userId: 'user-1', workspaceId: 'main', platform: 'instagram' })).toEqual({
-      userId: 'user-1',
-      platform: 'instagram',
-      $or: [
-        { workspaceId: 'main' },
-        { workspaceId: { $in: [null, ''] } }
+      $and: [
+        { userId: 'user-1' },
+        { platform: 'instagram' },
+        {
+          $or: [
+            { workspaceId: 'main' },
+            { workspaceId: { $in: [null, ''] } },
+            { workspaceId: { $exists: false } }
+          ]
+        }
       ]
     });
   });

@@ -20,7 +20,7 @@ const scanSchema = new mongoose.Schema({
     thumbnailUrl: String
   },
   
-  // OpenAI GPT-4o Vision Results
+  // AI Vision Analysis Results (Gemini Flash / GPT-4o Mini)
   analysis: {
     viralScore: Number, // 0-100
     viralLabel: String, // Poor, Average, Good, Viral

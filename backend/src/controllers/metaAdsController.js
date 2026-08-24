@@ -26,3 +26,23 @@ exports.createAudience = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get all connected Meta Ad Accounts
+// @route   GET /api/meta-ads/accounts
+exports.getAdAccounts = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const user = await User.findById(userId).lean();
+    const accessToken = user?.metaAdsConfig?.accessToken || user?.facebookAccessToken || user?.instagramAccessToken;
+
+    if (!accessToken) {
+      return res.status(200).json({ success: true, accounts: [] });
+    }
+
+    const accounts = await metaAdsService.getAdAccounts(accessToken);
+    res.status(200).json({ success: true, accounts: accounts || [] });
+  } catch (error) {
+    console.error('Meta Ad Accounts Controller Error:', error.message);
+    res.status(200).json({ success: true, accounts: [] });
+  }
+};

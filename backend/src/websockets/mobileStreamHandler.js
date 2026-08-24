@@ -7,12 +7,12 @@ const Lead = require('../models/leadModel');
 // 🚀 GLOBAL CACHE: Cache fallback audio to save resources
 let cachedMobileFallbackAudio = null;
 
-// 🌊 STABLE GLOBAL COVERSATIONAL MODELS CONFIGURATION
+// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE CALLING MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_1_5_FLASH: 'gemini-1.5-flash',       // Reliable Free Tier/Backup
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Corrected Spelling
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Corrected Spelling
-  OPENAI_MINI: 'gpt-4o-mini',                 // 🚀 Active OpenAI Engine Layer
+  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Mobile Calling Model
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Calling Model
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Calling Model
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Fallback Layer
 };
 
 module.exports = function (ws) {
@@ -65,6 +65,9 @@ module.exports = function (ws) {
           console.log(`👤 [Customer on Mobile]: ${transcript}`);
           rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
           conversationHistory.push({ role: "user", content: transcript });
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'transcript', text: transcript }));
+          }
           await processAIResponse();
         }
       }
@@ -90,28 +93,19 @@ module.exports = function (ws) {
 
       const systemPromptText = "You are a friendly DealClose AI calling assistant. Keep answers short (1 sentence). Speak in conversational Hinglish. CRITICAL RULE: DO NOT use complex Hindi words. Use simple words so an American AI voice can pronounce them naturally. Do NOT use Devanagari script.";
 
-      // 🚀 MULTI-MODEL DYNAMIC CHAIN (Gemini Lite Pipeline)
+      // 🚀 MULTI-MODEL DYNAMIC CHAIN (Gemini 3.5 / 3.1 Pipeline)
       if (genAI) {
-        // Level 1: Try Gemini 3.1 Flash Lite
-        try {
-          console.log(`🧠 [AI] Requesting model: ${MODELS.GEMINI_3_1_LITE}...`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
-          let promptStr = systemPromptText + "\n\nConversation History:\n";
-          conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
-          promptStr += "AI:";
-          
-          const result = await model.generateContent(promptStr);
-          aiText = result.response.text();
-          aiSuccess = true;
-        } catch (gemini3Err) {
-          console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_3_1_LITE} hit error: ${gemini3Err.message}. Trying 1.5 Flash...`);
-        }
+        const geminiOrder = [
+          MODELS.GEMINI_3_5_LITE,
+          MODELS.GEMINI_3_1_LITE,
+          MODELS.GEMINI_2_5_LITE,
+        ];
 
-        // Level 2: Try Gemini 1.5 Flash (Bypasses billing 403 blocks easily)
-        if (!aiSuccess) {
+        for (const modelName of geminiOrder) {
+          if (aiSuccess) break;
           try {
-            console.log(`🧠 [AI] Requesting stable model: ${MODELS.GEMINI_1_5_FLASH}...`);
-            const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
+            console.log(`🧠 [AI] Requesting model: ${modelName}...`);
+            const model = genAI.getGenerativeModel({ model: modelName });
             let promptStr = systemPromptText + "\n\nConversation History:\n";
             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
             promptStr += "AI:";
@@ -119,8 +113,8 @@ module.exports = function (ws) {
             const result = await model.generateContent(promptStr);
             aiText = result.response.text();
             aiSuccess = true;
-          } catch (gemini15Err) {
-            console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_1_5_FLASH} failed. Falling back to OpenAI...`);
+          } catch (geminiErr) {
+            console.warn(`⚠️ [AI Voice] ${modelName} hit error: ${geminiErr.message}. Trying next fallback...`);
           }
         }
       }
@@ -163,6 +157,7 @@ module.exports = function (ws) {
       const base64Audio = Buffer.from(arrayBuffer).toString('base64');
       
       if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'ai_response', text: aiText }));
         ws.send(JSON.stringify({ event: 'audio', data: base64Audio }));
       }
     } catch (error) {
@@ -257,16 +252,25 @@ module.exports = function (ws) {
             }
           }
 
-          // Summary Tier 2: Try Gemini 1.5 Flash if OpenAI fails
+          // Summary Tier 2: Try Gemini 3.5 / 3.1
           if (!summarySuccess && genAI) {
-            try {
-              console.log(`🧠 [Summary Engine] Requesting report via Gemini: ${MODELS.OPENAI_MINI}`);
-              const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
-              const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
-              callSummary = result.response.text();
-              summarySuccess = true;
-            } catch (gSummaryErr) {
-              console.warn("Gemini backup summary failed.");
+            const geminiOrder = [
+              MODELS.GEMINI_3_5_LITE,
+              MODELS.GEMINI_3_1_LITE,
+              MODELS.GEMINI_2_5_LITE,
+            ];
+
+            for (const modelName of geminiOrder) {
+              if (summarySuccess) break;
+              try {
+                console.log(`🧠 [Summary Engine] Requesting report via Gemini: ${modelName}`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+                callSummary = result.response.text();
+                summarySuccess = true;
+              } catch (gSummaryErr) {
+                console.warn(`⚠️ [Summary Engine] ${modelName} backup summary failed.`);
+              }
             }
           }
         }

@@ -8,12 +8,12 @@ const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 // 🚀 GLOBAL CACHE: Twilio calls (mulaw) ke liye alag cache
 let cachedTwilioFallbackAudio = null;
 
-// 🌊 ULTRA COST-EFFECTIVE & RE-CORRECTED OFFICIAL LITE MODELS CONFIGURATION
+// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE CALLING MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_1_5_FLASH: 'gemini-1.5-flash',       // Priority 1 (Highly Available Standard Model)
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 2 (Cheapest Corrected String Mapping)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 3 (Backup Corrected String Mapping)
-  OPENAI_MINI: 'gpt-4o-mini',                 // Priority 4 (Final Function Calling/Tools Fallback)
+  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Calling Model
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Calling Model
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Calling Model
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Calling & Function Calling Fallback
 };
 
 module.exports = function (ws) {
@@ -66,26 +66,17 @@ module.exports = function (ws) {
 
       // 🚀 MULTI-MODEL DYNAMIC CHAIN FOR TWILIO INTERACTION
       if (genAI) {
-        // Level 1: Try Gemini 1.5 Flash (Global Production King)
-        try {
-          console.log(`🧠 [AI] Trying model: ${MODELS.GEMINI_1_5_FLASH}...`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
-          let promptStr = systemPromptText + "\n\nConversation History:\n";
-          conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
-          promptStr += "AI:";
-          
-          const result = await model.generateContent(promptStr);
-          aiText = result.response.text();
-          aiSuccess = true;
-        } catch (gemini15Err) {
-          console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_1_5_FLASH} busy/failed: ${gemini15Err.message}. Trying ${MODELS.GEMINI_3_1_LITE}...`);
-        }
+        const geminiOrder = [
+          MODELS.GEMINI_3_5_LITE,
+          MODELS.GEMINI_3_1_LITE,
+          MODELS.GEMINI_2_5_LITE,
+        ];
 
-        // Level 2: Try Gemini 3.1 Flash Lite
-        if (!aiSuccess) {
+        for (const modelName of geminiOrder) {
+          if (aiSuccess) break;
           try {
-            console.log(`🧠 [AI] Trying model: ${MODELS.GEMINI_3_1_LITE}...`);
-            const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+            console.log(`🧠 [AI] Trying model: ${modelName}...`);
+            const model = genAI.getGenerativeModel({ model: modelName });
             let promptStr = systemPromptText + "\n\nConversation History:\n";
             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
             promptStr += "AI:";
@@ -93,8 +84,8 @@ module.exports = function (ws) {
             const result = await model.generateContent(promptStr);
             aiText = result.response.text();
             aiSuccess = true;
-          } catch (gemini3Err) {
-            console.warn(`⚠️ [AI Voice] ${MODELS.GEMINI_3_1_LITE} also failed: ${gemini3Err.message}. Falling back to OpenAI...`);
+          } catch (geminiErr) {
+            console.warn(`⚠️ [AI Voice] ${modelName} busy/failed: ${geminiErr.message}. Trying next fallback...`);
           }
         }
       }
@@ -193,19 +184,19 @@ module.exports = function (ws) {
       const audioPayload = msg.media.payload;
       const audioBuffer = Buffer.from(audioPayload, 'base64');
       
-      if (deepgramLive.readyState === 1) {
+      if (deepgramLive && deepgramLive.readyState === 1) {
         deepgramLive.send(audioBuffer);
       }
       
     } else if (msg.event === 'stop') {
       console.log(`🛑 [Twilio Stream] Call Ended. Stream SID: ${streamSid}`);
-      if (deepgramLive.readyState === 1) deepgramLive.close();
+      if (deepgramLive && deepgramLive.readyState === 1) deepgramLive.close();
     }
   });
 
   ws.on('close', async () => {
     console.log('🔌 [WebSocket] Twilio Stream Connection Closed');
-    if (deepgramLive.readyState === 1) deepgramLive.close();
+    if (deepgramLive && deepgramLive.readyState === 1) deepgramLive.close();
     
     if (callSid && rawTranscript.length > 0) {
       try {
@@ -229,18 +220,27 @@ module.exports = function (ws) {
              }
            }
 
-           // Summary Tier 2: Try Gemini 1.5 Flash
-           if (!summarySuccess && genAI) {
-             try {
-               console.log(`🧠 [Summary Engine] Requesting report using Gemini: ${MODELS.GEMINI_1_5_FLASH}`);
-               const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_1_5_FLASH });
-               const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
-               callSummary = result.response.text();
-               summarySuccess = true;
-             } catch (sErr3) {
-               console.warn(`⚠️ [Summary Engine] ${MODELS.GEMINI_1_5_FLASH} summary failed.`);
-             }
-           }
+            // Summary Tier 2: Try Gemini 3.5 / 3.1
+            if (!summarySuccess && genAI) {
+              const geminiOrder = [
+                MODELS.GEMINI_3_5_LITE,
+                MODELS.GEMINI_3_1_LITE,
+                MODELS.GEMINI_2_5_LITE,
+              ];
+
+              for (const modelName of geminiOrder) {
+                if (summarySuccess) break;
+                try {
+                  console.log(`🧠 [Summary Engine] Requesting report using Gemini: ${modelName}`);
+                  const model = genAI.getGenerativeModel({ model: modelName });
+                  const result = await model.generateContent(summaryPrompt + "\n\n" + transcriptText);
+                  callSummary = result.response.text();
+                  summarySuccess = true;
+                } catch (sErr) {
+                  console.warn(`⚠️ [Summary Engine] ${modelName} summary failed.`);
+                }
+              }
+            }
            console.log(`✅ [Post-Call Analysis] Summary:\n${callSummary}`);
         }
         

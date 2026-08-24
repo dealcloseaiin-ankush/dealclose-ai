@@ -73,12 +73,18 @@ const GlobalNotification = () => {
   const auth = useAuth();
   const user = auth?.user;
   const [lastMsgId, setLastMsgId] = useState(null);
+  // Use a ref so the interval callback always reads the latest value without re-registering
+  const shouldPoll = React.useRef(true);
 
   useEffect(() => {
     if (!user) return;
+    shouldPoll.current = true;
+
     const checkMessages = async () => {
+      if (!shouldPoll.current) return;
       try {
         const { data } = await api.get('/chats');
+        if (!shouldPoll.current) return;
         const messages = Array.isArray(data) ? data : data.data || [];
         if (messages.length === 0) return;
         
@@ -98,13 +104,22 @@ const GlobalNotification = () => {
         const hasUnread = messages.some(m => m.direction === 'incoming');
         window.dispatchEvent(new CustomEvent('update_unread_badge', { detail: { hasUnread } }));
       } catch(error) {
+        if (error.response?.status === 401) {
+          // 401 = expired/invalid token — permanently stop ALL future poll calls
+          shouldPoll.current = false;
+          clearInterval(intervalRef.current);
+        }
         console.debug('Background chat check skipped.', error.message);
       }
     };
+
     checkMessages();
-    const interval = setInterval(checkMessages, 4000);
-    return () => clearInterval(interval);
-  }, [user, lastMsgId]);
+    const intervalRef = { current: setInterval(checkMessages, 8000) }; // Increased to 8s to reduce server load
+    return () => {
+      shouldPoll.current = false;
+      clearInterval(intervalRef.current);
+    };
+  }, [user]); // Removed lastMsgId from deps so interval doesn't restart on every message
   return null;
 };
 

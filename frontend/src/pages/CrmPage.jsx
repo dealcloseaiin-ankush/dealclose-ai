@@ -66,8 +66,11 @@ export default function CrmPage() {
       Object.values(res.data.data).forEach(arr => allContacts.push(...arr));
       setFlatContacts(allContacts);
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to load CRM data");
+      // 401 is handled globally by api.js interceptor (redirects to /login)
+      if (error.response?.status !== 401) {
+        console.error(error);
+        toast.error("Failed to load CRM data");
+      }
     } finally {
       setLoading(false);
     }

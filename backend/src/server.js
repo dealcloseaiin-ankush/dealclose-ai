@@ -119,8 +119,5 @@ mongoose.connect(process.env.MONGO_URI, {
   console.error('Database connection error:', err);
 });
 
-// Schedule the new token refresh job
-scheduleTokenRefreshJob();
-
-// Schedule the new token refresh job
+// Schedule the daily Instagram token refresh job
 scheduleTokenRefreshJob();

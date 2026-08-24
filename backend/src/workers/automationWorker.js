@@ -26,12 +26,14 @@ const connection = process.env.REDIS_URL
         return Math.min(times * 100, 3000); 
       }
     })
-  : { host: '127.0.0.1', port: 6379 };
+  : new IORedis({ host: '127.0.0.1', port: 6379, maxRetriesPerRequest: null, lazyConnect: true });
 
 // 🔴 PREVENT CRASH: Agar Redis limit cross ho jaye toh server crash na ho
-connection.on('error', (err) => {
-  console.error('⚠️ [Redis Error] Server bacha liya gaya hai:', err.message);
-});
+if (connection && typeof connection.on === 'function') {
+  connection.on('error', (err) => {
+    console.error('⚠️ [Redis Error] Server bacha liya gaya hai:', err.message);
+  });
+}
 
 // Create the Queue
 const automationQueue = new Queue('automationQueue', { connection });

@@ -2,12 +2,12 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { OpenAI } = require('openai');
 const aiUsageTracker = require('./aiUsageTracker');
 
-// 🌊 ULTRA COST-EFFECTIVE MODELS FOR VISION / OCR
+// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS FOR VISION / OCR
 const VISION_MODELS = {
-  // ✅ FIX: Removed deprecated 'gemini-1.5-flash' which was causing 404 errors.
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3 (Final Fallback)
+  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Vision Flash-Lite
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Vision Flash-Lite
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Vision Flash-Lite
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Vision Fallback
 };
 
 /**
@@ -42,32 +42,26 @@ exports.extractTextFromImage = async (imageBuffer, mimeType, userId = null) => {
     // 🚀 DYNAMIC MULTI-MODEL FALLBACK CHAIN FOR VISION
     if (hasGemini) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      // Priority 1: Try Gemini 3.1 Flash Light (Vision Supported)
-      try {
-        const model = genAI.getGenerativeModel({ model: VISION_MODELS.GEMINI_3_1_LITE });
-        const result = await model.generateContent([prompt, ...imageParts]);
-        const response = await result.response;
-        extractedText = response.text();
-        modelUsed = VISION_MODELS.GEMINI_3_1_LITE;
-        if (userId) aiUsageTracker.trackUsage({ userId, feature: 'ocr-vision', provider: 'gemini', model: modelUsed, usage: response.usageMetadata });
-        console.log(`✅ [OCR AI] Successfully extracted text using model: ${modelUsed}`);
-        return extractedText;
-      } catch (gemini3Error) {
-        console.warn(`⚠️ [OCR AI] ${VISION_MODELS.GEMINI_3_1_LITE} failed or busy: ${gemini3Error.message}. Trying ${VISION_MODELS.GEMINI_2_5_LITE || 'OpenAI'}...`);
-      }
+      const visionChain = [
+        VISION_MODELS.GEMINI_3_5_LITE,
+        VISION_MODELS.GEMINI_3_1_LITE,
+        VISION_MODELS.GEMINI_2_5_LITE,
+      ];
 
-      // Priority 2: Try Gemini 2.5 Flash Light (Vision Supported)
-      try {
-        const model = genAI.getGenerativeModel({ model: VISION_MODELS.GEMINI_2_5_LITE });
-        const result = await model.generateContent([prompt, ...imageParts]);
-        const response = await result.response;
-        extractedText = response.text();
-        modelUsed = VISION_MODELS.GEMINI_2_5_LITE;
-        if (userId) aiUsageTracker.trackUsage({ userId, feature: 'ocr-vision', provider: 'gemini', model: modelUsed, usage: response.usageMetadata });
-        console.log(`✅ [OCR AI] Successfully extracted text using model: ${modelUsed}`);
-        return extractedText;
-      } catch (gemini2Error) {
-        console.warn(`⚠️ [OCR AI] ${VISION_MODELS.GEMINI_2_5_LITE} also failed. Falling back to OpenAI...`);
+      for (const modelName of visionChain) {
+        if (extractedText) break;
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent([prompt, ...imageParts]);
+          const response = await result.response;
+          extractedText = response.text();
+          modelUsed = modelName;
+          if (userId) aiUsageTracker.trackUsage({ userId, feature: 'ocr-vision', provider: 'gemini', model: modelUsed, usage: response.usageMetadata });
+          console.log(`✅ [OCR AI] Successfully extracted text using model: ${modelUsed}`);
+          return extractedText;
+        } catch (geminiError) {
+          console.warn(`⚠️ [OCR AI] ${modelName} failed or busy: ${geminiError.message}. Trying next fallback...`);
+        }
       }
     }
 

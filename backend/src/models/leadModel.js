@@ -105,6 +105,6 @@ const leadSchema = new Schema({
 // --- Indexes for Performance ---
 leadSchema.index({ userId: 1, phoneNumber: 1 });
 
-const Lead = mongoose.model('Lead', leadSchema);
+const Lead = mongoose.models.Lead || mongoose.model('Lead', leadSchema);
 
 module.exports = Lead;

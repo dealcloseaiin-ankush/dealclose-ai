@@ -18,4 +18,8 @@ If you are developing a production application, we recommend using TypeScript wi
 ---
 
 ## 🤖 AI Model Configuration Note
-**CRITICAL INSTRUCTION:** Please DO NOT change the AI model in the backend services. The entire application (including WhatsApp AI chat, OCR, and Vision Scaniq) is configured to strictly use **`gemini-2.5-pro`**. This is because `gemini-2.5-pro` is the ONLY model currently accepted and properly responding in this project's setup.
+The entire application (including WhatsApp AI chat, Voice Calling, Flow Builder, OCR, and Vision ScanIQ) is configured to use the latest ultra-cost-effective, high-speed models:
+- **Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`)** - Primary latest lowest-cost, ultra-fast model.
+- **Google Gemini 3.5 Flash (`gemini-3.5-flash`)** - Secondary high-speed production model.
+- **Google Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`)** - Lightweight cost-optimized fallback.
+- **OpenAI GPT-4o Mini (`gpt-4o-mini`)** - Fast, budget-friendly fallback and sales tool execution.

@@ -79,6 +79,9 @@ export default function Chats() {
 
       } catch (error) {
         console.error("Failed to fetch chats", error);
+        if (error.response?.status === 401) {
+          isMounted = false;
+        }
       } finally {
         if (isFirstLoad) {
           setLoading(false);

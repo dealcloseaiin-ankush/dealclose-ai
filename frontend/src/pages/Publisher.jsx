@@ -57,8 +57,10 @@ export default function Publisher() {
         setPosts(nextPosts);
       }
     } catch (error) {
-      toast.error('Failed to fetch posts.');
-      console.error(error);
+      if (error.response?.status !== 401) {
+        toast.error('Failed to fetch posts.');
+        console.error(error);
+      }
     } finally {
       setLoading(false);
     }

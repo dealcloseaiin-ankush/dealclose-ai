@@ -11,17 +11,17 @@ describe('Cost Calculator Utility', () => {
     };
 
     // Manual Calculation for Verification:
-    // gemini-1.5-flash prices: { input: $0.35, output: $0.70 } per 1M tokens
-    // Base Input Cost = (10000 / 1,000,000) * 0.35 = 0.0035
-    // Base Output Cost = (20000 / 1,000,000) * 0.70 = 0.014
-    // Total Base Cost = 0.0035 + 0.014 = 0.0175
-    // Internal Cost (x1.5) = 0.0175 * 1.5 = 0.02625
-    // User Cost (x8) = 0.02625 * 8 = 0.21
+    // gemini-1.5-flash prices: { input: $0.075, output: $0.30 } per 1M tokens
+    // Base Input Cost = (10000 / 1,000,000) * 0.075 = 0.00075
+    // Base Output Cost = (20000 / 1,000,000) * 0.30 = 0.006
+    // Total Base Cost = 0.00075 + 0.006 = 0.00675
+    // Internal Cost (x1.5) = 0.00675 * 1.5 = 0.010125
+    // User Cost (x8) = 0.010125 * 8 = 0.081
 
     const { internalCost, userCost } = calculateCosts(params);
 
-    expect(internalCost).toBeCloseTo(0.02625);
-    expect(userCost).toBeCloseTo(0.21);
+    expect(internalCost).toBeCloseTo(0.010125);
+    expect(userCost).toBeCloseTo(0.081);
   });
 
   it('should correctly calculate costs for an OpenAI model', () => {

@@ -9,12 +9,13 @@ const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const whatsappService = require('../services/whatsappService');
 const { automationQueue } = require('../workers/automationWorker');
 
-// 🌊 ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
+// 🌊 LATEST ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
 const MODELS = {
-  // ✅ FIX: Removed deprecated 'gemini-1.5-flash' which was causing 404 errors.
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',   // Priority 1 (Latest Cheapest Lite String)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',   // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',                 // Priority 4 (Final AI Fallback Loop)
+  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Latest & Cheapest Gemini 3.5 Model
+  GEMINI_3_5_FLASH: 'gemini-3.5-flash',      // Priority 2: Latest Gemini 3.5 Standard Flash
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 3: Cost-Optimized 3.1 Flash Lite
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 4: Stable 2.5 Fallback
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 5: OpenAI Cheapest Model Fallback
 };
 
 // @desc    Get unanswered queries for AI training
@@ -624,17 +625,25 @@ exports.generateFlow = async (req, res) => {
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
 
-      // Level 1: Try Gemini 3.1 Flash Lite
-      if (!flowGenSuccess) {
+      // Gemini Multi-Model Fallback Chain
+      const geminiOrder = [
+        MODELS.GEMINI_3_5_LITE,
+        MODELS.GEMINI_3_5_FLASH,
+        MODELS.GEMINI_3_1_LITE,
+        MODELS.GEMINI_2_5_LITE,
+      ];
+
+      for (const modelName of geminiOrder) {
+        if (flowGenSuccess) break;
         try {
-          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${MODELS.GEMINI_3_1_LITE}`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
+          console.log(`[Flow Gen] 🤖 Requesting canvas model: ${modelName}`);
+          const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([systemPrompt, prompt]);
-          console.log(`✅ [Flow Gen] Responded using model: ${MODELS.GEMINI_3_1_LITE}`);
+          console.log(`✅ [Flow Gen] Responded using model: ${modelName}`);
           rawResponse = result.response.text();
           flowGenSuccess = true;
-        } catch (gemini3Err) {
-          console.warn(`⚠️ [Flow Gen] ${MODELS.GEMINI_3_1_LITE} failed, trying ${MODELS.GEMINI_2_5_LITE}...`);
+        } catch (geminiErr) {
+          console.warn(`⚠️ [Flow Gen] ${modelName} failed, trying next fallback...`);
         }
       }
     }

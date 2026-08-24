@@ -34,18 +34,30 @@ exports.verifyPayment = async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, amount, isPremiumUpgrade } = req.body;
 
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) {
+      console.error("❌ RAZORPAY_KEY_SECRET is missing in environment variables.");
+      return res.status(500).json({ success: false, message: "Payment configuration error on server" });
+    }
+
+    const targetUserId = req.user?._id || userId;
+    if (!targetUserId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
     const text = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSign = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    const expectedSign = crypto.createHmac("sha256", secret)
                                .update(text.toString())
                                .digest("hex");
 
     if (razorpay_signature === expectedSign) {
-      const updatePayload = { $inc: { walletBalance: amount } };
+      const parsedAmount = Number(amount) || 0;
+      const updatePayload = { $inc: { walletBalance: parsedAmount } };
       if (isPremiumUpgrade) {
         updatePayload.$set = { isPremium: true };
       }
 
-      const updatedUser = await User.findByIdAndUpdate(userId, updatePayload, { new: true });
+      const updatedUser = await User.findByIdAndUpdate(targetUserId, updatePayload, { new: true });
       
       if (updatedUser) {
         if (isPremiumUpgrade) {

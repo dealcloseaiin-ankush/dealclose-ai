@@ -1,14 +1,15 @@
 // All prices are in USD per 1 Million tokens.
 const MODEL_PRICING = {
   gemini: {
-    'gemini-1.5-flash': { input: 0.35, output: 0.70 },
-    'gemini-3.1-flash-lite': { input: 0.35, output: 0.70 }, // Assuming same as flash for now
-    'gemini-2.5-flash-lite': { input: 0.35, output: 0.70 }, // Assuming same as flash for now
-    // Add other Gemini models here as you use them
+    'gemini-3.5-flash-lite': { input: 0.10, output: 0.40 }, // Latest ultra-cost-effective 3.5 lite
+    'gemini-3.5-flash': { input: 0.15, output: 0.60 },      // Latest 3.5 flash
+    'gemini-3.1-flash-lite': { input: 0.10, output: 0.40 }, // 3.1 flash lite
+    'gemini-2.5-flash-lite': { input: 0.10, output: 0.40 }, // 2.5 flash lite
+    'gemini-1.5-flash': { input: 0.075, output: 0.30 },     // 1.5 flash
   },
   openai: {
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },
-    // Add other OpenAI models here
+    'gpt-4o-mini': { input: 0.15, output: 0.60 },          // OpenAI cheapest flagship mini
+    'gpt-3.5-turbo': { input: 0.50, output: 1.50 },        // Legacy turbo
   },
 };
 

@@ -4,11 +4,12 @@ const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const scraperService = require('./scraper.service');
 
-// 🌊 ULTRA COST-EFFECTIVE MODELS CONFIGURATION
+// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite', // Priority 1 (Latest, Cheapest & Fast)
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite', // Priority 2 (Backup Gemini)
-  OPENAI_MINI: 'gpt-4o-mini',                  // Priority 3 (Final AI Fallback)
+  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Vision Model
+  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Vision Model
+  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Vision Model
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Vision Fallback
 };
 
 exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) => {
@@ -58,29 +59,23 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
     }
 
     if (imagePart) {
-      // Level 1: Try Gemini 3.1 Flash Light
-      try {
-        console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_3_1_LITE}...`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
-        const result = await model.generateContent([prompt, imagePart]);
-        rawResponse = result.response.text();
-        console.log(`[Vision Debug] ✅ Successfully generated response using: ${MODELS.GEMINI_3_1_LITE}`);
-        geminiSuccess = true;
-      } catch (gemini3Error) {
-        console.warn(`⚠️ [Vision AI] ${MODELS.GEMINI_3_1_LITE} failed/busy: ${gemini3Error.message}. Trying ${MODELS.GEMINI_2_5_LITE}...`);
-      }
+      const geminiOrder = [
+        MODELS.GEMINI_3_5_LITE,
+        MODELS.GEMINI_3_1_LITE,
+        MODELS.GEMINI_2_5_LITE,
+      ];
 
-      // Level 2: Try Gemini 2.5 Flash Light
-      if (!geminiSuccess) {
+      for (const modelName of geminiOrder) {
+        if (geminiSuccess) break;
         try {
-          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_2_5_LITE}...`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
+          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${modelName}...`);
+          const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([prompt, imagePart]);
           rawResponse = result.response.text();
-          console.log(`[Vision Debug] ✅ Successfully generated response using: ${MODELS.GEMINI_2_5_LITE}`);
+          console.log(`[Vision Debug] ✅ Successfully generated response using: ${modelName}`);
           geminiSuccess = true;
-        } catch (gemini2Error) {
-          console.warn(`⚠️ [Vision AI] ${MODELS.GEMINI_2_5_LITE} also failed: ${gemini2Error.message}. Falling back to OpenAI...`);
+        } catch (geminiError) {
+          console.warn(`⚠️ [Vision AI] ${modelName} failed/busy: ${geminiError.message}. Trying next fallback...`);
         }
       }
     }
@@ -219,29 +214,23 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
     if (hasGemini) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-      // Level 1: Gemini 3.1 Flash Light
-      try {
-        console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_3_1_LITE}...`);
-        const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_3_1_LITE });
-        const result = await model.generateContent(prompt);
-        aiResponseText = result.response.text();
-        console.log(`[Vision Debug] ✅ AI Analysis completed using: ${MODELS.GEMINI_3_1_LITE}`);
-        textAnalysisSuccess = true;
-      } catch (gemini3Err) {
-        console.warn(`⚠️ [Vision Debug] ${MODELS.GEMINI_3_1_LITE} failed: ${gemini3Err.message}. Trying ${MODELS.GEMINI_2_5_LITE}...`);
-      }
+      const geminiOrder = [
+        MODELS.GEMINI_3_5_LITE,
+        MODELS.GEMINI_3_1_LITE,
+        MODELS.GEMINI_2_5_LITE,
+      ];
 
-      // Level 2: Gemini 2.5 Flash Light
-      if (!textAnalysisSuccess) {
+      for (const modelName of geminiOrder) {
+        if (textAnalysisSuccess) break;
         try {
-          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${MODELS.GEMINI_2_5_LITE}...`);
-          const model = genAI.getGenerativeModel({ model: MODELS.GEMINI_2_5_LITE });
+          console.log(`[Vision Debug] 🤖 Triggering Gemini Model: ${modelName}...`);
+          const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent(prompt);
           aiResponseText = result.response.text();
-          console.log(`[Vision Debug] ✅ AI Analysis completed using: ${MODELS.GEMINI_2_5_LITE}`);
+          console.log(`[Vision Debug] ✅ AI Analysis completed using: ${modelName}`);
           textAnalysisSuccess = true;
-        } catch (gemini2Err) {
-          console.warn(`⚠️ [Vision Debug] ${MODELS.GEMINI_2_5_LITE} failed: ${gemini2Err.message}. Falling back to OpenAI...`);
+        } catch (geminiErr) {
+          console.warn(`⚠️ [Vision Debug] ${modelName} failed: ${geminiErr.message}. Trying next fallback...`);
         }
       }
     }
