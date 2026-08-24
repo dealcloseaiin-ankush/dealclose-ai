@@ -160,7 +160,12 @@ export default function Calls() {
     outcome: 'connected',
     summary: '',
     followUpDate: '',
-    targetBucket: 'today_queue'
+    targetBucket: 'today_queue',
+    callerIdentity: 'staff',
+    customCallerName: '',
+    customCallerPhone: '',
+    durationMinutes: 2,
+    durationSeconds: 30
   });
   const [submittingLog, setSubmittingLog] = useState(false);
 
@@ -248,7 +253,12 @@ export default function Calls() {
       outcome: lead.lastCallOutcome || 'connected',
       summary: lead.lastCallSummary || '',
       followUpDate: lead.followUpDate ? new Date(lead.followUpDate).toISOString().slice(0, 16) : '',
-      targetBucket: lead.callingBucket || 'today_queue'
+      targetBucket: lead.callingBucket || 'today_queue',
+      callerIdentity: 'staff',
+      customCallerName: '',
+      customCallerPhone: user?.phone || user?.ownerPhone || '',
+      durationMinutes: 2,
+      durationSeconds: 15
     });
   };
 
@@ -259,16 +269,32 @@ export default function Calls() {
     setSubmittingLog(true);
 
     try {
+      let callerLabel = user?.fullName || 'Staff Member';
+      let originPhone = user?.phone || user?.ownerPhone || '';
+
+      if (logFormData.callerIdentity === 'office') {
+        callerLabel = `Office Desk [${user?.businessName || 'HQ'}]`;
+        originPhone = user?.brandKit?.phone || user?.officePhone || '';
+      } else if (logFormData.callerIdentity === 'custom') {
+        callerLabel = logFormData.customCallerName || 'Custom Staff';
+        originPhone = logFormData.customCallerPhone || '';
+      }
+
+      const totalDuration = (Number(logFormData.durationMinutes) || 0) * 60 + (Number(logFormData.durationSeconds) || 0);
+
       const res = await api.post('/calls/log-manual', {
         leadId: logModalLead._id || logModalLead.id,
         outcome: logFormData.outcome,
         summary: logFormData.summary,
         followUpDate: logFormData.followUpDate || null,
         targetBucket: logFormData.targetBucket,
-        callerType: 'staff'
+        callerType: 'staff',
+        calledFromNumber: originPhone,
+        callerIdentityLabel: callerLabel,
+        durationSeconds: totalDuration
       });
 
-      toast.success('Call notes & follow-up saved! 📝');
+      toast.success('Call notes & duration saved! 📝');
       setLogModalLead(null);
       fetchBuckets();
     } catch (err) {
@@ -382,6 +408,84 @@ export default function Calls() {
             </div>
 
             <form onSubmit={handleSaveCallLog} className="space-y-4">
+              {/* 🚀 3 Origin Identity Buttons */}
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-2">Called From Number / Identity</label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setLogFormData({ ...logFormData, callerIdentity: 'staff', customCallerPhone: user?.phone || user?.ownerPhone || '' })}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center ${
+                      logFormData.callerIdentity === 'staff' ? 'bg-indigo-600/30 text-indigo-400 border-indigo-500 shadow-md' : 'bg-[#1a1a1a] text-gray-400 border-gray-700 hover:text-white'
+                    }`}
+                  >
+                    👤 Staff No.
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLogFormData({ ...logFormData, callerIdentity: 'office', customCallerPhone: user?.brandKit?.phone || user?.officePhone || '' })}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center ${
+                      logFormData.callerIdentity === 'office' ? 'bg-emerald-600/30 text-emerald-400 border-emerald-500 shadow-md' : 'bg-[#1a1a1a] text-gray-400 border-gray-700 hover:text-white'
+                    }`}
+                  >
+                    🏢 Office No.
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLogFormData({ ...logFormData, callerIdentity: 'custom' })}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center ${
+                      logFormData.callerIdentity === 'custom' ? 'bg-purple-600/30 text-purple-400 border-purple-500 shadow-md' : 'bg-[#1a1a1a] text-gray-400 border-gray-700 hover:text-white'
+                    }`}
+                  >
+                    📱 Others / Custom
+                  </button>
+                </div>
+
+                {logFormData.callerIdentity === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2 mt-2 animate-fade-in">
+                    <input
+                      type="text"
+                      placeholder="Caller Name (e.g. Priya Desk)"
+                      value={logFormData.customCallerName}
+                      onChange={(e) => setLogFormData({ ...logFormData, customCallerName: e.target.value })}
+                      className="bg-[#1a1a1a] border border-gray-700 rounded-xl p-2.5 text-white text-xs outline-none focus:border-purple-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Phone (e.g. +91 98111 22233)"
+                      value={logFormData.customCallerPhone}
+                      onChange={(e) => setLogFormData({ ...logFormData, customCallerPhone: e.target.value })}
+                      className="bg-[#1a1a1a] border border-gray-700 rounded-xl p-2.5 text-white text-xs outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Call Duration Tracker */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Call Duration (Minutes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={logFormData.durationMinutes}
+                    onChange={(e) => setLogFormData({ ...logFormData, durationMinutes: Number(e.target.value) })}
+                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-xl p-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Seconds</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={logFormData.durationSeconds}
+                    onChange={(e) => setLogFormData({ ...logFormData, durationSeconds: Number(e.target.value) })}
+                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-xl p-2.5 text-white text-xs outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-gray-400 text-xs font-semibold mb-1">Call Outcome</label>
                 <select

@@ -225,8 +225,17 @@ exports.batchAssignToday = async (req, res) => {
 exports.logManualCall = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const staffName = req.user?.fullName || req.user?.name || 'Staff Member';
-    const { leadId, outcome, summary, followUpDate, callerType = 'staff', targetBucket } = req.body;
+    const {
+      leadId,
+      outcome,
+      summary,
+      followUpDate,
+      callerType = 'staff',
+      targetBucket,
+      calledFromNumber = '',
+      callerIdentityLabel = '',
+      durationSeconds = 0
+    } = req.body;
 
     if (!leadId) return res.status(400).json({ success: false, message: 'leadId is required' });
 
@@ -237,7 +246,7 @@ exports.logManualCall = async (req, res) => {
     lead.lastCallDate = new Date();
     lead.lastCallOutcome = outcome;
     lead.lastCallerType = callerType;
-    lead.lastCallerName = callerType === 'ai' ? 'AI Voice Bot' : staffName;
+    lead.lastCallerName = callerIdentityLabel || (callerType === 'ai' ? 'AI Voice Bot' : staffName);
     lead.lastCallSummary = summary || '';
 
     // Determine target bucket if not explicitly passed
@@ -260,12 +269,14 @@ exports.logManualCall = async (req, res) => {
       lead.followUpDate = new Date(followUpDate);
     }
 
-    const callerLabel = callerType === 'ai' ? '🤖 AI Voice Bot' : `👤 Staff [${staffName}]`;
+    const callerLabel = callerType === 'ai' ? '🤖 AI Voice Bot' : `👤 ${callerIdentityLabel || `Staff [${staffName}]`}`;
+    const originLabel = calledFromNumber ? ` (From: ${calledFromNumber})` : '';
+    const durationLabel = durationSeconds > 0 ? ` [Duration: ${Math.floor(durationSeconds/60)}m ${durationSeconds%60}s]` : '';
     const outcomeLabel = outcome ? outcome.replace(/_/g, ' ').toUpperCase() : 'CALL COMPLETED';
 
     lead.timeline.push({
       eventType: 'Call Logged',
-      description: `${callerLabel} logged call [${outcomeLabel}]: ${summary || 'No notes'}${followUpDate ? ` | Next Callback: ${new Date(followUpDate).toLocaleString()}` : ''}`,
+      description: `${callerLabel}${originLabel} logged call [${outcomeLabel}]${durationLabel}: ${summary || 'No notes'}${followUpDate ? ` | Next Callback: ${new Date(followUpDate).toLocaleString()}` : ''}`,
       timestamp: new Date()
     });
 
