@@ -13,7 +13,9 @@ export default function TrackingAnalytics() {
         const res = await api.get('/leads/analytics');
         setData(res.data);
       } catch (error) {
-        console.error("Error fetching analytics", error);
+        if (error.response?.status !== 401) {
+          console.error("Error fetching analytics", error);
+        }
       } finally {
         setLoading(false);
       }
@@ -23,6 +25,15 @@ export default function TrackingAnalytics() {
 
   if (loading) return <div className="p-10 text-center text-white">Loading Analytics...</div>;
   if (!data) return <div className="p-10 text-center text-white">No data available.</div>;
+
+  // Safe destructure with defaults to prevent undefined crashes
+  const stats = data.stats || { totalLeads: 0, conversionRate: 0, costPerLead: 0 };
+  const messageStats = data.messageStats || { delivered: 0 };
+  const graphData = data.graphData || [];
+  const dailyLeads = data.dailyLeads || [];
+  const advancedStats = data.advancedStats || { replySources: { ai: 0, bot: 0, human: 0 } };
+  const replySources = advancedStats.replySources || { ai: 0, bot: 0, human: 0 };
+
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -35,19 +46,19 @@ export default function TrackingAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl shadow-lg flex items-center gap-4">
           <div className="bg-blue-500/20 p-4 rounded-xl text-blue-500"><Users size={28} /></div>
-          <div><p className="text-sm text-gray-400 font-medium">Total CRM Leads</p><h2 className="text-2xl font-bold text-white">{data.stats.totalLeads}</h2></div>
+          <div><p className="text-sm text-gray-400 font-medium">Total CRM Leads</p><h2 className="text-2xl font-bold text-white">{stats.totalLeads}</h2></div>
         </div>
         <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl shadow-lg flex items-center gap-4">
           <div className="bg-green-500/20 p-4 rounded-xl text-green-500"><TrendingUp size={28} /></div>
-          <div><p className="text-sm text-gray-400 font-medium">Conversion Rate</p><h2 className="text-2xl font-bold text-white">{data.stats.conversionRate}%</h2></div>
+          <div><p className="text-sm text-gray-400 font-medium">Conversion Rate</p><h2 className="text-2xl font-bold text-white">{stats.conversionRate}%</h2></div>
         </div>
         <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl shadow-lg flex items-center gap-4">
           <div className="bg-purple-500/20 p-4 rounded-xl text-purple-500"><MessageSquare size={28} /></div>
-          <div><p className="text-sm text-gray-400 font-medium">Messages Delivered</p><h2 className="text-2xl font-bold text-white">{data.messageStats.delivered}</h2></div>
+          <div><p className="text-sm text-gray-400 font-medium">Messages Delivered</p><h2 className="text-2xl font-bold text-white">{messageStats.delivered}</h2></div>
         </div>
         <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl shadow-lg flex items-center gap-4">
           <div className="bg-orange-500/20 p-4 rounded-xl text-orange-500"><IndianRupee size={28} /></div>
-          <div><p className="text-sm text-gray-400 font-medium">Est. Cost Per Lead</p><h2 className="text-2xl font-bold text-white">₹{data.stats.costPerLead}</h2></div>
+          <div><p className="text-sm text-gray-400 font-medium">Est. Cost Per Lead</p><h2 className="text-2xl font-bold text-white">₹{stats.costPerLead}</h2></div>
         </div>
       </div>
 
@@ -60,8 +71,8 @@ export default function TrackingAnalytics() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data.graphData} innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value">
-                  {data.graphData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                <Pie data={graphData} innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value">
+                  {graphData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} itemStyle={{ color: '#fff' }} />
                 <Legend verticalAlign="bottom" height={36}/>
@@ -75,7 +86,7 @@ export default function TrackingAnalytics() {
           <h3 className="text-lg font-bold text-white mb-6">New Leads Trend (Last 7 Days)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.dailyLeads}>
+              <LineChart data={dailyLeads}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis dataKey="date" stroke="#888" />
                 <YAxis stroke="#888" />
@@ -92,13 +103,13 @@ export default function TrackingAnalytics() {
         <h3 className="text-lg font-bold text-white mb-4">AI vs Human Workload</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
           <div className="p-4 bg-[#0a0a0a] rounded-xl border border-gray-800">
-            <p className="text-gray-400 text-sm mb-1">Handled by AI</p><p className="text-2xl font-bold text-blue-400">{data.advancedStats.replySources.ai}</p>
+            <p className="text-gray-400 text-sm mb-1">Handled by AI</p><p className="text-2xl font-bold text-blue-400">{replySources.ai}</p>
           </div>
           <div className="p-4 bg-[#0a0a0a] rounded-xl border border-gray-800">
-            <p className="text-gray-400 text-sm mb-1">Handled by Auto-Flow</p><p className="text-2xl font-bold text-green-400">{data.advancedStats.replySources.bot}</p>
+            <p className="text-gray-400 text-sm mb-1">Handled by Auto-Flow</p><p className="text-2xl font-bold text-green-400">{replySources.bot}</p>
           </div>
           <div className="p-4 bg-[#0a0a0a] rounded-xl border border-gray-800">
-            <p className="text-gray-400 text-sm mb-1">Handled by Human (You)</p><p className="text-2xl font-bold text-pink-400">{data.advancedStats.replySources.human}</p>
+            <p className="text-gray-400 text-sm mb-1">Handled by Human (You)</p><p className="text-2xl font-bold text-pink-400">{replySources.human}</p>
           </div>
         </div>
       </div>
