@@ -32,25 +32,11 @@ export default function AutoMarketerDashboard() {
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      // Note: You will need to create this simple GET route in your backend later
-      // e.g., router.get('/automarketer/posts', getGeneratedPosts);
       const { data } = await api.get('/automarketer/posts');
-      setPosts(data.posts || []);
+      setPosts(data?.posts || []);
     } catch (error) {
       console.error("Failed to fetch posts:", error);
-      // Mock data for UI demonstration until backend route is ready
-      setPosts([
-        {
-          _id: "65f1a2b3c4d5e6f7g8h9i0j1",
-          caption: "Elevate your everyday style with our premium collection! ✨ Tap the link in bio to shop now. \n\n#Fashion #Style #Trending #DealClose",          
-          media: [
-            { type: 'image', url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80", textOverlay: "Our Best Seller!" },
-            { type: 'image', url: "https://images.unsplash.com/photo-1525966222134-fcfa99b83778?w=800&q=80", textOverlay: "New Arrivals" }
-          ],
-          status: "pending_approval",
-          createdAt: new Date().toISOString()
-        }
-      ]);
+      setPosts([]);
     } finally {
       setLoading(false);
     }

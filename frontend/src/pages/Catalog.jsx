@@ -24,11 +24,8 @@ export default function Catalog() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Dummy Data for untested tabs
-  const [properties] = useState([
-    { _id: '60d0fe4f5311236168a109ca', propertyType: '2BHK Apartment', location: 'Andheri West, Mumbai', price: '1.5 Cr', status: 'listed', customerPhone: '+919876543210' },
-    { _id: '60d0fe4f5311236168a109cb', propertyType: 'Commercial Shop', location: 'Connaught Place, Delhi', price: '50 Lakh', status: 'pending', customerPhone: '+919876543211' }
-  ]);
+  // Real properties & quotes state
+  const [properties, setProperties] = useState([]);
   const [pendingQuotes, setPendingQuotes] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
