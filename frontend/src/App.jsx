@@ -51,9 +51,7 @@ const AutoMarketerDashboard = lazy(() => import('./pages/AutoMarketerDashboard')
 const InstagramOAuthCallback = lazy(() => import('./pages/InstagramOAuthCallback'));
 const MetaAdsManager = lazy(() => import('./pages/MetaAdsManager'));
 const BillingPage = lazy(() => import('./pages/BillingPage'));
-
-// Placeholder component for Change Password until we build the real one
-const ChangePasswordPlaceholder = () => <div className="p-10 text-white text-center"><h1 className="text-3xl font-bold text-blue-400">Change Password</h1><p className="mt-4 text-gray-400">This feature is currently under development. Coming soon!</p></div>;
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 
 // Smart Redirects for Logged In Users
 const PublicRoute = ({ children }) => {
@@ -234,14 +232,13 @@ export default function App() {
               <Route path="calls" element={<Calls />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="change-password" element={<ChangePasswordPlaceholder />} />
+              <Route path="change-password" element={<ChangePassword />} />
               <Route path="staff" element={<StaffManagement />} />
               <Route path="forms" element={<Forms />} />
               <Route path="instagram-automation" element={<InstagramAutomation />} />
               <Route path="whatsapp-rules" element={<WhatsAppRules />} />
               <Route path="scaniq" element={<ScanIQ />} />
               <Route path="super-admin" element={<SuperAdmin />} />
-              <Route path="change-password" element={<ChangePasswordPlaceholder />} /> {/* 🚀 NEW: Add route for Change Password */}
               <Route path="publish-post" element={<PublishPost />} />
               <Route path="publish" element={<PublishPost />} />
               <Route path="auto-marketer" element={<AutoMarketerDashboard />} />

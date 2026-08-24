@@ -576,19 +576,19 @@ function FlowBuilder() {
             </button>
           </div>
         )}
-        <div className="absolute top-6 right-6 z-50 flex gap-3">
+        <div className="absolute top-4 right-4 z-40 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100%-4rem)] bg-[#111]/90 backdrop-blur-md p-1.5 md:p-2 rounded-2xl border border-gray-800 shadow-2xl">
           
           {/* 🚀 NEW: Flow Name Input */}
           <input 
             type="text" 
             value={flowName} 
             onChange={(e) => setFlowName(e.target.value)} 
-            placeholder="Enter Flow Name..." 
-            className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 shadow-lg font-bold w-48"
+            placeholder="Flow Name..." 
+            className="bg-[#1a1a1a] border border-gray-700 text-white text-xs md:text-sm rounded-xl px-3 py-2 outline-none focus:border-blue-500 shadow font-semibold w-32 md:w-44"
           />
 
           {/* 🚀 NEW: Business / Workspace Selector */}
-          <select value={selectedWorkspace} onChange={(e) => setSelectedWorkspace(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 cursor-pointer shadow-lg font-bold">
+          <select value={selectedWorkspace} onChange={(e) => setSelectedWorkspace(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-xs md:text-sm rounded-xl px-2.5 py-2 outline-none focus:border-blue-500 cursor-pointer shadow font-semibold">
             <option value="main">🏢 {mainBusinessName}</option>
             {workspaces.map(ws => (
               <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
@@ -596,21 +596,22 @@ function FlowBuilder() {
           </select>
 
           {/* 🚀 NEW: Platform Selector */}
-          <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 cursor-pointer shadow-lg font-bold">
+          <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="bg-[#1a1a1a] border border-gray-700 text-white text-xs md:text-sm rounded-xl px-2.5 py-2 outline-none focus:border-blue-500 cursor-pointer shadow font-semibold">
             <option value="whatsapp">🟩 WhatsApp</option>
             <option value="instagram">🟪 Instagram</option>
           </select>
           
           {/* 🚀 NEW: My Flows Button */}
-          <button onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
-            <FolderOpen size={18} /> My Flows
+          <button onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow text-xs md:text-sm transition-colors">
+            <FolderOpen size={16} /> My Flows
           </button>
 
-          <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold shadow-lg transition-colors">
-            <HelpCircle size={18} /> How to Use?
+          <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-1.5 px-2.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold shadow text-xs md:text-sm transition-colors">
+            <HelpCircle size={16} /> Guide
           </button>
-        <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg transition-colors shadow-green-600/20 disabled:opacity-50">
-          <Save size={18} /> {isSaving ? 'Saving...' : 'Save & Publish'}
+          
+          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-600/20 text-xs md:text-sm transition-colors disabled:opacity-50">
+            <Save size={16} /> {isSaving ? 'Saving...' : 'Save Flow'}
           </button>
         </div>
           
