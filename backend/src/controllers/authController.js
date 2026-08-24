@@ -1376,3 +1376,119 @@ exports.logout = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to logout from Supabase session.' });
   }
 };
+
+// @desc    Get all staff members for current owner
+// @route   GET /api/users/staff
+exports.getStaff = async (req, res) => {
+  try {
+    const ownerId = req.user?._id || req.user?.id;
+    const owner = await User.findById(ownerId);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    res.status(200).json({ success: true, staff: owner.staff || [] });
+  } catch (error) {
+    console.error('Get Staff Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Add or Update Staff Member with Email & Login Access
+// @route   POST /api/users/staff
+exports.addStaff = async (req, res) => {
+  try {
+    const ownerId = req.user?._id || req.user?.id;
+    const { name, email, phone, role, password, workspaceId } = req.body;
+
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, message: 'Name and WhatsApp Phone are required' });
+    }
+
+    const owner = await User.findById(ownerId);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const normalizedEmail = email ? normalizeEmail(email) : '';
+    const staffPassword = password || 'staff1234';
+    const hashedPassword = await bcrypt.hash(staffPassword, 10);
+
+    // 1. If email is provided, create/update the standalone Staff User Account so staff can log in
+    if (normalizedEmail) {
+      let staffUser = await User.findOne({ email: normalizedEmail });
+      if (staffUser && String(staffUser.parentOwnerId) !== String(ownerId) && String(staffUser._id) !== String(ownerId)) {
+        return res.status(400).json({ success: false, message: 'This email is already registered under another account.' });
+      }
+
+      if (staffUser) {
+        staffUser.fullName = name;
+        staffUser.role = 'staff';
+        staffUser.parentOwnerId = ownerId;
+        staffUser.password = hashedPassword;
+        await staffUser.save();
+      } else {
+        await User.create({
+          fullName: name,
+          email: normalizedEmail,
+          password: hashedPassword,
+          role: 'staff',
+          parentOwnerId: ownerId,
+          businessName: owner.businessName || 'Staff Member'
+        });
+      }
+    }
+
+    // 2. Add to owner's staff array
+    if (!owner.staff) owner.staff = [];
+
+    const existingIndex = owner.staff.findIndex(s => (s.email && s.email === normalizedEmail) || (s.phone && s.phone === phone));
+    const staffObj = {
+      name,
+      email: normalizedEmail,
+      phone,
+      role: role || 'sales',
+      workspaceId: workspaceId || 'main',
+      password: staffPassword
+    };
+
+    if (existingIndex > -1) {
+      owner.staff[existingIndex] = { ...owner.staff[existingIndex].toObject(), ...staffObj };
+    } else {
+      owner.staff.push(staffObj);
+    }
+
+    await owner.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Staff member "${name}" saved successfully with login access!`,
+      staff: owner.staff
+    });
+  } catch (error) {
+    console.error('Add Staff Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete Staff Member
+// @route   DELETE /api/users/staff/:staffId
+exports.deleteStaff = async (req, res) => {
+  try {
+    const ownerId = req.user?._id || req.user?.id;
+    const { staffId } = req.params;
+
+    const owner = await User.findById(ownerId);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const staffMember = owner.staff.find(s => String(s._id) === String(staffId) || s.phone === staffId || s.email === staffId);
+    if (staffMember && staffMember.email) {
+      // Remove the standalone staff account
+      await User.deleteOne({ email: staffMember.email, parentOwnerId: ownerId });
+    }
+
+    owner.staff = owner.staff.filter(s => String(s._id) !== String(staffId) && s.phone !== staffId && s.email !== staffId);
+    await owner.save();
+
+    res.status(200).json({ success: true, message: 'Staff member removed successfully.', staff: owner.staff });
+  } catch (error) {
+    console.error('Delete Staff Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
