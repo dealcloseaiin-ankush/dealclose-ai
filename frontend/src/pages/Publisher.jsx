@@ -283,6 +283,24 @@ export default function Publisher() {
     }
   };
 
+  // 🚀 NEW: Tatkaal 1-Click Instant Publish for Scheduled/Draft posts
+  const handleInstantPublish = async (postId) => {
+    const toastId = toast.loading('Publishing post live now... 🚀');
+    try {
+      const { data } = await api.post(`/posts/${postId}/publish-now`, {
+        workspaceId: activeWorkspace
+      });
+      if (data.success) {
+        toast.success('Post published live successfully! 🎉', { id: toastId });
+        fetchPosts();
+      } else {
+        toast.error(data.message || 'Failed to publish post.', { id: toastId });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not publish post immediately.', { id: toastId });
+    }
+  };
+
   const handleGeneratePlanner = async () => {
     if (!plannerPrompt.trim()) {
       toast.error('Please describe your content plan goal first.');
@@ -524,6 +542,15 @@ export default function Publisher() {
                   </div>
                   {/* ✅ FIX: Added 'flex-wrap' and 'justify-end' to prevent buttons from overflowing on smaller card sizes. */}
                   <div className="flex items-center flex-wrap justify-end gap-2">
+                    {(post.status === 'scheduled' || post.status === 'draft' || post.status === 'failed') && (
+                      <button
+                        onClick={() => handleInstantPublish(post._id)}
+                        className="px-2.5 py-1 text-xs font-bold text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 rounded-lg flex items-center gap-1 shadow-md shadow-pink-500/20 transition-all"
+                        title="⚡ Tatkaal Publish Now (1-Click Live)"
+                      >
+                        <Send size={11} /> Post Now
+                      </button>
+                    )}
                     {post.isImported && !post.designJson && (
                       <button onClick={() => handleEnhanceWithAI(post._id)} className="p-1.5 text-purple-400 bg-purple-500/10 rounded-md hover:bg-purple-500/20" title="Enhance with AI">
                         <Sparkles size={14} />

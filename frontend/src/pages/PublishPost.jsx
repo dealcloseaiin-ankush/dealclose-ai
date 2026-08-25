@@ -522,6 +522,33 @@ export default function PublishPost() {
     }
   };
 
+  // 🚀 NEW: 1-Click Instant Post for Drafts
+  const handleQuickPublishDraft = async (draft) => {
+    const toastId = toast.loading('Publishing draft to Instagram/Facebook... 🚀');
+    try {
+      const formData = new FormData();
+      formData.append('caption', draft.caption || '');
+      formData.append('workspaceId', activeWorkspace);
+      formData.append('designJson', JSON.stringify(draft.designJson || {}));
+      formData.append('platforms', JSON.stringify(draft.platforms || { instagram: true, facebook: true }));
+      formData.append('publishMode', 'now');
+      if (draft.imageUrl) formData.append('imageUrl', draft.imageUrl);
+
+      const { data } = await api.post('/instagram/publish', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (data?.success) {
+        toast.success('Post published live successfully! 🎉', { id: toastId });
+        setDrafts(prev => prev.filter(d => d._id !== draft._id));
+      } else {
+        toast.error(data?.message || 'Failed to publish draft.', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Quick publish error:', error);
+      toast.error(error.response?.data?.message || 'Could not publish draft.', { id: toastId });
+    }
+  };
+
   // 🚀 NEW: Handler for platform selection
   const togglePlatform = (platform) => {
     setPlatforms(prev => ({ ...prev, [platform]: !prev[platform] }));
@@ -759,8 +786,9 @@ export default function PublishPost() {
                   <div key={draft._id} className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-2 flex items-center gap-3 hover:border-gray-600 transition-colors">
                     <img src={draft.imageUrl} alt="Draft" className="w-12 h-12 object-cover rounded-md border border-gray-700" />
                     <div className="flex-1"><p className="text-xs text-gray-300 line-clamp-2">{draft.caption || 'Untitled Draft'}</p></div>
-                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); setBackgroundColor(draft.designJson?.canvas?.backgroundColor || draft.designJson?.backgroundColor || draft.designJson?.background || '#1a1a1a'); renderDesign(draft.designJson); if (draft.platforms) setPlatforms(draft.platforms); if (draft.publishMode) setPublishMode(draft.publishMode); if (draft.scheduleDate) setScheduleDate(draft.scheduleDate); }} className="p-2 text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"><Edit size={14} /></button>
-                    <button onClick={async () => { try { await api.delete(`/instagram/drafts/${draft._id}`); setDrafts(p => p.filter(d => d._id !== draft._id)); toast.success('Draft deleted.'); } catch { toast.error('Could not delete draft.'); } }} className="p-2 text-gray-400 hover:text-rose-400 bg-red-900/30 hover:bg-red-900/60 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                    <button onClick={() => handleQuickPublishDraft(draft)} className="p-2 text-pink-400 hover:text-white bg-pink-500/20 hover:bg-pink-600 rounded-lg transition-all" title="⚡ Tatkaal Publish Now (1-Click Live)"><Send size={13} /></button>
+                    <button onClick={() => { setEditingDraft(draft); setCaption(draft.caption); setBackgroundColor(draft.designJson?.canvas?.backgroundColor || draft.designJson?.backgroundColor || draft.designJson?.background || '#1a1a1a'); renderDesign(draft.designJson); if (draft.platforms) setPlatforms(draft.platforms); if (draft.publishMode) setPublishMode(draft.publishMode); if (draft.scheduleDate) setScheduleDate(draft.scheduleDate); }} className="p-2 text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors" title="Edit Draft"><Edit size={14} /></button>
+                    <button onClick={async () => { try { await api.delete(`/instagram/drafts/${draft._id}`); setDrafts(p => p.filter(d => d._id !== draft._id)); toast.success('Draft deleted.'); } catch { toast.error('Could not delete draft.'); } }} className="p-2 text-gray-400 hover:text-rose-400 bg-red-900/30 hover:bg-red-900/60 rounded-lg transition-colors" title="Delete Draft"><Trash2 size={14} /></button>
                   </div>
                 ))}
               </div>

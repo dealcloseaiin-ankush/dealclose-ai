@@ -711,3 +711,30 @@ exports.downloadPostMedia = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to download media.' });
   }
 };
+
+// @desc    Publish an existing scheduled or draft post immediately (Tatkaal 1-Click Post)
+// @route   POST /api/posts/:id/publish-now
+exports.publishPostNow = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const post = await Post.findOne({ _id: req.params.id, userId, isDeleted: { $ne: true } });
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post not found.' });
+    }
+
+    post.status = 'publishing';
+    post.scheduledAt = null;
+    await post.save();
+
+    await automationQueue.add(
+      'publish-post',
+      { postId: post._id, userId: post.userId },
+      { removeOnComplete: true, removeOnFail: false }
+    );
+
+    res.status(200).json({ success: true, message: 'Post published immediately! 🚀', post });
+  } catch (error) {
+    console.error('Publish Post Now Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to trigger instant publishing.', error: error.message });
+  }
+};

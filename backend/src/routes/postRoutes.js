@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { getPosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics, getPostInsights } = require('../controllers/postController'); // 🚀 NEW: Import getPostInsights
+const { getPosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics, getPostInsights, publishPostNow } = require('../controllers/postController'); // 🚀 NEW: Import getPostInsights & publishPostNow
 const multer = require('multer');
 
 // ✅ FIX: The designJson field can exceed the default 1MB limit for multipart form fields.
@@ -25,6 +25,9 @@ router.route('/import-instagram')
 
 // 🚀 NEW: Route to get live insights for a single post
 router.route('/:platformPostId/insights').get(protect, getPostInsights);
+
+// 🚀 NEW: Route to immediately publish an existing draft or scheduled post
+router.route('/:id/publish-now').post(protect, publishPostNow);
 
 router.route('/:id')
   .get(protect, getPostById)
