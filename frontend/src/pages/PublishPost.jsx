@@ -467,25 +467,40 @@ export default function PublishPost() {
     if (!designData || !(designData.objects?.length || designData.layers?.length)) {
       return toast.error("Canvas is empty, nothing to save.");
     }
+    const toastId = toast.loading('Saving draft to cloud...');
     try {
       const imageDataUrl = exportToImage('jpeg');
-      const blob = await (await fetch(imageDataUrl)).blob();
+      let blob;
+      if (imageDataUrl) {
+        blob = await (await fetch(imageDataUrl)).blob();
+      }
       const formData = new FormData();
-      formData.append('media', new File([blob], 'draft-preview.jpg', { type: 'image/jpeg' }));
-      formData.append('caption', caption);
+      if (blob) {
+        const file = new File([blob], 'draft-preview.jpg', { type: 'image/jpeg' });
+        formData.append('media', file);
+        formData.append('image', file);
+      }
+      formData.append('caption', caption || '');
       formData.append('workspaceId', activeWorkspace);
       formData.append('designJson', JSON.stringify(designData));
-      // 🚀 NEW: Save platform and schedule info with the draft
       formData.append('platforms', JSON.stringify(platforms));
       formData.append('publishMode', publishMode);
       if (publishMode === 'schedule') formData.append('scheduleDate', scheduleDate);
       if (editingDraft?._id) formData.append('draftId', editingDraft._id);
-      const { data } = await api.post('/instagram/drafts', formData);
-      setDrafts(prev => [data.draft, ...prev.filter(d => d._id !== data.draft._id)]);
-      setEditingDraft(data.draft);
-      toast.success('Draft saved successfully!');
+
+      const { data } = await api.post('/instagram/drafts', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (data?.draft) {
+        setDrafts(prev => [data.draft, ...prev.filter(d => d._id !== data.draft._id)]);
+        setEditingDraft(data.draft);
+        toast.success('Draft saved successfully! 💾', { id: toastId });
+      } else {
+        toast.error(data?.message || 'Could not save draft.', { id: toastId });
+      }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not save draft.');
+      console.error('Draft save error:', error);
+      toast.error(error.response?.data?.message || 'Could not save draft.', { id: toastId });
     }
   };
 

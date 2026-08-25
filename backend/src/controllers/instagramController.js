@@ -329,7 +329,8 @@ exports.publishPost = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const { caption, workspaceId } = req.body;
 
-    if (!req.file) {
+    const fileToUpload = req.file || (req.files && (req.files.find?.(f => f.fieldname === 'image' || f.fieldname === 'media') || req.files[0])) || req.files?.media?.[0];
+    if (!fileToUpload) {
       return res.status(400).json({ success: false, message: 'Image file is required.' });
     }
 
@@ -355,9 +356,11 @@ exports.publishPost = async (req, res) => {
     // 1. Upload image to get a public URL
     let imageUrl = null;
     try {
-      const result = await cloudinary.uploader.upload(req.file.path, { resource_type: 'auto' });
+      const result = await cloudinary.uploader.upload(fileToUpload.path, { resource_type: 'auto' });
       imageUrl = result.secure_url;
-      fs.unlinkSync(req.file.path); // Delete local file after upload
+      if (fs.existsSync(fileToUpload.path)) {
+        fs.unlinkSync(fileToUpload.path); // Delete local file after upload
+      }
     } catch (uploadError) {
       console.error('Cloudinary Upload Error:', uploadError);
       return res.status(500).json({ success: false, message: 'Failed to upload image to cloud storage.' });
@@ -542,15 +545,18 @@ exports.saveDraft = async (req, res) => {
     let imageUrl = req.body.imageUrl || ''; // Use existing image URL if provided
 
     // If a new file is uploaded, upload it to Cloudinary
-    if (req.file || req.files?.media) {
-      const fileToUpload = req.file || req.files.media[0];
+    const fileToUpload = req.file || (req.files && (req.files.find?.(f => f.fieldname === 'image' || f.fieldname === 'media') || req.files[0])) || req.files?.media?.[0];
+    if (fileToUpload && fileToUpload.path) {
       console.log("🚀 [DRAFT DEBUG] 3. Uploading preview image to Cloudinary...");
       try {
         const result = await cloudinary.uploader.upload(fileToUpload.path, { resource_type: 'auto' });
         imageUrl = result.secure_url;
-        fs.unlinkSync(fileToUpload.path); // Clean up local file
+        if (fs.existsSync(fileToUpload.path)) {
+          fs.unlinkSync(fileToUpload.path); // Clean up local file
+        }
         console.log("✅ [DRAFT DEBUG] 4. Image uploaded successfully:", imageUrl);
       } catch (uploadError) {
+        console.error("❌ Cloudinary draft upload error:", uploadError);
         return res.status(500).json({ success: false, message: 'Image upload failed.' });
       }
     }

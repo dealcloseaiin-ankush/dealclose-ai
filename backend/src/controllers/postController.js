@@ -193,7 +193,9 @@ exports.createPost = async (req, res) => {
     const { caption, workspaceId, status, scheduledAt, platforms, designJson } = req.body;
     const userId = req.user?._id;
 
-    if (!req.file) {
+    const fileToUpload = req.file || (req.files && (req.files.find?.(f => f.fieldname === 'media' || f.fieldname === 'image') || req.files[0])) || req.files?.media?.[0];
+
+    if (!fileToUpload) {
       console.log("❌ [DEBUG] Post creation failed: Media file is required.");
       return res.status(400).json({ success: false, message: 'Media file is required.' });
     }
@@ -219,14 +221,19 @@ exports.createPost = async (req, res) => {
     console.log(`🚀 [DEBUG] 2. User: ${userId}, Status: ${status}, Platforms: ${requestedPlatforms}`);
 
     console.log(`🚀 [DEBUG] 3. Uploading media file to Cloudinary...`);
-    const mediaResult = await uploadToCloudinary(req.file.buffer, 'posts');
+    const fileBuffer = fileToUpload.buffer || (fileToUpload.path ? require('fs').readFileSync(fileToUpload.path) : null);
+    if (!fileBuffer) {
+      return res.status(400).json({ success: false, message: 'Unable to read media file data.' });
+    }
+    const mediaResult = await uploadToCloudinary(fileBuffer, 'posts');
     console.log(`✅ [DEBUG] 4. Media uploaded successfully.`);
 
+    const mimeType = fileToUpload.mimetype || 'image/jpeg';
     const post = new Post({
       userId,
       workspaceId: workspaceId || 'main',
       caption,
-      mediaUrls: [{ url: mediaResult.secure_url, type: req.file.mimetype.split('/')[0] }],
+      mediaUrls: [{ url: mediaResult.secure_url, type: mimeType.split('/')[0] }],
       status: status === 'now' ? 'publishing' : (status || 'draft'),
       scheduledAt: status === 'scheduled' ? new Date(scheduledAt) : null,
       platforms: requestedPlatforms,

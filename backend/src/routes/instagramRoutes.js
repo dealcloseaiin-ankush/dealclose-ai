@@ -34,14 +34,14 @@ router.delete('/comments/:id', protect, instagramController.deleteComment);
 router.post('/dm/reply', protect, instagramController.sendDirectMessage);
 
 // --- NEW CONTENT PUBLISH ROUTE ---
-router.post('/publish', protect, upload.single('image'), instagramController.publishPost);
+router.post('/publish', protect, upload.any(), instagramController.publishPost);
 
 // --- NEW AI CONTENT GENERATION ROUTE ---
 router.post('/ai-generate-post', protect, instagramController.generateAiPost);
 
 // --- NEW DRAFT SYSTEM ROUTES ---
 router.get('/drafts', protect, instagramController.getDrafts);
-router.post('/drafts', protect, upload.single('image'), instagramController.saveDraft);
+router.post('/drafts', protect, upload.any(), instagramController.saveDraft);
 router.delete('/drafts/:id', protect, instagramController.deleteDraft);
 
 module.exports = router;
