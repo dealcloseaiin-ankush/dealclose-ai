@@ -667,43 +667,74 @@ export default function PublishPost() {
           </div>
         </aside>
 
-        {/* Center Panel: Canvas & Toolbars */}
-        <main ref={canvasContainerRef} className="flex-1 flex items-center justify-center bg-[#050505] relative p-4 overflow-hidden">
-          {/* Floating Toolbar for selected object */}
-          {selectedObject && <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10"><Toolbar onAction={handleToolbarAction} selectedObject={selectedObject} /></div>}
-          
-          {/* Add Object Toolbar */}
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 bg-[#111] border border-gray-800 rounded-xl p-2 flex flex-col gap-2 z-10">
-            {/* ✅ FIX: Use canUndo/canRedo to disable buttons */}
-            <button onClick={undo} disabled={!canUndo} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed" title="Undo (Ctrl+Z)"><Undo size={20} /></button>
-            <button onClick={redo} disabled={!canRedo} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed" title="Redo (Ctrl+Y)"><Redo size={20} /></button>
-            <div className="h-px w-full bg-gray-700 my-1"></div>
-            <button onClick={() => handleToolbarAction('addText')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Text"><Type size={20} /></button>
-            <button onClick={() => handleToolbarAction('addImage')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Image"><ImageIcon size={20} /></button>
-            <button onClick={() => handleToolbarAction('addShape')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Shape"><Square size={20} /></button>
-            <button onClick={() => handleToolbarAction('addIcon')} className="p-3 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors" title="Add Icon/Logo"><Star size={20} /></button>
-          </div>
-          
-          {/* 🚀 NEW: Upload Media Button */}
-          <div className="absolute left-4 bottom-4 z-10">
-            {/* This button is now live and will open the file dialog */}
-            <button onClick={triggerMediaUpload} className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all cursor-pointer text-sm" title="Upload your own image or video">
-              <UploadCloud size={16} /> Upload Media
-            </button>
-            <input type="file" ref={uploadInputRef} accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
-          </div>
+        {/* Center Panel: Canvas & Dedicated Top Docked Toolbar */}
+        <main className="flex-1 flex flex-col bg-[#050505] relative overflow-hidden">
+          {/* 🌟 Professional Docked Top Toolbar (Canva style - No more blocking the canvas!) */}
+          <div className="w-full bg-[#111] border-b border-gray-800 px-4 py-2.5 flex items-center justify-between gap-3 z-10 shrink-0">
+            {/* Left Tool Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                className="p-2 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-semibold"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo size={15} /> Undo
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                className="p-2 hover:bg-gray-800 rounded-lg text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-semibold"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo size={15} /> Redo
+              </button>
+              <div className="h-5 w-px bg-gray-800 mx-1"></div>
+              <button
+                onClick={() => handleToolbarAction('addText')}
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all text-xs font-bold flex items-center gap-1.5 border border-gray-700 shadow-sm"
+                title="Add Text"
+              >
+                <Type size={14} className="text-pink-400" /> Add Text
+              </button>
+              <button
+                onClick={triggerMediaUpload}
+                className="px-3 py-1.5 bg-gradient-to-r from-pink-600/20 to-purple-600/20 hover:from-pink-600/30 hover:to-purple-600/30 text-pink-300 rounded-lg transition-all text-xs font-bold flex items-center gap-1.5 border border-pink-500/30 shadow-sm"
+                title="Upload image onto canvas"
+              >
+                <ImageIcon size={14} className="text-pink-400" /> Upload Image
+              </button>
+              <input type="file" ref={uploadInputRef} accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
+              <button
+                onClick={() => handleToolbarAction('addShape')}
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all text-xs font-bold flex items-center gap-1.5 border border-gray-700 shadow-sm"
+                title="Add Rectangle Shape"
+              >
+                <Square size={14} className="text-purple-400" /> Add Shape
+              </button>
+            </div>
 
-          <div className="flex-1 w-full h-full flex items-center justify-center" id="canvas-wrapper">
-            <div className="shadow-2xl shadow-black/50">
-              <CanvasRenderer ref={canvasRef} />
+            {/* Selected Object Active Controls (Bold, Italic, Delete, etc.) */}
+            {selectedObject && (
+              <div className="animate-fade-in">
+                <Toolbar onAction={handleToolbarAction} selectedObject={selectedObject} />
+              </div>
+            )}
+
+            {/* Right Zoom & View Controls */}
+            <div className="flex items-center gap-1 bg-[#1a1a1a] border border-gray-800 rounded-lg p-1">
+              <button onClick={() => handleZoom(zoom - 0.1)} className="p-1.5 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom Out"><ZoomOut size={14} /></button>
+              <button onClick={fitToScreen} className="px-2 py-1 hover:bg-gray-700 rounded text-xs font-semibold text-gray-300 hover:text-white flex items-center gap-1" title="Fit to Screen"><Expand size={13} /> Fit</button>
+              <span className="text-xs font-mono w-10 text-center text-gray-400">{(zoom * 100).toFixed(0)}%</span>
+              <button onClick={() => handleZoom(zoom + 0.1)} className="p-1.5 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom In"><ZoomIn size={14} /></button>
             </div>
           </div>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#1a1a1a] border border-gray-700 rounded-lg p-1 flex items-center gap-2 text-white shadow-lg">
-            <button onClick={() => handleZoom(zoom - 0.1)} className="p-2 hover:bg-gray-700 rounded-md"><ZoomOut size={16} /></button>
-            <button onClick={fitToScreen} className="p-2 hover:bg-gray-700 rounded-md"><Expand size={16} /></button>
-            <span className="text-xs font-mono w-12 text-center">{(zoom * 100).toFixed(0)}%</span>
-            <button onClick={() => handleZoom(1)} className="p-2 hover:bg-gray-700 rounded-md"><Minimize size={16} /></button>
-            <button onClick={() => handleZoom(zoom + 0.1)} className="p-2 hover:bg-gray-700 rounded-md"><ZoomIn size={16} /></button>
+
+          {/* Clean Canvas Display Area (Zero visual clutter!) */}
+          <div ref={canvasContainerRef} className="flex-1 w-full h-full flex items-center justify-center p-4 overflow-auto custom-scrollbar" id="canvas-wrapper">
+            <div className="shadow-2xl shadow-black/80 rounded-lg border border-gray-800/80 overflow-hidden">
+              <CanvasRenderer ref={canvasRef} />
+            </div>
           </div>
         </main>
 
