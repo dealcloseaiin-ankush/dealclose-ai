@@ -203,8 +203,23 @@ export default function PublishPost() {
       const reader = new FileReader();
       reader.onload = (f) => {
         fabric.Image.fromURL(f.target.result, (img) => {
-          fabricCanvas.add(img).centerObject(img).renderAll();
-          toast.success('Media loaded! Write a caption or ask AI.', { id: toastId });
+          // Auto Scale image to fit the 1080x1080 canvas
+          const imgW = img.width || 1080;
+          const imgH = img.height || 1080;
+          const scale = Math.min(1080 / imgW, 1080 / imgH);
+          img.set({
+            left: 540,
+            top: 540,
+            originX: 'center',
+            originY: 'center',
+            scaleX: scale,
+            scaleY: scale,
+          });
+          fabricCanvas.add(img);
+          fabricCanvas.centerObject(img);
+          fabricCanvas.setActiveObject(img);
+          fabricCanvas.renderAll();
+          toast.success('Media auto-fit to canvas! 🎯', { id: toastId });
         });
       };
       reader.readAsDataURL(initialFile);
@@ -230,8 +245,10 @@ export default function PublishPost() {
     reader.onload = (f) => {
       const data = f.target.result;
       fabric.Image.fromURL(data, (img) => {
-        // Scale image to fit the canvas
-        const scale = Math.min(1080 / img.width, 1080 / img.height);
+        // Auto Scale image to perfectly fit the 1080x1080 canvas
+        const imgW = img.width || 1080;
+        const imgH = img.height || 1080;
+        const scale = Math.min(1080 / imgW, 1080 / imgH);
         img.set({
           left: 540,
           top: 540,
@@ -242,8 +259,9 @@ export default function PublishPost() {
         });
         fabricCanvas.add(img);
         fabricCanvas.centerObject(img);
+        fabricCanvas.setActiveObject(img);
         fabricCanvas.renderAll();
-        toast.success('Image loaded! Now ask the AI to create a caption for it.');
+        toast.success('Image auto-fitted to canvas! 🎯');
       });
     };
     reader.readAsDataURL(file);
