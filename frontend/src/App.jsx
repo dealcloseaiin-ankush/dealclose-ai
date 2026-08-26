@@ -6,52 +6,68 @@ import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 
-// 🚀 PERFORMANCE UPGRADE: Lazy load all pages to reduce initial bundle size
-const LandingPage = lazy(() => import('./pages/LandingPage'));
-const Login = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Onboarding = lazy(() => import('./pages/Onboarding'));
-const ResultsPage = lazy(() => import('./pages/ResultsPage'));
-const Catalog = lazy(() => import('./pages/Catalog'));
-const OrderDispatch = lazy(() => import('./pages/OrderDispatch'));
-const AIAgent = lazy(() => import('./pages/AIAgent'));
-const Campaigns = lazy(() => import('./pages/Campaigns'));
-const FlowBuilder = lazy(() => import('./pages/FlowBuilder'));
-const MonthlyReport = lazy(() => import('./pages/MonthlyReport'));
-const Automations = lazy(() => import('./pages/Automations'));
-const TrackingAnalytics = lazy(() => import('./pages/TrackingAnalytics'));
-const WhatsAppTemplates = lazy(() => import('./pages/WhatsAppTemplates'));
-const Chats = lazy(() => import('./pages/Chats'));
-const Contacts = lazy(() => import('./pages/Contacts'));
-const Calls = lazy(() => import('./pages/Calls'));
-const Wallet = lazy(() => import('./pages/Wallet'));
-const Settings = lazy(() => import('./pages/Settings'));
-const CrmPage = lazy(() => import('./pages/CrmPage'));
-const StaffManagement = lazy(() => import('./pages/StaffManagement'));
-const Forms = lazy(() => import('./pages/Forms'));
-const InstagramAutomation = lazy(() => import('./pages/InstagramAutomation'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
-const AboutUs = lazy(() => import('./pages/AboutUs'));
-const FAQ = lazy(() => import('./pages/FAQ'));
-const Help = lazy(() => import('./pages/Help'));
-const DataDeletion = lazy(() => import('./pages/DataDeletion'));
-const DigitalCard = lazy(() => import('./pages/DigitalCard'));
-const AIVideoLanding = lazy(() => import('./pages/AIVideoLanding'));
-const ScanIQ = lazy(() => import('./pages/ScanIQ'));
-const AIVideoDashboard = lazy(() => import('./pages/AIVideoDashboard'));
-const WhatsAppRules = lazy(() => import('./pages/WhatsAppRules'));
-const SuperAdmin = lazy(() => import('./pages/SuperAdmin'));
-const PublishPost = lazy(() => import('./pages/PublishPost'));
-const SolutionRecommender = lazy(() => import('./pages/SolutionRecommender'));
-const Publisher = lazy(() => import('./pages/Publisher'));
-const AdminTemplates = lazy(() => import('./pages/AdminTemplates'));
-const AutoMarketerDashboard = lazy(() => import('./pages/AutoMarketerDashboard'));
-const InstagramOAuthCallback = lazy(() => import('./pages/InstagramOAuthCallback'));
-const MetaAdsManager = lazy(() => import('./pages/MetaAdsManager'));
-const BillingPage = lazy(() => import('./pages/BillingPage'));
-const ChangePassword = lazy(() => import('./pages/ChangePassword'));
+// 🚀 PERFORMANCE & AUTO-RECOVERY: Automatically retry and reload when new deployment changes chunk hashes
+const lazyWithRetry = (componentImport) =>
+  lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.warn('Chunk load error detected, reloading to fetch latest version...', error);
+      const hasReloaded = sessionStorage.getItem('chunk_retry_reload');
+      if (!hasReloaded) {
+        sessionStorage.setItem('chunk_retry_reload', 'true');
+        window.location.reload();
+        return { default: () => <div className="h-screen bg-[#050505] flex items-center justify-center text-white text-sm">Loading updated version...</div> };
+      }
+      throw error;
+    }
+  });
+
+const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'));
+const Login = lazyWithRetry(() => import('./pages/Login'));
+const Register = lazyWithRetry(() => import('./pages/Register'));
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const Onboarding = lazyWithRetry(() => import('./pages/Onboarding'));
+const ResultsPage = lazyWithRetry(() => import('./pages/ResultsPage'));
+const Catalog = lazyWithRetry(() => import('./pages/Catalog'));
+const OrderDispatch = lazyWithRetry(() => import('./pages/OrderDispatch'));
+const AIAgent = lazyWithRetry(() => import('./pages/AIAgent'));
+const Campaigns = lazyWithRetry(() => import('./pages/Campaigns'));
+const FlowBuilder = lazyWithRetry(() => import('./pages/FlowBuilder'));
+const MonthlyReport = lazyWithRetry(() => import('./pages/MonthlyReport'));
+const Automations = lazyWithRetry(() => import('./pages/Automations'));
+const TrackingAnalytics = lazyWithRetry(() => import('./pages/TrackingAnalytics'));
+const WhatsAppTemplates = lazyWithRetry(() => import('./pages/WhatsAppTemplates'));
+const Chats = lazyWithRetry(() => import('./pages/Chats'));
+const Contacts = lazyWithRetry(() => import('./pages/Contacts'));
+const Calls = lazyWithRetry(() => import('./pages/Calls'));
+const Wallet = lazyWithRetry(() => import('./pages/Wallet'));
+const Settings = lazyWithRetry(() => import('./pages/Settings'));
+const CrmPage = lazyWithRetry(() => import('./pages/CrmPage'));
+const StaffManagement = lazyWithRetry(() => import('./pages/StaffManagement'));
+const Forms = lazyWithRetry(() => import('./pages/Forms'));
+const InstagramAutomation = lazyWithRetry(() => import('./pages/InstagramAutomation'));
+const PrivacyPolicy = lazyWithRetry(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = lazyWithRetry(() => import('./pages/TermsAndConditions'));
+const AboutUs = lazyWithRetry(() => import('./pages/AboutUs'));
+const FAQ = lazyWithRetry(() => import('./pages/FAQ'));
+const Help = lazyWithRetry(() => import('./pages/Help'));
+const DataDeletion = lazyWithRetry(() => import('./pages/DataDeletion'));
+const DigitalCard = lazyWithRetry(() => import('./pages/DigitalCard'));
+const AIVideoLanding = lazyWithRetry(() => import('./pages/AIVideoLanding'));
+const ScanIQ = lazyWithRetry(() => import('./pages/ScanIQ'));
+const AIVideoDashboard = lazyWithRetry(() => import('./pages/AIVideoDashboard'));
+const WhatsAppRules = lazyWithRetry(() => import('./pages/WhatsAppRules'));
+const SuperAdmin = lazyWithRetry(() => import('./pages/SuperAdmin'));
+const PublishPost = lazyWithRetry(() => import('./pages/PublishPost'));
+const SolutionRecommender = lazyWithRetry(() => import('./pages/SolutionRecommender'));
+const Publisher = lazyWithRetry(() => import('./pages/Publisher'));
+const AdminTemplates = lazyWithRetry(() => import('./pages/AdminTemplates'));
+const AutoMarketerDashboard = lazyWithRetry(() => import('./pages/AutoMarketerDashboard'));
+const InstagramOAuthCallback = lazyWithRetry(() => import('./pages/InstagramOAuthCallback'));
+const MetaAdsManager = lazyWithRetry(() => import('./pages/MetaAdsManager'));
+const BillingPage = lazyWithRetry(() => import('./pages/BillingPage'));
+const ChangePassword = lazyWithRetry(() => import('./pages/ChangePassword'));
 
 // Smart Redirects for Logged In Users
 const PublicRoute = ({ children }) => {
