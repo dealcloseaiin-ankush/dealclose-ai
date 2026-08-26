@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom'; // 🚀 NEW: For handling import/edit IDs from URL
 import { fabric } from 'fabric'; // ✅ FIX: Import fabric
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: More icons for the new professional UI
-import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu, Undo, Redo, UploadCloud } from 'lucide-react';
+import { Send, Loader2, Bot, Sparkles, Save, Edit, Trash2, Calendar, Clock, ZoomIn, ZoomOut, Expand, Minimize, Image as ImageIcon, Type, Square, Star, ChevronLeft, Menu, Undo, Redo, UploadCloud } from 'lucide-react';
 import { useFabric } from '../hooks/useFabric'; // 🚀 NEW: Import the custom hook
 import { FaInstagram, FaFacebook, FaThreads } from "react-icons/fa6"; // ✅ FIX: Use react-icons for brand logos
 import { Heart, MessageCircle, Send as SendIcon, Bookmark } from 'lucide-react'; // For realistic preview
