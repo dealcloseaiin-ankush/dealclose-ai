@@ -661,94 +661,151 @@ export default function PublishPost() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0a0a0a] text-gray-100 font-sans">
-      {/* 🌟 Unified Canva-Style Top Header Bar */}
-      <header className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 bg-[#111] z-20 shrink-0 gap-3">
-        {/* Left: Brand & Workspace */}
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 tracking-tight whitespace-nowrap">
-            AI Post Designer
-          </h1>
-          <select
-            value={activeWorkspace}
-            onChange={(e) => setActiveWorkspace(e.target.value)}
-            className="bg-[#1a1a1a] border border-gray-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
-          >
-            {workspaces.map(ws => <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>)}
-          </select>
-        </div>
-
-        {/* Center: Canvas Tools & Context Bar */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[#1a1a1a] border border-gray-800 rounded-lg p-0.5">
-            <button
-              onClick={undo}
-              disabled={!canUndo}
-              className="p-1.5 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed"
-              title="Undo (Ctrl+Z)"
+      {/* 🌟 2-Tier Canva Studio Header Bar */}
+      <header className="border-b border-gray-800 bg-[#111] z-20 shrink-0 flex flex-col">
+        {/* Tier 1: Main Bar (Brand, Workspace, New, Save Draft, Schedule & Publish) */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800/80 gap-3">
+          {/* Left: Brand & Workspace */}
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-400 tracking-tight whitespace-nowrap">
+              AI Post Designer
+            </h1>
+            <select
+              value={activeWorkspace}
+              onChange={(e) => setActiveWorkspace(e.target.value)}
+              className="bg-[#1a1a1a] border border-gray-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
             >
-              <Undo size={14} />
-            </button>
-            <button
-              onClick={redo}
-              disabled={!canRedo}
-              className="p-1.5 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed"
-              title="Redo (Ctrl+Y)"
-            >
-              <Redo size={14} />
-            </button>
+              {workspaces.map(ws => <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>)}
+            </select>
           </div>
 
-          <div className="h-5 w-px bg-gray-800 mx-0.5"></div>
+          {/* Right: Actions & Publishing Flow */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleNewPost}
+              className="px-2.5 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white font-bold rounded-lg transition-all flex items-center gap-1.5 text-xs border border-gray-700 shadow-sm"
+              title="Clear canvas and start fresh"
+            >
+              <Sparkles size={13} className="text-yellow-400" /> New
+            </button>
 
-          <button
-            onClick={() => handleToolbarAction('addText')}
-            className="px-2.5 py-1.5 bg-[#1a1a1a] hover:bg-gray-800 text-white rounded-lg transition-all text-xs font-bold flex items-center gap-1 border border-gray-700 shadow-sm"
-            title="Add Text Layer"
-          >
-            <Type size={13} className="text-pink-400" /> Text
-          </button>
-          <button
-            onClick={triggerMediaUpload}
-            className="px-2.5 py-1.5 bg-gradient-to-r from-pink-600/20 to-purple-600/20 hover:from-pink-600/30 hover:to-purple-600/30 text-pink-300 rounded-lg transition-all text-xs font-bold flex items-center gap-1 border border-pink-500/30 shadow-sm"
-            title="Upload image (Auto-fits frame)"
-          >
-            <ImageIcon size={13} className="text-pink-400" /> Upload Image
-          </button>
-          <input type="file" ref={uploadInputRef} accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
-          <button
-            onClick={() => handleToolbarAction('addShape')}
-            className="px-2.5 py-1.5 bg-[#1a1a1a] hover:bg-gray-800 text-white rounded-lg transition-all text-xs font-bold flex items-center gap-1 border border-gray-700 shadow-sm"
-            title="Add Rectangle Shape"
-          >
-            <Square size={13} className="text-purple-400" /> Shape
-          </button>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg transition-all flex items-center gap-1.5 text-xs border border-gray-700 shadow-sm"
+            >
+              <Save size={13} /> {editingDraft ? 'Update Draft' : 'Save Draft'}
+            </button>
 
-          {/* Context Object Tools (Bold, Italic, Delete, Fill, Fit) */}
-          {selectedObject && (
-            <div className="ml-1 animate-fade-in">
-              <Toolbar onAction={handleToolbarAction} selectedObject={selectedObject} />
+            <div className="h-5 w-px bg-gray-800 mx-1"></div>
+
+            {/* Mode Switcher: Now vs Schedule */}
+            <div className="flex items-center bg-[#1a1a1a] border border-gray-700 rounded-lg p-0.5 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setPublishMode('now')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${publishMode === 'now' ? 'bg-pink-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+              >
+                <Send size={11} /> Now
+              </button>
+              <button
+                type="button"
+                onClick={() => setPublishMode('schedule')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${publishMode === 'schedule' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+              >
+                <Clock size={11} /> Schedule
+              </button>
             </div>
-          )}
+
+            {/* If Schedule is active, show date picker inline */}
+            {publishMode === 'schedule' && (
+              <input
+                type="datetime-local"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                className="bg-[#1a1a1a] border border-purple-500/80 rounded-lg px-2 py-1 text-xs text-white outline-none shadow-sm focus:border-purple-400"
+                required
+              />
+            )}
+
+            <button
+              type="submit"
+              form="publish-form"
+              disabled={isPublishing}
+              className="px-4 py-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-lg transition-all shadow-md shadow-pink-500/20 disabled:opacity-50 flex items-center gap-1.5 text-xs"
+            >
+              {isPublishing ? <Loader2 size={14} className="animate-spin" /> : publishMode === 'schedule' ? <Clock size={14} /> : <Send size={14} />}
+              {publishMode === 'schedule' ? 'Schedule Post ⏰' : 'Publish Live 🚀'}
+            </button>
+          </div>
         </div>
 
-        {/* Right: Zoom Controls, Save & Publish */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-[#1a1a1a] border border-gray-800 rounded-lg p-0.5">
-            <button onClick={() => handleZoom(zoom - 0.1)} className="p-1 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom Out"><ZoomOut size={13} /></button>
-            <button onClick={fitToScreen} className="px-2 py-0.5 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-300 hover:text-white flex items-center gap-1" title="Fit to Screen"><Expand size={11} /> Fit</button>
-            <button onClick={() => handleZoom(zoom + 0.1)} className="p-1 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom In"><ZoomIn size={13} /></button>
+        {/* Tier 2: Creative Toolbar (Tools, Shapes, Zoom, Formats) */}
+        <div className="flex items-center justify-between px-4 py-1.5 bg-[#161616] text-xs gap-3">
+          {/* Left Canvas Elements */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center bg-[#1a1a1a] border border-gray-800 rounded-lg p-0.5">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                className="p-1.5 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo size={13} />
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                className="p-1.5 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors disabled:text-gray-600 disabled:cursor-not-allowed"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo size={13} />
+              </button>
+            </div>
+
+            <div className="h-4 w-px bg-gray-800 mx-0.5"></div>
+
+            <button
+              onClick={() => handleToolbarAction('addText')}
+              className="px-2.5 py-1 bg-[#1a1a1a] hover:bg-gray-800 text-white rounded-lg transition-all font-semibold flex items-center gap-1.5 border border-gray-700 shadow-sm"
+              title="Add Text Layer"
+            >
+              <Type size={13} className="text-pink-400" /> Text
+            </button>
+            <button
+              onClick={triggerMediaUpload}
+              className="px-2.5 py-1 bg-gradient-to-r from-pink-600/20 to-purple-600/20 hover:from-pink-600/30 hover:to-purple-600/30 text-pink-300 rounded-lg transition-all font-semibold flex items-center gap-1.5 border border-pink-500/30 shadow-sm"
+              title="Upload image (Auto-fits canvas frame)"
+            >
+              <ImageIcon size={13} className="text-pink-400" /> Upload Image
+            </button>
+            <input type="file" ref={uploadInputRef} accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
+            <button
+              onClick={() => handleToolbarAction('addShape')}
+              className="px-2.5 py-1 bg-[#1a1a1a] hover:bg-gray-800 text-white rounded-lg transition-all font-semibold flex items-center gap-1.5 border border-gray-700 shadow-sm"
+              title="Add Rectangle Shape"
+            >
+              <Square size={13} className="text-purple-400" /> Shape
+            </button>
+
+            {/* Context Object Tools (Bold, Italic, Delete, Fill, Fit) */}
+            {selectedObject && (
+              <div className="ml-2 animate-fade-in flex items-center">
+                <Toolbar onAction={handleToolbarAction} selectedObject={selectedObject} />
+              </div>
+            )}
           </div>
 
-          <button type="button" onClick={handleNewPost} className="px-2.5 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white font-bold rounded-lg transition-all flex items-center gap-1 text-xs border border-gray-700" title="Clear and create a new post">
-            <Sparkles size={13} className="text-yellow-400" /> New
-          </button>
-          <button type="button" onClick={handleSaveDraft} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg transition-all flex items-center gap-1.5 text-xs border border-gray-700">
-            <Save size={14} /> {editingDraft ? 'Update' : 'Save'}
-          </button>
-          <button type="submit" form="publish-form" disabled={isPublishing} className="px-4 py-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-lg transition-all shadow-md shadow-purple-600/20 disabled:opacity-50 flex items-center gap-1.5 text-xs">
-            {isPublishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            {publishMode === 'schedule' ? 'Schedule' : 'Publish'}
-          </button>
+          {/* Right Zoom Controls */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-[#1a1a1a] border border-gray-800 rounded-lg p-0.5">
+              <button onClick={() => handleZoom(zoom - 0.1)} className="p-1 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom Out"><ZoomOut size={12} /></button>
+              <button onClick={fitToScreen} className="px-2 py-0.5 hover:bg-gray-700 rounded text-[11px] font-semibold text-gray-300 hover:text-white flex items-center gap-1" title="Fit to Screen"><Expand size={11} /> Fit Screen</button>
+              <button onClick={() => handleZoom(zoom + 0.1)} className="p-1 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom In"><ZoomIn size={12} /></button>
+            </div>
+            <span className="text-[11px] text-gray-500 font-mono">{Math.round(zoom * 100)}%</span>
+          </div>
         </div>
       </header>
 
