@@ -512,7 +512,7 @@ export default function PublishPost() {
       if (data?.draft) {
         setDrafts(prev => [data.draft, ...prev.filter(d => d._id !== data.draft._id)]);
         setEditingDraft(data.draft);
-        toast.success('Draft saved successfully! 💾', { id: toastId });
+        toast.success(data?.message || 'Post saved successfully to Publisher! 💾', { id: toastId, duration: 4000 });
       } else {
         toast.error(data?.message || 'Could not save draft.', { id: toastId });
       }

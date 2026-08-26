@@ -598,8 +598,39 @@ exports.saveDraft = async (req, res) => {
       savedDraft = await DraftPost.create(draftData);
       console.log(`✅ [DRAFT DEBUG] 6b. New draft created with ID: ${savedDraft._id}`);
     }
+
+    // 🚀 SYNC TO PUBLISHER: Also upsert in Post model so it appears immediately in Publisher (/publisher)
+    try {
+      let postPlatforms = ['instagram'];
+      if (platforms) {
+        try {
+          const parsed = typeof platforms === 'string' ? JSON.parse(platforms) : platforms;
+          postPlatforms = Array.isArray(parsed) ? parsed : Object.keys(parsed).filter(k => parsed[k]);
+        } catch (_) {}
+      }
+
+      await Post.findOneAndUpdate(
+        { legacySocialPostId: savedDraft._id },
+        {
+          userId,
+          workspaceId: workspaceId || 'main',
+          caption: caption || '',
+          mediaUrls: imageUrl ? [{ url: imageUrl, type: 'image' }] : [],
+          status: 'draft',
+          scheduledAt: scheduleDate ? new Date(scheduleDate) : null,
+          platforms: postPlatforms.length > 0 ? postPlatforms : ['instagram'],
+          designJson,
+          legacySocialPostId: savedDraft._id,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+      console.log(`✅ [DRAFT SYNC] Draft ${savedDraft._id} synced to Publisher Posts!`);
+    } catch (syncErr) {
+      console.warn('⚠️ [DRAFT SYNC] Could not sync draft to Post model:', syncErr.message);
+    }
+
     console.log("================== [DRAFT SAVE END] ==================\n");
-    res.status(201).json({ success: true, draft: savedDraft });
+    res.status(201).json({ success: true, draft: savedDraft, message: 'Post saved successfully to Publisher! 💾' });
 
   } catch (error) {
     console.error('❌ [CRITICAL DRAFT ERROR] Save Draft Failed:', error);
@@ -619,6 +650,9 @@ exports.deleteDraft = async (req, res) => {
     if (!draft) {
       return res.status(404).json({ success: false, message: 'Draft not found or you do not have permission to delete it.' });
     }
+
+    // Also delete synced post from Publisher
+    await Post.findOneAndDelete({ legacySocialPostId: id, userId });
 
     // Optional: Delete image from Cloudinary if it's not used elsewhere
     if (draft.imageUrl) {

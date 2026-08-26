@@ -19,24 +19,39 @@ const normalizeDesignForFabric = (designJson) => {
 
     const normalizedLayer = { ...layer };
 
-    if (normalizedLayer.type === 'text') {
+    if (normalizedLayer.type === 'text' || normalizedLayer.type === 'textbox') {
       normalizedLayer.type = 'textbox';
       normalizedLayer.fontFamily = normalizedLayer.fontFamily || 'Poppins';
-      normalizedLayer.fontSize = normalizedLayer.fontSize || 60;
+      normalizedLayer.fontSize = normalizedLayer.fontSize || 42;
       normalizedLayer.fontWeight = normalizedLayer.fontWeight || 'normal';
       normalizedLayer.fill = normalizedLayer.fill || '#ffffff';
       normalizedLayer.originX = normalizedLayer.originX || 'center';
       normalizedLayer.originY = normalizedLayer.originY || 'center';
-      normalizedLayer.width = normalizedLayer.width || canvasWidth * 0.8;
+      normalizedLayer.textAlign = normalizedLayer.textAlign || 'center';
+      normalizedLayer.width = normalizedLayer.width || canvasWidth * 0.85;
       normalizedLayer.left = typeof normalizedLayer.left === 'number' ? normalizedLayer.left : canvasWidth / 2;
       normalizedLayer.top = typeof normalizedLayer.top === 'number' ? normalizedLayer.top : canvasHeight / 2;
+      normalizedLayer.splitByGrapheme = true;
+    }
+
+    if (normalizedLayer.type === 'rect') {
+      normalizedLayer.originX = normalizedLayer.originX || 'center';
+      normalizedLayer.originY = normalizedLayer.originY || 'center';
+      normalizedLayer.left = typeof normalizedLayer.left === 'number' ? normalizedLayer.left : canvasWidth / 2;
+      normalizedLayer.top = typeof normalizedLayer.top === 'number' ? normalizedLayer.top : canvasHeight / 2;
+      normalizedLayer.rx = normalizedLayer.rx || 18;
+      normalizedLayer.ry = normalizedLayer.ry || 18;
     }
 
     if (typeof normalizedLayer.fill === 'string' && normalizedLayer.fill.includes('[')) {
       normalizedLayer.fill = '#ffffff';
     }
 
-    if (normalizedLayer.type === 'image' && typeof normalizedLayer.src === 'string' && normalizedLayer.src.startsWith('AI_IMAGE_PROMPT:')) {
+    if (normalizedLayer.type === 'image') {
+      normalizedLayer.originX = normalizedLayer.originX || 'center';
+      normalizedLayer.originY = normalizedLayer.originY || 'center';
+      normalizedLayer.left = typeof normalizedLayer.left === 'number' ? normalizedLayer.left : canvasWidth / 2;
+      normalizedLayer.top = typeof normalizedLayer.top === 'number' ? normalizedLayer.top : canvasHeight / 2;
       normalizedLayer.crossOrigin = 'anonymous';
     }
 
@@ -55,14 +70,11 @@ const normalizeDesignForFabric = (designJson) => {
 export const useFabric = (canvasRef) => {
   const [fabricCanvas, setFabricCanvas] = useState(null);
   
-  // ✅ NEW: State for Undo/Redo history
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [isProcessing, setIsProcessing] = useState(false); // Prevents saving state during undo/redo
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Initialize the canvas
   useEffect(() => {
-    // Debounce function to prevent excessive history saves
     const debounce = (func, delay) => {
       let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); };
     };
@@ -81,12 +93,8 @@ export const useFabric = (canvasRef) => {
       newHistory.push(json);
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
-    }, 500); // Debounce history saves by 500ms
+    }, 500);
 
-    // Capture initial state
-    saveState();
-
-    // Event listeners to capture changes
     canvas.on('object:added', saveState);
     canvas.on('object:removed', saveState);
     canvas.on('object:modified', saveState);
@@ -97,20 +105,13 @@ export const useFabric = (canvasRef) => {
       canvas.dispose();
       setFabricCanvas(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasRef]); // This effect should only run once to initialize the canvas. The functions inside create closures, which is intended.
+  }, [canvasRef]);
 
-  // ✅ FIX: Completely rewritten renderDesign to be robust and use Fabric's native JSON loader.
   const renderDesign = useCallback((designJson, callback) => {
     if (!fabricCanvas || !designJson) return;
 
     const normalizedDesign = normalizeDesignForFabric(designJson);
     if (!normalizedDesign) return;
-
-    console.log(`\n================== [FABRIC.JS RENDER START] ==================`);
-    console.log(`🎨 [Debug] 1. Received Design JSON to render.`);
-    console.log(`   - Background:`, normalizedDesign.backgroundColor);
-    console.log(`   - Layer Count:`, normalizedDesign.objects?.length || 0);
 
     fabricCanvas.clear();
     fabricCanvas.setBackgroundColor(normalizedDesign.backgroundColor || '#ffffff');
@@ -126,17 +127,12 @@ export const useFabric = (canvasRef) => {
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
 
-      // ✅ NEW: Reset history after loading a new design to prevent undoing into the old state.
       const json = fabricCanvas.toJSON();
       setHistory([json]);
       setHistoryIndex(0);
       setIsProcessing(false);
-      console.log(`🔄 [Debug] 3. Undo/Redo history has been reset for the new design.`);
 
-      // Optional callback for when rendering is complete
       if (callback) callback();
-      console.log(`✅ [Debug] 4. Canvas rendering complete.`);
-      console.log(`================== [FABRIC.JS RENDER END] ==================\n`);
     });
   }, [fabricCanvas]);
   
@@ -144,9 +140,6 @@ export const useFabric = (canvasRef) => {
     if (!fabricCanvas) return null;
     const design = fabricCanvas.toJSON(['id', 'layers', 'objects']);
 
-    // Keep an explicit, portable canvas definition. Fabric's serialized
-    // background field differs between versions, while the AI and API use
-    // `canvas.backgroundColor` as their design contract.
     return {
       ...design,
       canvas: {
@@ -166,7 +159,6 @@ export const useFabric = (canvasRef) => {
     });
   }, [fabricCanvas]);
 
-  // ✅ NEW: Undo/Redo functions
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       setIsProcessing(true);
