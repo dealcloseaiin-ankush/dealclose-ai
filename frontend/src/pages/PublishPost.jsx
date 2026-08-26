@@ -203,10 +203,10 @@ export default function PublishPost() {
       const reader = new FileReader();
       reader.onload = (f) => {
         fabric.Image.fromURL(f.target.result, (img) => {
-          // Auto Scale image to seamlessly fill the 1080x1080 canvas frame
+          // Auto Scale image to fit neatly within 1080x1080 canvas without overflowing
           const imgW = img.width || 1080;
           const imgH = img.height || 1080;
-          const scale = Math.max(1080 / imgW, 1080 / imgH);
+          const scale = Math.min(1080 / imgW, 1080 / imgH);
           img.set({
             left: 540,
             top: 540,
@@ -214,12 +214,17 @@ export default function PublishPost() {
             originY: 'center',
             scaleX: scale,
             scaleY: scale,
+            cornerColor: '#EC4899',
+            cornerStyle: 'circle',
+            borderColor: '#EC4899',
+            cornerSize: 20,
+            transparentCorners: false
           });
           fabricCanvas.add(img);
           fabricCanvas.centerObject(img);
           fabricCanvas.setActiveObject(img);
           fabricCanvas.renderAll();
-          toast.success('Image set to fill canvas perfectly! 🎯', { id: toastId });
+          toast.success('Image fitted to canvas! 🎯', { id: toastId });
         });
       };
       reader.readAsDataURL(initialFile);
@@ -238,17 +243,17 @@ export default function PublishPost() {
 
   // 🚀 NEW: Handle user uploading their own media file
   const handleMediaUpload = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file || !fabricCanvas) return;
 
     const reader = new FileReader();
     reader.onload = (f) => {
       const data = f.target.result;
       fabric.Image.fromURL(data, (img) => {
-        // Auto Scale image to seamlessly fill the 1080x1080 canvas frame
+        // Auto Scale image to fit neatly within 1080x1080 canvas without overflowing
         const imgW = img.width || 1080;
         const imgH = img.height || 1080;
-        const scale = Math.max(1080 / imgW, 1080 / imgH);
+        const scale = Math.min(1080 / imgW, 1080 / imgH);
         img.set({
           left: 540,
           top: 540,
@@ -256,15 +261,34 @@ export default function PublishPost() {
           originY: 'center',
           scaleX: scale,
           scaleY: scale,
+          cornerColor: '#EC4899',
+          cornerStyle: 'circle',
+          borderColor: '#EC4899',
+          cornerSize: 20,
+          transparentCorners: false
         });
         fabricCanvas.add(img);
         fabricCanvas.centerObject(img);
         fabricCanvas.setActiveObject(img);
         fabricCanvas.renderAll();
-        toast.success('Image set to fill canvas perfectly! 🎯');
+        toast.success('Image fitted to canvas! 🎯');
       });
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // 🚀 NEW: Start Fresh / Clear Canvas
+  const handleNewPost = () => {
+    if (fabricCanvas) {
+      fabricCanvas.clear();
+      fabricCanvas.setBackgroundColor('#0a0a0a');
+      fabricCanvas.renderAll();
+    }
+    setCaption('');
+    setEditingDraft(null);
+    setPreviewImageUrl('');
+    toast.success('Canvas cleared! Ready for new post ✨');
   };
 
   // 🚀 NEW: Trigger the hidden file input for media upload
@@ -715,6 +739,9 @@ export default function PublishPost() {
             <button onClick={() => handleZoom(zoom + 0.1)} className="p-1 hover:bg-gray-700 rounded text-gray-300 hover:text-white" title="Zoom In"><ZoomIn size={13} /></button>
           </div>
 
+          <button type="button" onClick={handleNewPost} className="px-2.5 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white font-bold rounded-lg transition-all flex items-center gap-1 text-xs border border-gray-700" title="Clear and create a new post">
+            <Sparkles size={13} className="text-yellow-400" /> New
+          </button>
           <button type="button" onClick={handleSaveDraft} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg transition-all flex items-center gap-1.5 text-xs border border-gray-700">
             <Save size={14} /> {editingDraft ? 'Update' : 'Save'}
           </button>
