@@ -579,19 +579,65 @@ export default function PublishPost() {
   };
 
   // 🚀 NEW: Toolbar action handler
-  const handleToolbarAction = (action) => {
+  const handleToolbarAction = (action, payload) => {
     // Actions that don't require a selected object
     if (action === 'addText') {
-      fabricCanvas.add(new fabric.Textbox('New Text', { left: 100, top: 100, fill: '#ffffff', fontSize: 80, fontFamily: 'Poppins' }));
+      const text = new fabric.Textbox('Heading Text', {
+        left: 540,
+        top: 540,
+        originX: 'center',
+        originY: 'center',
+        fill: '#ffffff',
+        fontSize: 56,
+        fontFamily: 'Poppins',
+        textAlign: 'center',
+        cornerColor: '#EC4899',
+        cornerStyle: 'circle',
+        cornerSize: 18,
+        transparentCorners: false,
+        width: 650,
+      });
+      fabricCanvas.add(text);
+      fabricCanvas.centerObject(text);
+      fabricCanvas.setActiveObject(text);
+      fabricCanvas.renderAll();
+      toast.success('Text layer added! Click to edit ✍️');
       return;
     }
     if (action === 'addShape') {
-      fabricCanvas.add(new fabric.Rect({ left: 150, top: 150, fill: '#8A2BE2', width: 200, height: 200 }));
+      const rect = new fabric.Rect({
+        left: 540,
+        top: 540,
+        originX: 'center',
+        originY: 'center',
+        fill: '#8A2BE2',
+        width: 400,
+        height: 240,
+        rx: 18,
+        ry: 18,
+        cornerColor: '#EC4899',
+        cornerStyle: 'circle',
+        cornerSize: 18,
+        transparentCorners: false,
+      });
+      fabricCanvas.add(rect);
+      fabricCanvas.centerObject(rect);
+      fabricCanvas.setActiveObject(rect);
+      fabricCanvas.renderAll();
+      toast.success('Shape added! 🔲');
       return;
     }
-    // 🚀 FIX: Make 'Add Image' button functional
     if (action === 'addImage' || action === 'addIcon') {
       triggerMediaUpload();
+      return;
+    }
+
+    if (action === 'undo') {
+      undo();
+      return;
+    }
+    if (action === 'redo') {
+      redo();
       return;
     }
 
@@ -600,7 +646,7 @@ export default function PublishPost() {
       return toast.error("Please select an object on the canvas first.");
     }
 
-    // 🚀 NEW: Image Canvas Scaling Actions
+    // Image Canvas Scaling Actions
     if (action === 'fillImage' && selectedObject) {
       const imgW = selectedObject.width || 1080;
       const imgH = selectedObject.height || 1080;
@@ -621,7 +667,7 @@ export default function PublishPost() {
     if (action === 'fitImage' && selectedObject) {
       const imgW = selectedObject.width || 1080;
       const imgH = selectedObject.height || 1080;
-      const scale = Math.min(1080 / imgW, 1080 / imgH);
+      const scale = Math.min(1000 / imgW, 1000 / imgH);
       selectedObject.set({
         scaleX: scale,
         scaleY: scale,
@@ -636,6 +682,7 @@ export default function PublishPost() {
       return;
     }
 
+    // Text formatting
     if (action === 'bold') {
       selectedObject.set('fontWeight', selectedObject.fontWeight === 'bold' ? 'normal' : 'bold');
     }
@@ -645,18 +692,43 @@ export default function PublishPost() {
     if (action === 'underline') {
       selectedObject.set('underline', !selectedObject.underline);
     }
+    if (action === 'increaseFontSize') {
+      const current = selectedObject.fontSize || 40;
+      selectedObject.set('fontSize', Math.min(200, current + 4));
+    }
+    if (action === 'decreaseFontSize') {
+      const current = selectedObject.fontSize || 40;
+      selectedObject.set('fontSize', Math.max(12, current - 4));
+    }
+    if (action === 'alignLeft') {
+      selectedObject.set('textAlign', 'left');
+    }
+    if (action === 'alignCenter') {
+      selectedObject.set('textAlign', 'center');
+    }
+    if (action === 'alignRight') {
+      selectedObject.set('textAlign', 'right');
+    }
+    if (action === 'setColor' && payload) {
+      selectedObject.set('fill', payload);
+    }
+
+    // Layer depth
+    if (action === 'bringForward') {
+      fabricCanvas.bringForward(selectedObject);
+    }
+    if (action === 'sendBackward') {
+      fabricCanvas.sendBackwards(selectedObject);
+    }
+
     if (action === 'delete') {
       fabricCanvas.remove(selectedObject);
       fabricCanvas.discardActiveObject();
+      setSelectedObject(null);
     }
-    // ✅ FIX: Use Undo/Redo from the hook
-    if (action === 'undo') {
-      undo();
-    }
-    if (action === 'redo') {
-      redo();
-    }
-    if (fabricCanvas) fabricCanvas.renderAll();
+
+    fabricCanvas.renderAll();
+    setSelectedObject({ ...selectedObject });
   };
 
   return (
