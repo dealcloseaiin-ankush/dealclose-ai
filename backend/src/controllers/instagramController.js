@@ -530,9 +530,10 @@ exports.getDrafts = async (req, res) => {
     };
     const drafts = await DraftPost.find(query)
       .select('caption imageUrl status platforms publishMode scheduleDate workspaceId createdAt')
-      .sort({ createdAt: -1 })
-      .limit(30)
+      .limit(50)
       .lean();
+
+    drafts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     res.status(200).json({ success: true, drafts: drafts || [] });
   } catch (error) {
     console.error('Fetch drafts error:', error);
