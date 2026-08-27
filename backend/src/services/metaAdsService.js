@@ -29,19 +29,20 @@ exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
 };
 
 // 2. 🚀 FIXED: Send Private DM Reply safely via Recipient Comment ID Token Link
-exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText) => {
+exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText, loginType = 'facebook_business') => {
   if (!accessToken) {
     throw new Error("[PRIVATE_REPLY] Missing access token");
-  }
-  if (!pageId) {
-    throw new Error("[PRIVATE_REPLY] Missing Facebook Page ID");
   }
   if (!commentId) {
     throw new Error("[PRIVATE_REPLY] Missing comment ID");
   }
 
-  const url = `https://graph.facebook.com/v19.0/${pageId}/messages`;
-  console.log("\n[PRIVATE REPLY REQUEST] URL:", url);
+  const isNative = loginType === 'instagram_basic_display' || loginType === 'instagram_business_login';
+  const url = isNative
+    ? `https://graph.instagram.com/v21.0/me/messages`
+    : (pageId ? `https://graph.facebook.com/v19.0/${pageId}/messages` : `https://graph.facebook.com/v19.0/me/messages`);
+
+  console.log("\n[PRIVATE REPLY REQUEST] URL:", url, "loginType:", loginType);
   console.log("[PRIVATE REPLY REQUEST] token snippet:", `${accessToken.slice(0, 12)}...${accessToken.slice(-12)}`);
   console.log("[PRIVATE REPLY REQUEST] payload:", {
     recipient: { comment_id: commentId },

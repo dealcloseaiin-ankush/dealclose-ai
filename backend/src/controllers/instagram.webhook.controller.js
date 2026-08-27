@@ -966,7 +966,11 @@ with whatever information is available (leave budget field empty/null if not pro
           console.log("[COMMENT WEBHOOK DEBUG] initial pageId:", igPageId, "initial token present:", Boolean(igToken));
 
           if (user.workspaces && user.workspaces.length > 0) {
-             activeWorkspaceNode = user.workspaces.find(w => w?.instagramConfig?.instagramBusinessAccountId === igAccountId);
+             activeWorkspaceNode = user.workspaces.find(w => 
+               w?.instagramConfig?.instagramBusinessAccountId === igAccountId ||
+               w?.instagramConfig?.instagramUserId === igAccountId ||
+               w?.instagramConfig?.facebookPageId === igAccountId
+             );
              if (activeWorkspaceNode?.instagramConfig?.accessToken) {
                 igToken = activeWorkspaceNode.instagramConfig.accessToken;
                 loginType = activeWorkspaceNode.instagramConfig.loginType || 'facebook_business';
