@@ -528,7 +528,11 @@ exports.getDrafts = async (req, res) => {
         { workspaceId: null }
       ]
     };
-    const drafts = await DraftPost.find(query).sort({ createdAt: -1 }).lean();
+    const drafts = await DraftPost.find(query)
+      .select('caption imageUrl status platforms publishMode scheduleDate workspaceId createdAt')
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
     res.status(200).json({ success: true, drafts: drafts || [] });
   } catch (error) {
     console.error('Fetch drafts error:', error);

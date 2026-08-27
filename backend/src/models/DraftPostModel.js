@@ -38,5 +38,9 @@ const draftPostSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// ✅ Compound indexes for fast sorting and memory optimization
+draftPostSchema.index({ userId: 1, workspaceId: 1, createdAt: -1 });
+draftPostSchema.index({ userId: 1, createdAt: -1 });
+
 const DraftPost = mongoose.model('DraftPost', draftPostSchema);
 module.exports = DraftPost;
