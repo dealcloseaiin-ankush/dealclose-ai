@@ -1,34 +1,45 @@
 /**
- * Centralized Data Retention Policy for Messages.
- * This ensures consistent data lifecycle management across all channels (WhatsApp, Instagram).
- *
- * @param {object} user - The user object from the database.
- * @param {string} channel - The channel ('whatsapp', 'instagram_dm', 'instagram_comment').
- * @returns {Date|null} The expiry date for the message, or null to keep it permanently.
+ * Centralized Data Retention Policy for Messages (TTL Management).
+ * 
+ * Policy:
+ * Free Tier:
+ *  - Instagram Comments: 15 Days
+ *  - Instagram DMs: 30 Days
+ *  - WhatsApp Messages: 30 Days
+ * 
+ * Paid / Premium Tier (Double retention):
+ *  - Instagram Comments: 30 Days (2x)
+ *  - Instagram DMs: 60 Days (2x)
+ *  - WhatsApp Messages: 60 Days (2x)
  */
 
 const addDays = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
 exports.getMessageExpiry = (user, channel) => {
-  const isPremium = user.isPremium === true || user.role === 'superadmin';
+  const isPremium = user?.isPremium === true || user?.role === 'superadmin' || user?.subscription?.plan !== 'free';
 
-  // 🚀 FIX: Implemented the tiered retention for Premium users as per the spec.
-  // Previously, it was returning 'null' for all premium channels, making them permanent.
-  // Now, comments for premium users will also expire, but after a longer period (7 days).
   if (isPremium) {
-    if (channel === 'instagram_comment') {
-      return addDays(7);
+    switch (channel) {
+      case 'instagram_comment':
+        return addDays(30); // 30 days for Paid
+      case 'instagram_dm':
+        return addDays(60); // 60 days for Paid
+      case 'whatsapp':
+        return addDays(60); // 60 days for Paid
+      default:
+        return addDays(30);
     }
-    return null; // WhatsApp and DMs remain permanent for premium users.
   }
 
-  // Free users have a tiered, shorter retention period to manage costs.
+  // Free Tier
   switch (channel) {
-    case 'whatsapp':
-      return addDays(30); // WhatsApp is more business-critical.
+    case 'instagram_comment':
+      return addDays(15); // 15 days for Free
     case 'instagram_dm':
-      return addDays(15); // DMs are less critical than WhatsApp.
-    default: // Includes 'instagram_comment' and any other type
-      return addDays(2);  // Comments are high-volume, low-value, shortest retention.
+      return addDays(30); // 30 days for Free
+    case 'whatsapp':
+      return addDays(30); // 30 days for Free
+    default:
+      return addDays(15);
   }
 };
