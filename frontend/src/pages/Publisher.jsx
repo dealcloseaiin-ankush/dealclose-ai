@@ -687,75 +687,121 @@ export default function Publisher() {
       <DashboardAIAssistant />
 
       {/* Comments Modal */}
-      {isCommentModalOpen && selectedPostForComments && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#111] border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b border-gray-800">
-              <h2 className="font-bold text-lg text-white">Comments for Post</h2>
-              <button onClick={() => setIsCommentModalOpen(false)} className="p-2 rounded-full hover:bg-gray-800"><X size={20} /></button>
-            </div>
-            <div className="p-4 overflow-y-auto space-y-4">
-              {comments.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No comments found or still loading...</p>
-              ) : (
-                comments.map(comment => (
-                  <div key={comment.id} className="text-sm">
-                    <div className="flex gap-3 items-start">
-                      {/* Fallback gradient avatar */}
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-500 shrink-0"></div>
-                      <div className="flex-1">
-                        {/* Comment Header: Username, Text, and Delete Button */}
-                        <div className="flex items-start justify-between gap-3">
-                          <p><span className="font-bold text-white">{comment.from?.username || comment.username}</span> <span className="text-gray-300">{comment.text}</span></p>
-                          <button type="button" onClick={() => handleDeleteComment(comment.id)} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete comment">
-                            <Trash2 size={14} />
-                          </button>
+      {/* Comments Modal */}
+      {isCommentModalOpen && selectedPostForComments && (() => {
+        // Collect nested reply IDs to prevent duplicate root-level rendering
+        const nestedReplyIds = new Set();
+        (comments || []).forEach(c => {
+          if (c.replies && Array.isArray(c.replies.data)) {
+            c.replies.data.forEach(r => nestedReplyIds.add(String(r.id)));
+          }
+        });
+        const rootComments = (comments || []).filter(c => !nestedReplyIds.has(String(c.id)));
+
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-[#121212] border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-[#161616]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold text-sm">💬</div>
+                  <div>
+                    <h2 className="font-bold text-base text-white">Instagram Comments & Replies</h2>
+                    <p className="text-xs text-gray-400">{rootComments.length} conversation thread{rootComments.length === 1 ? '' : 's'}</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsCommentModalOpen(false)} className="p-2 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-all"><X size={18} /></button>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                {rootComments.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <p className="text-sm">No comments found on this post yet.</p>
+                  </div>
+                ) : (
+                  rootComments.map(comment => {
+                    const commentUsername = comment.from?.username || comment.username || 'User';
+                    const repliesList = comment.replies?.data || [];
+
+                    return (
+                      <div key={comment.id} className="bg-[#181818] border border-gray-800/80 rounded-xl p-4 space-y-3">
+                        {/* Parent Comment */}
+                        <div className="flex gap-3 items-start">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                            {commentUsername.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="font-bold text-white text-xs hover:underline cursor-pointer">@{commentUsername}</span>
+                                {comment.timestamp && (
+                                  <span className="text-[10px] text-gray-500 ml-2">{new Date(comment.timestamp).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                              <button type="button" onClick={() => handleDeleteComment(comment.id)} className="shrink-0 p-1 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Delete comment">
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-200 mt-1 leading-relaxed">{comment.text}</p>
+                          </div>
                         </div>
 
-                        {/* ✅ FIX: Replies block is now a SIBLING to the header, not inside it. */}
-                        {/* ✅ FIX: Added safety check for comment.replies and comment.replies.data to prevent crashes. */}
-                        {comment.replies && comment.replies.data && comment.replies.data.length > 0 && (
-                          <div className="mt-3 pl-6 border-l-2 border-gray-800 space-y-3">
-                            {comment.replies.data.map(reply => (
-                              <div key={reply.id} className="flex gap-3 items-start">
-                                {/* Fallback gradient avatar for replies */}
-                                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 shrink-0"></div>
-                                <div className="flex-1">
-                                  <div className="flex items-start justify-between gap-3">
-                                    {/* ✅ FIX: Use fallback pattern for reply username as well. */}
-                                    <p><span className="font-bold text-white">{reply.from?.username || reply.username}</span> <span className="text-gray-400">{reply.text}</span></p>
-                                    <button type="button" onClick={() => handleDeleteComment(reply.id)} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10" title="Delete reply">
-                                      <Trash2 size={14} />
-                                    </button>
+                        {/* Nested Replies (Threaded Indentation) */}
+                        {repliesList.length > 0 && (
+                          <div className="ml-6 pl-3 border-l-2 border-purple-500/40 space-y-2.5 pt-1">
+                            {repliesList.map(reply => {
+                              const replyUsername = reply.from?.username || reply.username || 'User';
+                              return (
+                                <div key={reply.id} className="bg-[#202020] rounded-lg p-2.5 flex gap-2.5 items-start border border-gray-800/50">
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+                                    {replyUsername.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-purple-400 font-bold text-xs">@{replyUsername}</span>
+                                        <span className="text-[9px] bg-purple-500/20 text-purple-300 font-semibold px-1.5 py-0.5 rounded">↩️ Reply</span>
+                                        {reply.timestamp && (
+                                          <span className="text-[9px] text-gray-500">{new Date(reply.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        )}
+                                      </div>
+                                      <button type="button" onClick={() => handleDeleteComment(reply.id)} className="shrink-0 p-1 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Delete reply">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                    <p className="text-xs text-gray-300 mt-0.5">{reply.text}</p>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
 
-                        {/* Reply form is also a sibling, at the bottom of the comment body */}
-                        <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(comment.id); }} className="flex gap-2 mt-2">
-                          <input // ✅ FIX: Input is now controlled by the specific comment's state
+                        {/* Inline Reply Form */}
+                        <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(comment.id); }} className="flex gap-2 pt-1">
+                          <input
                             type="text"
-                            value={replyTexts[comment.id] || ''} // ✅ FIX: Use individual state for each reply input
+                            value={replyTexts[comment.id] || ''}
                             onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                            placeholder={`Reply to @${comment.username}...`} 
-                            className="flex-1 bg-[#2a2a2a] border border-gray-700 rounded-lg p-2 text-white text-xs focus:border-blue-500 outline-none"
+                            placeholder={`Reply to @${commentUsername}...`}
+                            className="flex-1 bg-[#101010] border border-gray-700/80 rounded-lg px-3 py-1.5 text-white text-xs focus:border-purple-500 outline-none transition-all placeholder:text-gray-600"
                           />
-                          <button type="submit" disabled={!replyTexts[comment.id]?.trim()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 rounded-lg transition-all disabled:opacity-50 flex items-center">
-                            <Send size={14} />
+                          <button
+                            type="submit"
+                            disabled={!replyTexts[comment.id]?.trim()}
+                            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40 flex items-center text-xs gap-1 shadow-sm"
+                          >
+                            <Send size={12} /> Reply
                           </button>
                         </form>
                       </div>
-                    </div>
-                  </div>
-                ))
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
