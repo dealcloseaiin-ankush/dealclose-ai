@@ -589,7 +589,7 @@ exports.getPostAnalytics = async (req, res) => {
     const engagementRate = totalReach > 0 ? ((totalEngagement / totalReach) * 100).toFixed(2) : (posts.length > 0 ? '4.80' : '0.00');
 
     const topPosts = posts
-      .slice(0, 5)
+      .slice(0, 50)
       .map(p => ({
         _id: p._id,
         caption: p.caption,
@@ -617,7 +617,7 @@ exports.getPostAnalytics = async (req, res) => {
           : user?.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
 
         if (igConfig?.accessToken) {
-          const recentLive = posts.slice(0, 5);
+          const recentLive = posts.slice(0, 25);
           for (const p of recentLive) {
             const platformId = p.platformPostIds?.instagram;
             if (!platformId) continue;
