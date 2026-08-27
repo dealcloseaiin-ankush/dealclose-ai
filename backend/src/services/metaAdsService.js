@@ -28,58 +28,73 @@ exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
   }
 };
 
-// 2. 🚀 FIXED: Send Private DM Reply safely via Direct IG User ID or Recipient Comment ID
+// 2. 🚀 FIXED: Send Private DM Reply safely with robust multi-endpoint fallback
 exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText, loginType = 'facebook_business', igUserId = null) => {
   if (!accessToken) {
     throw new Error("[PRIVATE_REPLY] Missing access token");
   }
 
   const isNative = loginType === 'instagram_basic_display' || loginType === 'instagram_business_login';
-  const url = isNative
-    ? `https://graph.instagram.com/v21.0/me/messages`
-    : (pageId ? `https://graph.facebook.com/v19.0/${pageId}/messages` : `https://graph.facebook.com/v19.0/me/messages`);
+  
+  // List of candidate endpoints and payloads to attempt in order
+  const attempts = [];
 
-  console.log("\n[PRIVATE REPLY REQUEST] URL:", url, "loginType:", loginType, "igUserId:", igUserId, "commentId:", commentId);
-
-  // Strategy 1: Direct DM to commenter's Instagram User ID
+  // Attempt A: Native Instagram direct DM to user ID
   if (igUserId) {
+    attempts.push({
+      name: "Native IG me/messages (User ID)",
+      url: `https://graph.instagram.com/v21.0/me/messages`,
+      payload: { recipient: { id: igUserId }, message: { text: messageText } }
+    });
+    attempts.push({
+      name: "Facebook Graph me/messages (User ID)",
+      url: `https://graph.facebook.com/v21.0/me/messages`,
+      payload: { recipient: { id: igUserId }, message: { text: messageText } }
+    });
+  }
+
+  // Attempt B: Page-level private reply to comment ID (if pageId is present)
+  if (pageId && commentId) {
+    attempts.push({
+      name: "Facebook Page messages (Comment ID)",
+      url: `https://graph.facebook.com/v21.0/${pageId}/messages`,
+      payload: { recipient: { comment_id: commentId }, message: { text: messageText }, messaging_type: "RESPONSE" }
+    });
+  }
+
+  // Attempt C: me/messages with comment ID
+  if (commentId) {
+    attempts.push({
+      name: "Facebook Graph me/messages (Comment ID)",
+      url: `https://graph.facebook.com/v21.0/me/messages`,
+      payload: { recipient: { comment_id: commentId }, message: { text: messageText }, messaging_type: "RESPONSE" }
+    });
+  }
+
+  let lastError = null;
+  for (const attempt of attempts) {
     try {
-      console.log(`[PRIVATE REPLY] Strategy 1: Sending DM to IG User ID: ${igUserId}`);
-      const directResponse = await axios.post(
-        url,
-        {
-          recipient: { id: igUserId },
-          message: { text: messageText }
-        },
+      console.log(`[PRIVATE REPLY] Attempting: ${attempt.name} -> ${attempt.url}`);
+      const response = await axios.post(
+        attempt.url,
+        attempt.payload,
         {
           params: { access_token: accessToken },
           headers: { Authorization: `Bearer ${accessToken}` }
         }
       );
-      console.log("✅ [PRIVATE REPLY SUCCESS - DIRECT USER ID]:", directResponse.data);
-      return directResponse.data;
-    } catch (directErr) {
-      console.warn(`⚠️ [PRIVATE REPLY DIRECT ID]:`, directErr.response?.data?.error?.message || directErr.message);
+      console.log(`✅ [PRIVATE REPLY SUCCESS] via ${attempt.name}:`, response.data);
+      return response.data;
+    } catch (err) {
+      lastError = err;
+      const metaMsg = err.response?.data?.error?.message || err.message;
+      console.warn(`⚠️ [PRIVATE REPLY] Failed attempt (${attempt.name}): ${metaMsg}`);
     }
   }
 
-  // Strategy 2: Reply via comment_id token link
-  if (commentId) {
-    console.log(`[PRIVATE REPLY] Strategy 2: Sending private reply to Comment ID: ${commentId}`);
-    const commentResponse = await axios.post(
-      url,
-      {
-        recipient: { comment_id: commentId },
-        message: { text: messageText },
-        messaging_type: "RESPONSE"
-      },
-      {
-        params: { access_token: accessToken },
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }
-    );
-    console.log("✅ [PRIVATE REPLY SUCCESS - COMMENT ID]:", commentResponse.data);
-    return commentResponse.data;
+  if (lastError) {
+    console.error("❌ [PRIVATE REPLY] All dispatch strategies failed. Last error:", lastError.response?.data || lastError.message);
+    throw lastError;
   }
 };
 
