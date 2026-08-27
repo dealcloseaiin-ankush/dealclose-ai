@@ -181,17 +181,43 @@ export default function InstagramAutomation() {
     }
   };
 
-  const handleInlineShortcutSave = async (post, keyword, targetLink) => {
-    if (!keyword || !targetLink) return toast.error("Please fill both Keyword and Target Link fields!");
-    const toastId = toast.loading("Injecting inline lightning rule...");
+  const handleCardPdfUpload = async (postId, file) => {
+    if (!file) return;
+    setIsUploadingPdf(true);
+    const toastId = toast.loading("Uploading file securely...");
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const uploadedUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+      updateInlineValue(postId, 'fileUrl', uploadedUrl);
+      toast.success("File uploaded and link attached!", { id: toastId });
+    } catch (err) {
+      console.error("Upload Error:", err);
+      toast.error("Failed to upload file. Check connection.", { id: toastId });
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
+
+  const handleInlineShortcutSave = async (post) => {
+    const keyword = post.chatBotKeyword?.trim();
+    const targetLink = post.fileUrl?.trim();
+    const publicReply = post.publicReply !== undefined ? post.publicReply : "Check your DM! Details sent. 📩";
+    const dmText = post.chatBotReply || "Here is your requested asset package link details:";
+
+    if (!keyword) return toast.error("Please enter a Comment Trigger Word!");
+    const toastId = toast.loading("Saving automation rule...");
     try {
       const { data } = await api.post('/instagram/automations', {
         postId: post.id,
         thumbnailUrl: post.thumbnail_url || post.media_url,
         triggerWord: keyword,
-        replyMessage: "Here is your requested asset package link details:",
-        publicReply: "Check your DM! Details sent. 📩",
-        fileUrl: targetLink,
+        replyMessage: dmText,
+        publicReply: publicReply,
+        fileUrl: targetLink || '',
         deliveryMode: 'instant_shortcut',
         workspaceId: activeWorkspace
       });
@@ -199,11 +225,11 @@ export default function InstagramAutomation() {
       console.log('[IG AUTO UI DEBUG] Inline shortcut save response', { workspaceId: activeWorkspace, postId: post.id, nextRules });
       setSavedAutomations(nextRules);
       setRecentPosts(posts => mergePostsWithAutomations(posts, nextRules));
-      toast.success("⚡ Inline Shortcut Rule Locked Successfully!", { id: toastId });
+      toast.success("⚡ Automation Rule Saved Successfully!", { id: toastId });
       handleSyncPosts();
     } catch (err) {
       console.error("Shortcut save crash context:", err);
-      toast.error("Failed to inject shortcut state to server context.", { id: toastId });
+      toast.error("Failed to save automation rule.", { id: toastId });
     }
   };
 
@@ -708,35 +734,72 @@ export default function InstagramAutomation() {
                       </select>
                     </div>
 
-                    {/* 🚀 FEATURE 1: INCORPORATED FIXED SUPER-FAST INLINE INPUT FIELDS SHORTCUT PANEL */}
+                    {/* 🚀 SUPER-POWERED INLINE RULE PANEL: Trigger, Public Reply, DM Body & PDF Upload */}
                     {post.botMode === 'instant_shortcut' && (
-                      <div className="p-3 bg-gray-950 rounded-xl border border-gray-800/60 mt-2 space-y-2 animate-fade-in">
+                      <div className="p-3.5 bg-gray-950 rounded-xl border border-pink-500/20 mt-2 space-y-2.5 animate-fade-in text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-pink-400 uppercase mb-1">Trigger Keyword *</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-pink-500" 
+                              placeholder="e.g. LINK, PRICE, BOOK" 
+                              value={post.chatBotKeyword || ''} 
+                              onChange={(e) => updateInlineValue(post.id, 'chatBotKeyword', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Public Comment Reply (Optional)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-pink-500" 
+                              placeholder="e.g. Check your DM! 📩" 
+                              value={post.publicReply !== undefined ? post.publicReply : 'Check your DM! Details sent. 📩'} 
+                              onChange={(e) => updateInlineValue(post.id, 'publicReply', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
                         <div>
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Comment Trigger Word *</label>
-                          <input 
-                            type="text" 
-                            className="w-full bg-[#0a0a0a] border border-gray-800 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-pink-500" 
-                            placeholder="e.g. MAP, PRICE" 
-                            value={post.chatBotKeyword || ''} 
-                            onChange={(e) => updateInlineValue(post.id, 'chatBotKeyword', e.target.value)}
+                          <label className="block text-[10px] font-bold text-purple-400 uppercase mb-1">DM Message Body (Customer Inbox)</label>
+                          <textarea 
+                            rows="2"
+                            className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-purple-500" 
+                            placeholder="Here is your requested asset package link details:" 
+                            value={post.chatBotReply !== undefined ? post.chatBotReply : 'Here is your requested asset package link details:'} 
+                            onChange={(e) => updateInlineValue(post.id, 'chatBotReply', e.target.value)}
                           />
                         </div>
+
                         <div>
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Destination Link URL *</label>
-                          <input 
-                            type="url" 
-                            className="w-full bg-[#0a0a0a] border border-gray-800 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-pink-500" 
-                            placeholder="https://newpropertyhub.in/map.pdf" 
-                            value={post.fileUrl || ''} 
-                            onChange={(e) => updateInlineValue(post.id, 'fileUrl', e.target.value)}
-                          />
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Link URL / Upload PDF File</label>
+                          <div className="flex gap-2">
+                            <input 
+                              type="url" 
+                              className="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-pink-500" 
+                              placeholder="https://... or upload PDF below" 
+                              value={post.fileUrl || ''} 
+                              onChange={(e) => updateInlineValue(post.id, 'fileUrl', e.target.value)}
+                            />
+                            <label className="bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold px-3 rounded-lg cursor-pointer flex items-center justify-center border border-gray-700 whitespace-nowrap text-xs">
+                              {isUploadingPdf ? 'Uploading...' : '📎 Upload PDF'}
+                              <input 
+                                type="file" 
+                                accept=".pdf,.png,.jpg,.jpeg" 
+                                className="hidden" 
+                                onChange={(e) => handleCardPdfUpload(post.id, e.target.files[0])} 
+                                disabled={isUploadingPdf} 
+                              />
+                            </label>
+                          </div>
                         </div>
+
                         <button 
                           type="button"
-                          onClick={() => handleInlineShortcutSave(post, post.chatBotKeyword, post.fileUrl)}
-                          className="w-full py-1 bg-gradient-to-r from-pink-600 to-purple-600 text-[10px] font-black text-white rounded-md uppercase tracking-wider shadow-md hover:opacity-90 transition-all mt-1"
+                          onClick={() => handleInlineShortcutSave(post)}
+                          className="w-full py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-xs font-bold text-white rounded-lg uppercase tracking-wider shadow-md hover:opacity-95 transition-all mt-1 flex items-center justify-center gap-1.5"
                         >
-                          ⚡ Save Shortcut Rule
+                          ⚡ Save Automation Rule (Public Reply + DM + PDF)
                         </button>
                       </div>
                     )}
