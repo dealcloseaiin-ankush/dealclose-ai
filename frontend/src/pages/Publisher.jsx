@@ -109,14 +109,16 @@ export default function Publisher() {
 
   useEffect(() => {
     if (view === 'list') {
-      syncInstagramPosts().finally(fetchPosts);
+      fetchPosts();
     } else if (view === 'analytics') {
-      // Render saved metrics immediately; refresh from Meta in the background.
-      // Waiting for every live-insight request left this screen blank for too long.
       fetchAnalytics();
-      syncInstagramPosts(false, true).then(fetchAnalytics);
     }
-  }, [filter, view, fetchPosts, fetchAnalytics, syncInstagramPosts]);
+  }, [filter, view, fetchPosts, fetchAnalytics]);
+
+  // Initial silent background sync on component mount
+  useEffect(() => {
+    syncInstagramPosts();
+  }, [syncInstagramPosts]);
 
   // A publish job completes asynchronously. Refresh while one is in flight so
   // the Publisher switches to "published" without requiring a manual reload.
