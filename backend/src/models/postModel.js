@@ -49,6 +49,12 @@ const postSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// ✅ HIGH PERFORMANCE COMPOUND INDEXES to prevent MongoDB Sort 32MB Memory Limit Exceeded errors
+postSchema.index({ userId: 1, isDeleted: 1, workspaceId: 1, status: 1, publishedAt: -1 });
+postSchema.index({ userId: 1, isDeleted: 1, publishedAt: -1, createdAt: -1 });
+postSchema.index({ userId: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ userId: 1, _id: -1 });
+
 const Post = mongoose.model('Post', postSchema);
 
 module.exports = Post;

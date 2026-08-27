@@ -133,14 +133,12 @@ exports.getPosts = async (req, res) => {
     }
     console.log("🔍 [POST DEBUGGER] 3. Final MongoDB query being executed:", JSON.stringify(query));
 
-    // ✅ PERFORMANCE FIX: Limit the number of posts fetched at once to prevent overload.
-    // Changed limit from 100 to 20. We can add full pagination later if needed.
-    const posts = await Post.find(query).limit(20).lean();
-    posts.sort((a, b) => {
-      const aDate = new Date(a.publishedAt || a.scheduledAt || a.createdAt || 0).getTime();
-      const bDate = new Date(b.publishedAt || b.scheduledAt || b.createdAt || 0).getTime();
-      return bDate - aDate;
-    });
+    // ✅ PERFORMANCE FIX: Exclude huge designJson from list query to prevent 32MB sort limit
+    const posts = await Post.find(query)
+      .select('-designJson')
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
 
     // Resolve the right Instagram config for a given workspaceId (root vs sub-workspace).
     const user = await User.findById(userId).lean();
@@ -529,7 +527,11 @@ exports.getPostAnalytics = async (req, res) => {
       query.workspaceId = 'main';
     }
 
-    const posts = await Post.find(query).sort({ publishedAt: -1, createdAt: -1 }).lean();
+    const posts = await Post.find(query)
+      .select('caption mediaUrls publishedAt createdAt status analytics platformPostIds workspaceId userId')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
 
     if (posts.length === 0) {
       return res.status(200).json({ success: true, analytics: { totalReach: 0, totalLikes: 0, totalComments: 0, totalSaves: 0, totalProfileVisits: 0, engagementRate: 0, topPosts: [], bestTimeToPost: 'N/A', aiRecommendation: 'Not enough data to generate recommendations. Publish more posts to get insights.' } });
