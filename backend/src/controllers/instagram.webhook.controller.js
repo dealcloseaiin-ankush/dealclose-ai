@@ -1131,16 +1131,16 @@ with whatever information is available (leave budget field empty/null if not pro
                     console.log("👉 LOGIN TYPE:", loginType);
                     console.log("====================================================");
                     
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg, loginType); // ✅ FIX: Pass loginType
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, compiledShortcutMsg, loginType, igUserId);
                     dmSentSuccessfully = true;
                  } 
                  else if (matchedRule.deliveryMode === 'button') { // This is a DM
                     const fallbackText = `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}`;
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText, loginType);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, fallbackText, loginType, igUserId);
                     dmSentSuccessfully = true;
                  }
                  else { // This is a DM
-                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, finalReplyMsg, loginType);
+                    await metaAdsService.sendInstagramCommentPrivateReply(igToken, igPageId, commentData.id, finalReplyMsg, loginType, igUserId);
                     dmSentSuccessfully = true;
                  }
                }
@@ -1150,23 +1150,22 @@ with whatever information is available (leave budget field empty/null if not pro
                  status: replyErr.response?.status,
                  data: replyErr.response?.data,
                  pageId: igPageId,
-                 commentId: commentData.id
+                 commentId: commentData.id,
+                 igUserId
                });
              }
 
-             if (dmSentSuccessfully) {
-               try {
-                 // ✅ FIX 3a: matched-rule public comment reply now checks both native-login values
-                 const commentReplyUrl = isInstagramNativeLogin(loginType)
-                    ? `https://graph.instagram.com/v21.0/${commentData.id}/replies`
-                    : `https://graph.facebook.com/v19.0/${commentData.id}/replies`;
-                 await axios.post(commentReplyUrl, {
-                     message: matchedRule.publicReply || `Hey @${username}, we've sent you a DM with the details! 📩`,
-                     access_token: igToken
-                 }, { params: { access_token: igToken } });
-               } catch (publicErr) {
-                 console.error("❌ [Meta Public Reply Comment Error]:", publicErr.message);
-               }
+             // Always fire Public Comment Reply on the post
+             try {
+               const commentReplyUrl = isInstagramNativeLogin(loginType)
+                  ? `https://graph.instagram.com/v21.0/${commentData.id}/replies`
+                  : `https://graph.facebook.com/v19.0/${commentData.id}/replies`;
+               await axios.post(commentReplyUrl, {
+                   message: matchedRule.publicReply || `Hey @${username}, we've sent you a DM with the details! 📩`
+               }, { params: { access_token: igToken } });
+               console.log(`✅ [Meta Public Reply Sent]: Posted public reply to @${username}`);
+             } catch (publicErr) {
+               console.error("❌ [Meta Public Reply Comment Error]:", publicErr.response?.data || publicErr.message);
              }
              
              const finalLoggedMsg = (matchedRule.deliveryMode === 'instant_shortcut' || matchedRule.deliveryMode === 'direct') 

@@ -28,13 +28,10 @@ exports.sendInstagramDM = async (accessToken, recipientId, messageText) => {
   }
 };
 
-// 2. 🚀 FIXED: Send Private DM Reply safely via Recipient Comment ID Token Link
-exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText, loginType = 'facebook_business') => {
+// 2. 🚀 FIXED: Send Private DM Reply safely via Direct IG User ID or Recipient Comment ID
+exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId, messageText, loginType = 'facebook_business', igUserId = null) => {
   if (!accessToken) {
     throw new Error("[PRIVATE_REPLY] Missing access token");
-  }
-  if (!commentId) {
-    throw new Error("[PRIVATE_REPLY] Missing comment ID");
   }
 
   const isNative = loginType === 'instagram_basic_display' || loginType === 'instagram_business_login';
@@ -42,16 +39,34 @@ exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId
     ? `https://graph.instagram.com/v21.0/me/messages`
     : (pageId ? `https://graph.facebook.com/v19.0/${pageId}/messages` : `https://graph.facebook.com/v19.0/me/messages`);
 
-  console.log("\n[PRIVATE REPLY REQUEST] URL:", url, "loginType:", loginType);
-  console.log("[PRIVATE REPLY REQUEST] token snippet:", `${accessToken.slice(0, 12)}...${accessToken.slice(-12)}`);
-  console.log("[PRIVATE REPLY REQUEST] payload:", {
-    recipient: { comment_id: commentId },
-    message: { text: messageText },
-    messaging_type: "RESPONSE"
-  });
+  console.log("\n[PRIVATE REPLY REQUEST] URL:", url, "loginType:", loginType, "igUserId:", igUserId, "commentId:", commentId);
 
-  try {
-    const response = await axios.post(
+  // Strategy 1: Direct DM to commenter's Instagram User ID
+  if (igUserId) {
+    try {
+      console.log(`[PRIVATE REPLY] Strategy 1: Sending DM to IG User ID: ${igUserId}`);
+      const directResponse = await axios.post(
+        url,
+        {
+          recipient: { id: igUserId },
+          message: { text: messageText }
+        },
+        {
+          params: { access_token: accessToken },
+          headers: { Authorization: `Bearer ${accessToken}` }
+        }
+      );
+      console.log("✅ [PRIVATE REPLY SUCCESS - DIRECT USER ID]:", directResponse.data);
+      return directResponse.data;
+    } catch (directErr) {
+      console.warn(`⚠️ [PRIVATE REPLY DIRECT ID]:`, directErr.response?.data?.error?.message || directErr.message);
+    }
+  }
+
+  // Strategy 2: Reply via comment_id token link
+  if (commentId) {
+    console.log(`[PRIVATE REPLY] Strategy 2: Sending private reply to Comment ID: ${commentId}`);
+    const commentResponse = await axios.post(
       url,
       {
         recipient: { comment_id: commentId },
@@ -59,31 +74,12 @@ exports.sendInstagramCommentPrivateReply = async (accessToken, pageId, commentId
         messaging_type: "RESPONSE"
       },
       {
-        params: { access_token: accessToken }
+        params: { access_token: accessToken },
+        headers: { Authorization: `Bearer ${accessToken}` }
       }
     );
-    console.log("[PRIVATE REPLY SUCCESS] response:", response.data);
-    return response.data;
-  } catch (error) {
-    const metaErr = error.response?.data?.error;
-    console.error("[PRIVATE REPLY ERROR] request failed", {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-      pageId,
-      commentId,
-      tokenSnippet: accessToken ? `${accessToken.slice(0, 12)}...${accessToken.slice(-12)}` : null
-    });
-    if (metaErr) {
-      console.error("[PRIVATE REPLY ERROR] meta error details", {
-        type: metaErr.type,
-        code: metaErr.code,
-        subcode: metaErr.error_subcode,
-        message: metaErr.message,
-        fbtrace_id: metaErr.fbtrace_id
-      });
-    }
-    throw error;
+    console.log("✅ [PRIVATE REPLY SUCCESS - COMMENT ID]:", commentResponse.data);
+    return commentResponse.data;
   }
 };
 
