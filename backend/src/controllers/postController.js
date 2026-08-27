@@ -9,31 +9,35 @@ const normalizeWorkspaceId = (workspaceId) => (workspaceId === 'main_business' ?
 const isMainWorkspaceId = (workspaceId) => !workspaceId || workspaceId === 'main' || workspaceId === 'main_business';
 
 const migrateLegacyPosts = async (userId) => {
-  const legacyPosts = await SocialPost.find({ userId }).lean();
-  for (const legacy of legacyPosts) {
-    if (await Post.exists({ legacySocialPostId: legacy._id })) continue;
-    const duplicate = legacy.platformPostIds?.instagram
-      ? await Post.findOne({ userId, 'platformPostIds.instagram': legacy.platformPostIds.instagram })
-      : null;
-    if (duplicate) {
-      await Post.updateOne({ _id: duplicate._id }, { $set: { legacySocialPostId: legacy._id } });
-      continue;
+  try {
+    const legacyPosts = await SocialPost.find({ userId }).lean();
+    for (const legacy of legacyPosts) {
+      if (await Post.exists({ legacySocialPostId: legacy._id })) continue;
+      const duplicate = legacy.platformPostIds?.instagram
+        ? await Post.findOne({ userId, 'platformPostIds.instagram': legacy.platformPostIds.instagram })
+        : null;
+      if (duplicate) {
+        await Post.updateOne({ _id: duplicate._id }, { $set: { legacySocialPostId: legacy._id } });
+        continue;
+      }
+      await Post.create({
+        userId,
+        workspaceId: legacy.workspaceId || 'main',
+        caption: legacy.caption,
+        mediaUrls: legacy.mediaUrls || [],
+        platforms: legacy.platforms || [],
+        status: legacy.status || 'draft',
+        scheduledAt: legacy.scheduledAt,
+        publishedAt: legacy.publishedAt,
+        platformPostIds: legacy.platformPostIds || {},
+        failureReason: legacy.failureReason,
+        legacySocialPostId: legacy._id,
+        createdAt: legacy.createdAt,
+        updatedAt: legacy.updatedAt,
+      });
     }
-    await Post.create({
-      userId,
-      workspaceId: legacy.workspaceId || 'main',
-      caption: legacy.caption,
-      mediaUrls: legacy.mediaUrls || [],
-      platforms: legacy.platforms || [],
-      status: legacy.status || 'draft',
-      scheduledAt: legacy.scheduledAt,
-      publishedAt: legacy.publishedAt,
-      platformPostIds: legacy.platformPostIds || {},
-      failureReason: legacy.failureReason,
-      legacySocialPostId: legacy._id,
-      createdAt: legacy.createdAt,
-      updatedAt: legacy.updatedAt,
-    });
+  } catch (err) {
+    console.warn(`[MigrateLegacyPosts] Skipped: ${err.message}`);
   }
 };
 
