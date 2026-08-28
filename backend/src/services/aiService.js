@@ -11,10 +11,10 @@ const openai = new OpenAI({
 
 // 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Model (Fast & Cheap)
-  GEMINI_3_5_FLASH: 'gemini-3.5-flash',      // Priority 2: Standard 3.5 Flash Model
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 3: Secondary Flash-Lite Model
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Tools & Fallback Model
+  GEMINI_3_7_FLASH: 'gemini-3.7-flash',          // Priority 1: High-Speed Agentic & Reasoning
+  GEMINI_3_5_FLASH_LITE: 'gemini-3.5-flash-lite',// Priority 2: Ultra Low-Cost High-Volume Chat
+  GEMINI_2_FLASH: 'gemini-2.0-flash',            // Priority 3: Stable Fallback Model
+  OPENAI_MINI: 'gpt-4o-mini',                    // Priority 4: OpenAI Tools & Fallback Model
 };
 
 /**
@@ -49,9 +49,9 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     // 🚀 DYNAMIC GEMINI MULTI-MODEL FALLBACK (3.5 Lite -> 3.5 Flash -> 3.1 Lite)
     if (genAI) {
       const geminiOrder = [
-        MODELS.GEMINI_3_5_LITE,
-        MODELS.GEMINI_3_5_FLASH,
-        MODELS.GEMINI_3_1_LITE,
+        MODELS.GEMINI_3_7_FLASH,
+        MODELS.GEMINI_3_5_FLASH_LITE,
+        MODELS.GEMINI_2_FLASH,
       ];
 
       for (const modelName of geminiOrder) {
