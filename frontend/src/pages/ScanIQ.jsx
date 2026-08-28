@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Flame, Target, AlertTriangle, CheckCircle, BarChart3, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import api from '../services/api';
 
 export default function ScanIQ() {
   const [keyword, setKeyword] = useState('');
@@ -13,17 +14,7 @@ export default function ScanIQ() {
     setIsScanning(true);
     
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/scaniq/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ query: keyword })
-      });
-      
-      const data = await res.json();
+      const { data } = await api.post('/scaniq/search', { query: keyword });
       
       if (data.success && data.analysis) {
         setScannedAds([{

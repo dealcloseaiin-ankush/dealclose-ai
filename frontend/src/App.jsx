@@ -68,6 +68,9 @@ const InstagramOAuthCallback = lazyWithRetry(() => import('./pages/InstagramOAut
 const MetaAdsManager = lazyWithRetry(() => import('./pages/MetaAdsManager'));
 const BillingPage = lazyWithRetry(() => import('./pages/BillingPage'));
 const ChangePassword = lazyWithRetry(() => import('./pages/ChangePassword'));
+const PricingPage = lazyWithRetry(() => import('./pages/PricingPage'));
+const ComparePage = lazyWithRetry(() => import('./pages/ComparePage'));
+const IndustryPage = lazyWithRetry(() => import('./pages/IndustryPage'));
 
 // Smart Redirects for Logged In Users
 const PublicRoute = ({ children }) => {
@@ -207,6 +210,11 @@ export default function App() {
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/compare" element={<ComparePage />} />
+          <Route path="/compare/:competitor" element={<ComparePage />} />
+          <Route path="/industries" element={<IndustryPage />} />
+          <Route path="/industries/:industryKey" element={<IndustryPage />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/help" element={<Help />} />
