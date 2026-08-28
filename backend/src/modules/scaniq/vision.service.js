@@ -6,10 +6,10 @@ const scraperService = require('./scraper.service');
 
 // 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_2_FLASH: 'gemini-2.0-flash',        // Priority 1: Primary Fast Vision Model
-  GEMINI_1_5_FLASH: 'gemini-1.5-flash',      // Priority 2: Secondary Vision Model
-  GEMINI_1_5_PRO: 'gemini-1.5-pro',          // Priority 3: Deep Reasoning Model
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Vision Fallback
+  GEMINI_3_7_FLASH: 'gemini-3.7-flash',          // Priority 1: Primary Agentic & Vision Model
+  GEMINI_3_5_FLASH_LITE: 'gemini-3.5-flash-lite',// Priority 2: Ultra Low-Cost Fast Chat & Scan
+  GEMINI_2_FLASH: 'gemini-2.0-flash',            // Priority 3: Stable Fallback Model
+  OPENAI_MINI: 'gpt-4o-mini',                    // Priority 4: OpenAI Vision Fallback
 };
 
 exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) => {
@@ -60,9 +60,9 @@ exports.analyzeImage = async (imageUrl, platform, scanType, scrapedData = null) 
 
     if (imagePart) {
       const geminiOrder = [
+        MODELS.GEMINI_3_7_FLASH,
+        MODELS.GEMINI_3_5_FLASH_LITE,
         MODELS.GEMINI_2_FLASH,
-        MODELS.GEMINI_1_5_FLASH,
-        MODELS.GEMINI_1_5_PRO,
       ];
 
       for (const modelName of geminiOrder) {
@@ -215,9 +215,9 @@ exports.searchAndCompareAd = async (query, userAdUrl) => {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
       const geminiOrder = [
+        MODELS.GEMINI_3_7_FLASH,
+        MODELS.GEMINI_3_5_FLASH_LITE,
         MODELS.GEMINI_2_FLASH,
-        MODELS.GEMINI_1_5_FLASH,
-        MODELS.GEMINI_1_5_PRO,
       ];
 
       for (const modelName of geminiOrder) {
