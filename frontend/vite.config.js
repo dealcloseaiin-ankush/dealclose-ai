@@ -21,8 +21,26 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         theme_color: '#050505',
-        background_color: '#050505',
-        icons: [{ src: '/vite.svg', sizes: '192x192', type: 'image/svg+xml' }]
+        icons: [
+          {
+            src: '/logo.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/logo.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/logo.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ]
       }
     })
   ],

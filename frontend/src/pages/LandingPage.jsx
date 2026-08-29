@@ -194,8 +194,8 @@ export default function LandingPage() {
       <nav className="border-b border-gray-900/80 bg-black/70 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-purple-500/20 font-black text-black text-lg">
-              ⚡
+            <div className="w-9 h-9 rounded-xl bg-white p-0.5 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
+              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
             </div>
             <span className="font-extrabold text-xl tracking-tight text-white">DealClose<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400"> AI</span></span>
           </Link>
@@ -205,6 +205,9 @@ export default function LandingPage() {
             <Link to="/industries" className="hover:text-white transition-colors">Industries</Link>
             <Link to="/compare" className="hover:text-white transition-colors">Compare vs Others</Link>
             <Link to="/pricing" className="hover:text-white transition-colors">Pricing</Link>
+            <Link to="/mobile" className="text-emerald-400 hover:text-emerald-300 font-black transition-colors flex items-center gap-1">
+              <Smartphone size={14} /> Mobile App (PWA)
+            </Link>
             <button 
               onClick={() => setIsScannerOpen(true)}
               className="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
@@ -212,16 +215,18 @@ export default function LandingPage() {
               <Flame size={14} /> Ad Spy Scanner
             </button>
             <Link to="/about" className="hover:text-white transition-colors">About</Link>
-            <Link to="/help" className="hover:text-white transition-colors">Help</Link>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <Link to="/mobile" className="text-xs font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 hover:bg-emerald-900/60 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1">
+              <Smartphone size={13} /> Open App
+            </Link>
             <Link to="/login" className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-lg border border-gray-800 hover:border-gray-700 transition-all">
               Login
             </Link>
             <Link to="/register" className="text-xs font-bold text-black bg-gradient-to-r from-emerald-400 to-teal-300 px-4 py-2 rounded-lg shadow-md hover:opacity-95 transition-all">
-              Start Free Trial
+              Start Free
             </Link>
           </div>
         </div>
@@ -248,6 +253,12 @@ export default function LandingPage() {
             className="px-8 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-300 text-black font-black text-xs sm:text-sm rounded-xl shadow-xl hover:opacity-95 transition-all flex items-center gap-2"
           >
             Start 14-Day Free Trial <ArrowRight size={16} />
+          </Link>
+          <Link
+            to="/mobile"
+            className="px-6 py-3.5 bg-purple-950/80 border border-purple-500/50 text-purple-200 font-black text-xs sm:text-sm rounded-xl hover:bg-purple-900/80 hover:text-white transition-all flex items-center gap-2 shadow-lg"
+          >
+            <Smartphone size={16} className="text-emerald-400" /> Open / Install Mobile App 📱
           </Link>
           <button
             onClick={() => setIsScannerOpen(true)}
