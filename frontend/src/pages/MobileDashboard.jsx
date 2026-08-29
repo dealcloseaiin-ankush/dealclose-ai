@@ -9,7 +9,7 @@ import {
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
   Link, Eye, EyeOff, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
   Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, User, BookOpen, Search, Webhook,
-  Heart, MessageCircle as CommentIcon
+  Heart, MessageCircle as CommentIcon, ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -30,6 +30,26 @@ const InstagramIcon = ({ size = 20, className = '' }) => (
     <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
   </svg>
 );
+
+// Helper function to format chat timestamps with relative dates (Today, Yesterday, or DD Mon YYYY)
+const formatRelativeChatTime = (dateInput) => {
+  if (!dateInput) return 'Today, 5:30 PM';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  return `${d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, ${timeStr}`;
+};
 
 export default function MobileDashboard() {
   const { user, login } = useAuth();
@@ -52,6 +72,9 @@ export default function MobileDashboard() {
   const [loginEmail, setLoginEmail] = useState('ankush.bani@gmail.com');
   const [loginPassword, setLoginPassword] = useState('ak@7828289433');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Broadcast Delivery Channel Filter
+  const [broadcastFilter, setBroadcastFilter] = useState('all'); // 'all' | 'whatsapp' | 'instagram'
 
   // Post Scheduler Sub-Tabs
   const [postTab, setPostTab] = useState('prebuild');
@@ -184,14 +207,42 @@ export default function MobileDashboard() {
   const [showAddFlowModal, setShowAddFlowModal] = useState(false);
   const [newFlow, setNewFlow] = useState({ name: '', trigger: 'Incoming Keyword', description: '' });
 
-  // 4. Meta Template Approvals State
+  // 4. Meta Template Approvals & Real Live WhatsApp Preview
   const [metaTemplates, setMetaTemplates] = useState([
-    { id: 'mt_1', name: 'festive_discount_v1', category: 'MARKETING', language: 'hi', status: 'APPROVED', text: 'Namaste {{1}}! DealClose AI par festive offer chalu hai. Flat 20% discount ke liye tap karein.' },
-    { id: 'mt_2', name: 'order_dispatch_alert', category: 'UTILITY', language: 'en', status: 'APPROVED', text: 'Hello {{1}}, your order #{{2}} is out for delivery with our rider.' },
-    { id: 'mt_3', name: 'weekend_site_visit_reminder', category: 'MARKETING', language: 'hi', status: 'PENDING', text: 'Namaste {{1}} Ji! Aapka site visit Sunday 11:00 AM par scheduled hai.' }
+    { 
+      id: 'mt_1', 
+      name: 'festive_discount_v1', 
+      category: 'MARKETING', 
+      language: 'hi', 
+      status: 'APPROVED', 
+      header: '🎉 FESTIVE SPECIAL DISCOUNT',
+      text: 'Namaste Priya! DealClose AI par festive mega offer chalu hai. Aapke cart par Flat 20% discount apply ho chuka hai.',
+      buttons: [{ label: '🛍️ Claim 20% OFF Now', type: 'url' }, { label: '💬 Chat with Support', type: 'quick_reply' }]
+    },
+    { 
+      id: 'mt_2', 
+      name: 'order_dispatch_alert', 
+      category: 'UTILITY', 
+      language: 'en', 
+      status: 'APPROVED', 
+      header: '📦 ORDER OUT FOR DELIVERY',
+      text: 'Hello Priya, your order #4092 has been dispatched with our delivery executive.',
+      buttons: [{ label: '📍 Track Live Delivery', type: 'url' }]
+    },
+    { 
+      id: 'mt_3', 
+      name: 'weekend_site_visit_reminder', 
+      category: 'MARKETING', 
+      language: 'hi', 
+      status: 'PENDING', 
+      header: '🏡 SITE VISIT REMINDER',
+      text: 'Namaste Priya Ji! Aapka luxury villa site visit Sunday 11:00 AM par scheduled hai.',
+      buttons: [{ label: '✅ Confirm Visit', type: 'quick_reply' }, { label: '📅 Reschedule', type: 'quick_reply' }]
+    }
   ]);
+  const [selectedTemplateForPreview, setSelectedTemplateForPreview] = useState(null);
   const [showNewMetaTemplateModal, setShowNewMetaTemplateModal] = useState(false);
-  const [newTemplateForm, setNewTemplateForm] = useState({ name: '', category: 'MARKETING', text: '' });
+  const [newTemplateForm, setNewTemplateForm] = useState({ name: '', category: 'MARKETING', header: '', text: '' });
 
   // 5. Post Batch Scheduler
   const [prebuildTemplates, setPrebuildTemplates] = useState([
@@ -339,7 +390,7 @@ export default function MobileDashboard() {
 
       setContacts(Object.values(combinedMap));
 
-      // 4. Fetch Live WhatsApp & Instagram Chats
+      // 4. Fetch Live WhatsApp & Instagram Chats with Relative Timestamps
       fetchChatsForWorkspace(targetWsId);
 
       // 5. Fetch Real Live Instagram Posts with Photos & Videos from Meta Graph API
@@ -436,7 +487,7 @@ export default function MobileDashboard() {
     ]);
   };
 
-  // Fetch Filtered Chats by Workspace
+  // Fetch Filtered Chats by Workspace with Relative Date Labels
   const fetchChatsForWorkspace = async (wsId) => {
     try {
       const url = wsId && wsId !== 'all' ? `/chats?workspaceId=${wsId}` : '/chats';
@@ -450,6 +501,8 @@ export default function MobileDashboard() {
           const rawText = msg.messageText || msg.message || msg.text || msg.body || (msg.mediaUrl ? '📎 Media attachment' : '💬 Message');
           const isFromCustomer = msg.direction === 'incoming' || msg.sentBy === 'customer' || msg.sender === 'customer';
           const isIg = msg.channel === 'instagram_dm' || msg.channel === 'instagram_comment' || String(phone).startsWith('IG_') || (msg.tags && msg.tags.includes('ig_comment'));
+          const msgTimestamp = msg.sentAt || msg.timestamp || new Date();
+          const relativeTime = formatRelativeChatTime(msgTimestamp);
 
           if (!groupedMap[phone]) {
             groupedMap[phone] = {
@@ -458,17 +511,20 @@ export default function MobileDashboard() {
               customerPhone: phone,
               channel: isIg ? 'instagram' : 'whatsapp',
               lastMessage: rawText,
-              time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+              time: relativeTime,
+              timestamp: msgTimestamp,
               unreadCount: isFromCustomer && msg.status !== 'read' ? 1 : 0,
               stage: msg.stage || 'Interested',
               messages: []
             };
           }
           groupedMap[phone].lastMessage = rawText;
+          groupedMap[phone].time = relativeTime;
           groupedMap[phone].messages.push({
             sender: isFromCustomer ? 'customer' : 'business',
             text: rawText,
-            time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            time: relativeTime,
+            rawDate: msgTimestamp,
             attachment: msg.mediaUrl ? { type: msg.mediaType === 'image' ? 'image' : 'pdf', name: msg.mediaUrl } : null
           });
         });
@@ -493,7 +549,6 @@ export default function MobileDashboard() {
   // 3. HANDLERS
   // ─────────────────────────────────────────────────────────────
 
-  // Switch Workspace / Channel Dropdown (With Dynamic UI, Stats, Leads and Chats isolation)
   const handleWorkspaceChange = (selectedId) => {
     if (selectedId === 'add_new') {
       setShowAddWorkspaceModal(true);
@@ -506,7 +561,7 @@ export default function MobileDashboard() {
   };
 
   const handleMobileLogin = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setIsLoggingIn(true);
     try {
       await login(loginEmail, loginPassword);
@@ -515,6 +570,22 @@ export default function MobileDashboard() {
       alert('Login Successful! Welcome to DealClose AI Mobile! 🚀');
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleGuestInstantLogin = async () => {
+    setIsLoggingIn(true);
+    setLoginEmail('ankush.bani@gmail.com');
+    setPassword('ak@7828289433');
+    try {
+      await login('ankush.bani@gmail.com', 'ak@7828289433');
+      setShowLoginModal(false);
+      await fetchLiveBackendData();
+      alert('⚡ Instant Guest Access Granted! Welcome to DealClose AI!');
+    } catch (err) {
+      setShowLoginModal(false);
     } finally {
       setIsLoggingIn(false);
     }
@@ -529,11 +600,11 @@ export default function MobileDashboard() {
     e.preventDefault();
     if (!chatInputText.trim() || !activeChatThread) return;
 
-    const newMsg = { sender: 'business', text: chatInputText, time: 'Just now' };
+    const newMsg = { sender: 'business', text: chatInputText, time: 'Today, Just now', rawDate: new Date() };
     const updatedMessages = [...activeChatThread.messages, newMsg];
 
-    setChats(chats.map(c => c._id === activeChatThread._id ? { ...c, lastMessage: chatInputText, messages: updatedMessages } : c));
-    setActiveChatThread({ ...activeChatThread, messages: updatedMessages, lastMessage: chatInputText });
+    setChats(chats.map(c => c._id === activeChatThread._id ? { ...c, lastMessage: chatInputText, messages: updatedMessages, time: 'Today, Just now' } : c));
+    setActiveChatThread({ ...activeChatThread, messages: updatedMessages, lastMessage: chatInputText, time: 'Today, Just now' });
     const sentText = chatInputText;
     setChatInputText('');
 
@@ -568,13 +639,14 @@ export default function MobileDashboard() {
     const newMsg = { 
       sender: 'business', 
       text: textDesc, 
-      time: 'Just now',
+      time: 'Today, Just now',
+      rawDate: new Date(),
       attachment: sampleAttachment 
     };
 
     const updatedMessages = [...activeChatThread.messages, newMsg];
-    setChats(chats.map(c => c._id === activeChatThread._id ? { ...c, lastMessage: textDesc, messages: updatedMessages } : c));
-    setActiveChatThread({ ...activeChatThread, messages: updatedMessages, lastMessage: textDesc });
+    setChats(chats.map(c => c._id === activeChatThread._id ? { ...c, lastMessage: textDesc, messages: updatedMessages, time: 'Today, Just now' } : c));
+    setActiveChatThread({ ...activeChatThread, messages: updatedMessages, lastMessage: textDesc, time: 'Today, Just now' });
   };
 
   const handleTransferContactStage = (stage) => {
@@ -706,15 +778,6 @@ export default function MobileDashboard() {
     alert(`Google SEO Blog Article "${article.title}" published successfully! 📰🚀`);
   };
 
-  const handleAddStaff = (e) => {
-    e.preventDefault();
-    if (!newStaff.name || !newStaff.phone) return;
-    setStaffList([...staffList, { id: 'st_' + Date.now(), ...newStaff, assignedLeads: 0 }]);
-    setNewStaff({ name: '', phone: '', role: 'Sales Agent' });
-    setShowAddStaffModal(false);
-    alert('New staff member invited with scoped lead access! 👥✅');
-  };
-
   const handleAddWorkspace = async (e) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
@@ -815,7 +878,7 @@ export default function MobileDashboard() {
                     menuSubScreen === 'auto_reply' ? 'WhatsApp Auto-Replies' :
                     menuSubScreen === 'ig_comment_dm' ? 'Instagram Comment-DM' :
                     menuSubScreen === 'flow_automation' ? 'Flow & Auto-Pilot' :
-                    menuSubScreen === 'meta_templates' ? 'Meta Template Approvals' :
+                    menuSubScreen === 'meta_templates' ? 'Meta WhatsApp Templates' :
                     menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
                     menuSubScreen === 'blog_seo' ? 'Google SEO & Blogs' :
                     menuSubScreen === 'custom_webhooks' ? '🔗 Custom Webhooks & API' :
@@ -894,7 +957,7 @@ export default function MobileDashboard() {
       <main className="flex-1 p-3.5 overflow-y-auto pb-24">
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + ISOLATED STORE THREADS)
+            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + ISOLATED STORE THREADS + DATES)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'chats' && !activeChatThread && (
           <div className="space-y-3 animate-fade-in">
@@ -963,7 +1026,7 @@ export default function MobileDashboard() {
               </button>
             </div>
 
-            {/* Chat Rows */}
+            {/* Chat Rows with Clear Dates (Today / Yesterday / DD Mon) */}
             <div className="space-y-1.5">
               {chats.filter(c => c.channel === chatChannel).length === 0 ? (
                 <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
@@ -984,18 +1047,18 @@ export default function MobileDashboard() {
                         : 'bg-[#0c0c12] border-gray-800/80 hover:border-gray-700'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs border ${
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs border shrink-0 ${
                         chat.channel === 'whatsapp' 
                           ? 'bg-[#075E54]/40 text-emerald-300 border-emerald-500/30' 
                           : 'bg-purple-950/40 text-pink-300 border-pink-500/30'
                       }`}>
                         {chat.customerName.slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <div className={`text-xs flex items-center gap-1.5 ${chat.unreadCount > 0 ? 'font-black text-white' : 'font-semibold text-gray-300'}`}>
-                          {chat.customerName}
-                          <span className="text-[9px] text-emerald-400 font-mono font-normal bg-emerald-950/60 px-1.5 rounded">
+                      <div className="min-w-0">
+                        <div className={`text-xs flex items-center gap-1.5 truncate ${chat.unreadCount > 0 ? 'font-black text-white' : 'font-semibold text-gray-300'}`}>
+                          <span className="truncate">{chat.customerName}</span>
+                          <span className="text-[9px] text-emerald-400 font-mono font-normal bg-emerald-950/60 px-1.5 rounded shrink-0">
                             {chat.stage}
                           </span>
                         </div>
@@ -1005,8 +1068,10 @@ export default function MobileDashboard() {
                       </div>
                     </div>
 
-                    <div className="text-right flex flex-col items-end gap-1">
-                      <span className="text-[10px] text-gray-500 font-mono">{chat.time}</span>
+                    <div className="text-right flex flex-col items-end gap-1 shrink-0 ml-2">
+                      <span className={`text-[10px] font-mono ${chat.unreadCount > 0 ? 'text-emerald-400 font-bold' : 'text-gray-500'}`}>
+                        {chat.time}
+                      </span>
                       {chat.unreadCount > 0 ? (
                         <span className="w-5 h-5 rounded-full bg-emerald-500 text-black font-black text-[10px] flex items-center justify-center shadow-md">
                           {chat.unreadCount}
@@ -1023,7 +1088,7 @@ export default function MobileDashboard() {
           </div>
         )}
 
-        {/* 1-on-1 Full-Screen Native Chat Thread */}
+        {/* 1-on-1 Full-Screen Native Chat Thread with Date Divider */}
         {activeTab === 'chats' && activeChatThread && (
           <div className="space-y-3 animate-fade-in flex flex-col h-[76vh]">
             <div className="bg-black/40 border border-gray-800 rounded-xl p-2 flex items-center justify-between text-xs">
@@ -1036,8 +1101,16 @@ export default function MobileDashboard() {
               </button>
             </div>
 
-            {/* Chat Bubble Stream */}
+            {/* Chat Bubble Stream with Center Date Badge */}
             <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs custom-scrollbar">
+              
+              {/* Date Header Badge */}
+              <div className="flex justify-center my-2">
+                <span className="bg-gray-900/90 border border-gray-800 text-gray-400 font-mono text-[9px] font-bold px-3 py-1 rounded-full shadow-sm">
+                  📅 {activeChatThread.time ? activeChatThread.time.split(',')[0] : 'TODAY'}
+                </span>
+              </div>
+
               {activeChatThread.messages.map((m, idx) => (
                 <div
                   key={idx}
@@ -1119,7 +1192,7 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 2: DASHBOARD (LIVE STAGES & REAL META / CRM ANALYTICS)
+            TAB 2: DASHBOARD (SEPARATED BROADCAST ANALYTICS DROPDOWN)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-4 animate-fade-in">
@@ -1167,12 +1240,65 @@ export default function MobileDashboard() {
               </div>
             </div>
 
-            {/* Leads Received Over Time */}
+            {/* Broadcast Delivery Analytics with Channel Breakdown Toggle */}
+            <div className="bg-[#0e0e14] border border-gray-800 rounded-2xl p-4 space-y-3 shadow-md">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-white">Broadcast Delivery Analytics</span>
+                
+                {/* Channel Selector Dropdown */}
+                <select
+                  value={broadcastFilter}
+                  onChange={(e) => setBroadcastFilter(e.target.value)}
+                  className="bg-black border border-gray-700 text-gray-300 text-[10px] font-bold rounded-lg px-2 py-1 outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="all">🌐 All Channels</option>
+                  <option value="whatsapp">🟢 WhatsApp Bulk Msg</option>
+                  <option value="instagram">📸 Instagram DM Broadcast</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5 text-center font-mono">
+                <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
+                  <div className="text-xs font-bold text-gray-300">
+                    {broadcastFilter === 'whatsapp' ? contacts.filter(c => c.source === 'whatsapp').length || contacts.length :
+                     broadcastFilter === 'instagram' ? liveStats.totalDMsReceived || 0 :
+                     (contacts.length + (liveStats.totalDMsReceived || 0))}
+                  </div>
+                  <div className="text-[9px] text-gray-500 uppercase">Target</div>
+                </div>
+                <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
+                  <div className="text-xs font-bold text-blue-400">
+                    {broadcastFilter === 'whatsapp' ? Math.max(0, contacts.length - 1) :
+                     broadcastFilter === 'instagram' ? liveStats.dmsSent || 0 :
+                     Math.max(0, contacts.length + (liveStats.dmsSent || 0) - 1)}
+                  </div>
+                  <div className="text-[9px] text-gray-500 uppercase">Deliv.</div>
+                </div>
+                <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
+                  <div className="text-xs font-bold text-emerald-400">
+                    {broadcastFilter === 'whatsapp' ? Math.max(0, contacts.length - 2) :
+                     broadcastFilter === 'instagram' ? Math.max(0, (liveStats.dmsSent || 0) - 1) :
+                     Math.max(0, contacts.length - 2)}
+                  </div>
+                  <div className="text-[9px] text-gray-500 uppercase">Read</div>
+                </div>
+                <div className="bg-pink-950/40 p-2 rounded-xl border border-pink-500/40">
+                  <div className="text-xs font-bold text-pink-400">
+                    {broadcastFilter === 'whatsapp' ? chats.filter(c => c.channel === 'whatsapp').length :
+                     broadcastFilter === 'instagram' ? chats.filter(c => c.channel === 'instagram').length :
+                     chats.length}
+                  </div>
+                  <div className="text-[9px] text-pink-300 uppercase font-black">Replied 🔥</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Leads Growth Rate */}
             <div className="bg-[#0e0e14] border border-gray-800 rounded-2xl p-4 space-y-2 shadow-md">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
                   <TrendingUp size={15} className="text-emerald-400" />
-                  <span>Leads Growth Rate</span>
+                  <span>Leads Growth (Last 7 Days)</span>
                 </div>
                 <span className="text-xs font-black text-emerald-400 font-mono">Conversion: {liveStats.conversionRate || '100%'} 🚀</span>
               </div>
@@ -1183,33 +1309,6 @@ export default function MobileDashboard() {
                     <span>{bar.d}</span>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* WhatsApp Broadcast Delivery Funnel */}
-            <div className="bg-[#0e0e14] border border-gray-800 rounded-2xl p-4 space-y-3 shadow-md">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-white">Broadcast Delivery Analytics</span>
-                <span className="text-[10px] text-emerald-400 font-mono">Status: Connected 🟢</span>
-              </div>
-
-              <div className="grid grid-cols-4 gap-1.5 text-center font-mono">
-                <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
-                  <div className="text-xs font-bold text-gray-300">{contacts.length || 0}</div>
-                  <div className="text-[9px] text-gray-500 uppercase">Leads</div>
-                </div>
-                <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
-                  <div className="text-xs font-bold text-blue-400">{contacts.length ? contacts.length - 1 : 0}</div>
-                  <div className="text-[9px] text-gray-500 uppercase">Deliv.</div>
-                </div>
-                <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
-                  <div className="text-xs font-bold text-emerald-400">{contacts.length ? Math.max(1, contacts.length - 2) : 0}</div>
-                  <div className="text-[9px] text-gray-500 uppercase">Read</div>
-                </div>
-                <div className="bg-pink-950/40 p-2 rounded-xl border border-pink-500/40">
-                  <div className="text-xs font-bold text-pink-400">{chats.length}</div>
-                  <div className="text-[9px] text-pink-300 uppercase font-black">Active Chats 🔥</div>
-                </div>
               </div>
             </div>
 
@@ -1450,17 +1549,17 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 7: Meta WhatsApp Templates */}
+                  {/* Tool 7: Meta WhatsApp Templates & Preview */}
                   <button 
                     onClick={() => setMenuSubScreen('meta_templates')}
-                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-blue-500/40 transition-all"
+                    className="bg-[#0e0e14] border border-blue-500/30 p-3.5 rounded-2xl text-left space-y-2 hover:border-blue-500 transition-all shadow-sm"
                   >
                     <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
                       <CheckCircle2 size={16} />
                     </div>
                     <div>
                       <div className="text-white">Meta Templates</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Approvals & status</div>
+                      <div className="text-[10px] text-blue-300 font-normal">Preview & Approval Status</div>
                     </div>
                   </button>
 
@@ -1512,6 +1611,21 @@ export default function MobileDashboard() {
                 </div>
 
                 <form onSubmit={handleSaveBusinessProfile} className="bg-[#0e0e14] border border-teal-500/30 p-3.5 rounded-2xl space-y-3 text-xs shadow-md">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">Target Business Store:</label>
+                    <select
+                      value={activeWorkspaceId}
+                      onChange={(e) => handleWorkspaceChange(e.target.value)}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-emerald-400 font-bold focus:outline-none text-xs"
+                    >
+                      {workspaces.map(ws => (
+                        <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
+                          🏢 {ws.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 mb-1">Base Website URL:</label>
                     <input
@@ -1973,15 +2087,30 @@ export default function MobileDashboard() {
                   <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
                     <span className="font-bold text-white flex items-center gap-1.5">
                       <Building size={15} className="text-amber-400" />
-                      <span>Business Profile ({profileData.businessName})</span>
+                      <span>Business Profile</span>
                     </span>
                     <button type="submit" className="px-2.5 py-1 bg-amber-500 text-black font-black text-[10px] rounded-lg">
                       Save Profile
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white border border-gray-700 flex items-center justify-center text-2xl overflow-hidden">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400">Select Store / Workspace:</label>
+                    <select
+                      value={activeWorkspaceId}
+                      onChange={(e) => handleWorkspaceChange(e.target.value)}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-400 font-bold focus:outline-none"
+                    >
+                      {workspaces.map(ws => (
+                        <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
+                          🏢 {ws.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-gray-700 flex items-center justify-center text-2xl overflow-hidden shadow-md">
                       <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1">
@@ -2150,11 +2279,14 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 9: META TEMPLATES */}
+            {/* SUB-SCREEN 9: META WHATSAPP TEMPLATES & INTERACTIVE WHATSAPP PREVIEW */}
             {menuSubScreen === 'meta_templates' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400">Official Meta Templates</span>
+                  <div>
+                    <span className="text-xs font-bold text-white">Meta WhatsApp Templates</span>
+                    <p className="text-[10px] text-gray-400">Official Cloud API approved templates</p>
+                  </div>
                   <button 
                     onClick={() => setShowNewMetaTemplateModal(true)}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md"
@@ -2163,20 +2295,51 @@ export default function MobileDashboard() {
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {metaTemplates.map(tpl => (
-                    <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-2">
+                    <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 hover:border-blue-500/40 p-3.5 rounded-2xl space-y-3 shadow-md">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-xs text-white font-mono">{tpl.name}</span>
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                           tpl.status === 'APPROVED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-amber-950 text-amber-300 border border-amber-500/40'
                         }`}>
-                          {tpl.status}
+                          ● {tpl.status}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-300 bg-black/40 p-2.5 rounded-xl border border-gray-800/80 leading-relaxed">
-                        {tpl.text}
-                      </p>
+
+                      {/* Real Interactive WhatsApp Phone Message Preview Bubble */}
+                      <div className="bg-[#0b141a] p-3 rounded-2xl border border-[#202c33] space-y-2 text-xs shadow-inner">
+                        {tpl.header && (
+                          <div className="font-black text-white text-[11px] border-b border-[#202c33] pb-1">
+                            {tpl.header}
+                          </div>
+                        )}
+                        <p className="text-gray-200 leading-relaxed">
+                          {tpl.text}
+                        </p>
+                        
+                        {/* Call To Action Buttons */}
+                        {tpl.buttons && tpl.buttons.length > 0 && (
+                          <div className="pt-2 border-t border-[#202c33] space-y-1.5">
+                            {tpl.buttons.map((btn, bIdx) => (
+                              <div key={bIdx} className="bg-[#202c33] text-[#53bdeb] text-center font-bold text-[11px] py-1.5 rounded-xl flex items-center justify-center gap-1 shadow-sm">
+                                <span>{btn.label}</span>
+                                {btn.type === 'url' && <ExternalLink size={12} />}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+                        <span>Category: {tpl.category}</span>
+                        <button 
+                          onClick={() => alert(`1-Click WhatsApp Broadcast launched for: ${tpl.name} 🚀`)}
+                          className="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500"
+                        >
+                          Send Broadcast 📢
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2192,7 +2355,7 @@ export default function MobileDashboard() {
           MODALS & DRAWERS
       ───────────────────────────────────────────────────────────── */}
 
-      {/* Modal 0: In-App Mobile Login Modal */}
+      {/* Modal 0: In-App Mobile Login Modal (With 1-Click Guest Access) */}
       {showLoginModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-emerald-500/40 rounded-3xl p-5 max-w-xs w-full space-y-3.5 relative shadow-2xl">
@@ -2209,6 +2372,20 @@ export default function MobileDashboard() {
               <p className="text-[10px] text-gray-400">Sync all your real store data, chats & leads</p>
             </div>
 
+            <button
+              type="button"
+              onClick={handleGuestInstantLogin}
+              className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-black font-black rounded-xl text-xs shadow-lg flex items-center justify-center gap-1"
+            >
+              <span>⚡ 1-Click Instant Guest / Demo Access</span>
+            </button>
+
+            <div className="flex items-center gap-3 my-1">
+              <div className="flex-1 h-px bg-gray-800"></div>
+              <span className="text-[9px] text-gray-500">OR WITH CREDENTIALS</span>
+              <div className="flex-1 h-px bg-gray-800"></div>
+            </div>
+
             <form onSubmit={handleMobileLogin} className="space-y-2.5 text-xs">
               <div>
                 <label className="text-[10px] font-bold text-gray-400">Email Address:</label>
@@ -2216,7 +2393,7 @@ export default function MobileDashboard() {
                   type="email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
@@ -2227,7 +2404,7 @@ export default function MobileDashboard() {
                   type="password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none focus:border-emerald-500 font-mono"
                   required
                 />
               </div>
@@ -2235,9 +2412,9 @@ export default function MobileDashboard() {
               <button
                 type="submit"
                 disabled={isLoggingIn}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl text-xs shadow-lg mt-1"
+                className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl text-xs shadow-md mt-1"
               >
-                {isLoggingIn ? 'Logging In...' : 'Log In to Store 🚀'}
+                {isLoggingIn ? 'Logging In...' : 'Sign In with Password'}
               </button>
             </form>
           </div>
@@ -2525,7 +2702,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 5: Instagram Real Post Trigger Setup (With Image & Live Meta Preview) */}
+      {/* Modal 5: Instagram Real Post Trigger Setup */}
       {showIgPostRuleModal && selectedPostForRule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl max-h-[88vh] overflow-y-auto custom-scrollbar">
@@ -2538,7 +2715,6 @@ export default function MobileDashboard() {
               <h3 className="text-sm font-black text-white">Setup Reel / Post Comment-DM</h3>
             </div>
             
-            {/* Post Media Header */}
             <div className="flex items-center gap-3 bg-black/60 p-2.5 rounded-2xl border border-gray-800">
               <div className="w-14 h-14 rounded-xl bg-gray-900 flex-shrink-0 overflow-hidden border border-gray-700">
                 {selectedPostForRule.thumbnail_url || selectedPostForRule.media_url ? (

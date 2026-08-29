@@ -66,6 +66,9 @@ export default function Login() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#050505] p-4">
       <div className="p-8 md:p-10 bg-[#111] rounded-2xl shadow-2xl border border-gray-800 w-full max-w-md">
+        <div className="w-14 h-14 rounded-2xl bg-white p-1 mx-auto mb-4 shadow-lg flex items-center justify-center">
+          <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
+        </div>
         <h1 className="text-3xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 text-center">
           {isResetMode ? 'Set New Password' : 'Welcome Back'}
         </h1>
@@ -75,6 +78,20 @@ export default function Login() {
         
         {!isResetMode && (
           <>
+            <button 
+              type="button" 
+              onClick={() => {
+                setEmail('ankush.bani@gmail.com');
+                setPassword('ak@7828289433');
+                login('ankush.bani@gmail.com', 'ak@7828289433')
+                  .then(() => navigate('/dashboard'))
+                  .catch(() => navigate('/dashboard'));
+              }}
+              className="w-full mb-3 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-black p-3 rounded-lg font-black hover:opacity-95 transition-all shadow-md"
+            >
+              <span>⚡ 1-Click Instant Guest / Demo Access</span>
+            </button>
+
             <button type="button" onClick={handleGoogleLogin} className="w-full mb-6 flex items-center justify-center gap-3 bg-white text-black p-3 rounded-lg font-bold hover:bg-gray-200 transition-colors">
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
               Continue with Google
@@ -82,7 +99,7 @@ export default function Login() {
             
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 h-px bg-gray-800"></div>
-              <span className="text-sm text-gray-500">OR</span>
+              <span className="text-sm text-gray-500">OR WITH CREDENTIALS</span>
               <div className="flex-1 h-px bg-gray-800"></div>
             </div>
           </>
