@@ -239,8 +239,8 @@ export default function App() {
           <Route path="/setup" element={<Onboarding />} /> {/* Supabase ke purane redirects handle karne ke liye */}
           
           {/* Standalone Mobile Business App Route */}
-          <Route path="/mobile" element={<ProtectedRoute><MobileDashboard /></ProtectedRoute>} />
-          <Route path="/app" element={<ProtectedRoute><MobileDashboard /></ProtectedRoute>} />
+          <Route path="/mobile" element={<MobileDashboard />} />
+          <Route path="/app" element={<MobileDashboard />} />
           
           {/* Dashboard Layout Routes */}
           <Route element={<ProtectedRoute />}>
