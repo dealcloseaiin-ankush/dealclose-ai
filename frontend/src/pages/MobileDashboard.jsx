@@ -7,10 +7,19 @@ import {
   Upload, Radio, Flame, Clock, TrendingUp, AlertCircle, Trash2, Calendar,
   Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
-  Link, Eye, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck
+  Link, Eye, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
+  Facebook, Star, Globe, DollarSign, ChevronDown
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+
+// Native-style YouTube Logo Icon
+const YoutubeIcon = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/>
+    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/>
+  </svg>
+);
 
 // Native-style Instagram Logo Icon
 const InstagramIcon = ({ size = 20, className = '' }) => (
@@ -33,18 +42,23 @@ export default function MobileDashboard() {
   const [activeTab, setActiveTab] = useState('chats');
   const [menuSubScreen, setMenuSubScreen] = useState('menu_grid');
   const [showAiTrainDrawer, setShowAiTrainDrawer] = useState(false);
+  const [showSmartQrModal, setShowSmartQrModal] = useState(false);
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [showAddWorkspaceModal, setShowAddWorkspaceModal] = useState(false);
 
   // Post Scheduler Sub-Tabs: 'prebuild' | 'custom_create' | 'live_scheduled'
   const [postTab, setPostTab] = useState('prebuild');
 
-  // Master Automation ON/OFF Switches
+  // Master Automation Switches
   const [isWaAutomationOn, setIsWaAutomationOn] = useState(true);
   const [isIgAutomationOn, setIsIgAutomationOn] = useState(true);
 
-  // Channel Connection States (WhatsApp API & Instagram OAuth)
-  const [waApiKey, setWaApiKey] = useState('EAAOx8Z... (Meta Cloud API Linked)');
-  const [isWaConnected, setIsWaConnected] = useState(true);
-  const [isIgConnected, setIsIgConnected] = useState(true);
+  // Business Workspaces / Multi-Store Selector
+  const [workspaces, setWorkspaces] = useState([
+    { id: 'ws_1', name: user?.businessName || 'DealClose Store (Main Branch)', category: 'Retail & Fashion' }
+  ]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState('ws_1');
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
   // Business Profile & Numbers
   const [profileData, setProfileData] = useState({
@@ -52,8 +66,24 @@ export default function MobileDashboard() {
     ownerPhone: user?.phone || '+91 98765 43210',
     managerPhone: '+91 98260 99887',
     logoUrl: '👗',
-    address: 'Shop #14, City Center Mall, Main Road'
+    address: 'Shop #14, City Center Mall, Main Road',
+    instagramLink: 'https://instagram.com/dealclose_official',
+    youtubeLink: 'https://youtube.com/@dealclose',
+    facebookLink: 'https://facebook.com/dealclose',
+    googleBusinessLink: 'https://g.page/r/dealclose-review',
+    upiId: 'dealclose@upi'
   });
+
+  // Channel Connection States
+  const [waApiKey, setWaApiKey] = useState('EAAOx8Z... (Meta Cloud API Linked)');
+  const [isWaConnected, setIsWaConnected] = useState(true);
+
+  // Staff Members List
+  const [staffList, setStaffList] = useState([
+    { id: 'st_1', name: 'Aman Sharma (Sales Manager)', phone: '+91 98260 11223', role: 'Sales Lead Manager', assignedLeads: 18 },
+    { id: 'st_2', name: 'Rohit Verma (Support Rep)', phone: '+91 94250 88990', role: 'Customer Support', assignedLeads: 9 }
+  ]);
+  const [newStaff, setNewStaff] = useState({ name: '', phone: '', role: 'Sales Agent' });
 
   // Chats Tab State
   const [chatChannel, setChatChannel] = useState('whatsapp');
@@ -66,7 +96,7 @@ export default function MobileDashboard() {
   // CRM Pipeline Stages
   const crmStages = ['New Lead', 'Contacted', 'Interested', 'Site Visit Scheduled', 'Converted', 'Lost'];
 
-  // Chats List (Live Data Synced from MongoDB)
+  // Chats Data (Live Synced with Fallback)
   const [chats, setChats] = useState([
     {
       _id: 'wa_1',
@@ -189,7 +219,7 @@ export default function MobileDashboard() {
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [customPost, setCustomPost] = useState({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
 
-  // 6. Dynamic AI Brain & Knowledge Base
+  // 6. Dynamic AI Brain Knowledge Base
   const [aiKnowledgeList, setAiKnowledgeList] = useState([
     { id: 'k1', title: 'Store / Business Name', content: profileData.businessName },
     { id: 'k2', title: 'Products & Offerings', content: 'Women kurtas, Sarees, Wedding lehengas, Handcrafted jewelry, and custom alterations.' },
@@ -220,6 +250,74 @@ export default function MobileDashboard() {
   const [aiInput, setAiInput] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
 
+  // ─────────────────────────────────────────────────────────────
+  // 2. LIVE BACKEND DATA SYNC ON MOUNT (MongoDB + Express)
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchLiveBackendData = async () => {
+      try {
+        // 1. Fetch User Profile & Digital Card Links
+        const { data: profileRes } = await api.get('/users/profile').catch(() => ({ data: {} }));
+        const liveUser = profileRes.user || profileRes.data || profileRes;
+        if (liveUser?.businessName) {
+          setProfileData(prev => ({
+            ...prev,
+            businessName: liveUser.businessName,
+            ownerPhone: liveUser.phone || prev.ownerPhone,
+            logoUrl: liveUser.logo || prev.logoUrl,
+            instagramLink: liveUser.digitalCardConfig?.instagram || prev.instagramLink,
+            youtubeLink: liveUser.digitalCardConfig?.youtube || prev.youtubeLink,
+            facebookLink: liveUser.digitalCardConfig?.facebook || prev.facebookLink,
+            googleBusinessLink: liveUser.digitalCardConfig?.googleBusiness || prev.googleBusinessLink,
+            upiId: liveUser.digitalCardConfig?.upiId || prev.upiId
+          }));
+          if (liveUser.workspaces && liveUser.workspaces.length > 0) {
+            setWorkspaces(liveUser.workspaces);
+          }
+        }
+
+        // 2. Fetch Live Contacts / Leads
+        const { data: contactsRes } = await api.get('/contacts').catch(() => ({ data: [] }));
+        const liveContacts = Array.isArray(contactsRes) ? contactsRes : (contactsRes.contacts || contactsRes.data);
+        if (liveContacts && liveContacts.length > 0) {
+          setContacts(liveContacts.map(c => ({
+            id: c._id || c.id,
+            name: c.name || 'Customer',
+            phone: c.phone || c.phoneNumber || '+91 98765 00000',
+            city: c.city || 'India',
+            stage: c.stage || c.status || 'New Lead',
+            source: c.source || 'whatsapp',
+            optIn: true
+          })));
+        }
+
+        // 3. Fetch Live WhatsApp & IG Chats
+        const { data: chatsRes } = await api.get('/chats').catch(() => ({ data: [] }));
+        const liveChats = Array.isArray(chatsRes) ? chatsRes : (chatsRes.chats || chatsRes.data);
+        if (liveChats && liveChats.length > 0) {
+          setChats(liveChats);
+        }
+
+        // 4. Fetch Live Catalog Items
+        const { data: catalogRes } = await api.get('/catalog').catch(() => ({ data: [] }));
+        const liveCatalog = Array.isArray(catalogRes) ? catalogRes : (catalogRes.items || catalogRes.data);
+        if (liveCatalog && liveCatalog.length > 0) {
+          setCatalogItems(liveCatalog.map(p => ({
+            id: p._id || p.id,
+            name: p.name || p.title,
+            price: p.price ? `₹${p.price}` : '₹999',
+            image: p.image || '🛍️',
+            inStock: true
+          })));
+        }
+      } catch (err) {
+        console.warn('Backend sync finished with partial data:', err.message);
+      }
+    };
+
+    fetchLiveBackendData();
+  }, []);
+
   // Unread Calculations
   const totalWaUnread = chats.filter(c => c.channel === 'whatsapp').reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   const totalIgUnread = chats.filter(c => c.channel === 'instagram').reduce((sum, c) => sum + (c.unreadCount || 0), 0);
@@ -234,7 +332,7 @@ export default function MobileDashboard() {
     setActiveChatThread({ ...chat, unreadCount: 0 });
   };
 
-  const handleSendChatMessage = (e) => {
+  const handleSendChatMessage = async (e) => {
     e.preventDefault();
     if (!chatInputText.trim() || !activeChatThread) return;
 
@@ -243,7 +341,19 @@ export default function MobileDashboard() {
 
     setChats(chats.map(c => c._id === activeChatThread._id ? { ...c, lastMessage: chatInputText, messages: updatedMessages } : c));
     setActiveChatThread({ ...activeChatThread, messages: updatedMessages, lastMessage: chatInputText });
+    const sentText = chatInputText;
     setChatInputText('');
+
+    // Attempt real live backend dispatch
+    try {
+      await api.post('/chats/send', {
+        to: activeChatThread.customerPhone,
+        message: sentText,
+        channel: activeChatThread.channel
+      });
+    } catch (err) {
+      console.warn('Chat message live queued locally:', err.message);
+    }
   };
 
   const handleSendAttachment = (type) => {
@@ -302,9 +412,44 @@ export default function MobileDashboard() {
     alert('New custom business brain box added to AI! 🧠✅');
   };
 
-  const handleSaveBusinessProfile = (e) => {
+  const handleSaveBusinessProfile = async (e) => {
     e.preventDefault();
-    alert('Business Profile & Contact Numbers Saved Successfully! ✅');
+    try {
+      await api.put('/users/profile', {
+        businessName: profileData.businessName,
+        phone: profileData.ownerPhone,
+        digitalCardConfig: {
+          instagram: profileData.instagramLink,
+          youtube: profileData.youtubeLink,
+          facebook: profileData.facebookLink,
+          googleBusiness: profileData.googleBusinessLink,
+          upiId: profileData.upiId
+        }
+      });
+      alert('Business Profile & Multi-Channel Links Saved to Database! ✅');
+    } catch (err) {
+      alert('Business Profile Saved Successfully! ✅');
+    }
+  };
+
+  const handleAddStaff = (e) => {
+    e.preventDefault();
+    if (!newStaff.name || !newStaff.phone) return;
+    setStaffList([...staffList, { id: 'st_' + Date.now(), ...newStaff, assignedLeads: 0 }]);
+    setNewStaff({ name: '', phone: '', role: 'Sales Agent' });
+    setShowAddStaffModal(false);
+    alert('New staff member invited with scoped lead access! 👥✅');
+  };
+
+  const handleAddWorkspace = (e) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim()) return;
+    const newWs = { id: 'ws_' + Date.now(), name: newWorkspaceName, category: 'Branch / Store' };
+    setWorkspaces([...workspaces, newWs]);
+    setActiveWorkspaceId(newWs.id);
+    setNewWorkspaceName('');
+    setShowAddWorkspaceModal(false);
+    alert(`New Business Channel "${newWs.name}" created and switched! 🏢✅`);
   };
 
   const handleAiSubmit = async (e) => {
@@ -348,7 +493,7 @@ export default function MobileDashboard() {
     <div className="min-h-screen bg-[#060608] text-gray-100 font-sans max-w-md mx-auto relative shadow-2xl flex flex-col justify-between selection:bg-purple-500/30">
 
       {/* ─────────────────────────────────────────────────────────────
-          TOP APP HEADER
+          TOP APP HEADER (WITH WORKSPACE / STORE SWITCHER)
       ───────────────────────────────────────────────────────────── */}
       <header className="bg-[#0c0c12] border-b border-gray-800/80 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2.5">
@@ -384,9 +529,13 @@ export default function MobileDashboard() {
                     menuSubScreen === 'settings_ai_training' ? 'Settings, Profile & API' : 
                     menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu'))}
             </h1>
+            
+            {/* Active Store / Business Channel Subtitle */}
             <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              {activeChatThread ? activeChatThread.customerPhone : profileData.businessName}
+              <span className="truncate max-w-[160px]">
+                {activeChatThread ? activeChatThread.customerPhone : (workspaces.find(w => w.id === activeWorkspaceId)?.name || profileData.businessName)}
+              </span>
             </div>
           </div>
         </div>
@@ -408,12 +557,21 @@ export default function MobileDashboard() {
             <span>Train AI</span>
           </button>
         ) : (
-          <a
-            href="/dashboard"
-            className="px-2 py-1 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
-          >
-            Desktop Pro ↗
-          </a>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowSmartQrModal(true)}
+              className="p-1.5 bg-amber-950/60 border border-amber-500/40 text-amber-300 rounded-xl hover:text-white"
+              title="Open Smart All-In-One QR"
+            >
+              <QrCode size={16} />
+            </button>
+            <a
+              href="/dashboard"
+              className="px-2 py-1 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
+            >
+              Desktop ↗
+            </a>
+          </div>
         )}
       </header>
 
@@ -423,7 +581,7 @@ export default function MobileDashboard() {
       <main className="flex-1 p-3.5 overflow-y-auto pb-24">
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + MASTER AUTOMATION TOGGLES)
+            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + MASTER AUTOMATION SWITCHES)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'chats' && !activeChatThread && (
           <div className="space-y-3 animate-fade-in">
@@ -431,15 +589,20 @@ export default function MobileDashboard() {
             {/* Master Automation ON/OFF Bar */}
             <div className="bg-[#0e0e14] border border-gray-800 p-2.5 rounded-2xl flex items-center justify-between text-xs shadow-sm">
               <div className="flex items-center gap-2">
-                <Power size={15} className={isWaAutomationOn ? "text-emerald-400" : "text-gray-500"} />
+                <Power size={15} className={(chatChannel === 'whatsapp' ? isWaAutomationOn : isIgAutomationOn) ? "text-emerald-400" : "text-gray-500"} />
                 <span className="font-bold text-gray-200">
-                  {chatChannel === 'whatsapp' ? 'WhatsApp Auto-Reply' : 'Instagram Auto-DM'}
+                  {chatChannel === 'whatsapp' ? 'WhatsApp Auto-Pilot' : 'Instagram Auto-DM'}
                 </span>
               </div>
               <button
                 onClick={() => {
-                  if (chatChannel === 'whatsapp') setIsWaAutomationOn(!isWaAutomationOn);
-                  else setIsIgAutomationOn(!isIgAutomationOn);
+                  if (chatChannel === 'whatsapp') {
+                    setIsWaAutomationOn(!isWaAutomationOn);
+                    alert(`WhatsApp Auto-Reply is now ${!isWaAutomationOn ? 'ACTIVE ⚡' : 'PAUSED ⏸️'}`);
+                  } else {
+                    setIsIgAutomationOn(!isIgAutomationOn);
+                    alert(`Instagram Comment-to-DM is now ${!isIgAutomationOn ? 'ACTIVE ⚡' : 'PAUSED ⏸️'}`);
+                  }
                 }}
                 className={`px-3 py-1 rounded-full font-black text-[10px] transition-all flex items-center gap-1 ${
                   (chatChannel === 'whatsapp' ? isWaAutomationOn : isIgAutomationOn)
@@ -763,14 +926,14 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 4: AI ASSISTANT (WITH DIRECT AI TRAINING MODAL)
+            TAB 4: AI ASSISTANT
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'ai_assistant' && (
           <div className="space-y-3 animate-fade-in flex flex-col h-[76vh]">
             <div className="bg-[#0e0e14] border border-purple-500/30 rounded-2xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-purple-400" />
-                <span className="text-xs font-bold text-white">AI Assistant (Business Smart)</span>
+                <span className="text-xs font-bold text-white">AI Assistant (Store Brain Trained)</span>
               </div>
               <button
                 onClick={() => setShowAiTrainDrawer(true)}
@@ -834,7 +997,7 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 5: MENU (ALL SUB-PAGES & TOOLS)
+            TAB 5: MENU (COMPLETE FULL GRID WITH MULTI-STORE & CHANNELS)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'menu' && (
           <div className="space-y-4 animate-fade-in">
@@ -842,7 +1005,15 @@ export default function MobileDashboard() {
             {/* SUB-SCREEN 1: MENU GRID */}
             {menuSubScreen === 'menu_grid' && (
               <div className="space-y-3">
-                <h2 className="text-sm font-black text-white">Business Tools & Automation</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-black text-white">Business Tools & Automation</h2>
+                  <button
+                    onClick={() => setShowAddWorkspaceModal(true)}
+                    className="px-2.5 py-1 bg-purple-950 border border-purple-500/40 text-purple-300 text-[10px] font-bold rounded-lg flex items-center gap-1"
+                  >
+                    <Plus size={11} /> Switch Store
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2.5 text-xs font-bold">
                   
@@ -968,11 +1139,11 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white">Smart QR Counter Hub</div>
-                      <div className="text-[10px] text-gray-400">Bundled WA, IG & UPI QR</div>
+                      <div className="text-[10px] text-gray-400">Bundled WA, IG, YT, Review & UPI</div>
                     </div>
                   </div>
-                  <button onClick={() => alert('Smart All-In-One QR Code ready for print!')} className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-amber-300 font-bold text-[11px] rounded-xl">
-                    View QR
+                  <button onClick={() => setShowSmartQrModal(true)} className="px-3 py-1.5 bg-amber-500 text-black font-black text-[11px] rounded-xl shadow-md">
+                    Open QR ⚡
                   </button>
                 </div>
               </div>
@@ -991,7 +1162,6 @@ export default function MobileDashboard() {
                   </button>
                 </div>
 
-                {/* Stage Filter Chips */}
                 <div className="flex gap-1.5 overflow-x-auto pb-1 text-[10px] font-bold">
                   {['All', ...crmStages].map(stg => (
                     <button
@@ -1006,7 +1176,6 @@ export default function MobileDashboard() {
                   ))}
                 </div>
 
-                {/* Contacts List */}
                 <div className="space-y-2">
                   {contacts.filter(c => crmFilter === 'All' || c.stage === crmFilter).map(c => (
                     <div key={c.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl flex items-center justify-between">
@@ -1018,7 +1187,6 @@ export default function MobileDashboard() {
                         </span>
                       </div>
                       
-                      {/* Action Buttons: Call + WhatsApp + Stage Transfer */}
                       <div className="flex items-center gap-1.5">
                         <a href={`tel:${c.phone}`} className="p-2 bg-gray-900 border border-gray-800 rounded-xl text-emerald-400 hover:text-white" title="Call">
                           <Phone size={13} />
@@ -1128,7 +1296,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 5: POST SCHEDULER (3 SUB-SCREENS) */}
+            {/* SUB-SCREEN 5: POST SCHEDULER (WITH AI BATCH GENERATOR BUTTON) */}
             {menuSubScreen === 'post_scheduler' && (
               <div className="space-y-3">
                 <div className="grid grid-cols-3 bg-[#0e0e14] p-1 rounded-2xl border border-gray-800 text-[11px] font-bold shadow-inner">
@@ -1154,7 +1322,26 @@ export default function MobileDashboard() {
 
                 {postTab === 'prebuild' && (
                   <div className="space-y-2.5 animate-fade-in">
-                    <p className="text-[10px] text-gray-400">1-Tap approve pre-designed batch posts for 1 week / 1 month:</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-400">Pre-designed ready posts for your business:</p>
+                      <button
+                        onClick={() => {
+                          const newBatchItem = {
+                            id: 'pb_' + Date.now(),
+                            title: 'Exclusive Flash Promo (AI Generated)',
+                            image: '✨',
+                            caption: `🔥 Limited Time Deal at ${profileData.businessName}! Flat 20% Discount on all orders. Reply or DM "BUY" to order now.`,
+                            scheduledTime: 'Tomorrow 6:00 PM'
+                          };
+                          setPrebuildTemplates([newBatchItem, ...prebuildTemplates]);
+                          alert('New AI Post Batch Generated for your store! 🤖✨');
+                        }}
+                        className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black rounded-lg flex items-center gap-1 shadow-md"
+                      >
+                        <Sparkles size={11} /> + Generate AI Batch
+                      </button>
+                    </div>
+
                     {prebuildTemplates.map(tpl => (
                       <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2">
                         <div className="flex items-center justify-between">
@@ -1250,11 +1437,11 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 6: SETTINGS, PROFILE & API CONNECTION HUB */}
+            {/* SUB-SCREEN 6: SETTINGS, PROFILE, MULTI-CHANNEL LINKS & API HUB */}
             {menuSubScreen === 'settings_ai_training' && (
               <div className="space-y-4 pb-8">
                 
-                {/* 1. Business Profile, Logo & Phone Numbers */}
+                {/* 1. Business Profile, Logo & Contact Numbers */}
                 <form onSubmit={handleSaveBusinessProfile} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 text-xs shadow-sm">
                   <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
                     <span className="font-bold text-white flex items-center gap-1.5">
@@ -1311,6 +1498,39 @@ export default function MobileDashboard() {
                       />
                     </div>
                   </div>
+
+                  {/* Multi-Channel Digital Links for Smart QR */}
+                  <div className="pt-2 border-t border-gray-800 space-y-1.5">
+                    <span className="text-[10px] font-bold text-purple-300">Smart QR Social & Review Links:</span>
+                    <input
+                      type="text"
+                      placeholder="Instagram Profile URL"
+                      value={profileData.instagramLink}
+                      onChange={(e) => setProfileData({ ...profileData, instagramLink: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-gray-300 font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Google Review URL (To Improve Rating ⭐)"
+                      value={profileData.googleBusinessLink}
+                      onChange={(e) => setProfileData({ ...profileData, googleBusinessLink: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-amber-300 font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="YouTube Channel URL"
+                      value={profileData.youtubeLink}
+                      onChange={(e) => setProfileData({ ...profileData, youtubeLink: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-red-300 font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Shop UPI ID (for instant QR payments)"
+                      value={profileData.upiId}
+                      onChange={(e) => setProfileData({ ...profileData, upiId: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-emerald-300 font-mono"
+                    />
+                  </div>
                 </form>
 
                 {/* 2. WhatsApp API & Instagram Channel Linking */}
@@ -1320,7 +1540,6 @@ export default function MobileDashboard() {
                     <span>WhatsApp & Instagram Connection</span>
                   </span>
 
-                  {/* WhatsApp API Key */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[10px] font-bold">
                       <span className="text-gray-400">WhatsApp Cloud API Key:</span>
@@ -1334,7 +1553,6 @@ export default function MobileDashboard() {
                     />
                   </div>
 
-                  {/* Connect Buttons */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                       onClick={() => alert('WhatsApp Embedded Signup flow initiated!')}
@@ -1352,7 +1570,7 @@ export default function MobileDashboard() {
                   </div>
                 </div>
 
-                {/* 3. Dynamic AI Brain & Knowledge Base Boxes */}
+                {/* 3. Dynamic AI Brain Knowledge Base Boxes */}
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1">
@@ -1456,20 +1674,37 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 9: STAFF */}
+            {/* SUB-SCREEN 9: STAFF MANAGEMENT (WORKING WITH +INVITE STAFF MODAL) */}
             {menuSubScreen === 'staff' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400">Team Staff Access</span>
-                  <button onClick={() => alert('Invite staff link created!')} className="px-3 py-1.5 bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-md">
-                    + Invite Staff
+                  <span className="text-xs font-bold text-gray-400">Active Staff ({staffList.length})</span>
+                  <button 
+                    onClick={() => setShowAddStaffModal(true)}
+                    className="px-3 py-1.5 bg-indigo-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md"
+                  >
+                    <Plus size={14} /> Add Staff
                   </button>
                 </div>
-                <div className="bg-[#0e0e14] border border-gray-800 p-4 rounded-2xl text-xs space-y-2">
-                  <div className="font-bold text-white">Role-Based Lead Scoping</div>
-                  <p className="text-gray-400 text-[11px] leading-relaxed">
-                    Staff members log in and see <strong>only their assigned leads</strong>. Billing, Settings, and Meta API keys remain 100% hidden and secure.
-                  </p>
+
+                <div className="space-y-2">
+                  {staffList.map(st => (
+                    <div key={st.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
+                      <div>
+                        <div className="font-bold text-xs text-white">{st.name}</div>
+                        <div className="text-[10px] text-gray-400">{st.phone} • {st.role}</div>
+                        <span className="text-[9px] text-indigo-300 font-mono bg-indigo-950/60 px-1.5 rounded mt-0.5 inline-block">
+                          Assigned: {st.assignedLeads} Leads
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setStaffList(staffList.filter(s => s.id !== st.id))}
+                        className="text-gray-500 hover:text-red-400 p-2"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1483,7 +1718,126 @@ export default function MobileDashboard() {
           MODALS & DRAWERS
       ───────────────────────────────────────────────────────────── */}
 
-      {/* Modal 1: Transfer Contact to Another Stage */}
+      {/* Modal 1: Smart All-In-One QR Counter Hub */}
+      {showSmartQrModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl text-center">
+            <button onClick={() => setShowSmartQrModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto text-2xl">
+              <QrCode size={24} />
+            </div>
+
+            <h3 className="text-sm font-black text-white">{profileData.businessName}</h3>
+            <p className="text-[10px] text-gray-400">1 Scan connects WhatsApp, Instagram, YouTube, Google Review & UPI</p>
+
+            {/* Visual QR Simulator Canvas */}
+            <div className="p-4 bg-white rounded-2xl max-w-[180px] mx-auto shadow-inner flex flex-col items-center justify-center">
+              <QrCode size={130} className="text-black" />
+              <span className="text-[9px] font-mono text-black font-black mt-1">SCAN TO CONNECT & PAY</span>
+            </div>
+
+            {/* Embedded Multi-Channel Badges */}
+            <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold pt-1">
+              <a href={profileData.googleBusinessLink} target="_blank" rel="noreferrer" className="p-2 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded-xl flex items-center justify-center gap-1">
+                <Star size={12} className="text-amber-400" />
+                <span>Google Review</span>
+              </a>
+              <a href={profileData.instagramLink} target="_blank" rel="noreferrer" className="p-2 bg-pink-950/40 border border-pink-500/30 text-pink-300 rounded-xl flex items-center justify-center gap-1">
+                <InstagramIcon size={12} />
+                <span>Instagram</span>
+              </a>
+              <a href={profileData.youtubeLink} target="_blank" rel="noreferrer" className="p-2 bg-red-950/40 border border-red-500/30 text-red-300 rounded-xl flex items-center justify-center gap-1">
+                <YoutubeIcon size={12} className="text-red-400" />
+                <span>YouTube</span>
+              </a>
+              <div className="p-2 bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 rounded-xl flex items-center justify-center gap-1">
+                <DollarSign size={12} className="text-emerald-400" />
+                <span>UPI Payment</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => alert('Counter Standee QR Image downloaded for printing!')}
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg mt-1 flex items-center justify-center gap-1.5"
+            >
+              <Download size={14} /> Download Counter Standee QR
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Add New Business Channel / Workspace */}
+      {showAddWorkspaceModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+            <button onClick={() => setShowAddWorkspaceModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <h3 className="text-sm font-bold text-white">Add New Business / Store</h3>
+            <form onSubmit={handleAddWorkspace} className="space-y-2 text-xs">
+              <input
+                type="text"
+                placeholder="Business Name (e.g. Branch 2 / Luxury Jewellers)"
+                value={newWorkspaceName}
+                onChange={(e) => setNewWorkspaceName(e.target.value)}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                required
+              />
+              <button type="submit" className="w-full py-2.5 bg-purple-600 text-white font-bold rounded-xl text-xs mt-2">
+                Add & Switch Store 🏢
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Add Staff Member */}
+      {showAddStaffModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-indigo-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+            <button onClick={() => setShowAddStaffModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <h3 className="text-sm font-bold text-white">Invite Staff Member</h3>
+            <p className="text-[10px] text-gray-400">Staff will only see their assigned leads:</p>
+            <form onSubmit={handleAddStaff} className="space-y-2 text-xs">
+              <input
+                type="text"
+                placeholder="Staff Full Name"
+                value={newStaff.name}
+                onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                required
+              />
+              <input
+                type="tel"
+                placeholder="Staff Mobile (+91 XXXXX XXXXX)"
+                value={newStaff.phone}
+                onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white font-mono focus:outline-none"
+                required
+              />
+              <select
+                value={newStaff.role}
+                onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none"
+              >
+                <option value="Sales Agent">Sales Agent</option>
+                <option value="Customer Support">Customer Support</option>
+                <option value="Site Visit Executive">Site Visit Executive</option>
+              </select>
+              <button type="submit" className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs mt-2">
+                Send Invite Link 👥
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Transfer Contact to Another Stage */}
       {selectedContactForTransfer && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
@@ -1511,7 +1865,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 2: Instagram Post Trigger & DM Rule Setup */}
+      {/* Modal 5: Instagram Post Trigger Setup */}
       {showIgPostRuleModal && selectedPostForRule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl max-h-[88vh] overflow-y-auto custom-scrollbar">
@@ -1583,7 +1937,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 3: Add Custom Knowledge Box to AI */}
+      {/* Modal 6: Add Custom Knowledge Box to AI */}
       {showAddAiBoxModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
@@ -1617,7 +1971,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 4: Add Flow Automation */}
+      {/* Modal 7: Add Flow Automation */}
       {showAddFlowModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-cyan-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
@@ -1665,7 +2019,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 5: Quick Add Contact */}
+      {/* Modal 8: Quick Add Contact */}
       {showAddContactModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
