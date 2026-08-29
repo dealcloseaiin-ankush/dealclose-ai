@@ -16,17 +16,19 @@ export default defineConfig({
       manifest: {
         name: 'DealClose AI',
         short_name: 'DealClose',
-        description: 'AI Sales & Marketing Automation',
+        description: 'AI Sales & Marketing Automation Suite',
+        start_url: '/mobile',
+        scope: '/',
+        display: 'standalone',
         theme_color: '#050505',
         background_color: '#050505',
-        display: 'standalone',
         icons: [{ src: '/vite.svg', sizes: '192x192', type: 'image/svg+xml' }]
       }
     })
   ],
   esbuild: {
-    loader: "jsx", // Treat .js files as JSX
-    include: /src\/.*\.jsx?$/, // Apply to all .js and .jsx files in src
+    loader: "jsx",
+    include: /src\/.*\.jsx?$/,
     exclude: [], 
   },
   optimizeDeps: {
