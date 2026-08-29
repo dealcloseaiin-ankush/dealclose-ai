@@ -71,6 +71,7 @@ const ChangePassword = lazyWithRetry(() => import('./pages/ChangePassword'));
 const PricingPage = lazyWithRetry(() => import('./pages/PricingPage'));
 const ComparePage = lazyWithRetry(() => import('./pages/ComparePage'));
 const IndustryPage = lazyWithRetry(() => import('./pages/IndustryPage'));
+const MobileDashboard = lazyWithRetry(() => import('./pages/MobileDashboard'));
 
 // Smart Redirects for Logged In Users
 const PublicRoute = ({ children }) => {
@@ -236,6 +237,10 @@ export default function App() {
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/discover" element={<SolutionRecommender />} />
           <Route path="/setup" element={<Onboarding />} /> {/* Supabase ke purane redirects handle karne ke liye */}
+          
+          {/* Standalone Mobile Business App Route */}
+          <Route path="/mobile" element={<ProtectedRoute><MobileDashboard /></ProtectedRoute>} />
+          <Route path="/app" element={<ProtectedRoute><MobileDashboard /></ProtectedRoute>} />
           
           {/* Dashboard Layout Routes */}
           <Route element={<ProtectedRoute />}>
