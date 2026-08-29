@@ -19,7 +19,6 @@ export const AuthProvider = ({ children }) => {
     return null;
   });
 
-  // Fast loading state: If we already have stored token and user, start with loading = false
   const [loading, setLoading] = useState(() => {
     return !localStorage.getItem('token') && !localStorage.getItem('user');
   });
@@ -84,7 +83,6 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    // Safe Supabase Auth Listener with Timeout
     let authSubscription = null;
     try {
       if (supabase?.auth?.onAuthStateChange) {
@@ -104,18 +102,16 @@ export const AuthProvider = ({ children }) => {
         authSubscription = data?.subscription;
       }
     } catch (sbErr) {
-      console.warn('Supabase listener disabled due to network/domain resolution:', sbErr.message);
+      console.warn('Supabase listener disabled:', sbErr.message);
       clearSupabaseStorage();
       if (isMounted) setLoading(false);
     }
 
-    // Check Initial Local Session + Backend Profile Verification
     const checkInitialSession = async () => {
       try {
         const storedToken = localStorage.getItem('token');
         if (storedToken) {
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-          // Background verify without blocking UI
           api.get('/users/profile')
             .then(({ data }) => {
               const verifiedUser = data.user || data.data || data;
@@ -126,13 +122,12 @@ export const AuthProvider = ({ children }) => {
             })
             .catch(profileErr => {
               if (profileErr.response?.status === 401) {
-                console.warn('Token expired. Logging out.');
+                console.warn('Token expired.');
                 clearLocalAuth();
               }
             });
         }
 
-        // Fast check Supabase session with 1.2s timeout
         if (supabase?.auth?.getSession) {
           const sessionPromise = supabase.auth.getSession();
           const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: { session: null } }), 1200));
@@ -158,16 +153,44 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = (token, userData) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(userData);
-    setLoading(false);
+  // Dual mode login: supports login(email, password) OR login(token, userData)
+  const login = async (emailOrToken, passwordOrUserData) => {
+    if (typeof emailOrToken === 'string' && typeof passwordOrUserData === 'string') {
+      const { data } = await api.post('/users/login', {
+        email: emailOrToken,
+        password: passwordOrUserData
+      });
+      const token = data.token;
+      const userData = data.user || data.data || data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setUser(userData);
+      setLoading(false);
+      return data;
+    } else {
+      localStorage.setItem('token', emailOrToken);
+      localStorage.setItem('user', JSON.stringify(passwordOrUserData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${emailOrToken}`;
+      setUser(passwordOrUserData);
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (email, password) => {
+    const { data } = await api.post('/users/reset-password', { email, password });
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      setUser(data.user);
+      setLoading(false);
+    }
+    return data;
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, clearLocalAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, resetPassword, logout, clearLocalAuth }}>
       {children}
     </AuthContext.Provider>
   );

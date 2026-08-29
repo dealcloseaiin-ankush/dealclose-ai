@@ -24,13 +24,22 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle 401 Unauthorized globally
+// Response interceptor to handle 401 Unauthorized globally without breaking public or mobile routes
 api.interceptors.response.use(
   response => response,
   error => {
     if (error.response && error.response.status === 401) {
       const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
+      const isPublicOrMobile = 
+        currentPath === '/login' || 
+        currentPath === '/register' || 
+        currentPath === '/' || 
+        currentPath.startsWith('/mobile') || 
+        currentPath.startsWith('/app') || 
+        currentPath.startsWith('/card') || 
+        currentPath.startsWith('/digital-card');
+
+      if (!isPublicOrMobile) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         delete api.defaults.headers.common['Authorization'];

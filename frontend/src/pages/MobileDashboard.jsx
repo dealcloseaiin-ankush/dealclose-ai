@@ -8,7 +8,7 @@ import {
   Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
   Link, Eye, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
-  Facebook, Star, Globe, DollarSign, ChevronDown
+  Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, User
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -31,13 +31,11 @@ const InstagramIcon = ({ size = 20, className = '' }) => (
 );
 
 export default function MobileDashboard() {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const fileInputRef = useRef(null);
 
   // ─────────────────────────────────────────────────────────────
   // 1. PRIMARY NAVIGATION & ROUTER STATE
-  // 'chats' | 'dashboard' | 'catalog' | 'ai_assistant' | 'menu'
-  // Sub-screens: 'menu_grid' | 'contacts_crm' | 'meta_templates' | 'post_scheduler' | 'settings_ai_training' | 'smart_qr' | 'auto_reply' | 'ig_comment_dm' | 'flow_automation' | 'staff'
   // ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('chats');
   const [menuSubScreen, setMenuSubScreen] = useState('menu_grid');
@@ -45,6 +43,12 @@ export default function MobileDashboard() {
   const [showSmartQrModal, setShowSmartQrModal] = useState(false);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showAddWorkspaceModal, setShowAddWorkspaceModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Login Form State for Mobile
+  const [loginEmail, setLoginEmail] = useState('ankush.bani@gmail.com');
+  const [loginPassword, setLoginPassword] = useState('ak@7828289433');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Post Scheduler Sub-Tabs: 'prebuild' | 'custom_create' | 'live_scheduled'
   const [postTab, setPostTab] = useState('prebuild');
@@ -63,15 +67,15 @@ export default function MobileDashboard() {
   // Business Profile & Numbers
   const [profileData, setProfileData] = useState({
     businessName: user?.businessName || 'DealClose Fashion & Boutique',
-    ownerPhone: user?.phone || '+91 98765 43210',
+    ownerPhone: user?.phone || user?.ownerPhone || '+91 98765 43210',
     managerPhone: '+91 98260 99887',
-    logoUrl: '👗',
+    logoUrl: user?.logo || '👗',
     address: 'Shop #14, City Center Mall, Main Road',
-    instagramLink: 'https://instagram.com/dealclose_official',
-    youtubeLink: 'https://youtube.com/@dealclose',
-    facebookLink: 'https://facebook.com/dealclose',
-    googleBusinessLink: 'https://g.page/r/dealclose-review',
-    upiId: 'dealclose@upi'
+    instagramLink: user?.digitalCardConfig?.instagram || 'https://instagram.com/dealclose_official',
+    youtubeLink: user?.digitalCardConfig?.youtube || 'https://youtube.com/@dealclose',
+    facebookLink: user?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose',
+    googleBusinessLink: user?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review',
+    upiId: user?.digitalCardConfig?.upiId || 'dealclose@upi'
   });
 
   // Channel Connection States
@@ -256,15 +260,15 @@ export default function MobileDashboard() {
   useEffect(() => {
     const fetchLiveBackendData = async () => {
       try {
-        // 1. Fetch User Profile & Digital Card Links
+        // 1. Fetch User Profile & Settings
         const { data: profileRes } = await api.get('/users/profile').catch(() => ({ data: {} }));
         const liveUser = profileRes.user || profileRes.data || profileRes;
-        if (liveUser?.businessName) {
+        if (liveUser?.businessName || liveUser?._id) {
           setProfileData(prev => ({
             ...prev,
-            businessName: liveUser.businessName,
-            ownerPhone: liveUser.phone || prev.ownerPhone,
-            logoUrl: liveUser.logo || prev.logoUrl,
+            businessName: liveUser.businessName || prev.businessName,
+            ownerPhone: liveUser.phone || liveUser.ownerPhone || prev.ownerPhone,
+            logoUrl: liveUser.logo || liveUser.avatar || prev.logoUrl,
             instagramLink: liveUser.digitalCardConfig?.instagram || prev.instagramLink,
             youtubeLink: liveUser.digitalCardConfig?.youtube || prev.youtubeLink,
             facebookLink: liveUser.digitalCardConfig?.facebook || prev.facebookLink,
@@ -310,13 +314,31 @@ export default function MobileDashboard() {
             inStock: true
           })));
         }
+
+        // 5. Fetch Live Instagram Posts
+        const { data: postsRes } = await api.get('/instagram/posts').catch(() => ({ data: [] }));
+        const livePosts = Array.isArray(postsRes) ? postsRes : (postsRes.posts || postsRes.data);
+        if (livePosts && livePosts.length > 0) {
+          setLiveIgPosts(livePosts.map(p => ({
+            id: p._id || p.id,
+            title: p.caption ? p.caption.slice(0, 35) + '...' : 'Instagram Post',
+            type: p.mediaType === 'VIDEO' ? 'reel' : 'post',
+            thumbnail: p.mediaUrl ? '📸' : '✨',
+            commentsCount: p.commentsCount || 48,
+            keyword: p.keywordTrigger || 'PRICE',
+            responseType: p.responseType || 'product_rate',
+            customLink: p.link || 'https://dealcloseai.in/shop',
+            dmText: p.dmMessage || 'Namaste! Check our catalog with free shipping!',
+            active: true
+          })));
+        }
       } catch (err) {
         console.warn('Backend sync finished with partial data:', err.message);
       }
     };
 
     fetchLiveBackendData();
-  }, []);
+  }, [user]);
 
   // Unread Calculations
   const totalWaUnread = chats.filter(c => c.channel === 'whatsapp').reduce((sum, c) => sum + (c.unreadCount || 0), 0);
@@ -326,6 +348,20 @@ export default function MobileDashboard() {
   // ─────────────────────────────────────────────────────────────
   // 3. HANDLERS
   // ─────────────────────────────────────────────────────────────
+
+  const handleMobileLogin = async (e) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    try {
+      await login(loginEmail, loginPassword);
+      setShowLoginModal(false);
+      alert('Login Successful! Welcome to DealClose AI Mobile! 🚀');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleOpenChat = (chat) => {
     setChats(chats.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c));
@@ -344,7 +380,6 @@ export default function MobileDashboard() {
     const sentText = chatInputText;
     setChatInputText('');
 
-    // Attempt real live backend dispatch
     try {
       await api.post('/chats/send', {
         to: activeChatThread.customerPhone,
@@ -352,7 +387,7 @@ export default function MobileDashboard() {
         channel: activeChatThread.channel
       });
     } catch (err) {
-      console.warn('Chat message live queued locally:', err.message);
+      console.warn('Chat message sent locally:', err.message);
     }
   };
 
@@ -418,6 +453,7 @@ export default function MobileDashboard() {
       await api.put('/users/profile', {
         businessName: profileData.businessName,
         phone: profileData.ownerPhone,
+        ownerPhone: profileData.ownerPhone,
         digitalCardConfig: {
           instagram: profileData.instagramLink,
           youtube: profileData.youtubeLink,
@@ -493,7 +529,7 @@ export default function MobileDashboard() {
     <div className="min-h-screen bg-[#060608] text-gray-100 font-sans max-w-md mx-auto relative shadow-2xl flex flex-col justify-between selection:bg-purple-500/30">
 
       {/* ─────────────────────────────────────────────────────────────
-          TOP APP HEADER (WITH WORKSPACE / STORE SWITCHER)
+          TOP APP HEADER (WITH LOGO & USER LOGIN STATUS)
       ───────────────────────────────────────────────────────────── */}
       <header className="bg-[#0c0c12] border-b border-gray-800/80 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2.5">
@@ -508,8 +544,12 @@ export default function MobileDashboard() {
               <ArrowLeft size={16} />
             </button>
           ) : (
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center font-black text-black text-base shadow-md">
-              {profileData.logoUrl || '⚡'}
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center font-black text-black text-sm shadow-md overflow-hidden">
+              {profileData.logoUrl?.startsWith('http') ? (
+                <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span>{profileData.logoUrl || '⚡'}</span>
+              )}
             </div>
           )}
           <div>
@@ -533,7 +573,7 @@ export default function MobileDashboard() {
             {/* Active Store / Business Channel Subtitle */}
             <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="truncate max-w-[160px]">
+              <span className="truncate max-w-[150px]">
                 {activeChatThread ? activeChatThread.customerPhone : (workspaces.find(w => w.id === activeWorkspaceId)?.name || profileData.businessName)}
               </span>
             </div>
@@ -558,13 +598,23 @@ export default function MobileDashboard() {
           </button>
         ) : (
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowSmartQrModal(true)}
-              className="p-1.5 bg-amber-950/60 border border-amber-500/40 text-amber-300 rounded-xl hover:text-white"
-              title="Open Smart All-In-One QR"
-            >
-              <QrCode size={16} />
-            </button>
+            {!user ? (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="px-2.5 py-1 bg-emerald-500 text-black font-black text-[10px] rounded-lg shadow-md flex items-center gap-1"
+              >
+                <LogIn size={12} />
+                <span>Log In</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowSmartQrModal(true)}
+                className="p-1.5 bg-amber-950/60 border border-amber-500/40 text-amber-300 rounded-xl hover:text-white"
+                title="Open Smart All-In-One QR"
+              >
+                <QrCode size={16} />
+              </button>
+            )}
             <a
               href="/dashboard"
               className="px-2 py-1 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
@@ -726,6 +776,7 @@ export default function MobileDashboard() {
                 >
                   <p>{m.text}</p>
                   
+                  {/* File / Image / PDF Attachment Card */}
                   {m.attachment && (
                     <div className="mt-2 p-2 bg-black/50 border border-gray-700/60 rounded-xl flex items-center justify-between text-[11px]">
                       <div className="flex items-center gap-1.5 truncate">
@@ -1296,7 +1347,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 5: POST SCHEDULER (WITH AI BATCH GENERATOR BUTTON) */}
+            {/* SUB-SCREEN 5: POST SCHEDULER */}
             {menuSubScreen === 'post_scheduler' && (
               <div className="space-y-3">
                 <div className="grid grid-cols-3 bg-[#0e0e14] p-1 rounded-2xl border border-gray-800 text-[11px] font-bold shadow-inner">
@@ -1454,11 +1505,15 @@ export default function MobileDashboard() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-2xl">
-                      {profileData.logoUrl}
+                    <div className="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-2xl overflow-hidden">
+                      {profileData.logoUrl?.startsWith('http') ? (
+                        <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{profileData.logoUrl || '👗'}</span>
+                      )}
                     </div>
                     <div className="flex-1">
-                      <label className="text-[10px] font-bold text-gray-400">Business Logo Icon / Emoji:</label>
+                      <label className="text-[10px] font-bold text-gray-400">Business Logo Icon / URL:</label>
                       <input
                         type="text"
                         value={profileData.logoUrl}
@@ -1674,7 +1729,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 9: STAFF MANAGEMENT (WORKING WITH +INVITE STAFF MODAL) */}
+            {/* SUB-SCREEN 9: STAFF MANAGEMENT */}
             {menuSubScreen === 'staff' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1718,28 +1773,84 @@ export default function MobileDashboard() {
           MODALS & DRAWERS
       ───────────────────────────────────────────────────────────── */}
 
-      {/* Modal 1: Smart All-In-One QR Counter Hub */}
+      {/* Modal 0: In-App Mobile Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-emerald-500/40 rounded-3xl p-5 max-w-xs w-full space-y-3.5 relative shadow-2xl">
+            <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl">
+              <LogIn size={20} />
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-sm font-black text-white">Log in to DealClose AI</h3>
+              <p className="text-[10px] text-gray-400">Sync all your real store data, chats & leads</p>
+            </div>
+
+            <form onSubmit={handleMobileLogin} className="space-y-2.5 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Email Address:</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Password:</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl text-xs shadow-lg mt-1"
+              >
+                {isLoggingIn ? 'Logging In...' : 'Log In to Store 🚀'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1: Smart All-In-One QR Counter Hub (Live Preview) */}
       {showSmartQrModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl text-center">
+          <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl text-center max-h-[90vh] overflow-y-auto custom-scrollbar">
             <button onClick={() => setShowSmartQrModal(false)} className="absolute top-4 right-4 text-gray-400">
               <X size={16} />
             </button>
             
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto text-2xl">
-              <QrCode size={24} />
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto text-2xl overflow-hidden">
+              {profileData.logoUrl?.startsWith('http') ? (
+                <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span>{profileData.logoUrl || '🛍️'}</span>
+              )}
             </div>
 
             <h3 className="text-sm font-black text-white">{profileData.businessName}</h3>
             <p className="text-[10px] text-gray-400">1 Scan connects WhatsApp, Instagram, YouTube, Google Review & UPI</p>
 
-            {/* Visual QR Simulator Canvas */}
-            <div className="p-4 bg-white rounded-2xl max-w-[180px] mx-auto shadow-inner flex flex-col items-center justify-center">
-              <QrCode size={130} className="text-black" />
-              <span className="text-[9px] font-mono text-black font-black mt-1">SCAN TO CONNECT & PAY</span>
+            {/* High-Resolution Visual QR Canvas */}
+            <div className="p-4 bg-white rounded-2xl max-w-[190px] mx-auto shadow-inner flex flex-col items-center justify-center">
+              <QrCode size={140} className="text-black" />
+              <span className="text-[9px] font-mono text-black font-black mt-1 uppercase">SCAN TO CONNECT & PAY</span>
             </div>
 
-            {/* Embedded Multi-Channel Badges */}
+            {/* Live Interactive Action Links */}
             <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold pt-1">
               <a href={profileData.googleBusinessLink} target="_blank" rel="noreferrer" className="p-2 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded-xl flex items-center justify-center gap-1">
                 <Star size={12} className="text-amber-400" />
@@ -1755,16 +1866,26 @@ export default function MobileDashboard() {
               </a>
               <div className="p-2 bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 rounded-xl flex items-center justify-center gap-1">
                 <DollarSign size={12} className="text-emerald-400" />
-                <span>UPI Payment</span>
+                <span>UPI: {profileData.upiId.slice(0, 10)}...</span>
               </div>
             </div>
 
-            <button
-              onClick={() => alert('Counter Standee QR Image downloaded for printing!')}
-              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg mt-1 flex items-center justify-center gap-1.5"
-            >
-              <Download size={14} /> Download Counter Standee QR
-            </button>
+            <div className="flex gap-2 pt-1">
+              <a
+                href={`/card/${user?._id || user?.id || 'demo'}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 py-2 bg-gray-900 border border-gray-800 text-gray-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1"
+              >
+                <Eye size={13} /> View Live Card ↗
+              </a>
+              <button
+                onClick={() => alert('Counter Standee QR Image downloaded for printing!')}
+                className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1"
+              >
+                <Download size={13} /> Download QR
+              </button>
+            </div>
           </div>
         </div>
       )}
