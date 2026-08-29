@@ -132,10 +132,18 @@ export default function Settings() {
           discountPercentage: savedData.discountConfig?.percentage || prevConfig.discountPercentage,
           discountCode: savedData.discountConfig?.code || prevConfig.discountCode,
           validityDays: savedData.discountConfig?.validityDays || prevConfig.validityDays,
-          workspaces: (savedData.workspaces || []).map((ws) => ({
-            ...ws,
-            instagramConfig: ws.instagramConfig || {},
-          })),
+          workspaces: (savedData.workspaces || []).map((ws) => {
+            const isProp = ws.name && ws.name.toLowerCase().includes('property');
+            return {
+              ...ws,
+              instagramConfig: ws.instagramConfig || {},
+              externalApiUrl: ws.externalApiUrl || (isProp ? 'https://newpropertyhub.in' : ''),
+              externalApiPostUrl: ws.externalApiPostUrl || (isProp ? 'https://newpropertyhub.in/api/post' : ''),
+              externalApiSearchUrl: ws.externalApiSearchUrl || (isProp ? 'https://newpropertyhub.in/api/search' : ''),
+              externalApiVisitUrl: ws.externalApiVisitUrl || (isProp ? 'https://newpropertyhub.in/api/visit' : ''),
+              externalApiBlogUrl: ws.externalApiBlogUrl || (isProp ? 'https://newpropertyhub.in/api/blog' : '')
+            };
+          }),
           aiAgentEnabled: savedData.aiAgentEnabled !== false,
           acceptCollabs: savedData.acceptCollabs || false,
           businessDescription: savedData.businessDescription || '',
