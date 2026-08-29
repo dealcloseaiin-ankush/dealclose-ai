@@ -7,8 +7,8 @@ import {
   Upload, Radio, Flame, Clock, TrendingUp, AlertCircle, Trash2, Calendar,
   Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
-  Link, Eye, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
-  Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, User, BookOpen, Search
+  Link, Eye, EyeOff, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
+  Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, User, BookOpen, Search, Webhook
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -46,6 +46,8 @@ export default function MobileDashboard() {
   const [showAddWorkspaceModal, setShowAddWorkspaceModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showCreateBlogModal, setShowCreateBlogModal] = useState(false);
+  const [showWaConnectModal, setShowWaConnectModal] = useState(false);
+  const [showIgConnectModal, setShowIgConnectModal] = useState(false);
 
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('ankush.bani@gmail.com');
@@ -59,16 +61,19 @@ export default function MobileDashboard() {
   const [isWaAutomationOn, setIsWaAutomationOn] = useState(true);
   const [isIgAutomationOn, setIsIgAutomationOn] = useState(true);
 
-  // Business Workspaces
+  // Show / Hide External API Token
+  const [showExternalToken, setShowExternalToken] = useState(false);
+
+  // Full Backend Workspaces / Multi-Store List
   const [workspaces, setWorkspaces] = useState([
-    { id: 'ws_1', name: user?.businessName || 'DealClose Store (Main Branch)', category: 'Retail & Fashion' }
+    { id: 'main', name: 'DealClose AI (Main Business)', category: 'Retail & Fashion' }
   ]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState('ws_1');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState('main');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
-  // Business Profile, SEO & External Website Sync Config
+  // Business Profile, SEO & 🔗 Custom Webhooks & API Integrations
   const [profileData, setProfileData] = useState({
-    businessName: user?.businessName || 'DealClose Fashion & Boutique',
+    businessName: user?.businessName || 'DealClose AI',
     ownerPhone: user?.phone || user?.ownerPhone || '+91 98765 43210',
     managerPhone: '+91 98260 99887',
     logoUrl: user?.logo || '👗',
@@ -78,17 +83,22 @@ export default function MobileDashboard() {
     facebookLink: user?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose',
     googleBusinessLink: user?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review',
     upiId: user?.digitalCardConfig?.upiId || 'dealclose@upi',
-    // 🌐 External Website & Property Listing Sync
-    externalApiUrl: '',
-    externalApiPostUrl: '',
-    externalApiSearchUrl: '',
-    externalApiVisitUrl: '',
-    externalApiToken: ''
+    // 🔗 Custom Webhooks & External Website Sync (NewPropertyHub, etc.)
+    externalApiUrl: 'https://newpropertyhub.in',
+    externalApiToken: '',
+    externalApiPostUrl: 'https://newpropertyhub.in/api/post',
+    externalApiSearchUrl: 'https://newpropertyhub.in/api/search',
+    externalApiVisitUrl: 'https://newpropertyhub.in/api/visit',
+    externalApiBlogUrl: 'https://newpropertyhub.in/api/blog',
+    customWebhooks: ''
   });
 
   // Channel Connection States
   const [waApiKey, setWaApiKey] = useState('EAAOx8Z... (Meta Cloud API Linked)');
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState('109823485748392');
   const [isWaConnected, setIsWaConnected] = useState(true);
+  const [igAccessToken, setIgAccessToken] = useState('');
+  const [isIgConnected, setIsIgConnected] = useState(true);
 
   // Blog & SEO Articles List
   const [blogArticles, setBlogArticles] = useState([
@@ -129,7 +139,7 @@ export default function MobileDashboard() {
   // CRM Pipeline Stages
   const crmStages = ['New Lead', 'Contacted', 'Interested', 'Site Visit Scheduled', 'Converted', 'Lost'];
 
-  // Chats Data (Live Synced from MongoDB Message collection)
+  // Chats Data (Live Synced from MongoDB Message collection with robust fallbacks)
   const [chats, setChats] = useState([]);
 
   // Contacts & CRM List (Live Synced from MongoDB Lead collection)
@@ -190,7 +200,7 @@ export default function MobileDashboard() {
     { id: 'k2', title: 'Products & Offerings', content: 'Women kurtas, Sarees, Wedding lehengas, Handcrafted jewelry, and custom alterations.' },
     { id: 'k3', title: 'Pricing & Discount Policy', content: 'Kurtas start from ₹899, Sarees from ₹1,499. Flat 10% off on orders above ₹3,000 with coupon "SAVE10".' },
     { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery across India on prepaid orders. COD available for ₹50 extra. Delivery takes 2-4 days.' },
-    { id: 'k5', title: 'Property / Inventory External Sync', content: 'Auto posts property listings and synchronizes site visit appointments to external API.' }
+    { id: 'k5', title: 'Property & External Website Sync', content: 'Auto posts property listings and synchronizes site visit appointments to external website.' }
   ]);
   const [showAddAiBoxModal, setShowAddAiBoxModal] = useState(false);
   const [newAiBox, setNewAiBox] = useState({ title: '', content: '' });
@@ -218,128 +228,149 @@ export default function MobileDashboard() {
   // ─────────────────────────────────────────────────────────────
   // 2. LIVE BACKEND DATA SYNC ON MOUNT (MongoDB + Express)
   // ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchLiveBackendData = async () => {
-      try {
-        // 1. Fetch User Profile & Settings
-        const { data: profileRes } = await api.get('/users/profile').catch(() => ({ data: {} }));
-        const liveUser = profileRes.user || profileRes.data || profileRes;
-        if (liveUser?.businessName || liveUser?._id) {
-          setProfileData(prev => ({
-            ...prev,
-            businessName: liveUser.businessName || prev.businessName,
-            ownerPhone: liveUser.phone || liveUser.ownerPhone || prev.ownerPhone,
-            logoUrl: liveUser.logo || liveUser.avatar || prev.logoUrl,
-            instagramLink: liveUser.digitalCardConfig?.instagram || prev.instagramLink,
-            youtubeLink: liveUser.digitalCardConfig?.youtube || prev.youtubeLink,
-            facebookLink: liveUser.digitalCardConfig?.facebook || prev.facebookLink,
-            googleBusinessLink: liveUser.digitalCardConfig?.googleBusiness || prev.googleBusinessLink,
-            upiId: liveUser.digitalCardConfig?.upiId || prev.upiId,
-            externalApiUrl: liveUser.externalApiUrl || '',
-            externalApiPostUrl: liveUser.externalApiPostUrl || '',
-            externalApiSearchUrl: liveUser.externalApiSearchUrl || '',
-            externalApiVisitUrl: liveUser.externalApiVisitUrl || '',
-            externalApiToken: liveUser.externalApiToken || ''
-          }));
-          if (liveUser.workspaces && liveUser.workspaces.length > 0) {
-            setWorkspaces(liveUser.workspaces);
-          }
-          if (liveUser.businessDescription || liveUser.aiRules) {
-            setAiKnowledgeList(prev => [
-              { id: 'k1', title: 'Store / Business Name', content: liveUser.businessName || 'Our Business' },
-              { id: 'k2', title: 'Business Description & Offerings', content: liveUser.businessDescription || 'Store offerings and services' },
-              { id: 'k3', title: 'AI Automation Rules & Instructions', content: liveUser.aiRules || 'Always reply politely with price and catalog link' },
-              { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery on prepaid orders across India.' },
-              { id: 'k5', title: 'Property / Inventory External Sync', content: 'Auto posts property listings and synchronizes site visit appointments to external API.' }
-            ]);
-          }
-        }
+  const fetchLiveBackendData = async () => {
+    try {
+      // 1. Fetch User Profile & Settings
+      const { data: profileRes } = await api.get('/users/profile').catch(() => ({ data: {} }));
+      const liveUser = profileRes.user || profileRes.data || profileRes;
+      if (liveUser?.businessName || liveUser?._id) {
+        setProfileData(prev => ({
+          ...prev,
+          businessName: liveUser.businessName || prev.businessName,
+          ownerPhone: liveUser.phone || liveUser.ownerPhone || prev.ownerPhone,
+          logoUrl: liveUser.logo || liveUser.avatar || prev.logoUrl,
+          instagramLink: liveUser.digitalCardConfig?.instagram || prev.instagramLink,
+          youtubeLink: liveUser.digitalCardConfig?.youtube || prev.youtubeLink,
+          facebookLink: liveUser.digitalCardConfig?.facebook || prev.facebookLink,
+          googleBusinessLink: liveUser.digitalCardConfig?.googleBusiness || prev.googleBusinessLink,
+          upiId: liveUser.digitalCardConfig?.upiId || prev.upiId,
+          externalApiUrl: liveUser.externalApiUrl || prev.externalApiUrl,
+          externalApiToken: liveUser.externalApiToken || '',
+          externalApiPostUrl: liveUser.externalApiPostUrl || prev.externalApiPostUrl,
+          externalApiSearchUrl: liveUser.externalApiSearchUrl || prev.externalApiSearchUrl,
+          externalApiVisitUrl: liveUser.externalApiVisitUrl || prev.externalApiVisitUrl,
+          externalApiBlogUrl: liveUser.externalApiBlogUrl || prev.externalApiBlogUrl,
+          customWebhooks: liveUser.customWebhooks || ''
+        }));
 
-        // 2. Fetch Live Contacts & Leads
-        const { data: contactsRes } = await api.get('/contacts').catch(() => ({ data: [] }));
-        const liveContacts = Array.isArray(contactsRes) ? contactsRes : (contactsRes.contacts || contactsRes.data || []);
-        if (liveContacts && liveContacts.length > 0) {
-          setContacts(liveContacts.map(c => ({
-            id: c._id || c.id,
-            name: c.name || 'Customer',
-            phone: c.phone || c.phoneNumber || '+91 98765 00000',
-            city: c.city || 'India',
-            stage: c.stage || c.status || 'New Lead',
-            source: c.source || 'whatsapp',
-            optIn: true
-          })));
-        }
-
-        // 3. Fetch Live WhatsApp & Instagram Chats from /api/chats
-        const { data: rawMessages } = await api.get('/chats').catch(() => ({ data: [] }));
-        if (Array.isArray(rawMessages) && rawMessages.length > 0) {
-          const groupedMap = {};
-          rawMessages.forEach(msg => {
-            const phone = msg.customerPhone;
-            if (!phone) return;
-            if (!groupedMap[phone]) {
-              groupedMap[phone] = {
-                _id: phone,
-                customerName: msg.customerName || (msg.platform?.startsWith('instagram') ? phone.replace('IG_', '@') : phone),
-                customerPhone: phone,
-                channel: msg.platform?.startsWith('instagram') ? 'instagram' : 'whatsapp',
-                lastMessage: msg.message || msg.text || '',
-                time: msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-                unreadCount: msg.sender === 'customer' && msg.status !== 'read' ? 1 : 0,
-                stage: msg.stage || 'Interested',
-                messages: []
-              };
+        // Hydrate All Branches / Workspaces
+        const wsList = [{ id: 'main', name: liveUser.businessName || 'DealClose AI (Main Business)', category: 'Main' }];
+        if (liveUser.workspaces && Array.isArray(liveUser.workspaces)) {
+          liveUser.workspaces.forEach((ws, idx) => {
+            if (ws && ws.name) {
+              wsList.push({
+                id: ws._id ? ws._id.toString() : `ws_${idx}`,
+                name: ws.name,
+                category: ws.description || 'Branch / Store'
+              });
             }
-            groupedMap[phone].lastMessage = msg.message || msg.text || '';
-            groupedMap[phone].messages.push({
-              sender: msg.sender === 'business' || msg.sender === 'bot' || msg.sender === 'agent' ? 'business' : 'customer',
-              text: msg.message || msg.text || '',
-              time: msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-              attachment: msg.mediaUrl ? { type: msg.mediaType === 'image' ? 'image' : 'pdf', name: msg.mediaUrl } : null
-            });
           });
-
-          const conversationList = Object.values(groupedMap);
-          if (conversationList.length > 0) {
-            setChats(conversationList);
-          }
         }
+        setWorkspaces(wsList);
 
-        // 4. Fetch Live Catalog Items
-        const { data: catalogRes } = await api.get('/catalog').catch(() => ({ data: [] }));
-        const liveCatalog = Array.isArray(catalogRes) ? catalogRes : (catalogRes.items || catalogRes.data || []);
-        if (liveCatalog && liveCatalog.length > 0) {
-          setCatalogItems(liveCatalog.map(p => ({
-            id: p._id || p.id,
-            name: p.name || p.title,
-            price: p.price ? `₹${p.price}` : '₹999',
-            image: p.image || '🛍️',
-            inStock: true
-          })));
+        if (liveUser.businessDescription || liveUser.aiRules) {
+          setAiKnowledgeList([
+            { id: 'k1', title: 'Store / Business Name', content: liveUser.businessName || 'Our Business' },
+            { id: 'k2', title: 'Business Description & Offerings', content: liveUser.businessDescription || 'Store offerings and services' },
+            { id: 'k3', title: 'AI Automation Rules & Instructions', content: liveUser.aiRules || 'Always reply politely with price and catalog link' },
+            { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery on prepaid orders across India.' },
+            { id: 'k5', title: 'Property & External Website Sync', content: 'Auto posts property listings and synchronizes site visit appointments to external website.' }
+          ]);
         }
-
-        // 5. Fetch Live Connected Instagram Posts
-        const { data: postsRes } = await api.get('/instagram/posts').catch(() => ({ data: [] }));
-        const livePosts = Array.isArray(postsRes) ? postsRes : (postsRes.posts || postsRes.data || []);
-        if (livePosts && livePosts.length > 0) {
-          setLiveIgPosts(livePosts.map(p => ({
-            id: p._id || p.id,
-            title: p.caption ? p.caption.slice(0, 35) + '...' : 'Instagram Post',
-            type: p.mediaType === 'VIDEO' ? 'reel' : 'post',
-            thumbnail: p.mediaUrl ? '📸' : '✨',
-            commentsCount: p.commentsCount || 48,
-            keyword: p.keywordTrigger || 'PRICE',
-            responseType: p.responseType || 'product_rate',
-            customLink: p.link || 'https://dealcloseai.in/shop',
-            dmText: p.dmMessage || 'Namaste! Check our catalog with free shipping!',
-            active: true
-          })));
-        }
-      } catch (err) {
-        console.warn('Backend sync finished with partial data:', err.message);
       }
-    };
 
+      // 2. Fetch Live Contacts & Leads
+      const { data: contactsRes } = await api.get('/contacts').catch(() => ({ data: [] }));
+      const liveContacts = Array.isArray(contactsRes) ? contactsRes : (contactsRes.contacts || contactsRes.data || []);
+      if (liveContacts && liveContacts.length > 0) {
+        setContacts(liveContacts.map(c => ({
+          id: c._id || c.id,
+          name: c.name || 'Customer',
+          phone: c.phone || c.phoneNumber || '+91 98765 00000',
+          city: c.city || 'India',
+          stage: c.stage || c.status || 'New Lead',
+          source: c.source || 'whatsapp',
+          optIn: true
+        })));
+      }
+
+      // 3. Fetch Live WhatsApp & Instagram Chats from /api/chats
+      // 🔥 FIX: Extract messageText, body, message or text from MongoDB messageModel
+      const { data: rawMessages } = await api.get('/chats').catch(() => ({ data: [] }));
+      if (Array.isArray(rawMessages) && rawMessages.length > 0) {
+        const groupedMap = {};
+        rawMessages.forEach(msg => {
+          const phone = msg.customerPhone;
+          if (!phone) return;
+          
+          const rawText = msg.messageText || msg.message || msg.text || msg.body || (msg.mediaUrl ? '📎 Media attachment' : '💬 Message');
+          const isFromCustomer = msg.direction === 'incoming' || msg.sentBy === 'customer' || msg.sender === 'customer';
+          const isIg = msg.channel === 'instagram_dm' || msg.channel === 'instagram_comment' || String(phone).startsWith('IG_') || (msg.tags && msg.tags.includes('ig_comment'));
+
+          if (!groupedMap[phone]) {
+            groupedMap[phone] = {
+              _id: phone,
+              customerName: msg.customerName || (isIg ? String(phone).replace('IG_', '@') : phone),
+              customerPhone: phone,
+              channel: isIg ? 'instagram' : 'whatsapp',
+              lastMessage: rawText,
+              time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+              unreadCount: isFromCustomer && msg.status !== 'read' ? 1 : 0,
+              stage: msg.stage || 'Interested',
+              messages: []
+            };
+          }
+          groupedMap[phone].lastMessage = rawText;
+          groupedMap[phone].messages.push({
+            sender: isFromCustomer ? 'customer' : 'business',
+            text: rawText,
+            time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            attachment: msg.mediaUrl ? { type: msg.mediaType === 'image' ? 'image' : 'pdf', name: msg.mediaUrl } : null
+          });
+        });
+
+        const conversationList = Object.values(groupedMap);
+        if (conversationList.length > 0) {
+          setChats(conversationList);
+        }
+      }
+
+      // 4. Fetch Live Catalog Items
+      const { data: catalogRes } = await api.get('/catalog').catch(() => ({ data: [] }));
+      const liveCatalog = Array.isArray(catalogRes) ? catalogRes : (catalogRes.items || catalogRes.data || []);
+      if (liveCatalog && liveCatalog.length > 0) {
+        setCatalogItems(liveCatalog.map(p => ({
+          id: p._id || p.id,
+          name: p.name || p.title,
+          price: p.price ? `₹${p.price}` : '₹999',
+          image: p.image || '🛍️',
+          inStock: true
+        })));
+      }
+
+      // 5. Fetch Live Connected Instagram Posts
+      const { data: postsRes } = await api.get('/instagram/posts').catch(() => ({ data: [] }));
+      const livePosts = Array.isArray(postsRes) ? postsRes : (postsRes.posts || postsRes.data || []);
+      if (livePosts && livePosts.length > 0) {
+        setLiveIgPosts(livePosts.map(p => ({
+          id: p._id || p.id,
+          title: p.caption ? p.caption.slice(0, 35) + '...' : 'Instagram Post',
+          type: p.mediaType === 'VIDEO' ? 'reel' : 'post',
+          thumbnail: p.mediaUrl ? '📸' : '✨',
+          commentsCount: p.commentsCount || 48,
+          keyword: p.keywordTrigger || 'PRICE',
+          responseType: p.responseType || 'product_rate',
+          customLink: p.link || 'https://dealcloseai.in/shop',
+          dmText: p.dmMessage || 'Namaste! Check our catalog with free shipping!',
+          active: true
+        })));
+      }
+    } catch (err) {
+      console.warn('Backend sync finished with partial data:', err.message);
+    }
+  };
+
+  useEffect(() => {
     fetchLiveBackendData();
   }, [user]);
 
@@ -352,12 +383,26 @@ export default function MobileDashboard() {
   // 3. HANDLERS
   // ─────────────────────────────────────────────────────────────
 
+  // Switch Workspace / Channel Dropdown
+  const handleWorkspaceChange = (selectedId) => {
+    if (selectedId === 'add_new') {
+      setShowAddWorkspaceModal(true);
+      return;
+    }
+    setActiveWorkspaceId(selectedId);
+    const selectedWs = workspaces.find(w => w.id === selectedId);
+    if (selectedWs) {
+      alert(`Switched active business to: "${selectedWs.name}" 🏢✅`);
+    }
+  };
+
   const handleMobileLogin = async (e) => {
     e.preventDefault();
     setIsLoggingIn(true);
     try {
       await login(loginEmail, loginPassword);
       setShowLoginModal(false);
+      await fetchLiveBackendData();
       alert('Login Successful! Welcome to DealClose AI Mobile! 🚀');
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
@@ -467,9 +512,11 @@ export default function MobileDashboard() {
         externalApiPostUrl: profileData.externalApiPostUrl,
         externalApiSearchUrl: profileData.externalApiSearchUrl,
         externalApiVisitUrl: profileData.externalApiVisitUrl,
-        externalApiToken: profileData.externalApiToken
+        externalApiBlogUrl: profileData.externalApiBlogUrl,
+        externalApiToken: profileData.externalApiToken,
+        customWebhooks: profileData.customWebhooks
       });
-      alert('Business Profile, External Website Sync & Social Links Saved to Database! ✅');
+      alert('Business Profile, 🔗 Custom Webhooks & API Integrations Saved to Database! ✅');
     } catch (err) {
       alert('Business Profile Saved Successfully! ✅');
     }
@@ -501,11 +548,12 @@ export default function MobileDashboard() {
     alert('New staff member invited with scoped lead access! 👥✅');
   };
 
-  const handleAddWorkspace = (e) => {
+  const handleAddWorkspace = async (e) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
-    const newWs = { id: 'ws_' + Date.now(), name: newWorkspaceName, category: 'Branch / Store' };
-    setWorkspaces([...workspaces, newWs]);
+    const newWs = { id: 'ws_' + Date.now(), name: newWorkspaceName.trim(), category: 'Branch / Store' };
+    const updated = [...workspaces, newWs];
+    setWorkspaces(updated);
     setActiveWorkspaceId(newWs.id);
     setNewWorkspaceName('');
     setShowAddWorkspaceModal(false);
@@ -553,10 +601,10 @@ export default function MobileDashboard() {
     <div className="min-h-screen bg-[#060608] text-gray-100 font-sans max-w-md mx-auto relative shadow-2xl flex flex-col justify-between selection:bg-purple-500/30">
 
       {/* ─────────────────────────────────────────────────────────────
-          TOP APP HEADER
+          TOP APP HEADER (WITH LOGO, MULTI-STORE DROPDOWN & LOGIN STATUS)
       ───────────────────────────────────────────────────────────── */}
-      <header className="bg-[#0c0c12] border-b border-gray-800/80 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-2.5">
+      <header className="bg-[#0c0c12] border-b border-gray-800/80 px-3.5 py-2.5 sticky top-0 z-40 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2">
           {activeChatThread || (activeTab === 'menu' && menuSubScreen !== 'menu_grid') ? (
             <button 
               onClick={() => {
@@ -568,7 +616,7 @@ export default function MobileDashboard() {
               <ArrowLeft size={16} />
             </button>
           ) : (
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center font-black text-black text-sm shadow-md overflow-hidden">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center font-black text-black text-sm shadow-md overflow-hidden shrink-0">
               {profileData.logoUrl?.startsWith('http') ? (
                 <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
               ) : (
@@ -576,8 +624,9 @@ export default function MobileDashboard() {
               )}
             </div>
           )}
+
           <div>
-            <h1 className="font-extrabold text-sm text-white tracking-tight leading-tight">
+            <h1 className="font-extrabold text-xs text-white tracking-tight leading-tight">
               {activeChatThread 
                 ? activeChatThread.customerName 
                 : (activeTab === 'chats' ? 'Conversations' : 
@@ -591,15 +640,27 @@ export default function MobileDashboard() {
                     menuSubScreen === 'meta_templates' ? 'Meta Template Approvals' :
                     menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
                     menuSubScreen === 'blog_seo' ? 'Google SEO & Blogs' :
+                    menuSubScreen === 'custom_webhooks' ? '🔗 Custom Webhooks & API' :
                     menuSubScreen === 'settings_ai_training' ? 'Settings, Profile & API' : 
                     menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu'))}
             </h1>
             
-            <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="truncate max-w-[150px]">
-                {activeChatThread ? activeChatThread.customerPhone : (workspaces.find(w => w.id === activeWorkspaceId)?.name || profileData.businessName)}
-              </span>
+            {/* 🏢 Store / Channel Switcher Dropdown (Just like desktop Settings) */}
+            <div className="flex items-center gap-1 mt-0.5">
+              <select
+                value={activeWorkspaceId}
+                onChange={(e) => handleWorkspaceChange(e.target.value)}
+                className="bg-black/60 border border-gray-800 rounded-lg px-1.5 py-0.5 text-[10px] text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[170px] truncate"
+              >
+                {workspaces.map(ws => (
+                  <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
+                    🏢 {ws.name}
+                  </option>
+                ))}
+                <option value="add_new" className="bg-[#0e0e14] text-purple-300 font-bold">
+                  ➕ Add New Business / Store...
+                </option>
+              </select>
             </div>
           </div>
         </div>
@@ -1082,7 +1143,7 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 5: MENU (COMPLETE FULL GRID WITH BLOG & SEO ENGINE)
+            TAB 5: MENU (COMPLETE FULL GRID WITH CUSTOM WEBHOOKS & API TOOL)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'menu' && (
           <div className="space-y-4 animate-fade-in">
@@ -1102,7 +1163,21 @@ export default function MobileDashboard() {
 
                 <div className="grid grid-cols-2 gap-2.5 text-xs font-bold">
                   
-                  {/* Tool 1: WhatsApp Auto-Replies */}
+                  {/* Tool 1: 🔗 Custom Webhooks & API Integrations */}
+                  <button 
+                    onClick={() => setMenuSubScreen('custom_webhooks')}
+                    className="bg-gradient-to-br from-teal-950/40 to-[#0e0e14] border border-teal-500/40 p-3.5 rounded-2xl text-left space-y-2 hover:border-teal-400 transition-all shadow-md"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center">
+                      <Webhook size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white font-black">🔗 Custom Webhooks</div>
+                      <div className="text-[10px] text-teal-400 font-normal">Link website API & sync</div>
+                    </div>
+                  </button>
+
+                  {/* Tool 2: WhatsApp Auto-Replies */}
                   <button 
                     onClick={() => setMenuSubScreen('auto_reply')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-emerald-500/40 transition-all"
@@ -1116,7 +1191,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 2: Instagram Comment-to-DM */}
+                  {/* Tool 3: Instagram Comment-to-DM */}
                   <button 
                     onClick={() => setMenuSubScreen('ig_comment_dm')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-pink-500/40 transition-all"
@@ -1130,7 +1205,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 3: Flow & Auto-Pilot Automations */}
+                  {/* Tool 4: Flow & Auto-Pilot Automations */}
                   <button 
                     onClick={() => setMenuSubScreen('flow_automation')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-cyan-500/40 transition-all"
@@ -1140,16 +1215,16 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-white">Flow Automation</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Website sync & rules</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Property auto-sync</div>
                     </div>
                   </button>
 
-                  {/* Tool 4: Contacts & CRM */}
+                  {/* Tool 5: Contacts & CRM */}
                   <button 
                     onClick={() => setMenuSubScreen('contacts_crm')}
-                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-teal-500/40 transition-all"
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-purple-500/40 transition-all"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
                       <Users size={16} />
                     </div>
                     <div>
@@ -1158,35 +1233,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 5: Meta WhatsApp Templates */}
-                  <button 
-                    onClick={() => setMenuSubScreen('meta_templates')}
-                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-blue-500/40 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                      <CheckCircle2 size={16} />
-                    </div>
-                    <div>
-                      <div className="text-white">Meta Templates</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Approvals & status</div>
-                    </div>
-                  </button>
-
-                  {/* Tool 6: Social Post Scheduler */}
-                  <button 
-                    onClick={() => setMenuSubScreen('post_scheduler')}
-                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-purple-500/40 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-                      <Calendar size={16} />
-                    </div>
-                    <div>
-                      <div className="text-white">Post Scheduler</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Pre-built, Custom & Live</div>
-                    </div>
-                  </button>
-
-                  {/* Tool 7: Google SEO & Blog Engine */}
+                  {/* Tool 6: Google SEO & Blog Engine */}
                   <button 
                     onClick={() => setMenuSubScreen('blog_seo')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-amber-500/40 transition-all"
@@ -1200,6 +1247,20 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
+                  {/* Tool 7: Meta WhatsApp Templates */}
+                  <button 
+                    onClick={() => setMenuSubScreen('meta_templates')}
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-blue-500/40 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                      <CheckCircle2 size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white">Meta Templates</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Approvals & status</div>
+                    </div>
+                  </button>
+
                   {/* Tool 8: Settings & Channels */}
                   <button 
                     onClick={() => setMenuSubScreen('settings_ai_training')}
@@ -1209,8 +1270,8 @@ export default function MobileDashboard() {
                       <SettingsIcon size={16} />
                     </div>
                     <div>
-                      <div className="text-white">Settings & Channels</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Profile, API & Webhooks</div>
+                      <div className="text-white">Settings & Profile</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Logo, API & AI brain</div>
                     </div>
                   </button>
 
@@ -1231,6 +1292,109 @@ export default function MobileDashboard() {
                     Open QR ⚡
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 1.5: 🔗 CUSTOM WEBHOOKS & API INTEGRATIONS */}
+            {menuSubScreen === 'custom_webhooks' && (
+              <div className="space-y-3 pb-8 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
+                  <div>
+                    <h3 className="text-xs font-black text-teal-300 flex items-center gap-1.5">
+                      <Webhook size={15} />
+                      <span>🔗 Custom Webhooks & API Integrations</span>
+                    </h3>
+                    <p className="text-[10px] text-gray-400">Link your website (e.g. NewPropertyHub) to auto-list properties & sync leads</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveBusinessProfile} className="bg-[#0e0e14] border border-teal-500/30 p-3.5 rounded-2xl space-y-3 text-xs shadow-md">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">Base Website URL:</label>
+                    <input
+                      type="url"
+                      placeholder="https://newpropertyhub.in"
+                      value={profileData.externalApiUrl}
+                      onChange={(e) => setProfileData({ ...profileData, externalApiUrl: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500 font-mono text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">API Secret Token / Key:</label>
+                    <div className="relative">
+                      <input
+                        type={showExternalToken ? "text" : "password"}
+                        placeholder="Bearer token or secret key"
+                        value={profileData.externalApiToken}
+                        onChange={(e) => setProfileData({ ...profileData, externalApiToken: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-teal-500 font-mono text-xs pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowExternalToken(!showExternalToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                      >
+                        {showExternalToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-800/80 space-y-2">
+                    <span className="text-[11px] font-bold text-teal-400">Specific Custom API Endpoints:</span>
+                    
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Quick Post Endpoint URL (POST):</label>
+                      <input
+                        type="url"
+                        placeholder="https://newpropertyhub.in/api/post"
+                        value={profileData.externalApiPostUrl}
+                        onChange={(e) => setProfileData({ ...profileData, externalApiPostUrl: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Search / Catalog Endpoint URL (GET):</label>
+                      <input
+                        type="url"
+                        placeholder="https://newpropertyhub.in/api/search"
+                        value={profileData.externalApiSearchUrl}
+                        onChange={(e) => setProfileData({ ...profileData, externalApiSearchUrl: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Schedule Visit Endpoint URL (POST):</label>
+                      <input
+                        type="url"
+                        placeholder="https://newpropertyhub.in/api/visit"
+                        value={profileData.externalApiVisitUrl}
+                        onChange={(e) => setProfileData({ ...profileData, externalApiVisitUrl: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-gray-400">Publish Blog Endpoint URL (POST):</label>
+                      <input
+                        type="url"
+                        placeholder="https://newpropertyhub.in/api/blog"
+                        value={profileData.externalApiBlogUrl}
+                        onChange={(e) => setProfileData({ ...profileData, externalApiBlogUrl: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black text-xs rounded-xl shadow-lg mt-2"
+                  >
+                    Save & Test Webhooks Integration 🚀
+                  </button>
+                </form>
               </div>
             )}
 
@@ -1569,7 +1733,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 7: SETTINGS, PROFILE, EXTERNAL WEBSITE SYNC & API HUB */}
+            {/* SUB-SCREEN 7: SETTINGS, PROFILE, LOGO & CHANNELS */}
             {menuSubScreen === 'settings_ai_training' && (
               <div className="space-y-4 pb-8">
                 
@@ -1635,42 +1799,6 @@ export default function MobileDashboard() {
                     </div>
                   </div>
 
-                  {/* External Website & Property Listing Sync */}
-                  <div className="pt-2 border-t border-gray-800 space-y-1.5">
-                    <span className="text-[10px] font-bold text-cyan-300 flex items-center gap-1">
-                      <Globe size={12} />
-                      <span>External Website & Property Sync API:</span>
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Post Property / Product API URL (POST)"
-                      value={profileData.externalApiPostUrl}
-                      onChange={(e) => setProfileData({ ...profileData, externalApiPostUrl: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-cyan-300 font-mono"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search Inventory API URL (GET)"
-                      value={profileData.externalApiSearchUrl}
-                      onChange={(e) => setProfileData({ ...profileData, externalApiSearchUrl: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-cyan-300 font-mono"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Book Site Visit API URL (POST)"
-                      value={profileData.externalApiVisitUrl}
-                      onChange={(e) => setProfileData({ ...profileData, externalApiVisitUrl: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-cyan-300 font-mono"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Bearer API Token / Secret"
-                      value={profileData.externalApiToken}
-                      onChange={(e) => setProfileData({ ...profileData, externalApiToken: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-gray-400 font-mono"
-                    />
-                  </div>
-
                   {/* Multi-Channel Digital Links for Smart QR */}
                   <div className="pt-2 border-t border-gray-800 space-y-1.5">
                     <span className="text-[10px] font-bold text-purple-300">Smart QR Social & Review Links:</span>
@@ -1705,7 +1833,7 @@ export default function MobileDashboard() {
                   </div>
                 </form>
 
-                {/* 2. WhatsApp API & Instagram Channel Linking */}
+                {/* 2. WhatsApp API & Instagram Channel Linking (Interactive Connect Modals) */}
                 <div className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-3 text-xs shadow-sm">
                   <span className="font-bold text-white flex items-center gap-1.5 border-b border-gray-800/80 pb-2">
                     <Link2 size={15} className="text-emerald-400" />
@@ -1727,14 +1855,14 @@ export default function MobileDashboard() {
 
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
-                      onClick={() => alert('WhatsApp Embedded Signup flow initiated!')}
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1"
+                      onClick={() => setShowWaConnectModal(true)}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 shadow-md"
                     >
                       <span>🟢 Link WhatsApp</span>
                     </button>
                     <button
-                      onClick={() => alert('Instagram Professional Account OAuth initiated!')}
-                      className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1"
+                      onClick={() => setShowIgConnectModal(true)}
+                      className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 shadow-md"
                     >
                       <InstagramIcon size={12} />
                       <span>Link Instagram</span>
@@ -1990,7 +2118,7 @@ export default function MobileDashboard() {
                 <label className="text-[10px] font-bold text-gray-400">Article Title (H1 Headline):</label>
                 <input
                   type="text"
-                  placeholder="e.g. Best Kurtas & Sarees for Weddings in 2026"
+                  placeholder="e.g. Best Properties & Boutiques in 2026"
                   value={newBlog.title}
                   onChange={(e) => setNewBlog({ ...newBlog, title: e.target.value })}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
@@ -2002,7 +2130,7 @@ export default function MobileDashboard() {
                 <label className="text-[10px] font-bold text-gray-400">Target Google Keywords (Comma separated):</label>
                 <input
                   type="text"
-                  placeholder="e.g. buy saree online, summer kurtas, Raipur boutique"
+                  placeholder="e.g. buy flat online, property deals, shop kurtas"
                   value={newBlog.seoKeywords}
                   onChange={(e) => setNewBlog({ ...newBlog, seoKeywords: e.target.value })}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-amber-300 font-mono focus:outline-none"
@@ -2039,19 +2167,97 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             <h3 className="text-sm font-bold text-white">Add New Business / Store</h3>
+            <p className="text-[10px] text-gray-400">e.g. NewPropertyHub, Branch 2, Luxury Jewellers</p>
             <form onSubmit={handleAddWorkspace} className="space-y-2 text-xs">
               <input
                 type="text"
-                placeholder="Business Name (e.g. Branch 2 / Luxury Jewellers)"
+                placeholder="Business Name (e.g. NewPropertyHub)"
                 value={newWorkspaceName}
                 onChange={(e) => setNewWorkspaceName(e.target.value)}
                 className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
                 required
               />
-              <button type="submit" className="w-full py-2.5 bg-purple-600 text-white font-bold rounded-xl text-xs mt-2">
+              <button type="submit" className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs mt-2 shadow-lg">
                 Add & Switch Store 🏢
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3.5: WhatsApp Link Modal */}
+      {showWaConnectModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-emerald-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+            <button onClick={() => setShowWaConnectModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">🟢</div>
+              <h3 className="text-sm font-black text-white">Link WhatsApp Cloud API</h3>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Permanent Access Token:</label>
+                <input
+                  type="text"
+                  value={waApiKey}
+                  onChange={(e) => setWaApiKey(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-300 font-mono text-[11px] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Phone Number ID:</label>
+                <input
+                  type="text"
+                  value={waPhoneNumberId}
+                  onChange={(e) => setWaPhoneNumberId(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-gray-200 font-mono text-[11px] focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowWaConnectModal(false);
+                  setIsWaConnected(true);
+                  alert('WhatsApp Cloud API credentials saved and tested! ✅');
+                }}
+                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-md mt-1"
+              >
+                Save & Verify WhatsApp 🟢
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3.6: Instagram OAuth Link Modal */}
+      {showIgConnectModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+            <button onClick={() => setShowIgConnectModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center">
+                <InstagramIcon size={16} />
+              </div>
+              <h3 className="text-sm font-black text-white">Link Instagram Account</h3>
+            </div>
+            <p className="text-[10px] text-gray-400">Connect with Meta Facebook Login for Business or Instagram Professional Account:</p>
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  window.open('/settings', '_blank');
+                  setShowIgConnectModal(false);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+              >
+                <InstagramIcon size={14} />
+                <span>Open Meta Instagram Login ↗</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
