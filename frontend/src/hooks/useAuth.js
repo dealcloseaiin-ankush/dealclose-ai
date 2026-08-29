@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
-import { supabase } from '../lib/supabase'; // Supabase client import karein
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext();
 
@@ -18,14 +18,20 @@ export const AuthProvider = ({ children }) => {
     }
     return null;
   });
-  const [loading, setLoading] = useState(true); // Initial loading state
+
+  // Fast loading state: If we already have stored token and user, start with loading = false
+  const [loading, setLoading] = useState(() => {
+    return !localStorage.getItem('token') && !localStorage.getItem('user');
+  });
 
   const clearSupabaseStorage = () => {
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-        localStorage.removeItem(key);
-      }
-    });
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
   };
 
   const clearLocalAuth = () => {
@@ -38,150 +44,139 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     sessionStorage.setItem('auth_logout_requested', 'true');
     clearLocalAuth();
+    clearSupabaseStorage();
     try {
-      await supabase.auth.signOut({ scope: 'global' });
+      if (supabase?.auth) {
+        await Promise.race([
+          supabase.auth.signOut({ scope: 'global' }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1000))
+        ]);
+      }
     } catch (error) {
-      console.warn('Supabase logout failed, clearing local session anyway:', error.message);
+      console.warn('Supabase logout skipped or failed:', error.message);
     } finally {
       clearLocalAuth();
       clearSupabaseStorage();
+      window.location.href = '/login';
     }
   };
 
   useEffect(() => {
-    const syncSupabaseSession = async (session) => {
-      const { data } = await api.post('/users/supabase-auth', {
-        email: session.user.email,
-        supabaseId: session.user.id,
-        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
-      });
+    let isMounted = true;
 
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      setUser(data.user);
-      api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+    const syncSupabaseSession = async (session) => {
+      if (!session?.user) return;
+      try {
+        const { data } = await api.post('/users/supabase-auth', {
+          email: session.user.email,
+          supabaseId: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
+        });
+
+        if (isMounted && data?.token) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          setUser(data.user);
+          api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+        }
+      } catch (err) {
+        console.warn('Supabase session backend sync skipped:', err.message);
+      }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        try {
-          const logoutRequested = sessionStorage.getItem('auth_logout_requested') === 'true';
-          if (logoutRequested) {
-            clearLocalAuth();
-            clearSupabaseStorage();
-            if (session) {
-              await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-            }
-            if (event === 'SIGNED_OUT' || !session) {
-              sessionStorage.removeItem('auth_logout_requested');
-            }
-            return;
-          }
-
-          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-            // Google se login hone ke baad backend JWT create/sync karein.
-            await syncSupabaseSession(session);
-          } else if (event === 'SIGNED_OUT') {
-            clearLocalAuth();
-            clearSupabaseStorage();
-            sessionStorage.removeItem('auth_logout_requested');
-          }
-        } catch (error) {
-          console.error('Google login sync failed:', error.response?.data || error.message);
-          clearLocalAuth();
-        } finally {
-          setLoading(false);
-        }
-      }
-    );
-
-    // Check initial session on load
-    const checkInitialSession = async () => {
-      try {
-        const logoutRequested = sessionStorage.getItem('auth_logout_requested') === 'true';
-        if (logoutRequested) {
-          clearLocalAuth();
-          clearSupabaseStorage();
-          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-          sessionStorage.removeItem('auth_logout_requested');
-          return;
-        }
-
-        const storedToken = localStorage.getItem('token');
-        if (storedToken) {
+    // Safe Supabase Auth Listener with Timeout
+    let authSubscription = null;
+    try {
+      if (supabase?.auth?.onAuthStateChange) {
+        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           try {
-            api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-            const { data } = await api.get('/users/profile');
-            const verifiedUser = data.user || data.data || data;
-            if (verifiedUser) {
-              setUser(verifiedUser);
-              localStorage.setItem('user', JSON.stringify(verifiedUser));
-            }
-          } catch (profileErr) {
-            if (profileErr.response?.status === 401) {
-              console.warn('Stored JWT session expired. Clearing local auth.');
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+              await syncSupabaseSession(session);
+            } else if (event === 'SIGNED_OUT') {
               clearLocalAuth();
             }
+          } catch (e) {
+            console.warn('Auth state change error ignored:', e.message);
+          } finally {
+            if (isMounted) setLoading(false);
           }
+        });
+        authSubscription = data?.subscription;
+      }
+    } catch (sbErr) {
+      console.warn('Supabase listener disabled due to network/domain resolution:', sbErr.message);
+      clearSupabaseStorage();
+      if (isMounted) setLoading(false);
+    }
+
+    // Check Initial Local Session + Backend Profile Verification
+    const checkInitialSession = async () => {
+      try {
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+          // Background verify without blocking UI
+          api.get('/users/profile')
+            .then(({ data }) => {
+              const verifiedUser = data.user || data.data || data;
+              if (isMounted && verifiedUser) {
+                setUser(verifiedUser);
+                localStorage.setItem('user', JSON.stringify(verifiedUser));
+              }
+            })
+            .catch(profileErr => {
+              if (profileErr.response?.status === 401) {
+                console.warn('Token expired. Logging out.');
+                clearLocalAuth();
+              }
+            });
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await syncSupabaseSession(session);
+        // Fast check Supabase session with 1.2s timeout
+        if (supabase?.auth?.getSession) {
+          const sessionPromise = supabase.auth.getSession();
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: { session: null } }), 1200));
+          const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+          if (data?.session) {
+            await syncSupabaseSession(data.session);
+          }
         }
       } catch (error) {
-        console.error('Initial auth check failed:', error.response?.data || error.message);
-        if (!localStorage.getItem('token')) clearLocalAuth();
+        console.warn('Initial session check caught error:', error.message);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     checkInitialSession();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      if (authSubscription?.unsubscribe) {
+        authSubscription.unsubscribe();
+      }
+    };
   }, []);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/users/login', { email, password });
-    localStorage.setItem('token', data.token);
-    const storedUser = data.user;
-    if (storedUser) {
-      localStorage.setItem('user', JSON.stringify(storedUser));
-      setUser(storedUser);
-      api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      return storedUser;
-    }
-    return null;
+  const login = (token, userData) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setUser(userData);
+    setLoading(false);
   };
 
-  const register = async (fullName, email, password) => {
-    const { data } = await api.post('/users/register', { fullName, email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    setUser(data.user);
-    api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-    return data.user;
-  };
-
-  const resetPassword = async (email, password) => {
-    const { data } = await api.post('/users/reset-password', { email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    setUser(data.user);
-    api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-    return data.user;
-  };
-
-  const value = { user, login, register, resetPassword, logout, loading };
-  
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user, loading, login, logout, clearLocalAuth }}>
+      {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
