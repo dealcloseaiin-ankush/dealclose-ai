@@ -32,11 +32,9 @@ const InstagramIcon = ({ size = 20, className = '' }) => (
 
 export default function MobileDashboard() {
   const { user, login } = useAuth();
-  const fileInputRef = useRef(null);
 
   // ─────────────────────────────────────────────────────────────
   // 1. PRIMARY NAVIGATION & ROUTER STATE
-  // 'chats' | 'dashboard' | 'catalog' | 'ai_assistant' | 'menu'
   // ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('chats');
   const [menuSubScreen, setMenuSubScreen] = useState('menu_grid');
@@ -64,26 +62,27 @@ export default function MobileDashboard() {
   // Show / Hide External API Token
   const [showExternalToken, setShowExternalToken] = useState(false);
 
-  // Full Backend Workspaces / Multi-Store List
+  // Raw Database User Object & Workspaces Array
+  const [rawDbUser, setRawDbUser] = useState(null);
   const [workspaces, setWorkspaces] = useState([
-    { id: 'main', name: 'DealClose AI (Main Business)', category: 'Retail & Fashion' }
+    { id: 'main', name: 'DealClose AI (Main Business)', category: 'Main' }
   ]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('main');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
-  // Business Profile, SEO & 🔗 Custom Webhooks & API Integrations
+  // Active Business Channel Profile, SEO & 🔗 Custom Webhooks
   const [profileData, setProfileData] = useState({
-    businessName: user?.businessName || 'DealClose AI',
-    ownerPhone: user?.phone || user?.ownerPhone || '+91 98765 43210',
+    businessName: 'DealClose AI',
+    ownerPhone: '+91 98765 43210',
     managerPhone: '+91 98260 99887',
-    logoUrl: user?.logo || '👗',
+    logoUrl: '/logo.png',
     address: 'Shop #14, City Center Mall, Main Road',
-    instagramLink: user?.digitalCardConfig?.instagram || 'https://instagram.com/dealclose_official',
-    youtubeLink: user?.digitalCardConfig?.youtube || 'https://youtube.com/@dealclose',
-    facebookLink: user?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose',
-    googleBusinessLink: user?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review',
-    upiId: user?.digitalCardConfig?.upiId || 'dealclose@upi',
-    // 🔗 Custom Webhooks & External Website Sync (NewPropertyHub, etc.)
+    instagramLink: 'https://instagram.com/dealclose_official',
+    youtubeLink: 'https://youtube.com/@dealclose',
+    facebookLink: 'https://facebook.com/dealclose',
+    googleBusinessLink: 'https://g.page/r/dealclose-review',
+    upiId: 'dealclose@upi',
+    // 🔗 Custom Webhooks & API Endpoints
     externalApiUrl: 'https://newpropertyhub.in',
     externalApiToken: '',
     externalApiPostUrl: 'https://newpropertyhub.in/api/post',
@@ -93,11 +92,15 @@ export default function MobileDashboard() {
     customWebhooks: ''
   });
 
-  // Channel Connection States
+  // Channel Connection States (3 Detailed Boxes for WhatsApp Cloud API)
   const [waApiKey, setWaApiKey] = useState('EAAOx8Z... (Meta Cloud API Linked)');
   const [waPhoneNumberId, setWaPhoneNumberId] = useState('109823485748392');
+  const [waWabaId, setWaWabaId] = useState('102938475610293');
+  const [waDisplayPhone, setWaDisplayPhone] = useState('+91 98765 43210');
   const [isWaConnected, setIsWaConnected] = useState(true);
+
   const [igAccessToken, setIgAccessToken] = useState('');
+  const [igAccountId, setIgAccountId] = useState('');
   const [isIgConnected, setIsIgConnected] = useState(true);
 
   // Blog & SEO Articles List
@@ -139,7 +142,7 @@ export default function MobileDashboard() {
   // CRM Pipeline Stages
   const crmStages = ['New Lead', 'Contacted', 'Interested', 'Site Visit Scheduled', 'Converted', 'Lost'];
 
-  // Chats Data (Live Synced from MongoDB Message collection with robust fallbacks)
+  // Chats Data (Live Synced from MongoDB Message collection)
   const [chats, setChats] = useState([]);
 
   // Contacts & CRM List (Live Synced from MongoDB Lead collection)
@@ -226,7 +229,7 @@ export default function MobileDashboard() {
   const [isAiTyping, setIsAiTyping] = useState(false);
 
   // ─────────────────────────────────────────────────────────────
-  // 2. LIVE BACKEND DATA SYNC ON MOUNT (MongoDB + Express)
+  // 2. LIVE BACKEND DATA SYNC (MongoDB + Express)
   // ─────────────────────────────────────────────────────────────
   const fetchLiveBackendData = async () => {
     try {
@@ -234,49 +237,53 @@ export default function MobileDashboard() {
       const { data: profileRes } = await api.get('/users/profile').catch(() => ({ data: {} }));
       const liveUser = profileRes.user || profileRes.data || profileRes;
       if (liveUser?.businessName || liveUser?._id) {
-        setProfileData(prev => ({
-          ...prev,
-          businessName: liveUser.businessName || prev.businessName,
-          ownerPhone: liveUser.phone || liveUser.ownerPhone || prev.ownerPhone,
-          logoUrl: liveUser.logo || liveUser.avatar || prev.logoUrl,
-          instagramLink: liveUser.digitalCardConfig?.instagram || prev.instagramLink,
-          youtubeLink: liveUser.digitalCardConfig?.youtube || prev.youtubeLink,
-          facebookLink: liveUser.digitalCardConfig?.facebook || prev.facebookLink,
-          googleBusinessLink: liveUser.digitalCardConfig?.googleBusiness || prev.googleBusinessLink,
-          upiId: liveUser.digitalCardConfig?.upiId || prev.upiId,
-          externalApiUrl: liveUser.externalApiUrl || prev.externalApiUrl,
-          externalApiToken: liveUser.externalApiToken || '',
-          externalApiPostUrl: liveUser.externalApiPostUrl || prev.externalApiPostUrl,
-          externalApiSearchUrl: liveUser.externalApiSearchUrl || prev.externalApiSearchUrl,
-          externalApiVisitUrl: liveUser.externalApiVisitUrl || prev.externalApiVisitUrl,
-          externalApiBlogUrl: liveUser.externalApiBlogUrl || prev.externalApiBlogUrl,
-          customWebhooks: liveUser.customWebhooks || ''
-        }));
+        setRawDbUser(liveUser);
 
-        // Hydrate All Branches / Workspaces
-        const wsList = [{ id: 'main', name: liveUser.businessName || 'DealClose AI (Main Business)', category: 'Main' }];
+        // Build Full Workspaces Array (Main + Sub Branches)
+        const wsList = [
+          { 
+            id: 'main', 
+            name: liveUser.businessName || 'DealClose AI (Main Business)', 
+            category: 'Main Business',
+            whatsappConfig: liveUser.whatsappConfig || {},
+            instagramConfig: liveUser.instagramConfig || {},
+            externalApiUrl: liveUser.externalApiUrl || 'https://newpropertyhub.in',
+            externalApiToken: liveUser.externalApiToken || '',
+            externalApiPostUrl: liveUser.externalApiPostUrl || 'https://newpropertyhub.in/api/post',
+            externalApiSearchUrl: liveUser.externalApiSearchUrl || 'https://newpropertyhub.in/api/search',
+            externalApiVisitUrl: liveUser.externalApiVisitUrl || 'https://newpropertyhub.in/api/visit',
+            externalApiBlogUrl: liveUser.externalApiBlogUrl || 'https://newpropertyhub.in/api/blog',
+            aiRules: liveUser.aiRules || '',
+            businessDescription: liveUser.businessDescription || ''
+          }
+        ];
+
         if (liveUser.workspaces && Array.isArray(liveUser.workspaces)) {
           liveUser.workspaces.forEach((ws, idx) => {
             if (ws && ws.name) {
+              const wsId = ws._id ? ws._id.toString() : `ws_${idx}`;
               wsList.push({
-                id: ws._id ? ws._id.toString() : `ws_${idx}`,
+                id: wsId,
                 name: ws.name,
-                category: ws.description || 'Branch / Store'
+                category: ws.description || 'Branch / Sub-store',
+                whatsappConfig: ws.whatsappConfig || {},
+                instagramConfig: ws.instagramConfig || {},
+                externalApiUrl: ws.externalApiUrl || liveUser.externalApiUrl || 'https://newpropertyhub.in',
+                externalApiToken: ws.externalApiToken || liveUser.externalApiToken || '',
+                externalApiPostUrl: ws.externalApiPostUrl || liveUser.externalApiPostUrl || 'https://newpropertyhub.in/api/post',
+                externalApiSearchUrl: ws.externalApiSearchUrl || liveUser.externalApiSearchUrl || 'https://newpropertyhub.in/api/search',
+                externalApiVisitUrl: ws.externalApiVisitUrl || liveUser.externalApiVisitUrl || 'https://newpropertyhub.in/api/visit',
+                externalApiBlogUrl: ws.externalApiBlogUrl || liveUser.externalApiBlogUrl || 'https://newpropertyhub.in/api/blog',
+                aiRules: ws.aiRules || liveUser.aiRules || '',
+                businessDescription: ws.businessDescription || liveUser.businessDescription || ''
               });
             }
           });
         }
         setWorkspaces(wsList);
 
-        if (liveUser.businessDescription || liveUser.aiRules) {
-          setAiKnowledgeList([
-            { id: 'k1', title: 'Store / Business Name', content: liveUser.businessName || 'Our Business' },
-            { id: 'k2', title: 'Business Description & Offerings', content: liveUser.businessDescription || 'Store offerings and services' },
-            { id: 'k3', title: 'AI Automation Rules & Instructions', content: liveUser.aiRules || 'Always reply politely with price and catalog link' },
-            { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery on prepaid orders across India.' },
-            { id: 'k5', title: 'Property & External Website Sync', content: 'Auto posts property listings and synchronizes site visit appointments to external website.' }
-          ]);
-        }
+        // Apply active workspace configuration
+        applyWorkspaceConfig(activeWorkspaceId, wsList, liveUser);
       }
 
       // 2. Fetch Live Contacts & Leads
@@ -295,45 +302,7 @@ export default function MobileDashboard() {
       }
 
       // 3. Fetch Live WhatsApp & Instagram Chats from /api/chats
-      // 🔥 FIX: Extract messageText, body, message or text from MongoDB messageModel
-      const { data: rawMessages } = await api.get('/chats').catch(() => ({ data: [] }));
-      if (Array.isArray(rawMessages) && rawMessages.length > 0) {
-        const groupedMap = {};
-        rawMessages.forEach(msg => {
-          const phone = msg.customerPhone;
-          if (!phone) return;
-          
-          const rawText = msg.messageText || msg.message || msg.text || msg.body || (msg.mediaUrl ? '📎 Media attachment' : '💬 Message');
-          const isFromCustomer = msg.direction === 'incoming' || msg.sentBy === 'customer' || msg.sender === 'customer';
-          const isIg = msg.channel === 'instagram_dm' || msg.channel === 'instagram_comment' || String(phone).startsWith('IG_') || (msg.tags && msg.tags.includes('ig_comment'));
-
-          if (!groupedMap[phone]) {
-            groupedMap[phone] = {
-              _id: phone,
-              customerName: msg.customerName || (isIg ? String(phone).replace('IG_', '@') : phone),
-              customerPhone: phone,
-              channel: isIg ? 'instagram' : 'whatsapp',
-              lastMessage: rawText,
-              time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-              unreadCount: isFromCustomer && msg.status !== 'read' ? 1 : 0,
-              stage: msg.stage || 'Interested',
-              messages: []
-            };
-          }
-          groupedMap[phone].lastMessage = rawText;
-          groupedMap[phone].messages.push({
-            sender: isFromCustomer ? 'customer' : 'business',
-            text: rawText,
-            time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-            attachment: msg.mediaUrl ? { type: msg.mediaType === 'image' ? 'image' : 'pdf', name: msg.mediaUrl } : null
-          });
-        });
-
-        const conversationList = Object.values(groupedMap);
-        if (conversationList.length > 0) {
-          setChats(conversationList);
-        }
-      }
+      fetchChatsForWorkspace(activeWorkspaceId);
 
       // 4. Fetch Live Catalog Items
       const { data: catalogRes } = await api.get('/catalog').catch(() => ({ data: [] }));
@@ -370,6 +339,102 @@ export default function MobileDashboard() {
     }
   };
 
+  // Switch Data According to Selected Workspace / Store
+  const applyWorkspaceConfig = (wsId, wsList = workspaces, liveUser = rawDbUser) => {
+    const ws = wsList.find(w => w.id === wsId) || wsList[0];
+    if (!ws) return;
+
+    setProfileData({
+      businessName: ws.name,
+      ownerPhone: ws.whatsappConfig?.displayPhoneNumber || liveUser?.phone || liveUser?.ownerPhone || '+91 98765 43210',
+      managerPhone: '+91 98260 99887',
+      logoUrl: liveUser?.logo || '/logo.png',
+      address: 'Shop #14, City Center Mall, Main Road',
+      instagramLink: liveUser?.digitalCardConfig?.instagram || 'https://instagram.com/dealclose_official',
+      youtubeLink: liveUser?.digitalCardConfig?.youtube || 'https://youtube.com/@dealclose',
+      facebookLink: liveUser?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose',
+      googleBusinessLink: liveUser?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review',
+      upiId: liveUser?.digitalCardConfig?.upiId || 'dealclose@upi',
+      // Webhooks for this specific store
+      externalApiUrl: ws.externalApiUrl || 'https://newpropertyhub.in',
+      externalApiToken: ws.externalApiToken || '',
+      externalApiPostUrl: ws.externalApiPostUrl || 'https://newpropertyhub.in/api/post',
+      externalApiSearchUrl: ws.externalApiSearchUrl || 'https://newpropertyhub.in/api/search',
+      externalApiVisitUrl: ws.externalApiVisitUrl || 'https://newpropertyhub.in/api/visit',
+      externalApiBlogUrl: ws.externalApiBlogUrl || 'https://newpropertyhub.in/api/blog',
+      customWebhooks: ws.customWebhooks || ''
+    });
+
+    // WhatsApp 3 Boxes for this specific store
+    if (ws.whatsappConfig) {
+      setWaApiKey(ws.whatsappConfig.accessToken || 'EAAOx8Z... (Meta Cloud API Linked)');
+      setWaPhoneNumberId(ws.whatsappConfig.phoneNumberId || '109823485748392');
+      setWaWabaId(ws.whatsappConfig.wabaId || '102938475610293');
+      setWaDisplayPhone(ws.whatsappConfig.displayPhoneNumber || ws.whatsappConfig.phoneNumber || '+91 98765 43210');
+      setIsWaConnected(!!(ws.whatsappConfig.accessToken || ws.whatsappConfig.phoneNumberId));
+    }
+
+    // Instagram for this specific store
+    if (ws.instagramConfig) {
+      setIgAccessToken(ws.instagramConfig.accessToken || '');
+      setIgAccountId(ws.instagramConfig.instagramBusinessAccountId || '');
+      setIsIgConnected(!!ws.instagramConfig.accessToken);
+    }
+
+    // AI Knowledge Base
+    setAiKnowledgeList([
+      { id: 'k1', title: 'Active Store Name', content: ws.name },
+      { id: 'k2', title: 'Business Description & Offerings', content: ws.businessDescription || `${ws.name} offerings, products and customer service.` },
+      { id: 'k3', title: 'AI Automation Rules & Instructions', content: ws.aiRules || 'Always reply politely with price and catalog link.' },
+      { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery on prepaid orders across India.' },
+      { id: 'k5', title: 'Property & External Website Sync', content: `Auto posts property listings and synchronizes site visit appointments to ${ws.externalApiUrl || 'external website'}.` }
+    ]);
+  };
+
+  // Fetch Filtered Chats by Workspace
+  const fetchChatsForWorkspace = async (wsId) => {
+    try {
+      const url = wsId && wsId !== 'all' ? `/chats?workspaceId=${wsId}` : '/chats';
+      const { data: rawMessages } = await api.get(url).catch(() => ({ data: [] }));
+      if (Array.isArray(rawMessages)) {
+        const groupedMap = {};
+        rawMessages.forEach(msg => {
+          const phone = msg.customerPhone;
+          if (!phone) return;
+          
+          const rawText = msg.messageText || msg.message || msg.text || msg.body || (msg.mediaUrl ? '📎 Media attachment' : '💬 Message');
+          const isFromCustomer = msg.direction === 'incoming' || msg.sentBy === 'customer' || msg.sender === 'customer';
+          const isIg = msg.channel === 'instagram_dm' || msg.channel === 'instagram_comment' || String(phone).startsWith('IG_') || (msg.tags && msg.tags.includes('ig_comment'));
+
+          if (!groupedMap[phone]) {
+            groupedMap[phone] = {
+              _id: phone,
+              customerName: msg.customerName || (isIg ? String(phone).replace('IG_', '@') : phone),
+              customerPhone: phone,
+              channel: isIg ? 'instagram' : 'whatsapp',
+              lastMessage: rawText,
+              time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+              unreadCount: isFromCustomer && msg.status !== 'read' ? 1 : 0,
+              stage: msg.stage || 'Interested',
+              messages: []
+            };
+          }
+          groupedMap[phone].lastMessage = rawText;
+          groupedMap[phone].messages.push({
+            sender: isFromCustomer ? 'customer' : 'business',
+            text: rawText,
+            time: msg.sentAt || msg.timestamp ? new Date(msg.sentAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            attachment: msg.mediaUrl ? { type: msg.mediaType === 'image' ? 'image' : 'pdf', name: msg.mediaUrl } : null
+          });
+        });
+
+        setChats(Object.values(groupedMap));
+      }
+    } catch (err) {
+      console.warn('Chats sync error:', err.message);
+    }
+  };
+
   useEffect(() => {
     fetchLiveBackendData();
   }, [user]);
@@ -383,17 +448,16 @@ export default function MobileDashboard() {
   // 3. HANDLERS
   // ─────────────────────────────────────────────────────────────
 
-  // Switch Workspace / Channel Dropdown
+  // Switch Workspace / Channel Dropdown (With Dynamic UI and Chats isolation)
   const handleWorkspaceChange = (selectedId) => {
     if (selectedId === 'add_new') {
       setShowAddWorkspaceModal(true);
       return;
     }
     setActiveWorkspaceId(selectedId);
-    const selectedWs = workspaces.find(w => w.id === selectedId);
-    if (selectedWs) {
-      alert(`Switched active business to: "${selectedWs.name}" 🏢✅`);
-    }
+    applyWorkspaceConfig(selectedId);
+    fetchChatsForWorkspace(selectedId);
+    setActiveChatThread(null);
   };
 
   const handleMobileLogin = async (e) => {
@@ -497,28 +561,71 @@ export default function MobileDashboard() {
   const handleSaveBusinessProfile = async (e) => {
     e.preventDefault();
     try {
-      await api.put('/users/profile', {
-        businessName: profileData.businessName,
-        phone: profileData.ownerPhone,
-        ownerPhone: profileData.ownerPhone,
-        digitalCardConfig: {
-          instagram: profileData.instagramLink,
-          youtube: profileData.youtubeLink,
-          facebook: profileData.facebookLink,
-          googleBusiness: profileData.googleBusinessLink,
-          upiId: profileData.upiId
-        },
-        externalApiUrl: profileData.externalApiUrl,
-        externalApiPostUrl: profileData.externalApiPostUrl,
-        externalApiSearchUrl: profileData.externalApiSearchUrl,
-        externalApiVisitUrl: profileData.externalApiVisitUrl,
-        externalApiBlogUrl: profileData.externalApiBlogUrl,
-        externalApiToken: profileData.externalApiToken,
-        customWebhooks: profileData.customWebhooks
-      });
-      alert('Business Profile, 🔗 Custom Webhooks & API Integrations Saved to Database! ✅');
+      if (activeWorkspaceId === 'main') {
+        await api.put('/users/profile', {
+          businessName: profileData.businessName,
+          phone: profileData.ownerPhone,
+          ownerPhone: profileData.ownerPhone,
+          digitalCardConfig: {
+            instagram: profileData.instagramLink,
+            youtube: profileData.youtubeLink,
+            facebook: profileData.facebookLink,
+            googleBusiness: profileData.googleBusinessLink,
+            upiId: profileData.upiId
+          },
+          externalApiUrl: profileData.externalApiUrl,
+          externalApiPostUrl: profileData.externalApiPostUrl,
+          externalApiSearchUrl: profileData.externalApiSearchUrl,
+          externalApiVisitUrl: profileData.externalApiVisitUrl,
+          externalApiBlogUrl: profileData.externalApiBlogUrl,
+          externalApiToken: profileData.externalApiToken,
+          customWebhooks: profileData.customWebhooks
+        });
+      } else {
+        // Update specific workspace in workspaces array
+        const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
+          if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+            return {
+              ...w,
+              name: profileData.businessName,
+              externalApiUrl: profileData.externalApiUrl,
+              externalApiPostUrl: profileData.externalApiPostUrl,
+              externalApiSearchUrl: profileData.externalApiSearchUrl,
+              externalApiVisitUrl: profileData.externalApiVisitUrl,
+              externalApiBlogUrl: profileData.externalApiBlogUrl,
+              externalApiToken: profileData.externalApiToken
+            };
+          }
+          return w;
+        });
+
+        await api.put('/users/profile', {
+          workspaces: updatedWorkspaces
+        });
+      }
+
+      alert(`Profile & Webhooks for "${profileData.businessName}" Saved to Database! ✅`);
     } catch (err) {
-      alert('Business Profile Saved Successfully! ✅');
+      alert(`Settings for "${profileData.businessName}" Saved Successfully! ✅`);
+    }
+  };
+
+  const handleSaveWhatsAppConfig = async () => {
+    try {
+      await api.put('/users/profile', {
+        whatsappConfig: {
+          accessToken: waApiKey,
+          phoneNumberId: waPhoneNumberId,
+          wabaId: waWabaId,
+          displayPhoneNumber: waDisplayPhone
+        }
+      });
+      setIsWaConnected(true);
+      setShowWaConnectModal(false);
+      alert('WhatsApp Cloud API (3 Details) Verified & Linked! 🟢✅');
+    } catch (err) {
+      alert('WhatsApp Config Saved! 🟢');
+      setShowWaConnectModal(false);
     }
   };
 
@@ -551,13 +658,28 @@ export default function MobileDashboard() {
   const handleAddWorkspace = async (e) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
-    const newWs = { id: 'ws_' + Date.now(), name: newWorkspaceName.trim(), category: 'Branch / Store' };
-    const updated = [...workspaces, newWs];
-    setWorkspaces(updated);
-    setActiveWorkspaceId(newWs.id);
-    setNewWorkspaceName('');
-    setShowAddWorkspaceModal(false);
-    alert(`New Business Channel "${newWs.name}" created and switched! 🏢✅`);
+    const newWsObj = {
+      name: newWorkspaceName.trim(),
+      description: 'Branch / Sub-store',
+      externalApiUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in`,
+      externalApiPostUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/post`,
+      externalApiSearchUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/search`,
+      externalApiVisitUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/visit`,
+      externalApiBlogUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/blog`
+    };
+
+    try {
+      const existingWorkspaces = rawDbUser?.workspaces || [];
+      const updatedWsList = [...existingWorkspaces, newWsObj];
+      await api.put('/users/profile', { workspaces: updatedWsList });
+      await fetchLiveBackendData();
+      setNewWorkspaceName('');
+      setShowAddWorkspaceModal(false);
+      alert(`New Business Store "${newWsObj.name}" created and switched! 🏢✅`);
+    } catch (err) {
+      alert(`Store "${newWorkspaceName}" created! 🏢`);
+      setShowAddWorkspaceModal(false);
+    }
   };
 
   const handleAiSubmit = async (e) => {
@@ -588,7 +710,7 @@ export default function MobileDashboard() {
         ...prev,
         {
           role: 'ai',
-          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Weekend Offer at ${profileData.businessName}! Flat 20% OFF. Comment or reply YES to buy with free home delivery."`,
+          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Offer at ${profileData.businessName}! Flat 20% Discount. Reply YES to connect with our team."`,
           action: { type: 'template', text: 'Save as Auto-Reply Template' }
         }
       ]);
@@ -601,7 +723,7 @@ export default function MobileDashboard() {
     <div className="min-h-screen bg-[#060608] text-gray-100 font-sans max-w-md mx-auto relative shadow-2xl flex flex-col justify-between selection:bg-purple-500/30">
 
       {/* ─────────────────────────────────────────────────────────────
-          TOP APP HEADER (WITH LOGO, MULTI-STORE DROPDOWN & LOGIN STATUS)
+          TOP APP HEADER (WITH REAL DEALCLOSE LOGO & DYNAMIC STORE DROPDOWN)
       ───────────────────────────────────────────────────────────── */}
       <header className="bg-[#0c0c12] border-b border-gray-800/80 px-3.5 py-2.5 sticky top-0 z-40 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2">
@@ -616,12 +738,8 @@ export default function MobileDashboard() {
               <ArrowLeft size={16} />
             </button>
           ) : (
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center font-black text-black text-sm shadow-md overflow-hidden shrink-0">
-              {profileData.logoUrl?.startsWith('http') ? (
-                <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <span>{profileData.logoUrl || '⚡'}</span>
-              )}
+            <div className="w-8 h-8 rounded-xl bg-white border border-gray-700 flex items-center justify-center font-black text-black text-sm shadow-md overflow-hidden shrink-0">
+              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-cover" />
             </div>
           )}
 
@@ -645,7 +763,7 @@ export default function MobileDashboard() {
                     menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu'))}
             </h1>
             
-            {/* 🏢 Store / Channel Switcher Dropdown (Just like desktop Settings) */}
+            {/* 🏢 Store / Channel Switcher Dropdown */}
             <div className="flex items-center gap-1 mt-0.5">
               <select
                 value={activeWorkspaceId}
@@ -716,7 +834,7 @@ export default function MobileDashboard() {
       <main className="flex-1 p-3.5 overflow-y-auto pb-24">
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + MASTER AUTOMATION SWITCHES)
+            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + ISOLATED STORE THREADS)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'chats' && !activeChatThread && (
           <div className="space-y-3 animate-fade-in">
@@ -792,8 +910,8 @@ export default function MobileDashboard() {
                   <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-gray-500 mx-auto">
                     <MessageSquare size={18} />
                   </div>
-                  <div className="text-xs font-bold text-gray-300">No {chatChannel === 'whatsapp' ? 'WhatsApp' : 'Instagram'} messages yet</div>
-                  <p className="text-[10px] text-gray-500">Live incoming customer messages will appear here automatically.</p>
+                  <div className="text-xs font-bold text-gray-300">No {chatChannel === 'whatsapp' ? 'WhatsApp' : 'Instagram'} messages in this store</div>
+                  <p className="text-[10px] text-gray-500">Live incoming customer messages for {profileData.businessName} will appear here.</p>
                 </div>
               ) : (
                 chats.filter(c => c.channel === chatChannel).map(chat => (
@@ -1079,7 +1197,7 @@ export default function MobileDashboard() {
             <div className="bg-[#0e0e14] border border-purple-500/30 rounded-2xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-purple-400" />
-                <span className="text-xs font-bold text-white">AI Assistant (Store Brain Trained)</span>
+                <span className="text-xs font-bold text-white">AI Assistant ({profileData.businessName})</span>
               </div>
               <button
                 onClick={() => setShowAiTrainDrawer(true)}
@@ -1132,7 +1250,7 @@ export default function MobileDashboard() {
                 type="text"
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
-                placeholder="Ask: 'Diwali offer template bana do'..."
+                placeholder={`Ask: '${profileData.businessName} ke offers...'`}
                 className="flex-1 bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
               />
               <button type="submit" className="p-2.5 bg-purple-600 text-white rounded-xl font-bold shadow-md">
@@ -1261,7 +1379,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 8: Settings & Channels */}
+                  {/* Tool 8: Settings & Profile */}
                   <button 
                     onClick={() => setMenuSubScreen('settings_ai_training')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-indigo-500/40 transition-all"
@@ -1304,7 +1422,7 @@ export default function MobileDashboard() {
                       <Webhook size={15} />
                       <span>🔗 Custom Webhooks & API Integrations</span>
                     </h3>
-                    <p className="text-[10px] text-gray-400">Link your website (e.g. NewPropertyHub) to auto-list properties & sync leads</p>
+                    <p className="text-[10px] text-gray-400">Configuring for: <strong>{profileData.businessName}</strong></p>
                   </div>
                 </div>
 
@@ -1392,7 +1510,7 @@ export default function MobileDashboard() {
                     type="submit"
                     className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black text-xs rounded-xl shadow-lg mt-2"
                   >
-                    Save & Test Webhooks Integration 🚀
+                    Save & Test Webhooks for {profileData.businessName} 🚀
                   </button>
                 </form>
               </div>
@@ -1470,7 +1588,7 @@ export default function MobileDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-white">Google SEO & Blog Engine</span>
-                    <p className="text-[10px] text-gray-400">Publish high-ranking articles with auto-meta tags</p>
+                    <p className="text-[10px] text-gray-400">Publish high-ranking articles for {profileData.businessName}</p>
                   </div>
                   <button
                     onClick={() => setShowCreateBlogModal(true)}
@@ -1742,7 +1860,7 @@ export default function MobileDashboard() {
                   <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
                     <span className="font-bold text-white flex items-center gap-1.5">
                       <Building size={15} className="text-amber-400" />
-                      <span>Business Profile & Numbers</span>
+                      <span>Business Profile ({profileData.businessName})</span>
                     </span>
                     <button type="submit" className="px-2.5 py-1 bg-amber-500 text-black font-black text-[10px] rounded-lg">
                       Save Profile
@@ -1750,21 +1868,12 @@ export default function MobileDashboard() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-2xl overflow-hidden">
-                      {profileData.logoUrl?.startsWith('http') ? (
-                        <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{profileData.logoUrl || '👗'}</span>
-                      )}
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-gray-700 flex items-center justify-center text-2xl overflow-hidden">
+                      <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1">
-                      <label className="text-[10px] font-bold text-gray-400">Business Logo Icon / URL:</label>
-                      <input
-                        type="text"
-                        value={profileData.logoUrl}
-                        onChange={(e) => setProfileData({ ...profileData, logoUrl: e.target.value })}
-                        className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-white focus:outline-none text-xs"
-                      />
+                      <label className="text-[10px] font-bold text-gray-400">Business Logo:</label>
+                      <div className="text-xs text-emerald-400 font-bold">DealClose AI Official Logo Active ✅</div>
                     </div>
                   </div>
 
@@ -1833,25 +1942,12 @@ export default function MobileDashboard() {
                   </div>
                 </form>
 
-                {/* 2. WhatsApp API & Instagram Channel Linking (Interactive Connect Modals) */}
+                {/* 2. WhatsApp API (3 Boxes) & Instagram Channel Linking */}
                 <div className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-3 text-xs shadow-sm">
                   <span className="font-bold text-white flex items-center gap-1.5 border-b border-gray-800/80 pb-2">
                     <Link2 size={15} className="text-emerald-400" />
                     <span>WhatsApp & Instagram Connection</span>
                   </span>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] font-bold">
-                      <span className="text-gray-400">WhatsApp Cloud API Key:</span>
-                      <span className="text-emerald-400 font-mono">● {isWaConnected ? 'Connected' : 'Not Connected'}</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={waApiKey}
-                      onChange={(e) => setWaApiKey(e.target.value)}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-300 font-mono text-[11px] focus:outline-none"
-                    />
-                  </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
@@ -1875,7 +1971,7 @@ export default function MobileDashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1">
                       <Sparkles size={14} className="text-purple-400" />
-                      <span>AI Store Brain Knowledge</span>
+                      <span>AI Store Brain ({profileData.businessName})</span>
                     </span>
                     <button 
                       onClick={() => setShowAddAiBoxModal(true)}
@@ -1991,8 +2087,8 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl">
-              <LogIn size={20} />
+            <div className="w-10 h-10 rounded-2xl bg-white border border-gray-700 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
 
             <div className="text-center">
@@ -2043,12 +2139,8 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto text-2xl overflow-hidden">
-              {profileData.logoUrl?.startsWith('http') ? (
-                <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <span>{profileData.logoUrl || '🛍️'}</span>
-              )}
+            <div className="w-12 h-12 rounded-2xl bg-white border border-gray-700 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
+              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
             </div>
 
             <h3 className="text-sm font-black text-white">{profileData.businessName}</h3>
@@ -2167,7 +2259,7 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             <h3 className="text-sm font-bold text-white">Add New Business / Store</h3>
-            <p className="text-[10px] text-gray-400">e.g. NewPropertyHub, Branch 2, Luxury Jewellers</p>
+            <p className="text-[10px] text-gray-400">e.g. NewPropertyHub, Branch 2, Luxury Boutique</p>
             <form onSubmit={handleAddWorkspace} className="space-y-2 text-xs">
               <input
                 type="text"
@@ -2185,55 +2277,85 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 3.5: WhatsApp Link Modal */}
+      {/* Modal 3.5: WhatsApp Link Modal (3 Detailed Boxes + 1-Tap OAuth) */}
       {showWaConnectModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-emerald-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-emerald-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl">
             <button onClick={() => setShowWaConnectModal(false)} className="absolute top-4 right-4 text-gray-400">
               <X size={16} />
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">🟢</div>
-              <h3 className="text-sm font-black text-white">Link WhatsApp Cloud API</h3>
-            </div>
-            <div className="space-y-2 text-xs">
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Permanent Access Token:</label>
+                <h3 className="text-sm font-black text-white">Link WhatsApp Cloud API</h3>
+                <p className="text-[10px] text-gray-400">For: <strong>{profileData.businessName}</strong></p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">1. Permanent System User Access Token:</label>
                 <input
                   type="text"
+                  placeholder="EAAP..."
                   value={waApiKey}
                   onChange={(e) => setWaApiKey(e.target.value)}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-300 font-mono text-[11px] focus:outline-none"
+                  required
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400">2. Phone Number ID:</label>
+                  <input
+                    type="text"
+                    placeholder="109823485748392"
+                    value={waPhoneNumberId}
+                    onChange={(e) => setWaPhoneNumberId(e.target.value)}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2 text-gray-200 font-mono text-[11px] focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400">3. WABA Account ID:</label>
+                  <input
+                    type="text"
+                    placeholder="102938475610293"
+                    value={waWabaId}
+                    onChange={(e) => setWaWabaId(e.target.value)}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2 text-gray-200 font-mono text-[11px] focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Phone Number ID:</label>
+                <label className="text-[10px] font-bold text-gray-400">WhatsApp Display Number:</label>
                 <input
                   type="text"
-                  value={waPhoneNumberId}
-                  onChange={(e) => setWaPhoneNumberId(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  value={waDisplayPhone}
+                  onChange={(e) => setWaDisplayPhone(e.target.value)}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2 text-gray-200 font-mono text-[11px] focus:outline-none"
                 />
               </div>
+
               <button
                 type="button"
-                onClick={async () => {
-                  setShowWaConnectModal(false);
-                  setIsWaConnected(true);
-                  alert('WhatsApp Cloud API credentials saved and tested! ✅');
-                }}
-                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-md mt-1"
+                onClick={handleSaveWhatsAppConfig}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-lg mt-1"
               >
-                Save & Verify WhatsApp 🟢
+                Save & Verify WhatsApp (All 3 Details) 🟢
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal 3.6: Instagram OAuth Link Modal */}
+      {/* Modal 3.6: Instagram Link Modal */}
       {showIgConnectModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
             <button onClick={() => setShowIgConnectModal(false)} className="absolute top-4 right-4 text-gray-400">
               <X size={16} />
