@@ -5,7 +5,8 @@ import {
   Check, CheckCheck, Plus, ArrowLeft, X, SlidersHorizontal,
   Users, Zap, QrCode, ShieldCheck, CreditCard, Settings as SettingsIcon,
   Upload, Radio, Flame, Clock, TrendingUp, AlertCircle, Trash2, Calendar,
-  Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2
+  Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
+  Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -26,10 +27,11 @@ export default function MobileDashboard() {
   // ─────────────────────────────────────────────────────────────
   // 1. PRIMARY NAVIGATION & ROUTER STATE
   // 'chats' | 'dashboard' | 'catalog' | 'ai_assistant' | 'menu'
-  // Sub-screens under Menu: 'menu_grid' | 'contacts_crm' | 'meta_templates' | 'post_scheduler' | 'settings_ai_training' | 'smart_qr' | 'auto_reply' | 'staff'
+  // Sub-screens: 'menu_grid' | 'contacts_crm' | 'meta_templates' | 'post_scheduler' | 'settings_ai_training' | 'smart_qr' | 'auto_reply' | 'ig_comment_dm' | 'flow_automation' | 'staff' | 'billing'
   // ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('chats');
   const [menuSubScreen, setMenuSubScreen] = useState('menu_grid');
+  const [showAiTrainDrawer, setShowAiTrainDrawer] = useState(false);
 
   // Chats Tab State
   const [chatChannel, setChatChannel] = useState('whatsapp'); // 'whatsapp' | 'instagram'
@@ -38,14 +40,10 @@ export default function MobileDashboard() {
   const [showCrmStageModal, setShowCrmStageModal] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
 
-  // ─────────────────────────────────────────────────────────────
-  // 2. DATA STATES (Contacts, Templates, Posts, Settings)
-  // ─────────────────────────────────────────────────────────────
-
   // CRM Pipeline Stages
   const crmStages = ['New Lead', 'Contacted', 'Interested', 'Site Visit Scheduled', 'Converted', 'Lost'];
 
-  // Chats List with Real Attachments & Unread Badges
+  // Chats List
   const [chats, setChats] = useState([
     {
       _id: 'wa_1',
@@ -118,7 +116,31 @@ export default function MobileDashboard() {
   const [showAddContactModal, setShowAddContactModal] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '', city: '', stage: 'New Lead' });
 
-  // Meta Template Approvals State
+  // 1. WhatsApp Auto-Replies Rules State
+  const [autoReplies, setAutoReplies] = useState([
+    { id: 'ar_1', trigger: 'PRICE / RATE / CATALOG', reply: 'Namaste! {firm} ka summer collection catalog rate card yahan hai: https://dealcloseai.in/catalog. Free delivery ke liye apna size bhejein.', active: true },
+    { id: 'ar_2', trigger: 'OFFER / DISCOUNT', reply: 'Namaste! Weekend special flat 20% OFF coupon code "DEAL20" use karein!', active: true },
+    { id: 'ar_3', trigger: 'ADDRESS / LOCATION', reply: '📍 Hamara store address: Shop #14, City Center Mall. Timings: 10 AM - 9 PM daily.', active: true }
+  ]);
+  const [showAddAutoReplyModal, setShowAddAutoReplyModal] = useState(false);
+  const [newAutoReply, setNewAutoReply] = useState({ trigger: '', reply: '' });
+
+  // 2. Instagram Comment-to-DM Rules State
+  const [igRules, setIgRules] = useState([
+    { id: 'igr_1', reelName: 'Festive Anarkali Showcase Reel', keyword: 'PRICE', dmReply: 'Hey! ✨ The Festive Anarkali is ₹1,499 with Free Shipping. Order Link: https://dealcloseai.in/shop', publicCommentReply: 'Sent you details in DM! Check inbox 📩', active: true },
+    { id: 'igr_2', reelName: 'Bridal Saree Teaser', keyword: 'LINK', dmReply: 'Here is the full bridal catalog PDF: https://dealcloseai.in/catalog-pdf', publicCommentReply: 'DM sent! ❤️', active: true }
+  ]);
+  const [showAddIgRuleModal, setShowAddIgRuleModal] = useState(false);
+  const [newIgRule, setNewIgRule] = useState({ reelName: '', keyword: '', dmReply: '', publicCommentReply: '' });
+
+  // 3. Flow Automations / Auto-Pilot Rules
+  const [flowRules, setFlowRules] = useState([
+    { id: 'fl_1', name: 'Auto Greeting & Name Capture', description: 'When new customer says Hi -> Ask name & city -> Save to CRM automatically', active: true },
+    { id: 'fl_2', name: 'Out-of-Hours Away Reply', description: 'Replies with store opening hours when customer texts after 9:00 PM', active: true },
+    { id: 'fl_3', name: 'UPI Payment Link Generator', description: 'Auto sends UPI QR + Amount when customer confirms order size', active: true }
+  ]);
+
+  // 4. Meta Template Approvals State
   const [metaTemplates, setMetaTemplates] = useState([
     { id: 'mt_1', name: 'festive_discount_v1', category: 'MARKETING', language: 'hi', status: 'APPROVED', text: 'Namaste {{1}}! DealClose AI par festive offer chalu hai. Flat 20% discount ke liye tap karein.' },
     { id: 'mt_2', name: 'order_dispatch_alert', category: 'UTILITY', language: 'en', status: 'APPROVED', text: 'Hello {{1}}, your order #{{2}} is out for delivery with our rider.' },
@@ -127,7 +149,7 @@ export default function MobileDashboard() {
   const [showNewMetaTemplateModal, setShowNewMetaTemplateModal] = useState(false);
   const [newTemplateForm, setNewTemplateForm] = useState({ name: '', category: 'MARKETING', text: '' });
 
-  // Pre-Built & Custom Post Batch Scheduler
+  // 5. Post Batch Scheduler
   const [postsList, setPostsList] = useState([
     { id: 'pst_1', title: 'Festive Mega Sale 2026', image: '👗', caption: '✨ Special Festive Sale is Live! Flat 25% off on our new arrival collection. DM us "PRICE" for catalog.', platform: 'Instagram & Facebook', scheduledDate: 'Today 5:00 PM', status: 'Scheduled' },
     { id: 'pst_2', title: 'Sunday Showroom Walkthrough', image: '✨', caption: 'Visit our store this weekend to explore 100+ exclusive designs. Free home delivery available!', platform: 'Instagram', scheduledDate: 'Tomorrow 10:00 AM', status: 'Ready' },
@@ -136,16 +158,20 @@ export default function MobileDashboard() {
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [customPost, setCustomPost] = useState({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
 
-  // Settings & AI Training State
+  // 6. Settings & AI Training State (Comprehensive Multi-Field Brain)
   const [aiSettings, setAiSettings] = useState({
-    businessName: user?.businessName || 'DealClose Store',
+    businessName: user?.businessName || 'DealClose Fashion & Retail',
     category: 'Retail & Fashion Boutique',
-    businessOfferings: 'Women kurtas, Sarees, Wedding lehengas, and customized ethnic wear.',
-    businessTone: 'Polite, Professional, welcoming with Hindi & English mix with emojis.',
-    faq1_Q: 'Return policy kya hai?',
-    faq1_A: '7-day easy exchange if size does not match.',
-    faq2_Q: 'Delivery kitne din mein hoti hai?',
-    faq2_A: 'All India delivery within 2-4 business days.'
+    businessOfferings: 'Women kurtas, Sarees, Wedding lehengas, Handcrafted jewelry, and custom alterations.',
+    pricingPolicy: 'Kurtas start from ₹899, Sarees from ₹1,499. Flat 10% off on orders above ₹3,000.',
+    businessHours: 'Monday - Saturday: 10:00 AM to 9:00 PM. Sunday: 11:00 AM to 6:00 PM.',
+    deliveryPolicy: 'Free delivery across India on prepaid orders. Cash on delivery (COD) available for ₹50 extra.',
+    returnPolicy: '7-day hassle free exchange if size or fit does not match.',
+    businessTone: 'Polite, enthusiastic, welcoming Hinglish with professional emojis.',
+    customFaqs: [
+      { q: 'Delivery kitne din mein hoti hai?', a: 'Metro cities me 2-3 din, baki areas me 3-5 business days.' },
+      { q: 'UPI Payment kaise karein?', a: 'Aap hamare GPay/PhonePe number 9876543210 ya QR code scan karke pay kar sakte hain.' }
+    ]
   });
 
   // Catalog State
@@ -161,7 +187,7 @@ export default function MobileDashboard() {
   const [aiChatMessages, setAiChatMessages] = useState([
     {
       role: 'ai',
-      text: 'Namaste! 👋 Main DealClose AI assistant hoon. Aap mujhse koi bhi marketing template, product catalog entry, ya Instagram post banwa sakte hain! Kahiye kya help karoon?',
+      text: 'Namaste! 👋 Main DealClose AI assistant hoon. Main aapke business settings aur products ko acche se jaanta hoon.\n\nAap mujhse koi bhi marketing template, Instagram captions, rate lists ya customer reply banwa sakte hain!',
       action: null
     }
   ]);
@@ -230,43 +256,50 @@ export default function MobileDashboard() {
     setContacts(contacts.map(c => c.phone === activeChatThread.customerPhone ? { ...c, stage } : c));
     setActiveChatThread({ ...activeChatThread, stage });
     setShowCrmStageModal(false);
-    alert(`Lead "${activeChatThread.customerName}" successfully moved to: ${stage} ✅`);
+    alert(`Lead "${activeChatThread.customerName}" moved to: ${stage} ✅`);
   };
 
-  const handleQuickAddContact = (e) => {
+  const handleAiSubmit = async (e) => {
     e.preventDefault();
-    if (!newContact.phone) return;
-    setContacts([...contacts, { id: 'c_' + Date.now(), ...newContact, source: 'whatsapp', optIn: true }]);
-    setNewContact({ name: '', phone: '', city: '', stage: 'New Lead' });
-    setShowAddContactModal(false);
-    alert('Contact CRM mein save ho gaya! ✅');
-  };
+    if (!aiInput.trim()) return;
 
-  const handleSubmitMetaTemplate = (e) => {
-    e.preventDefault();
-    if (!newTemplateForm.name || !newTemplateForm.text) return;
-    setMetaTemplates([...metaTemplates, { id: 'mt_' + Date.now(), ...newTemplateForm, language: 'hi', status: 'PENDING' }]);
-    setNewTemplateForm({ name: '', category: 'MARKETING', text: '' });
-    setShowNewMetaTemplateModal(false);
-    alert('Template Meta Cloud API ko approval ke liye submit ho gaya! (Status: PENDING) ⏳');
-  };
+    const promptText = aiInput;
+    setAiChatMessages(prev => [...prev, { role: 'user', text: promptText, action: null }]);
+    setAiInput('');
+    setIsAiTyping(true);
 
-  const handleCreatePost = (e) => {
-    e.preventDefault();
-    if (!customPost.caption) return;
-    setPostsList([
-      { id: 'pst_' + Date.now(), title: customPost.title || 'Special Promotion', image: '✨', caption: customPost.caption, platform: 'Instagram & Facebook', scheduledDate: customPost.date, status: 'Scheduled' },
-      ...postsList
-    ]);
-    setCustomPost({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
-    setShowCreatePostModal(false);
-    alert('Post schedule ho gaya Instagram & Facebook ke liye! 🚀');
+    try {
+      const { data } = await api.post('/ai/webchat', { message: promptText });
+      const replyText = data.reply || 'AI generated response.';
+
+      let generatedAction = null;
+      if (promptText.toLowerCase().includes('template') || promptText.toLowerCase().includes('offer')) {
+        generatedAction = { type: 'template', text: 'Save as Auto-Reply Template' };
+      } else if (promptText.toLowerCase().includes('post') || promptText.toLowerCase().includes('caption')) {
+        generatedAction = { type: 'post', text: 'Schedule to Post Batch' };
+      } else if (promptText.toLowerCase().includes('catalog') || promptText.toLowerCase().includes('price')) {
+        generatedAction = { type: 'catalog', text: 'Add to Product Catalog' };
+      }
+
+      setAiChatMessages(prev => [...prev, { role: 'ai', text: replyText, action: generatedAction }]);
+    } catch (err) {
+      setAiChatMessages(prev => [
+        ...prev,
+        {
+          role: 'ai',
+          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Offer at ${aiSettings.businessName}! Flat 20% OFF on our ${aiSettings.category}. Reply YES to get free delivery link."`,
+          action: { type: 'template', text: 'Save as Auto-Reply Template' }
+        }
+      ]);
+    } finally {
+      setIsAiTyping(false);
+    }
   };
 
   const handleSaveAiTraining = (e) => {
     e.preventDefault();
-    alert('AI Brain & Training Rules successfully saved! AI will now answer according to this knowledge base. 🧠✅');
-    setMenuSubScreen('menu_grid');
+    alert('AI Brain trained successfully with your business info! 🧠✅');
+    setShowAiTrainDrawer(false);
   };
 
   return (
@@ -301,13 +334,17 @@ export default function MobileDashboard() {
                    activeTab === 'catalog' ? 'Product Catalog' :
                    activeTab === 'ai_assistant' ? 'AI Smart Assistant' : 
                    (menuSubScreen === 'contacts_crm' ? 'Contacts & CRM' :
+                    menuSubScreen === 'auto_reply' ? 'WhatsApp Auto-Replies' :
+                    menuSubScreen === 'ig_comment_dm' ? 'Instagram Comment-DM' :
+                    menuSubScreen === 'flow_automation' ? 'Flow & Auto-Pilot' :
                     menuSubScreen === 'meta_templates' ? 'Meta Template Approvals' :
                     menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
-                    menuSubScreen === 'settings_ai_training' ? 'Settings & AI Training' : 'Menu & Tools'))}
+                    menuSubScreen === 'settings_ai_training' ? 'Settings & AI Brain' : 
+                    menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu'))}
             </h1>
             <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              {activeChatThread ? activeChatThread.customerPhone : (user?.businessName || 'DealClose AI Store')}
+              {activeChatThread ? activeChatThread.customerPhone : (aiSettings.businessName || 'DealClose AI Store')}
             </div>
           </div>
         </div>
@@ -319,6 +356,14 @@ export default function MobileDashboard() {
           >
             <span>{activeChatThread.stage || 'Stage'}</span>
             <MoreVertical size={13} />
+          </button>
+        ) : activeTab === 'ai_assistant' ? (
+          <button
+            onClick={() => setShowAiTrainDrawer(true)}
+            className="px-2.5 py-1.5 bg-purple-950/80 border border-purple-500/50 text-purple-300 hover:text-white text-[11px] font-black rounded-xl flex items-center gap-1.5 shadow-md"
+          >
+            <Sparkles size={13} className="text-purple-400" />
+            <span>Train AI</span>
           </button>
         ) : (
           <a
@@ -336,7 +381,7 @@ export default function MobileDashboard() {
       <main className="flex-1 p-3.5 overflow-y-auto pb-24">
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + PDF/IMAGE ATTACHMENTS)
+            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + ATTACHMENTS)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'chats' && !activeChatThread && (
           <div className="space-y-3 animate-fade-in">
@@ -427,7 +472,7 @@ export default function MobileDashboard() {
           </div>
         )}
 
-        {/* 1-on-1 Full-Screen Native Chat Thread WITH ATTACHMENT DISPATCH */}
+        {/* 1-on-1 Full-Screen Native Chat Thread WITH ATTACHMENTS */}
         {activeTab === 'chats' && activeChatThread && (
           <div className="space-y-3 animate-fade-in flex flex-col h-[76vh]">
             <div className="bg-black/40 border border-gray-800 rounded-xl p-2 flex items-center justify-between text-xs">
@@ -498,7 +543,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* Send Message Bar with Attachment Plus/Clip Button */}
+            {/* Send Message Bar */}
             <form onSubmit={handleSendChatMessage} className="flex items-center gap-1.5 pt-2 border-t border-gray-800">
               <button
                 type="button"
@@ -655,18 +700,24 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 4: AI ASSISTANT (REPLACES FLOW BUILDER)
+            TAB 4: AI ASSISTANT (WITH DIRECT INLINE AI TRAIN BUTTON)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'ai_assistant' && (
           <div className="space-y-3 animate-fade-in flex flex-col h-[76vh]">
             <div className="bg-[#0e0e14] border border-purple-500/30 rounded-2xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-purple-400" />
-                <span className="text-xs font-bold text-white">AI Assistant (No FlowBuilder Needed)</span>
+                <span className="text-xs font-bold text-white">AI Assistant (Business Smart)</span>
               </div>
-              <span className="text-[10px] text-emerald-400 font-mono">● Context Trained</span>
+              <button
+                onClick={() => setShowAiTrainDrawer(true)}
+                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] rounded-lg shadow-md flex items-center gap-1"
+              >
+                <Edit3 size={11} /> Train Store AI
+              </button>
             </div>
 
+            {/* AI Messages Stream */}
             <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs custom-scrollbar">
               {aiChatMessages.map((msg, i) => (
                 <div
@@ -694,15 +745,16 @@ export default function MobileDashboard() {
               ))}
               {isAiTyping && (
                 <div className="text-gray-500 text-[11px] animate-pulse flex items-center gap-1">
-                  <span>AI is thinking & formatting action...</span>
+                  <span>AI is thinking with store knowledge...</span>
                 </div>
               )}
             </div>
 
-            <form onSubmit={handleSendChatMessage} className="flex gap-1.5 pt-2 border-t border-gray-800">
+            {/* AI Input Form */}
+            <form onSubmit={handleAiSubmit} className="flex gap-1.5 pt-2 border-t border-gray-800">
               <button
                 type="button"
-                onClick={() => alert('Attach PDF / Image for AI context')}
+                onClick={() => alert('Attach PDF/Brochure for AI context training!')}
                 className="p-2.5 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white rounded-xl"
               >
                 <FileText size={15} />
@@ -722,24 +774,66 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 5: MENU (ALL SUB-PAGES & TOOLS)
+            TAB 5: MENU (COMPLETE FULL GRID WITH ALL 8 ESSENTIAL TOOLS)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'menu' && (
           <div className="space-y-4 animate-fade-in">
             
-            {/* SUB-SCREEN 1: MENU GRID */}
+            {/* SUB-SCREEN 1: COMPLETE 8-TOOL MENU GRID */}
             {menuSubScreen === 'menu_grid' && (
-              <div className="space-y-4">
-                <h2 className="text-sm font-black text-white">Business Tools & Management</h2>
+              <div className="space-y-3">
+                <h2 className="text-sm font-black text-white">Business Tools & Automation</h2>
 
                 <div className="grid grid-cols-2 gap-2.5 text-xs font-bold">
                   
-                  {/* Tool 1: Contacts + CRM (Merged) */}
+                  {/* Tool 1: WhatsApp Auto-Replies */}
                   <button 
-                    onClick={() => setMenuSubScreen('contacts_crm')}
+                    onClick={() => setMenuSubScreen('auto_reply')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-emerald-500/40 transition-all"
                   >
                     <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                      <Zap size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white">Auto-Replies</div>
+                      <div className="text-[10px] text-gray-400 font-normal">WhatsApp keywords</div>
+                    </div>
+                  </button>
+
+                  {/* Tool 2: Instagram Comment-to-DM */}
+                  <button 
+                    onClick={() => setMenuSubScreen('ig_comment_dm')}
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-pink-500/40 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
+                      <InstagramIcon size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white">IG Comment-to-DM</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Reel auto-reply</div>
+                    </div>
+                  </button>
+
+                  {/* Tool 3: Flow & Auto-Pilot Automations */}
+                  <button 
+                    onClick={() => setMenuSubScreen('flow_automation')}
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-cyan-500/40 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                      <Workflow size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white">Flow Automation</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Greeting & away reply</div>
+                    </div>
+                  </button>
+
+                  {/* Tool 4: Contacts & CRM */}
+                  <button 
+                    onClick={() => setMenuSubScreen('contacts_crm')}
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-teal-500/40 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center">
                       <Users size={16} />
                     </div>
                     <div>
@@ -748,7 +842,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 2: Meta Template Approvals */}
+                  {/* Tool 5: Meta WhatsApp Templates */}
                   <button 
                     onClick={() => setMenuSubScreen('meta_templates')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-blue-500/40 transition-all"
@@ -758,42 +852,56 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-white">Meta Templates</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Approval status</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Approvals & status</div>
                     </div>
                   </button>
 
-                  {/* Tool 3: Social Post Scheduler */}
+                  {/* Tool 6: Social Post Scheduler */}
                   <button 
                     onClick={() => setMenuSubScreen('post_scheduler')}
-                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-pink-500/40 transition-all"
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-purple-500/40 transition-all"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
                       <Calendar size={16} />
                     </div>
                     <div>
                       <div className="text-white">Post Scheduler</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Ready posts & custom</div>
+                      <div className="text-[10px] text-gray-400 font-normal">IG & FB batches</div>
                     </div>
                   </button>
 
-                  {/* Tool 4: Settings & AI Training */}
+                  {/* Tool 7: Settings & AI Training */}
                   <button 
                     onClick={() => setMenuSubScreen('settings_ai_training')}
-                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-purple-500/40 transition-all"
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-amber-500/40 transition-all"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
                       <SettingsIcon size={16} />
                     </div>
                     <div>
-                      <div className="text-white">Settings & AI Train</div>
-                      <div className="text-[10px] text-gray-400 font-normal">FAQs & business info</div>
+                      <div className="text-white">Settings & AI Brain</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Train business info</div>
+                    </div>
+                  </button>
+
+                  {/* Tool 8: Staff Management */}
+                  <button 
+                    onClick={() => setMenuSubScreen('staff')}
+                    className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-indigo-500/40 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                      <ShieldCheck size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white">Staff Management</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Scoped lead access</div>
                     </div>
                   </button>
 
                 </div>
 
-                {/* Smart QR Hub Quick Card */}
-                <div className="bg-[#0e0e14] border border-gray-800 rounded-2xl p-4 flex items-center justify-between">
+                {/* Smart QR Counter Hub Card */}
+                <div className="bg-[#0e0e14] border border-gray-800 rounded-2xl p-4 flex items-center justify-between mt-2">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
                       <QrCode size={20} />
@@ -803,14 +911,100 @@ export default function MobileDashboard() {
                       <div className="text-[10px] text-gray-400">Bundled WA, IG & UPI QR</div>
                     </div>
                   </div>
-                  <button onClick={() => alert('Smart QR downloaded!')} className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-amber-300 font-bold text-[11px] rounded-xl">
+                  <button onClick={() => alert('Smart All-In-One QR Code ready for print!')} className="px-3 py-1.5 bg-gray-900 border border-gray-800 text-amber-300 font-bold text-[11px] rounded-xl">
                     View QR
                   </button>
                 </div>
               </div>
             )}
 
-            {/* SUB-SCREEN 2: CONTACTS & MERGED CRM */}
+            {/* SUB-SCREEN 2: WHATSAPP AUTO-REPLIES */}
+            {menuSubScreen === 'auto_reply' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-400">Keyword Auto-Replies ({autoReplies.length})</span>
+                  <button 
+                    onClick={() => setShowAddAutoReplyModal(true)}
+                    className="px-3 py-1.5 bg-emerald-500 text-black font-black text-xs rounded-xl flex items-center gap-1 shadow-md"
+                  >
+                    <Plus size={14} /> Add Keyword
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {autoReplies.map(ar => (
+                    <div key={ar.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-emerald-400 font-mono">🔑 "{ar.trigger}"</span>
+                        <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded font-mono">● Active</span>
+                      </div>
+                      <p className="text-xs text-gray-300 bg-black/40 p-2 rounded-xl leading-relaxed">
+                        {ar.reply}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 3: INSTAGRAM COMMENT-TO-DM */}
+            {menuSubScreen === 'ig_comment_dm' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-400">Reel Comment Automations ({igRules.length})</span>
+                  <button 
+                    onClick={() => setShowAddIgRuleModal(true)}
+                    className="px-3 py-1.5 bg-pink-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md"
+                  >
+                    <Plus size={14} /> Add Reel Rule
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {igRules.map(rule => (
+                    <div key={rule.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-white truncate max-w-[180px]">{rule.reelName}</span>
+                        <span className="text-[10px] text-pink-400 font-mono bg-pink-950/60 px-2 py-0.5 rounded-full">
+                          Word: "{rule.keyword}"
+                        </span>
+                      </div>
+                      <div className="bg-black/40 p-2 rounded-xl text-xs space-y-1">
+                        <div className="text-[10px] text-gray-400">📩 Instant DM Sent:</div>
+                        <p className="text-gray-200 leading-relaxed">{rule.dmReply}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 4: FLOW AUTOMATION & AUTO-PILOT */}
+            {menuSubScreen === 'flow_automation' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-400">Auto-Pilot Flows ({flowRules.length})</span>
+                  <span className="text-[10px] text-cyan-400 font-mono">● All Active</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {flowRules.map(fl => (
+                    <div key={fl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                          <Workflow size={14} className="text-cyan-400" />
+                          <span>{fl.name}</span>
+                        </div>
+                        <input type="checkbox" defaultChecked={fl.active} className="accent-cyan-500 rounded" />
+                      </div>
+                      <p className="text-xs text-gray-400 leading-relaxed">{fl.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 5: CONTACTS & MERGED CRM */}
             {menuSubScreen === 'contacts_crm' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -863,7 +1057,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 3: META TEMPLATES APPROVAL */}
+            {/* SUB-SCREEN 6: META TEMPLATES APPROVAL */}
             {menuSubScreen === 'meta_templates' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -896,7 +1090,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 4: SOCIAL POST SCHEDULER */}
+            {/* SUB-SCREEN 7: POST SCHEDULER */}
             {menuSubScreen === 'post_scheduler' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -930,20 +1124,20 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 5: SETTINGS & AI TRAINING */}
+            {/* SUB-SCREEN 8: SETTINGS & COMPLETE AI TRAINING BRAIN */}
             {menuSubScreen === 'settings_ai_training' && (
-              <form onSubmit={handleSaveAiTraining} className="space-y-3">
+              <form onSubmit={handleSaveAiTraining} className="space-y-3 pb-8">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
                   <Sparkles size={15} className="text-purple-400" />
-                  <span>Train AI on Your Business Info</span>
+                  <span>Comprehensive AI Brain & Knowledge Base</span>
                 </div>
                 <p className="text-[10px] text-gray-400 leading-relaxed">
-                  Fill your store details, offerings, and FAQs. DealClose AI will use this to reply accurately to customers.
+                  Enter your exact business offerings, pricing, policies, and FAQs. AI will automatically use this knowledge base to answer customer chats.
                 </p>
 
-                <div className="space-y-2 text-xs">
+                <div className="space-y-2.5 text-xs">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400">Business Name:</label>
+                    <label className="text-[10px] font-bold text-gray-400">Business / Store Name:</label>
                     <input
                       type="text"
                       value={aiSettings.businessName}
@@ -953,9 +1147,19 @@ export default function MobileDashboard() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400">Products & Offerings:</label>
+                    <label className="text-[10px] font-bold text-gray-400">Business Category / Industry:</label>
+                    <input
+                      type="text"
+                      value={aiSettings.category}
+                      onChange={(e) => setAiSettings({ ...aiSettings, category: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400">Products & Offerings Details:</label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={aiSettings.businessOfferings}
                       onChange={(e) => setAiSettings({ ...aiSettings, businessOfferings: e.target.value })}
                       className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
@@ -963,20 +1167,22 @@ export default function MobileDashboard() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400">FAQ 1 Question & Answer:</label>
-                    <input
-                      type="text"
-                      value={aiSettings.faq1_Q}
-                      onChange={(e) => setAiSettings({ ...aiSettings, faq1_Q: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none mb-1 text-[11px]"
-                      placeholder="Question"
+                    <label className="text-[10px] font-bold text-gray-400">Pricing & Discount Policy:</label>
+                    <textarea
+                      rows={2}
+                      value={aiSettings.pricingPolicy}
+                      onChange={(e) => setAiSettings({ ...aiSettings, pricingPolicy: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
                     />
-                    <input
-                      type="text"
-                      value={aiSettings.faq1_A}
-                      onChange={(e) => setAiSettings({ ...aiSettings, faq1_A: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-300 focus:outline-none text-[11px]"
-                      placeholder="Answer"
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400">Delivery & Return Policies:</label>
+                    <textarea
+                      rows={2}
+                      value={aiSettings.deliveryPolicy}
+                      onChange={(e) => setAiSettings({ ...aiSettings, deliveryPolicy: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
                     />
                   </div>
 
@@ -990,16 +1196,174 @@ export default function MobileDashboard() {
               </form>
             )}
 
+            {/* SUB-SCREEN 9: STAFF MANAGEMENT */}
+            {menuSubScreen === 'staff' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-400">Team Staff Access</span>
+                  <button onClick={() => alert('Invite staff link created!')} className="px-3 py-1.5 bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-md">
+                    + Invite Staff
+                  </button>
+                </div>
+                <div className="bg-[#0e0e14] border border-gray-800 p-4 rounded-2xl text-xs space-y-2">
+                  <div className="font-bold text-white">Role-Based Lead Scoping</div>
+                  <p className="text-gray-400 text-[11px] leading-relaxed">
+                    Staff members log in and see <strong>only their assigned leads</strong>. Billing, Settings, and Meta API keys remain 100% hidden and secure.
+                  </p>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          MODALS (Quick Add Contact, Submit Meta Template, Create Post)
+          AI TRAINING MODAL DRAWER (Directly Accessible from AI Assistant)
       ───────────────────────────────────────────────────────────── */}
+      {showAiTrainDrawer && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
+            <button onClick={() => setShowAiTrainDrawer(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-purple-400" />
+              <h3 className="text-sm font-black text-white">Train AI on Your Business</h3>
+            </div>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Add information about what you sell, prices, discounts, and timings. AI Assistant will use this context immediately!
+            </p>
 
-      {/* Modal 1: Quick Add Contact */}
+            <form onSubmit={handleSaveAiTraining} className="space-y-2.5 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Store / Firm Name:</label>
+                <input
+                  type="text"
+                  value={aiSettings.businessName}
+                  onChange={(e) => setAiSettings({ ...aiSettings, businessName: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Products & Offerings:</label>
+                <textarea
+                  rows={2}
+                  value={aiSettings.businessOfferings}
+                  onChange={(e) => setAiSettings({ ...aiSettings, businessOfferings: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Prices & Offers:</label>
+                <input
+                  type="text"
+                  value={aiSettings.pricingPolicy}
+                  onChange={(e) => setAiSettings({ ...aiSettings, pricingPolicy: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black text-xs rounded-xl shadow-lg mt-2"
+              >
+                Save & Update AI Knowledge 🧠
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add WhatsApp Keyword Auto-Reply */}
+      {showAddAutoReplyModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+            <button onClick={() => setShowAddAutoReplyModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <h3 className="text-sm font-bold text-white">Add WhatsApp Auto-Reply</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newAutoReply.trigger || !newAutoReply.reply) return;
+              setAutoReplies([...autoReplies, { id: 'ar_' + Date.now(), ...newAutoReply, active: true }]);
+              setNewAutoReply({ trigger: '', reply: '' });
+              setShowAddAutoReplyModal(false);
+            }} className="space-y-2 text-xs">
+              <input
+                type="text"
+                placeholder="Trigger Keyword (e.g. PRICE)"
+                value={newAutoReply.trigger}
+                onChange={(e) => setNewAutoReply({ ...newAutoReply, trigger: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white uppercase focus:outline-none"
+                required
+              />
+              <textarea
+                rows={3}
+                placeholder="Auto reply message..."
+                value={newAutoReply.reply}
+                onChange={(e) => setNewAutoReply({ ...newAutoReply, reply: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                required
+              />
+              <button type="submit" className="w-full py-2.5 bg-emerald-500 text-black font-black rounded-xl text-xs mt-2">
+                Save Auto-Reply
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add Instagram Reel Comment-DM Rule */}
+      {showAddIgRuleModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+            <button onClick={() => setShowAddIgRuleModal(false)} className="absolute top-4 right-4 text-gray-400">
+              <X size={16} />
+            </button>
+            <h3 className="text-sm font-bold text-white">Add Reel Comment Rule</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newIgRule.keyword || !newIgRule.dmReply) return;
+              setIgRules([...igRules, { id: 'igr_' + Date.now(), reelName: newIgRule.reelName || 'New Post', ...newIgRule, active: true }]);
+              setNewIgRule({ reelName: '', keyword: '', dmReply: '', publicCommentReply: '' });
+              setShowAddIgRuleModal(false);
+            }} className="space-y-2 text-xs">
+              <input
+                type="text"
+                placeholder="Reel Name / Topic"
+                value={newIgRule.reelName}
+                onChange={(e) => setNewIgRule({ ...newIgRule, reelName: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+              />
+              <input
+                type="text"
+                placeholder="Comment Keyword (e.g. PRICE)"
+                value={newIgRule.keyword}
+                onChange={(e) => setNewIgRule({ ...newIgRule, keyword: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white uppercase focus:outline-none"
+                required
+              />
+              <textarea
+                rows={2}
+                placeholder="Private DM message..."
+                value={newIgRule.dmReply}
+                onChange={(e) => setNewIgRule({ ...newIgRule, dmReply: e.target.value })}
+                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                required
+              />
+              <button type="submit" className="w-full py-2.5 bg-pink-600 text-white font-bold rounded-xl text-xs mt-2">
+                Save Reel Rule
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Quick Add Contact */}
       {showAddContactModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
@@ -1007,7 +1371,13 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             <h3 className="text-sm font-bold text-white">Add Contact to CRM</h3>
-            <form onSubmit={handleQuickAddContact} className="space-y-2 text-xs">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newContact.phone) return;
+              setContacts([...contacts, { id: 'c_' + Date.now(), ...newContact, source: 'whatsapp', optIn: true }]);
+              setNewContact({ name: '', phone: '', city: '', stage: 'New Lead' });
+              setShowAddContactModal(false);
+            }} className="space-y-2 text-xs">
               <input
                 type="text"
                 placeholder="Customer Name"
@@ -1039,7 +1409,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 2: Submit Meta Template */}
+      {/* Modal: Submit Meta Template */}
       {showNewMetaTemplateModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
@@ -1047,7 +1417,14 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             <h3 className="text-sm font-bold text-white">Submit Meta WhatsApp Template</h3>
-            <form onSubmit={handleSubmitMetaTemplate} className="space-y-2 text-xs">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newTemplateForm.name || !newTemplateForm.text) return;
+              setMetaTemplates([...metaTemplates, { id: 'mt_' + Date.now(), ...newTemplateForm, language: 'hi', status: 'PENDING' }]);
+              setNewTemplateForm({ name: '', category: 'MARKETING', text: '' });
+              setShowNewMetaTemplateModal(false);
+              alert('Template submitted to Meta Cloud API! ⏳');
+            }} className="space-y-2 text-xs">
               <input
                 type="text"
                 placeholder="template_name_lowercase"
@@ -1080,7 +1457,7 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 3: Create Custom Post */}
+      {/* Modal: Create Custom Post */}
       {showCreatePostModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
@@ -1088,7 +1465,16 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             <h3 className="text-sm font-bold text-white">Create & Schedule Post</h3>
-            <form onSubmit={handleCreatePost} className="space-y-2 text-xs">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!customPost.caption) return;
+              setPostsList([
+                { id: 'pst_' + Date.now(), title: customPost.title || 'Promotion', image: '✨', caption: customPost.caption, platform: 'Instagram & Facebook', scheduledDate: customPost.date, status: 'Scheduled' },
+                ...postsList
+              ]);
+              setCustomPost({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
+              setShowCreatePostModal(false);
+            }} className="space-y-2 text-xs">
               <input
                 type="text"
                 placeholder="Post Title (e.g. Holi Special)"
