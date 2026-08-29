@@ -7,7 +7,7 @@ import {
   Upload, Radio, Flame, Clock, TrendingUp, AlertCircle, Trash2, Calendar,
   Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
-  Link, Eye, Play, CheckSquare, Layers
+  Link, Eye, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -37,8 +37,26 @@ export default function MobileDashboard() {
   // Post Scheduler Sub-Tabs: 'prebuild' | 'custom_create' | 'live_scheduled'
   const [postTab, setPostTab] = useState('prebuild');
 
+  // Master Automation ON/OFF Switches
+  const [isWaAutomationOn, setIsWaAutomationOn] = useState(true);
+  const [isIgAutomationOn, setIsIgAutomationOn] = useState(true);
+
+  // Channel Connection States (WhatsApp API & Instagram OAuth)
+  const [waApiKey, setWaApiKey] = useState('EAAOx8Z... (Meta Cloud API Linked)');
+  const [isWaConnected, setIsWaConnected] = useState(true);
+  const [isIgConnected, setIsIgConnected] = useState(true);
+
+  // Business Profile & Numbers
+  const [profileData, setProfileData] = useState({
+    businessName: user?.businessName || 'DealClose Fashion & Boutique',
+    ownerPhone: user?.phone || '+91 98765 43210',
+    managerPhone: '+91 98260 99887',
+    logoUrl: '👗',
+    address: 'Shop #14, City Center Mall, Main Road'
+  });
+
   // Chats Tab State
-  const [chatChannel, setChatChannel] = useState('whatsapp'); // 'whatsapp' | 'instagram'
+  const [chatChannel, setChatChannel] = useState('whatsapp');
   const [activeChatThread, setActiveChatThread] = useState(null);
   const [chatInputText, setChatInputText] = useState('');
   const [showCrmStageModal, setShowCrmStageModal] = useState(false);
@@ -48,7 +66,7 @@ export default function MobileDashboard() {
   // CRM Pipeline Stages
   const crmStages = ['New Lead', 'Contacted', 'Interested', 'Site Visit Scheduled', 'Converted', 'Lost'];
 
-  // Chats List
+  // Chats List (Live Data Synced from MongoDB)
   const [chats, setChats] = useState([
     {
       _id: 'wa_1',
@@ -139,7 +157,7 @@ export default function MobileDashboard() {
   const [showAddAutoReplyModal, setShowAddAutoReplyModal] = useState(false);
   const [newAutoReply, setNewAutoReply] = useState({ trigger: '', reply: '' });
 
-  // 3. Flow Automations State (With + Create New Flow)
+  // 3. Flow Automations State
   const [flowRules, setFlowRules] = useState([
     { id: 'fl_1', name: 'Auto Greeting & Name Capture', description: 'When new customer says Hi -> Ask name & city -> Save to CRM automatically', trigger: 'New Incoming Chat', active: true },
     { id: 'fl_2', name: 'Out-of-Hours Away Reply', description: 'Replies with store opening hours when customer texts after 9:00 PM', trigger: 'After 9 PM', active: true },
@@ -157,7 +175,7 @@ export default function MobileDashboard() {
   const [showNewMetaTemplateModal, setShowNewMetaTemplateModal] = useState(false);
   const [newTemplateForm, setNewTemplateForm] = useState({ name: '', category: 'MARKETING', text: '' });
 
-  // 5. Post Batch Scheduler (Pre-Built + Custom + Live/Scheduled Feed)
+  // 5. Post Batch Scheduler
   const [prebuildTemplates, setPrebuildTemplates] = useState([
     { id: 'pb_1', title: 'Festive Flash Sale (1-Week Batch)', image: '👗', caption: '✨ 1-Week Festive Rush! Flat 25% OFF on all new arrivals. Comment "PRICE" to get instant DM.', scheduledTime: 'Daily 6:00 PM' },
     { id: 'pb_2', title: 'Weekend Special Offer (Monthly Batch)', image: '🎉', caption: 'Sunday Mega Showcase! Visit store or order online with free doorstep delivery.', scheduledTime: 'Every Saturday 11:00 AM' },
@@ -171,9 +189,9 @@ export default function MobileDashboard() {
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [customPost, setCustomPost] = useState({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
 
-  // 6. Dynamic AI Brain & Knowledge Base (With Infinite Custom Fields / Boxes)
+  // 6. Dynamic AI Brain & Knowledge Base
   const [aiKnowledgeList, setAiKnowledgeList] = useState([
-    { id: 'k1', title: 'Store / Business Name', content: user?.businessName || 'DealClose Fashion & Boutique' },
+    { id: 'k1', title: 'Store / Business Name', content: profileData.businessName },
     { id: 'k2', title: 'Products & Offerings', content: 'Women kurtas, Sarees, Wedding lehengas, Handcrafted jewelry, and custom alterations.' },
     { id: 'k3', title: 'Pricing & Discount Policy', content: 'Kurtas start from ₹899, Sarees from ₹1,499. Flat 10% off on orders above ₹3,000 with coupon "SAVE10".' },
     { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery across India on prepaid orders. COD available for ₹50 extra. Delivery takes 2-4 days.' },
@@ -262,7 +280,7 @@ export default function MobileDashboard() {
     if (!selectedContactForTransfer) return;
     setContacts(contacts.map(c => c.id === selectedContactForTransfer.id ? { ...c, stage } : c));
     setChats(chats.map(c => c.customerPhone === selectedContactForTransfer.phone ? { ...c, stage } : c));
-    alert(`Lead "${selectedContactForTransfer.name}" successfully transferred to stage: ${stage} 🚀`);
+    alert(`Lead "${selectedContactForTransfer.name}" transferred to stage: ${stage} 🚀`);
     setSelectedContactForTransfer(null);
   };
 
@@ -282,6 +300,11 @@ export default function MobileDashboard() {
     setNewAiBox({ title: '', content: '' });
     setShowAddAiBoxModal(false);
     alert('New custom business brain box added to AI! 🧠✅');
+  };
+
+  const handleSaveBusinessProfile = (e) => {
+    e.preventDefault();
+    alert('Business Profile & Contact Numbers Saved Successfully! ✅');
   };
 
   const handleAiSubmit = async (e) => {
@@ -312,7 +335,7 @@ export default function MobileDashboard() {
         ...prev,
         {
           role: 'ai',
-          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Weekend Offer at ${aiKnowledgeList[0]?.content || 'Our Store'}! Flat 20% OFF. Comment or reply YES to buy with free home delivery."`,
+          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Weekend Offer at ${profileData.businessName}! Flat 20% OFF. Comment or reply YES to buy with free home delivery."`,
           action: { type: 'template', text: 'Save as Auto-Reply Template' }
         }
       ]);
@@ -341,7 +364,7 @@ export default function MobileDashboard() {
             </button>
           ) : (
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center font-black text-black text-base shadow-md">
-              ⚡
+              {profileData.logoUrl || '⚡'}
             </div>
           )}
           <div>
@@ -358,12 +381,12 @@ export default function MobileDashboard() {
                     menuSubScreen === 'flow_automation' ? 'Flow & Auto-Pilot' :
                     menuSubScreen === 'meta_templates' ? 'Meta Template Approvals' :
                     menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
-                    menuSubScreen === 'settings_ai_training' ? 'Settings & AI Brain' : 
+                    menuSubScreen === 'settings_ai_training' ? 'Settings, Profile & API' : 
                     menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu'))}
             </h1>
             <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              {activeChatThread ? activeChatThread.customerPhone : (aiKnowledgeList[0]?.content || 'DealClose AI Store')}
+              {activeChatThread ? activeChatThread.customerPhone : profileData.businessName}
             </div>
           </div>
         </div>
@@ -400,11 +423,34 @@ export default function MobileDashboard() {
       <main className="flex-1 p-3.5 overflow-y-auto pb-24">
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + ATTACHMENTS)
+            TAB 1: CHATS (NATIVE WA & IG SUB-TABS + MASTER AUTOMATION TOGGLES)
         ════════════════════════════════════════════════════════════ */}
         {activeTab === 'chats' && !activeChatThread && (
           <div className="space-y-3 animate-fade-in">
             
+            {/* Master Automation ON/OFF Bar */}
+            <div className="bg-[#0e0e14] border border-gray-800 p-2.5 rounded-2xl flex items-center justify-between text-xs shadow-sm">
+              <div className="flex items-center gap-2">
+                <Power size={15} className={isWaAutomationOn ? "text-emerald-400" : "text-gray-500"} />
+                <span className="font-bold text-gray-200">
+                  {chatChannel === 'whatsapp' ? 'WhatsApp Auto-Reply' : 'Instagram Auto-DM'}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (chatChannel === 'whatsapp') setIsWaAutomationOn(!isWaAutomationOn);
+                  else setIsIgAutomationOn(!isIgAutomationOn);
+                }}
+                className={`px-3 py-1 rounded-full font-black text-[10px] transition-all flex items-center gap-1 ${
+                  (chatChannel === 'whatsapp' ? isWaAutomationOn : isIgAutomationOn)
+                    ? 'bg-emerald-500 text-black shadow-md'
+                    : 'bg-gray-800 text-gray-400'
+                }`}
+              >
+                <span>{(chatChannel === 'whatsapp' ? isWaAutomationOn : isIgAutomationOn) ? 'AUTO ON ⚡' : 'PAUSED ⏸️'}</span>
+              </button>
+            </div>
+
             {/* Visual Native Sub-Tabs */}
             <div className="grid grid-cols-2 bg-[#0e0e14] p-1 rounded-2xl border border-gray-800 text-xs font-black shadow-inner">
               <button
@@ -517,7 +563,6 @@ export default function MobileDashboard() {
                 >
                   <p>{m.text}</p>
                   
-                  {/* File / Image / PDF Attachment Card */}
                   {m.attachment && (
                     <div className="mt-2 p-2 bg-black/50 border border-gray-700/60 rounded-xl flex items-center justify-between text-[11px]">
                       <div className="flex items-center gap-1.5 truncate">
@@ -871,7 +916,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 6: Social Post Scheduler (3 Screens) */}
+                  {/* Tool 6: Social Post Scheduler */}
                   <button 
                     onClick={() => setMenuSubScreen('post_scheduler')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-purple-500/40 transition-all"
@@ -885,7 +930,7 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 7: Settings & AI Training (With +Add Custom Brain Box) */}
+                  {/* Tool 7: Settings & AI Training (Profile + Channels + AI Brain) */}
                   <button 
                     onClick={() => setMenuSubScreen('settings_ai_training')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-amber-500/40 transition-all"
@@ -894,8 +939,8 @@ export default function MobileDashboard() {
                       <SettingsIcon size={16} />
                     </div>
                     <div>
-                      <div className="text-white">Settings & AI Brain</div>
-                      <div className="text-[10px] text-gray-400 font-normal">+Add custom boxes</div>
+                      <div className="text-white">Settings & Channels</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Profile, API Key & Brain</div>
                     </div>
                   </button>
 
@@ -933,7 +978,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 2: CONTACTS & CRM (WITH TRANSFER CARD BUTTON) */}
+            {/* SUB-SCREEN 2: CONTACTS & CRM */}
             {menuSubScreen === 'contacts_crm' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -973,7 +1018,7 @@ export default function MobileDashboard() {
                         </span>
                       </div>
                       
-                      {/* Action Buttons: Call + WhatsApp + 🚀 Stage Transfer Button */}
+                      {/* Action Buttons: Call + WhatsApp + Stage Transfer */}
                       <div className="flex items-center gap-1.5">
                         <a href={`tel:${c.phone}`} className="p-2 bg-gray-900 border border-gray-800 rounded-xl text-emerald-400 hover:text-white" title="Call">
                           <Phone size={13} />
@@ -1037,7 +1082,6 @@ export default function MobileDashboard() {
                         <ChevronRight size={16} className="text-gray-500" />
                       </div>
 
-                      {/* Configured Rule Preview */}
                       <div className="bg-black/50 p-2.5 rounded-xl border border-gray-800/80 text-[11px] space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-gray-400 text-[10px]">Response Type: <strong className="text-pink-300 uppercase">{post.responseType.replace('_', ' ')}</strong></span>
@@ -1051,7 +1095,7 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 4: FLOW AUTOMATION (WITH + CREATE NEW FLOW) */}
+            {/* SUB-SCREEN 4: FLOW AUTOMATION */}
             {menuSubScreen === 'flow_automation' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1084,11 +1128,9 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 5: POST SCHEDULER (3 SUB-SCREENS: PRE-BUILD, CUSTOM, LIVE/SCHEDULED) */}
+            {/* SUB-SCREEN 5: POST SCHEDULER (3 SUB-SCREENS) */}
             {menuSubScreen === 'post_scheduler' && (
               <div className="space-y-3">
-                
-                {/* 3 Sub-Tabs Navigation */}
                 <div className="grid grid-cols-3 bg-[#0e0e14] p-1 rounded-2xl border border-gray-800 text-[11px] font-bold shadow-inner">
                   <button
                     onClick={() => setPostTab('prebuild')}
@@ -1110,7 +1152,6 @@ export default function MobileDashboard() {
                   </button>
                 </div>
 
-                {/* Sub-Screen A: Pre-Built Auto Templates */}
                 {postTab === 'prebuild' && (
                   <div className="space-y-2.5 animate-fade-in">
                     <p className="text-[10px] text-gray-400">1-Tap approve pre-designed batch posts for 1 week / 1 month:</p>
@@ -1138,7 +1179,6 @@ export default function MobileDashboard() {
                   </div>
                 )}
 
-                {/* Sub-Screen B: Create Custom Post */}
                 {postTab === 'custom_create' && (
                   <form onSubmit={(e) => {
                     e.preventDefault();
@@ -1184,7 +1224,6 @@ export default function MobileDashboard() {
                   </form>
                 )}
 
-                {/* Sub-Screen C: Live & Scheduled Posts Feed */}
                 {postTab === 'live_scheduled' && (
                   <div className="space-y-2.5 animate-fade-in">
                     <p className="text-[10px] text-gray-400">View all scheduled and live published posts:</p>
@@ -1211,35 +1250,132 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 6: SETTINGS & DYNAMIC AI BRAIN (WITH +ADD CUSTOM BOX BUTTON) */}
+            {/* SUB-SCREEN 6: SETTINGS, PROFILE & API CONNECTION HUB */}
             {menuSubScreen === 'settings_ai_training' && (
-              <div className="space-y-3 pb-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Sparkles size={15} className="text-purple-400" />
-                      <span>AI Store Brain & Knowledge Base</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400">Dynamic customizable boxes for store training</p>
+              <div className="space-y-4 pb-8">
+                
+                {/* 1. Business Profile, Logo & Phone Numbers */}
+                <form onSubmit={handleSaveBusinessProfile} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 text-xs shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <Building size={15} className="text-amber-400" />
+                      <span>Business Profile & Numbers</span>
+                    </span>
+                    <button type="submit" className="px-2.5 py-1 bg-amber-500 text-black font-black text-[10px] rounded-lg">
+                      Save Profile
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setShowAddAiBoxModal(true)}
-                    className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md shrink-0"
-                  >
-                    <Plus size={14} /> Add New Box
-                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-2xl">
+                      {profileData.logoUrl}
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-gray-400">Business Logo Icon / Emoji:</label>
+                      <input
+                        type="text"
+                        value={profileData.logoUrl}
+                        onChange={(e) => setProfileData({ ...profileData, logoUrl: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-white focus:outline-none text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400">Business Name:</label>
+                    <input
+                      type="text"
+                      value={profileData.businessName}
+                      onChange={(e) => setProfileData({ ...profileData, businessName: e.target.value })}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400">Owner Number:</label>
+                      <input
+                        type="text"
+                        value={profileData.ownerPhone}
+                        onChange={(e) => setProfileData({ ...profileData, ownerPhone: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white font-mono text-[11px] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400">Manager Number:</label>
+                      <input
+                        type="text"
+                        value={profileData.managerPhone}
+                        onChange={(e) => setProfileData({ ...profileData, managerPhone: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white font-mono text-[11px] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </form>
+
+                {/* 2. WhatsApp API & Instagram Channel Linking */}
+                <div className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-3 text-xs shadow-sm">
+                  <span className="font-bold text-white flex items-center gap-1.5 border-b border-gray-800/80 pb-2">
+                    <Link2 size={15} className="text-emerald-400" />
+                    <span>WhatsApp & Instagram Connection</span>
+                  </span>
+
+                  {/* WhatsApp API Key */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-bold">
+                      <span className="text-gray-400">WhatsApp Cloud API Key:</span>
+                      <span className="text-emerald-400 font-mono">● {isWaConnected ? 'Connected' : 'Not Connected'}</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={waApiKey}
+                      onChange={(e) => setWaApiKey(e.target.value)}
+                      className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-300 font-mono text-[11px] focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Connect Buttons */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => alert('WhatsApp Embedded Signup flow initiated!')}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1"
+                    >
+                      <span>🟢 Link WhatsApp</span>
+                    </button>
+                    <button
+                      onClick={() => alert('Instagram Professional Account OAuth initiated!')}
+                      className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1"
+                    >
+                      <InstagramIcon size={12} />
+                      <span>Link Instagram</span>
+                    </button>
+                  </div>
                 </div>
 
+                {/* 3. Dynamic AI Brain & Knowledge Base Boxes */}
                 <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1">
+                      <Sparkles size={14} className="text-purple-400" />
+                      <span>AI Store Brain Knowledge</span>
+                    </span>
+                    <button 
+                      onClick={() => setShowAddAiBoxModal(true)}
+                      className="px-2.5 py-1 bg-purple-600 text-white font-bold text-[10px] rounded-lg flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Add Box
+                    </button>
+                  </div>
+
                   {aiKnowledgeList.map(item => (
-                    <div key={item.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-1.5 shadow-sm">
+                    <div key={item.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1 shadow-sm">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-purple-300">{item.title}</span>
+                        <span className="font-bold text-[11px] text-purple-300">{item.title}</span>
                         <button 
                           onClick={() => setAiKnowledgeList(aiKnowledgeList.filter(k => k.id !== item.id))}
                           className="text-gray-500 hover:text-red-400 p-1"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                       <textarea
@@ -1249,18 +1385,12 @@ export default function MobileDashboard() {
                           const updated = aiKnowledgeList.map(k => k.id === item.id ? { ...k, content: e.target.value } : k);
                           setAiKnowledgeList(updated);
                         }}
-                        className="w-full bg-black border border-gray-800/80 rounded-xl p-2.5 text-xs text-gray-200 focus:outline-none focus:border-purple-500"
+                        className="w-full bg-black border border-gray-800/80 rounded-xl p-2 text-xs text-gray-200 focus:outline-none focus:border-purple-500"
                       />
                     </div>
                   ))}
                 </div>
 
-                <button
-                  onClick={() => alert('All AI Brain knowledge boxes saved successfully! 🧠✅')}
-                  className="w-full py-3 bg-emerald-500 text-black font-black text-xs rounded-xl shadow-lg mt-2"
-                >
-                  Save All Brain Boxes to AI 🧠
-                </button>
               </div>
             )}
 
