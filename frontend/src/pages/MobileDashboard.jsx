@@ -73,6 +73,16 @@ export default function MobileDashboard() {
   const [loginPassword, setLoginPassword] = useState('ak@7828289433');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // Read Chat IDs Set (Persists so unread badges don't re-appear)
+  const [readChatPhones, setReadChatPhones] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dealclose_read_phones');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch(e) {
+      return new Set();
+    }
+  });
+
   // Broadcast Delivery Channel Filter
   const [broadcastFilter, setBroadcastFilter] = useState('all'); // 'all' | 'whatsapp' | 'instagram'
 
@@ -89,7 +99,18 @@ export default function MobileDashboard() {
   // Workspaces Array & Selection
   const [rawDbUser, setRawDbUser] = useState(null);
   const [workspaces, setWorkspaces] = useState([
-    { id: 'main', name: 'DealClose AI (Main Business)', category: 'Main' }
+    { 
+      id: 'main', 
+      name: 'DealClose AI', 
+      category: 'Main Business',
+      externalApiUrl: 'https://dealcloseai.in',
+      externalApiPostUrl: 'https://dealcloseai.in/api/post',
+      externalApiSearchUrl: 'https://dealcloseai.in/api/search',
+      externalApiVisitUrl: 'https://dealcloseai.in/api/visit',
+      externalApiBlogUrl: 'https://dealcloseai.in/api/blog',
+      externalApiToken: '',
+      customWebhooks: ''
+    }
   ]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('main');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -107,12 +128,12 @@ export default function MobileDashboard() {
     googleBusinessLink: 'https://g.page/r/dealclose-review',
     upiId: 'dealclose@upi',
     // 🔗 Custom Webhooks & API Endpoints
-    externalApiUrl: 'https://newpropertyhub.in',
+    externalApiUrl: 'https://dealcloseai.in',
     externalApiToken: '',
-    externalApiPostUrl: 'https://newpropertyhub.in/api/post',
-    externalApiSearchUrl: 'https://newpropertyhub.in/api/search',
-    externalApiVisitUrl: 'https://newpropertyhub.in/api/visit',
-    externalApiBlogUrl: 'https://newpropertyhub.in/api/blog',
+    externalApiPostUrl: 'https://dealcloseai.in/api/post',
+    externalApiSearchUrl: 'https://dealcloseai.in/api/search',
+    externalApiVisitUrl: 'https://dealcloseai.in/api/visit',
+    externalApiBlogUrl: 'https://dealcloseai.in/api/blog',
     customWebhooks: ''
   });
 
@@ -303,16 +324,16 @@ export default function MobileDashboard() {
         const wsList = [
           { 
             id: 'main', 
-            name: liveUser.businessName || 'DealClose AI (Main Business)', 
+            name: liveUser.businessName || 'DealClose AI', 
             category: 'Main Business',
             whatsappConfig: liveUser.whatsappConfig || {},
             instagramConfig: liveUser.instagramConfig || {},
-            externalApiUrl: liveUser.externalApiUrl || 'https://newpropertyhub.in',
+            externalApiUrl: liveUser.externalApiUrl || 'https://dealcloseai.in',
             externalApiToken: liveUser.externalApiToken || '',
-            externalApiPostUrl: liveUser.externalApiPostUrl || 'https://newpropertyhub.in/api/post',
-            externalApiSearchUrl: liveUser.externalApiSearchUrl || 'https://newpropertyhub.in/api/search',
-            externalApiVisitUrl: liveUser.externalApiVisitUrl || 'https://newpropertyhub.in/api/visit',
-            externalApiBlogUrl: liveUser.externalApiBlogUrl || 'https://newpropertyhub.in/api/blog',
+            externalApiPostUrl: liveUser.externalApiPostUrl || 'https://dealcloseai.in/api/post',
+            externalApiSearchUrl: liveUser.externalApiSearchUrl || 'https://dealcloseai.in/api/search',
+            externalApiVisitUrl: liveUser.externalApiVisitUrl || 'https://dealcloseai.in/api/visit',
+            externalApiBlogUrl: liveUser.externalApiBlogUrl || 'https://dealcloseai.in/api/blog',
             aiRules: liveUser.aiRules || '',
             businessDescription: liveUser.businessDescription || ''
           }
@@ -322,20 +343,23 @@ export default function MobileDashboard() {
           liveUser.workspaces.forEach((ws, idx) => {
             if (ws && ws.name) {
               const wsId = ws._id ? ws._id.toString() : `ws_${idx}`;
+              const isPropertyHub = ws.name.toLowerCase().includes('property');
+              const defaultDomain = isPropertyHub ? 'newpropertyhub.in' : `${ws.name.toLowerCase().replace(/\s+/g, '')}.in`;
+
               wsList.push({
                 id: wsId,
                 name: ws.name,
                 category: ws.description || 'Branch / Sub-store',
                 whatsappConfig: ws.whatsappConfig || {},
                 instagramConfig: ws.instagramConfig || {},
-                externalApiUrl: ws.externalApiUrl || liveUser.externalApiUrl || 'https://newpropertyhub.in',
-                externalApiToken: ws.externalApiToken || liveUser.externalApiToken || '',
-                externalApiPostUrl: ws.externalApiPostUrl || liveUser.externalApiPostUrl || 'https://newpropertyhub.in/api/post',
-                externalApiSearchUrl: ws.externalApiSearchUrl || liveUser.externalApiSearchUrl || 'https://newpropertyhub.in/api/search',
-                externalApiVisitUrl: ws.externalApiVisitUrl || liveUser.externalApiVisitUrl || 'https://newpropertyhub.in/api/visit',
-                externalApiBlogUrl: ws.externalApiBlogUrl || liveUser.externalApiBlogUrl || 'https://newpropertyhub.in/api/blog',
-                aiRules: ws.aiRules || liveUser.aiRules || '',
-                businessDescription: ws.businessDescription || liveUser.businessDescription || ''
+                externalApiUrl: ws.externalApiUrl || `https://${defaultDomain}`,
+                externalApiToken: ws.externalApiToken || '',
+                externalApiPostUrl: ws.externalApiPostUrl || `https://${defaultDomain}/api/post`,
+                externalApiSearchUrl: ws.externalApiSearchUrl || `https://${defaultDomain}/api/search`,
+                externalApiVisitUrl: ws.externalApiVisitUrl || `https://${defaultDomain}/api/visit`,
+                externalApiBlogUrl: ws.externalApiBlogUrl || `https://${defaultDomain}/api/blog`,
+                aiRules: ws.aiRules || '',
+                businessDescription: ws.businessDescription || ''
               });
             }
           });
@@ -451,13 +475,13 @@ export default function MobileDashboard() {
       facebookLink: liveUser?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose',
       googleBusinessLink: liveUser?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review',
       upiId: liveUser?.digitalCardConfig?.upiId || 'dealclose@upi',
-      // Webhooks for this specific store
-      externalApiUrl: ws.externalApiUrl || 'https://newpropertyhub.in',
+      // Webhooks for this specific store (Distinct per workspace)
+      externalApiUrl: ws.externalApiUrl || (ws.id === 'main' ? 'https://dealcloseai.in' : 'https://newpropertyhub.in'),
       externalApiToken: ws.externalApiToken || '',
-      externalApiPostUrl: ws.externalApiPostUrl || 'https://newpropertyhub.in/api/post',
-      externalApiSearchUrl: ws.externalApiSearchUrl || 'https://newpropertyhub.in/api/search',
-      externalApiVisitUrl: ws.externalApiVisitUrl || 'https://newpropertyhub.in/api/visit',
-      externalApiBlogUrl: ws.externalApiBlogUrl || 'https://newpropertyhub.in/api/blog',
+      externalApiPostUrl: ws.externalApiPostUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/post' : 'https://newpropertyhub.in/api/post'),
+      externalApiSearchUrl: ws.externalApiSearchUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/search' : 'https://newpropertyhub.in/api/search'),
+      externalApiVisitUrl: ws.externalApiVisitUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/visit' : 'https://newpropertyhub.in/api/visit'),
+      externalApiBlogUrl: ws.externalApiBlogUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/blog' : 'https://newpropertyhub.in/api/blog'),
       customWebhooks: ws.customWebhooks || ''
     });
 
@@ -487,7 +511,7 @@ export default function MobileDashboard() {
     ]);
   };
 
-  // Fetch Filtered Chats by Workspace with Relative Date Labels
+  // Fetch Filtered Chats by Workspace with Relative Date Labels & Read State Persistence
   const fetchChatsForWorkspace = async (wsId) => {
     try {
       const url = wsId && wsId !== 'all' ? `/chats?workspaceId=${wsId}` : '/chats';
@@ -503,6 +527,7 @@ export default function MobileDashboard() {
           const isIg = msg.channel === 'instagram_dm' || msg.channel === 'instagram_comment' || String(phone).startsWith('IG_') || (msg.tags && msg.tags.includes('ig_comment'));
           const msgTimestamp = msg.sentAt || msg.timestamp || new Date();
           const relativeTime = formatRelativeChatTime(msgTimestamp);
+          const isAlreadyRead = readChatPhones.has(phone) || (activeChatThread && activeChatThread._id === phone);
 
           if (!groupedMap[phone]) {
             groupedMap[phone] = {
@@ -513,7 +538,7 @@ export default function MobileDashboard() {
               lastMessage: rawText,
               time: relativeTime,
               timestamp: msgTimestamp,
-              unreadCount: isFromCustomer && msg.status !== 'read' ? 1 : 0,
+              unreadCount: isAlreadyRead ? 0 : (isFromCustomer && msg.status !== 'read' ? 1 : 0),
               stage: msg.stage || 'Interested',
               messages: []
             };
@@ -592,6 +617,15 @@ export default function MobileDashboard() {
   };
 
   const handleOpenChat = (chat) => {
+    // Mark as read permanently
+    const nextReadSet = new Set(readChatPhones);
+    nextReadSet.add(chat._id);
+    nextReadSet.add(chat.customerPhone);
+    setReadChatPhones(nextReadSet);
+    try {
+      localStorage.setItem('dealclose_read_phones', JSON.stringify(Array.from(nextReadSet)));
+    } catch(e) {}
+
     setChats(chats.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c));
     setActiveChatThread({ ...chat, unreadCount: 0 });
   };
@@ -1606,13 +1640,13 @@ export default function MobileDashboard() {
                       <Webhook size={15} />
                       <span>🔗 Custom Webhooks & API Integrations</span>
                     </h3>
-                    <p className="text-[10px] text-gray-400">Configuring for: <strong>{profileData.businessName}</strong></p>
+                    <p className="text-[10px] text-gray-400">Active Business: <strong className="text-white">{profileData.businessName}</strong></p>
                   </div>
                 </div>
 
                 <form onSubmit={handleSaveBusinessProfile} className="bg-[#0e0e14] border border-teal-500/30 p-3.5 rounded-2xl space-y-3 text-xs shadow-md">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 mb-1">Target Business Store:</label>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">Target Store / Website Domain:</label>
                     <select
                       value={activeWorkspaceId}
                       onChange={(e) => handleWorkspaceChange(e.target.value)}
@@ -1620,7 +1654,7 @@ export default function MobileDashboard() {
                     >
                       {workspaces.map(ws => (
                         <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
-                          🏢 {ws.name}
+                          🏢 {ws.name} ({ws.id === 'main' ? 'dealcloseai.in' : ws.name.toLowerCase().replace(/\s+/g, '') + '.in'})
                         </option>
                       ))}
                     </select>
@@ -1658,13 +1692,13 @@ export default function MobileDashboard() {
                   </div>
 
                   <div className="pt-2 border-t border-gray-800/80 space-y-2">
-                    <span className="text-[11px] font-bold text-teal-400">Specific Custom API Endpoints:</span>
+                    <span className="text-[11px] font-bold text-teal-400">Specific Custom API Endpoints for {profileData.businessName}:</span>
                     
                     <div>
                       <label className="block text-[10px] text-gray-400">Quick Post Endpoint URL (POST):</label>
                       <input
                         type="url"
-                        placeholder="https://newpropertyhub.in/api/post"
+                        placeholder="https://.../api/post"
                         value={profileData.externalApiPostUrl}
                         onChange={(e) => setProfileData({ ...profileData, externalApiPostUrl: e.target.value })}
                         className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
@@ -1675,7 +1709,7 @@ export default function MobileDashboard() {
                       <label className="block text-[10px] text-gray-400">Search / Catalog Endpoint URL (GET):</label>
                       <input
                         type="url"
-                        placeholder="https://newpropertyhub.in/api/search"
+                        placeholder="https://.../api/search"
                         value={profileData.externalApiSearchUrl}
                         onChange={(e) => setProfileData({ ...profileData, externalApiSearchUrl: e.target.value })}
                         className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
@@ -1686,7 +1720,7 @@ export default function MobileDashboard() {
                       <label className="block text-[10px] text-gray-400">Schedule Visit Endpoint URL (POST):</label>
                       <input
                         type="url"
-                        placeholder="https://newpropertyhub.in/api/visit"
+                        placeholder="https://.../api/visit"
                         value={profileData.externalApiVisitUrl}
                         onChange={(e) => setProfileData({ ...profileData, externalApiVisitUrl: e.target.value })}
                         className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
@@ -1697,7 +1731,7 @@ export default function MobileDashboard() {
                       <label className="block text-[10px] text-gray-400">Publish Blog Endpoint URL (POST):</label>
                       <input
                         type="url"
-                        placeholder="https://newpropertyhub.in/api/blog"
+                        placeholder="https://.../api/blog"
                         value={profileData.externalApiBlogUrl}
                         onChange={(e) => setProfileData({ ...profileData, externalApiBlogUrl: e.target.value })}
                         className="w-full bg-black border border-gray-800 rounded-xl p-2 text-teal-300 font-mono text-[11px] focus:outline-none"
