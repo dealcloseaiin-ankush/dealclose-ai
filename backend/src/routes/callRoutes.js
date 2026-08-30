@@ -6,12 +6,18 @@ const {
   getCallingBuckets,
   moveCallingBucket,
   batchAssignToday,
-  logManualCall
+  logManualCall,
+  getVoiceScripts,
+  triggerAiVoiceCampaign
 } = require('../controllers/callController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.get('/', protect, getCalls);
 router.post('/dial', protect, initiateCall);
+
+// 🎙️ AI Voice Calling Automation Routes
+router.get('/voice-scripts', protect, getVoiceScripts);
+router.post('/trigger-ai-campaign', protect, triggerAiVoiceCampaign);
 
 // 🚀 5-Bucket Telephony & Follow-up Queue Routes
 router.get('/buckets', protect, getCallingBuckets);

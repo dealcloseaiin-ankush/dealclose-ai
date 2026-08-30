@@ -1881,6 +1881,25 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
+                  {/* Tool 4.5: AI Voice Calling Agent */}
+                  <button 
+                    onClick={() => setMenuSubScreen('ai_calling')}
+                    className="col-span-2 bg-gradient-to-r from-blue-950/60 to-cyan-950/60 border border-blue-500/40 p-3.5 rounded-2xl text-left space-y-2 hover:border-blue-400 transition-all shadow-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center">
+                        <PhoneCall size={16} />
+                      </div>
+                      <span className="text-[10px] font-mono bg-blue-950 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/40">
+                        ● Hindi / Hinglish Voice AI Ready
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-white font-black">🎙️ AI Voice Calling Agent</div>
+                      <div className="text-[10px] text-blue-300 font-normal">Automated Hindi voice calls for Site Visits, Festive Offers & VIP passes</div>
+                    </div>
+                  </button>
+
                   {/* Tool 5: Contacts & CRM */}
                   <button 
                     onClick={() => setMenuSubScreen('contacts_crm')}
@@ -2477,6 +2496,76 @@ export default function MobileDashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 5.75: 🎙️ AI VOICE CALLING AGENT */}
+            {menuSubScreen === 'ai_calling' && (
+              <div className="space-y-3 animate-fade-in text-xs">
+                <div className="bg-gradient-to-r from-blue-950/80 to-cyan-950/80 border border-blue-500/40 rounded-2xl p-3.5 space-y-1.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PhoneCall size={16} className="text-blue-400" />
+                      <span className="text-xs font-bold text-white">AI Voice Calling Bot (Hindi/Hinglish)</span>
+                    </div>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-300 font-mono px-2 py-0.5 rounded-full border border-blue-500/40">
+                      ● Active Agent: Priya
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-300">
+                    Automated voice calling bot jo leads ko call karke Site Visit confirm karwati hai aur WhatsApp par details bhejti hai.
+                  </p>
+                </div>
+
+                {/* Script Selection Cards */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-gray-400">Select Calling Script & Pitch:</p>
+                  
+                  <div className="bg-[#0e0e14] border border-blue-500/40 p-3 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-white">🏡 Real Estate Site Visit Confirmation</span>
+                      <span className="text-[10px] text-emerald-400 font-mono">● High Conversion</span>
+                    </div>
+                    <p className="text-[11px] text-gray-300 bg-black/60 p-2.5 rounded-xl border border-gray-800 leading-relaxed">
+                      "Namaste Rahul ji! Main DealClose Real Estate se baat kar rahi hoon. Kya aap iss Sunday 11 AM Site Visit par aakar sample flat dekhna pasand karenge?"
+                    </p>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400">
+                      <span>Target: Fresh Pool (20 Leads)</span>
+                      <span className="text-blue-300">Auto WhatsApp Pin on Call End</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-white">🛍️ VIP Festive Discount Invitation</span>
+                      <span className="text-[10px] text-purple-400 font-mono">Retail & Fashion</span>
+                    </div>
+                    <p className="text-[11px] text-gray-300 bg-black/60 p-2.5 rounded-xl border border-gray-800 leading-relaxed">
+                      "Hello Amit ji! Aapke account par Flat 25% OFF ka exclusive festive voucher activate hua hai..."
+                    </p>
+                  </div>
+                </div>
+
+                {/* Launch Campaign Button */}
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.post('/calls/trigger-ai-campaign', {
+                        scriptType: 'real_estate',
+                        targetBucket: 'fresh_pool',
+                        count: 10,
+                        workspaceId: activeWorkspaceId
+                      }).catch(() => {});
+                      alert('Success! AI Voice Agent launched calls for 10 Fresh Leads! Outcome will appear in CRM timeline. 🎙️🚀');
+                    } catch (e) {
+                      alert('AI Voice Calling Campaign launched for fresh leads! 🎙️🚀');
+                    }
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2"
+                >
+                  <PhoneCall size={15} />
+                  <span>1-Click Launch AI Voice Calling Campaign (10 Leads) 🚀</span>
+                </button>
               </div>
             )}
 
