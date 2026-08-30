@@ -15,73 +15,55 @@ export default function PricingPage() {
 
   const plans = [
     {
-      id: 'starter',
-      name: 'Micro Starter',
-      tagline: 'Best for local shops, boutiques & solo founders',
-      priceMonthly: 199,
-      priceAnnual: 149,
+      id: 'essential',
+      name: 'Essential Growth',
+      tagline: 'WhatsApp Cloud API + Instagram Comment-to-DM + Prebuilt Niche Posts',
+      originalPrice: 999,
+      priceMonthly: 499,
+      priceAnnual: 399,
       badge: '14-Day Free Trial',
       highlight: false,
       features: [
         'Official WhatsApp Cloud API Access',
-        '1 Business WhatsApp & Instagram Account',
-        'Instagram Comment-to-DM Auto-replies',
-        'Quick Keyword Broadcast Engine',
-        'Direct WhatsApp Catalog & PDF Sharing',
-        '1 Team Agent Access',
-        'Zero Markup on Meta Conversations',
-        'Community & WhatsApp Support',
-      ],
-      cta: 'Start 14-Day Free Trial',
-      ctaLink: '/register',
-    },
-    {
-      id: 'growth',
-      name: 'Business Pro',
-      tagline: 'For growing retail, real estate & e-commerce brands',
-      priceMonthly: 499,
-      priceAnnual: 399,
-      badge: 'Most Popular ⭐',
-      highlight: true,
-      features: [
-        'Everything in Micro Starter +',
+        'Instagram Reel Comment-to-DM Automation',
+        'Prebuilt Niche Industry Social Media Posts',
         'Visual Drag & Drop Flow & Bot Builder',
-        'Multi-Agent Shared Team Inbox (Up to 3 Users)',
-        'Automated Abandoned Cart & COD Verification',
-        'Smart AI Intent Recovery for Comments',
-        'Google Business & Local Demand Search Insights',
-        'Webhook & Shopify / WooCommerce Sync',
-        'Priority 24/7 WhatsApp & Call Support',
+        'Direct Product Catalog & PDF Brochure Sharing',
+        '1 Team Staff Access Included',
+        '0% Markup on Meta Conversation Rates',
+        'Priority WhatsApp & Community Support',
       ],
-      cta: 'Start 14-Day Free Trial',
+      cta: 'Start 14-Day Free Trial (₹0)',
       ctaLink: '/register',
     },
     {
       id: 'omnichannel',
-      name: 'Omnichannel AI',
-      tagline: 'Complete automation with Human-like Inbound Voice AI',
-      priceMonthly: 999,
-      priceAnnual: 799,
-      badge: 'Full Automation Suite',
-      highlight: false,
+      name: 'Omnichannel Pro Automation',
+      tagline: 'WhatsApp + Instagram + Google 1-Tap Review Booster + Full CRM',
+      originalPrice: 1499,
+      priceMonthly: 749,
+      priceAnnual: 599,
+      badge: 'Most Popular ⭐ Recommended',
+      highlight: true,
       features: [
-        'Everything in Business Pro +',
-        'AI Voice Calling Agent (Inbound & Outbound)',
-        'Meta Ads Automation & Real-time ROAS Tracker',
-        'Multi-Workspace & Branch Management (5 Users)',
-        'Custom CRM Integrations & Webhooks',
-        'Dedicated Account Onboarding Specialist',
-        'Free Official Meta Green Tick Application Support',
+        'Everything in Essential Growth +',
+        '1-Tap 5-Star Google Review Booster Engine',
+        'Multi-Agent Shared Team Inbox (3 Staff Included)',
+        'Automated CRM Lead Stages & Distribution',
+        'Meta Approved Bulk Template Broadcaster',
+        '1-Click Social Media Batch Publisher',
+        'Google Demand Search Insights',
+        'Free Meta Official Green Tick Support',
       ],
-      cta: 'Get Full Access',
+      cta: 'Start 14-Day Free Trial (₹0)',
       ctaLink: '/register',
     }
   ];
 
   const addOns = [
-    { icon: <Users className="text-blue-400" size={20} />, title: 'Extra Team Agent', desc: 'Add more agents to your shared inbox', price: '₹99 / agent / mo' },
-    { icon: <InstagramIcon className="text-pink-400" size={20} />, title: 'Extra Social Channel', desc: 'Connect additional Instagram / FB Page', price: '₹199 / channel / mo' },
-    { icon: <Phone className="text-green-400" size={20} />, title: 'AI Calling Minutes Pack', desc: 'High-quality Indian accent voice bot', price: '₹1.50 / minute' },
+    { icon: <InstagramIcon className="text-pink-400" size={20} />, title: 'Extra Social / WA Channel', desc: 'Connect additional WhatsApp numbers or FB pages', price: '₹249 / channel / mo' },
+    { icon: <Users className="text-blue-400" size={20} />, title: 'Extra Staff Login Seat', desc: 'Add staff logins with lead isolation', price: '₹99 / staff / mo' },
+    { icon: <Phone className="text-green-400" size={20} />, title: 'AI Response & Voice Wallet', desc: 'Conversational Hinglish AI chat & calling bot', price: 'Min. ₹499 recharge' },
     { icon: <Layers className="text-purple-400" size={20} />, title: 'Extra Workspace', desc: 'Separate brand or multi-branch workspace', price: '₹249 / workspace / mo' },
   ];
 
@@ -152,16 +134,75 @@ export default function PricingPage() {
           </button>
         </div>
 
+        {/* 🏆 SPECIAL VIP EARLY ADOPTER OFFER (FIRST 100 CUSTOMERS ONLY) */}
+        <div className="bg-gradient-to-r from-amber-950/60 via-[#181206] to-amber-950/60 border-2 border-amber-500 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden mb-12 text-left">
+          <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-600 text-black font-black text-[10px] sm:text-xs px-4 py-1.5 rounded-bl-2xl uppercase tracking-wider shadow-md">
+            🔥 First 100 Customers Special (Limited Time)
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <div className="lg:col-span-7 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">👑</span>
+                <h3 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
+                  Early Adopter VIP Lifetime Access
+                </h3>
+              </div>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Get complete access to <strong>WhatsApp API + Instagram Auto-Replies + Google 1-Tap Review Booster + Pre-built Industry Posts & Flow Automations</strong> at an unbeatable founder rate!
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-200/90 pt-1">
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ WhatsApp Official Cloud API</span>
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ Instagram Reel DMs</span>
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ Google Review Booster</span>
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ All Pre-Built Templates</span>
+              </div>
+              <p className="text-[10px] text-gray-400 italic">
+                *Note: Conversational AI Replies & AI Voice Calling separate via minimum recharge wallet (₹499).
+              </p>
+            </div>
+
+            {/* 2 VIP Pricing Cards */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-black/70 border border-amber-500/50 p-4 rounded-2xl text-center space-y-2 hover:border-amber-400 transition-all">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">3 Months Pass</span>
+                <div className="text-gray-500 line-through text-xs">₹2,999</div>
+                <div className="text-2xl font-black text-white font-mono">₹599</div>
+                <span className="text-[10px] text-emerald-400 font-bold block">(Just ₹199 / mo)</span>
+                <Link
+                  to="/register"
+                  className="w-full py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-black font-black text-xs rounded-xl block hover:opacity-90 shadow-md transition-all"
+                >
+                  Claim 3-Mo Pass ⚡
+                </Link>
+              </div>
+
+              <div className="bg-black/90 border-2 border-amber-400 p-4 rounded-2xl text-center space-y-2 shadow-lg shadow-amber-500/20 relative">
+                <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider block">12 Months (1 Year)</span>
+                <div className="text-gray-500 line-through text-xs">₹8,999</div>
+                <div className="text-2xl font-black text-amber-300 font-mono">₹2,499</div>
+                <span className="text-[10px] text-emerald-400 font-bold block">(Only ₹208 / mo)</span>
+                <Link
+                  to="/register"
+                  className="w-full py-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-black font-black text-xs rounded-xl block hover:opacity-90 shadow-md transition-all"
+                >
+                  Claim 1-Year Pass 🚀
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left mb-16 max-w-4xl mx-auto">
           {plans.map((plan) => {
             const price = billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly;
             return (
               <div
                 key={plan.id}
-                className={`relative rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all ${
+                className={`relative rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all space-y-6 ${
                   plan.highlight
-                    ? 'bg-gradient-to-b from-purple-950/40 via-gray-950 to-black border-2 border-purple-500/60 shadow-2xl shadow-purple-500/10 -translate-y-1'
+                    ? 'bg-gradient-to-b from-purple-950/40 via-gray-950 to-black border-2 border-purple-500/80 shadow-2xl shadow-purple-500/10'
                     : 'bg-gray-950 border border-gray-800 hover:border-gray-700'
                 }`}
               >
@@ -171,18 +212,21 @@ export default function PricingPage() {
                   </div>
                 )}
 
-                <div>
+                <div className="space-y-4">
                   <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
-                  <p className="text-xs text-gray-400 mb-6 min-h-[32px]">{plan.tagline}</p>
+                  <p className="text-xs text-gray-400 min-h-[32px]">{plan.tagline}</p>
 
-                  <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-black text-white">₹{price}</span>
-                    <span className="text-xs text-gray-400">/ month</span>
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹{plan.originalPrice} / month</div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black text-white font-mono">₹{price}</span>
+                      <span className="text-xs text-gray-400 font-sans">/ month (50% OFF)</span>
+                    </div>
                   </div>
 
                   <Link
                     to={plan.ctaLink}
-                    className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all mb-8 shadow-lg ${
+                    className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-lg ${
                       plan.highlight
                         ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-emerald-400 text-black hover:opacity-95'
                         : 'bg-gray-800 hover:bg-gray-700 text-white'
@@ -202,7 +246,7 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-gray-900/60 text-[10px] text-gray-500 text-center">
+                <div className="pt-4 border-t border-gray-900/60 text-[10px] text-gray-500 text-center">
                   14 days free trial • Cancel anytime
                 </div>
               </div>

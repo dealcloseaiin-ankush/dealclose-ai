@@ -640,83 +640,192 @@ res = requests.post(
       </section>
 
       {/* Transparent Pricing Section */}
-      <section className="max-w-6xl mx-auto px-4 py-12">
-        <div className="text-center max-w-3xl mx-auto mb-10">
-          <span className="text-xs font-black text-purple-400 uppercase tracking-wider bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-full">
+      <section id="pricing" className="max-w-6xl mx-auto px-4 py-12 space-y-10">
+        <div className="text-center max-w-3xl mx-auto space-y-3">
+          <span className="text-xs font-black text-purple-400 uppercase tracking-wider bg-purple-500/10 border border-purple-500/20 px-3.5 py-1 rounded-full">
             Transparent Pricing
           </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-white mt-3">Simple Plans for Every Stage</h2>
-          <p className="text-xs sm:text-sm text-gray-400 mt-2">Zero markup on Meta conversations. Cancel anytime with 1-click.</p>
+          <h2 className="text-3xl sm:text-4xl font-black text-white">Simple, Honest Plans for Every Business</h2>
+          <p className="text-xs sm:text-sm text-gray-400">
+            14 Days 100% Free Trial • Zero credit card required • Zero markup on Meta conversations.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          {/* Micro Starter */}
-          <div className="bg-gray-950 border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-gray-700 transition-all">
-            <div>
-              <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Micro Starter</div>
-              <div className="text-3xl font-black text-white mb-1">₹199 <span className="text-xs text-gray-400 font-normal">/ mo</span></div>
-              <p className="text-xs text-gray-400 mb-6">For small shops, boutiques & solo founders</p>
-
-              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4 mb-6">
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> WhatsApp Cloud API Access</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Instagram Comment-to-DM</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Catalog & PDF Dispatch</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> 0% Markup on Meta Rates</div>
-              </div>
-            </div>
-            <Link to="/register" className="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs text-center transition-all">
-              Start 14-Day Free Trial
-            </Link>
+        {/* 🏆 SPECIAL VIP EARLY ADOPTER OFFER (FIRST 100 CUSTOMERS ONLY) */}
+        <div className="bg-gradient-to-r from-amber-950/60 via-[#181206] to-amber-950/60 border-2 border-amber-500 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-600 text-black font-black text-[10px] sm:text-xs px-4 py-1.5 rounded-bl-2xl uppercase tracking-wider shadow-md">
+            🔥 First 100 Customers Special (Limited Time)
           </div>
 
-          {/* Business Pro */}
-          <div className="bg-gradient-to-b from-purple-950/40 via-gray-950 to-black border-2 border-purple-500/60 rounded-3xl p-6 flex flex-col justify-between shadow-2xl shadow-purple-500/10 -translate-y-1 relative">
-            <div className="absolute -top-3 left-6 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
-              Most Popular ⭐
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <div className="lg:col-span-7 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">👑</span>
+                <h3 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
+                  Early Adopter VIP Lifetime Access
+                </h3>
+              </div>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Get full access to <strong>WhatsApp API + Instagram Comment-to-DM + Google 1-Tap Review Booster + Pre-built Industry Posts & Flow Automations</strong> at an unbeatable founder rate!
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-200/90 pt-1">
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ WhatsApp Official Cloud API</span>
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ Instagram Reel DMs</span>
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ Google Review Booster</span>
+                <span className="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/40">✓ All Pre-Built Templates</span>
+              </div>
+              <p className="text-[10px] text-gray-400 italic">
+                *Note: Conversational AI Replies & AI Voice Calling separate via minimum recharge wallet (₹499).
+              </p>
             </div>
-            <div>
-              <div className="text-[10px] font-black text-purple-300 uppercase tracking-wider mb-2">Business Pro</div>
-              <div className="text-3xl font-black text-white mb-1">₹499 <span className="text-xs text-gray-400 font-normal">/ mo</span></div>
-              <p className="text-xs text-gray-400 mb-6">For growing retail, real estate & e-commerce</p>
 
-              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4 mb-6">
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Everything in Starter +</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Visual Flow & Bot Builder</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Multi-Agent Team Inbox (3 Users)</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Auto CRM Lead Pipelines</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Google Search Demand Scanner</div>
+            {/* 2 VIP Pricing Cards */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-black/70 border border-amber-500/50 p-4 rounded-2xl text-center space-y-2 hover:border-amber-400 transition-all">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">3 Months Pass</span>
+                <div className="text-gray-500 line-through text-xs">₹2,999</div>
+                <div className="text-2xl font-black text-white font-mono">₹599</div>
+                <span className="text-[10px] text-emerald-400 font-bold block">(Just ₹199 / mo)</span>
+                <Link
+                  to="/register"
+                  className="w-full py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-black font-black text-xs rounded-xl block hover:opacity-90 shadow-md transition-all"
+                >
+                  Claim 3-Mo Pass ⚡
+                </Link>
+              </div>
+
+              <div className="bg-black/90 border-2 border-amber-400 p-4 rounded-2xl text-center space-y-2 shadow-lg shadow-amber-500/20 relative">
+                <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider block">12 Months (1 Year)</span>
+                <div className="text-gray-500 line-through text-xs">₹8,999</div>
+                <div className="text-2xl font-black text-amber-300 font-mono">₹2,499</div>
+                <span className="text-[10px] text-emerald-400 font-bold block">(Only ₹208 / mo)</span>
+                <Link
+                  to="/register"
+                  className="w-full py-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-black font-black text-xs rounded-xl block hover:opacity-90 shadow-md transition-all"
+                >
+                  Claim 1-Year Pass 🚀
+                </Link>
               </div>
             </div>
-            <Link to="/register" className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-emerald-400 text-black font-black text-xs text-center transition-all shadow-lg hover:opacity-95">
-              Start 14-Day Free Trial
-            </Link>
-          </div>
-
-          {/* Omnichannel AI */}
-          <div className="bg-gray-950 border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-gray-700 transition-all">
-            <div>
-              <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Omnichannel AI</div>
-              <div className="text-3xl font-black text-white mb-1">₹999 <span className="text-xs text-gray-400 font-normal">/ mo</span></div>
-              <p className="text-xs text-gray-400 mb-6">Complete automation with Inbound Voice AI</p>
-
-              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4 mb-6">
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Everything in Pro +</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Human-like Voice AI Calling</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Meta Ads ROAS Automation</div>
-                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Free Green Tick Application</div>
-              </div>
-            </div>
-            <Link to="/register" className="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs text-center transition-all">
-              Get Full Access
-            </Link>
           </div>
         </div>
 
-        <div className="text-center">
-          <Link to="/pricing" className="text-xs font-bold text-purple-400 hover:text-white underline">
-            View full pricing breakdown & modular add-ons →
-          </Link>
+        {/* Standard Plans Grid with 50% Slashed Prices */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Plan 1: Essential Growth */}
+          <div className="bg-gray-950 border border-gray-800 rounded-3xl p-6 sm:p-8 flex flex-col justify-between hover:border-gray-700 transition-all space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider">Essential Growth</span>
+                <span className="text-[10px] font-bold text-purple-400 bg-purple-950/60 border border-purple-500/30 px-2.5 py-0.5 rounded-full">
+                  14 Days Free Trial
+                </span>
+              </div>
+              
+              <div>
+                <div className="text-sm text-gray-500 line-through font-mono">₹999 / month</div>
+                <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                  <span>₹499</span>
+                  <span className="text-xs text-gray-400 font-normal font-sans">/ month (50% OFF)</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">Perfect for local retail boutiques, salons, cafes & solo shops.</p>
+
+              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4">
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> WhatsApp Official Meta Cloud API</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Instagram Comment-to-DM Auto-Replies</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Ready-Made Niche Social Media Posts</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Visual Drag & Drop Flow Builder</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Product Catalog & PDF Brochure Dispatch</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> 0% Markup on Meta Conversation Rates</div>
+              </div>
+            </div>
+
+            <Link
+              to="/register"
+              className="w-full py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-black text-xs text-center transition-all border border-gray-700"
+            >
+              Start 14-Day Free Trial (₹0) ⚡
+            </Link>
+          </div>
+
+          {/* Plan 2: Omnichannel Pro */}
+          <div className="bg-gradient-to-b from-purple-950/40 via-gray-950 to-black border-2 border-purple-500/80 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-2xl shadow-purple-500/10 space-y-6 relative">
+            <div className="absolute -top-3 left-8 px-3.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
+              Most Popular ⭐ Recommended
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] font-black text-purple-300 uppercase tracking-wider">Omnichannel Pro Automation</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                  14 Days Free Trial
+                </span>
+              </div>
+              
+              <div>
+                <div className="text-sm text-gray-500 line-through font-mono">₹1,499 / month</div>
+                <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
+                  <span>₹749</span>
+                  <span className="text-xs text-gray-400 font-normal font-sans">/ month (50% OFF)</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">For high-growth real estate builders, gym clubs, clinics & e-commerce brands.</p>
+
+              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4">
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> <strong>Everything in Essential Growth +</strong></div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> <strong>1-Tap 5-Star Google Review Booster</strong></div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Multi-Agent Shared Team Inbox (3 Staff Included)</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Automated CRM Lead Stages & Distribution</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Meta Approved Bulk Template Broadcaster</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> 1-Click Social Media Batch Publisher</div>
+              </div>
+            </div>
+
+            <Link
+              to="/register"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-amber-400 text-black font-black text-xs text-center transition-all shadow-lg hover:opacity-95"
+            >
+              Start 14-Day Free Trial (₹0) 🚀
+            </Link>
+          </div>
+
         </div>
+
+        {/* Modular Add-Ons & AI Recharge Box */}
+        <div className="bg-[#0b0f14] border border-gray-800 rounded-3xl p-6 sm:p-8 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-3">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white">Modular Add-Ons & AI Response Wallet</h3>
+              <p className="text-[11px] text-gray-400">Scale as you grow without paying high rigid bundle pricing.</p>
+            </div>
+            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+              Pay Only For What You Use
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="bg-black/50 border border-gray-800 p-4 rounded-2xl space-y-1">
+              <div className="text-gray-400 font-bold">Extra Social / WA Channel</div>
+              <div className="text-lg font-black text-white font-mono">₹249 <span className="text-[10px] text-gray-400 font-normal">/ channel / mo</span></div>
+              <p className="text-[10px] text-gray-500">Connect extra WhatsApp numbers or FB pages.</p>
+            </div>
+
+            <div className="bg-black/50 border border-gray-800 p-4 rounded-2xl space-y-1">
+              <div className="text-gray-400 font-bold">Extra Staff Login Seat</div>
+              <div className="text-lg font-black text-white font-mono">₹99 <span className="text-[10px] text-gray-400 font-normal">/ staff / mo</span></div>
+              <p className="text-[10px] text-gray-500">Dedicated staff logins with lead isolation.</p>
+            </div>
+
+            <div className="bg-black/50 border border-emerald-500/40 p-4 rounded-2xl space-y-1">
+              <div className="text-emerald-300 font-bold">AI Response & Voice Bot Wallet</div>
+              <div className="text-lg font-black text-emerald-300 font-mono">Min. ₹499 <span className="text-[10px] text-gray-400 font-normal">recharge</span></div>
+              <p className="text-[10px] text-gray-500">Hinglish sales AI chat & Hindi AI calling agent.</p>
+            </div>
+          </div>
+        </div>
+
       </section>
 
       {/* FAQ Section */}
