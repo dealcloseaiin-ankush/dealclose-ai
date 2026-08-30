@@ -8,7 +8,7 @@ import {
   Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
   Link, Eye, EyeOff, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
-  Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, User, BookOpen, Search, Webhook,
+  Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, LogOut, User, BookOpen, Search, Webhook,
   Heart, MessageCircle as CommentIcon, ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
@@ -52,7 +52,7 @@ const formatRelativeChatTime = (dateInput) => {
 };
 
 export default function MobileDashboard() {
-  const { user, login } = useAuth();
+  const { user, login, logout } = useAuth();
 
   // ─────────────────────────────────────────────────────────────
   // 1. PRIMARY NAVIGATION & ROUTER STATE
@@ -967,13 +967,27 @@ export default function MobileDashboard() {
                 <span>Log In</span>
               </button>
             ) : (
-              <button
-                onClick={() => setShowSmartQrModal(true)}
-                className="p-1.5 bg-amber-950/60 border border-amber-500/40 text-amber-300 rounded-xl hover:text-white"
-                title="Open Smart All-In-One QR"
-              >
-                <QrCode size={16} />
-              </button>
+              <>
+                <button
+                  onClick={() => setShowSmartQrModal(true)}
+                  className="p-1.5 bg-amber-950/60 border border-amber-500/40 text-amber-300 rounded-xl hover:text-white"
+                  title="Open Smart All-In-One QR"
+                >
+                  <QrCode size={16} />
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm("Logout from DealClose AI?")) {
+                      if (logout) await logout();
+                      window.location.href = '/login';
+                    }
+                  }}
+                  className="p-1.5 bg-red-950/60 border border-red-500/40 text-red-300 hover:text-white rounded-xl"
+                  title="Logout"
+                >
+                  <LogOut size={16} />
+                </button>
+              </>
             )}
             <a
               href="/dashboard"
@@ -1628,6 +1642,20 @@ export default function MobileDashboard() {
                     Open QR ⚡
                   </button>
                 </div>
+
+                {/* Logout Button */}
+                <button
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to log out from DealClose AI?")) {
+                      if (logout) await logout();
+                      window.location.href = '/login';
+                    }
+                  }}
+                  className="w-full mt-2 py-3 bg-red-950/40 border border-red-500/30 text-red-300 hover:bg-red-900/50 hover:text-white rounded-2xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-sm"
+                >
+                  <LogOut size={15} />
+                  <span>Log Out of DealClose AI</span>
+                </button>
               </div>
             )}
 
