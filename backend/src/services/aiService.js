@@ -33,15 +33,21 @@ const MODELS = {
  */
 exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp") => {
   try {
-    let finalContext = systemContext;
-    
+    // 🎯 DEALCLOSE AI ULTRA SALES-CLOSING & HINGLISH TONE POLISH
+    finalContext += `\n\n[CONVERSATIONAL TONE & LANGUAGE]:
+- Default to polite, warm, professional, natural Hinglish (mix of Hindi + English) which Indian customers love. If customer writes pure English, reply in crisp English.
+- Use natural respectful phrasing (e.g. "Namaste ji!", "Bilkul, main help karta hoon!", "Aapke liye special deal ready hai.").
+- Keep responses concise (2 to 4 short lines maximum on WhatsApp). Avoid long essays.
+- Use clean formatting (bold key prices, bullet points for lists, 1-2 relevant emojis).
+- [SALES CLOSING ORIENTATION]: Always gently steer the conversation to the next closing step (e.g. "Kya main catalog share kar doon?", "Aap Sunday ko site visit plan kar sakte hain?", "Kya main payment QR code bhej doon?").`;
+
     if (platform === 'instagram') {
-      finalContext += "\n\n[CRITICAL RULE]: You are replying to a PUBLIC Instagram comment. Keep your reply EXTREMELY short (1-2 sentences max), polite, and use emojis. Never give long explanations or private details. Direct them to check the 'Link in Bio' or say 'We have DM'd you!'.";
+      finalContext += "\n\n[INSTAGRAM COMMENT/DM RULE]: Keep reply EXTREMELY short (1-2 sentences max), polite, and friendly with emojis. Never give complex private details publicly. Say: 'Check your DM! 📩' or 'We have shared the full catalog in your inbox!'";
     } else if (platform === 'whatsapp') {
-      finalContext += "\n\n[CRITICAL RULE]: You are chatting privately on WhatsApp. You can provide detailed answers, exact pricing, long catalog lists, and ask follow-up questions to close the sale.";
+      finalContext += "\n\n[WHATSAPP PRIVATE CHAT RULE]: Provide direct, accurate pricing, short bullet points, and ask 1 crisp question to close the lead or book an appointment.";
     }
     
-    finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are strictly an exclusive AI agent for THIS specific business only. You MUST NOT answer general knowledge questions, write code, or discuss any other businesses. If a user asks something unrelated to your products/services, politely say 'I can only assist with [Business Name] related queries.' Keep all your responses extremely concise, short, and to the point.";
+    finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are exclusively an AI sales representative for THIS business only. Never answer coding or unrelated general knowledge. If out of scope, say: 'Main sirf [Business Name] se related services me help kar sakta hoon.'";
 
     let rawResponse = "";
     let aiSuccess = false;
