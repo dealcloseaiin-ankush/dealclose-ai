@@ -1071,10 +1071,10 @@ export default function MobileDashboard() {
       {/* ─────────────────────────────────────────────────────────────
           TOP APP HEADER (WITH REAL DEALCLOSE LOGO & DYNAMIC STORE DROPDOWN)
       ───────────────────────────────────────────────────────────── */}
-      <header className="bg-[#0c0c12] border-b border-gray-800/80 px-3.5 py-2.5 sticky top-0 z-40 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-40 bg-[#060608]/90 backdrop-blur-md border-b border-gray-800/80 px-4 py-2.5 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-2.5">
           {activeChatThread || (activeTab === 'menu' && menuSubScreen !== 'menu_grid') ? (
-            <button 
+            <button
               onClick={() => {
                 if (activeChatThread) setActiveChatThread(null);
                 else setMenuSubScreen('menu_grid');
@@ -1096,8 +1096,10 @@ export default function MobileDashboard() {
                 : (activeTab === 'chats' ? 'Conversations' : 
                    activeTab === 'dashboard' ? 'Business Dashboard' :
                    activeTab === 'catalog' ? 'Product Catalog' :
-                   activeTab === 'ai_assistant' ? 'AI Smart Assistant' : 
+                   activeTab === 'posts' ? 'Social Post Scheduler' : 
                    (menuSubScreen === 'contacts_crm' ? 'Contacts & CRM' :
+                    menuSubScreen === 'stage_funnel' ? 'Funnel & Stage Sequences' :
+                    menuSubScreen === 'ai_assistant' ? 'AI Smart Assistant' :
                     menuSubScreen === 'auto_reply' ? 'WhatsApp Auto-Replies' :
                     menuSubScreen === 'ig_comment_dm' ? 'Instagram Comment-DM' :
                     menuSubScreen === 'flow_automation' ? 'Flow & Auto-Pilot' :
@@ -1608,76 +1610,151 @@ export default function MobileDashboard() {
         )}
 
         {/* ════════════════════════════════════════════════════════════
-            TAB 4: AI ASSISTANT
+            TAB 4: POSTS & SOCIAL PUBLISHER (1-TAP DIRECT ACCESS)
         ════════════════════════════════════════════════════════════ */}
-        {activeTab === 'ai_assistant' && (
-          <div className="space-y-3 animate-fade-in flex flex-col h-[76vh]">
-            <div className="bg-[#0e0e14] border border-purple-500/30 rounded-2xl p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-purple-400" />
-                <span className="text-xs font-bold text-white">AI Assistant ({profileData.businessName})</span>
+        {activeTab === 'posts' && (
+          <div className="space-y-3 animate-fade-in pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-black text-white">Social Posts & Publisher</h2>
+                <p className="text-[10px] text-gray-400">Instagram, Facebook & WhatsApp Channel Broadcast</p>
               </div>
               <button
                 onClick={() => {
-                  setActiveTab('menu');
-                  setMenuSubScreen('settings_ai_training');
+                  const newBatchItem = {
+                    id: 'pb_' + Date.now(),
+                    title: '⚡ 1-Click Festive Creative (AI Batch)',
+                    image: '✨',
+                    caption: `🔥 Special Promotion at ${profileData.businessName}! Flat 20% Discount. Reply or DM "OFFER" to claim.`,
+                    scheduledTime: 'Today 6:00 PM'
+                  };
+                  setPrebuildTemplates([newBatchItem, ...prebuildTemplates]);
+                  alert('New AI Post Batch Generated for your store! 🤖✨');
                 }}
-                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] rounded-lg shadow-md flex items-center gap-1"
+                className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-black rounded-xl flex items-center gap-1 shadow-md"
               >
-                <Edit3 size={11} /> + Train Store AI
+                <Sparkles size={12} /> + AI Create Batch
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs custom-scrollbar">
-              {aiChatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`p-3 rounded-2xl max-w-[88%] leading-relaxed ${
-                    msg.role === 'ai'
-                      ? 'bg-[#111118] border border-gray-800 text-gray-200 rounded-tl-sm mr-auto shadow-sm'
-                      : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-tr-sm ml-auto shadow-md'
-                  }`}
-                >
-                  <p className="whitespace-pre-line">{msg.text}</p>
-                  
-                  {msg.action && (
-                    <div className="mt-2.5 pt-2 border-t border-gray-800">
-                      <button
-                        onClick={() => alert(`Success! Action completed: ${msg.action.text} ✅`)}
-                        className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] rounded-lg shadow-md flex items-center justify-center gap-1"
-                      >
-                        <Check size={12} /> {msg.action.text}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {isAiTyping && (
-                <div className="text-gray-500 text-[11px] animate-pulse flex items-center gap-1">
-                  <span>AI is thinking with {profileData.businessName} store knowledge...</span>
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={handleAiSubmit} className="flex gap-1.5 pt-2 border-t border-gray-800">
+            <div className="grid grid-cols-3 bg-[#0e0e14] p-1 rounded-2xl border border-gray-800 text-[11px] font-bold shadow-inner">
               <button
-                type="button"
-                onClick={() => alert('Attach PDF/Brochure for AI context training!')}
-                className="p-2.5 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white rounded-xl"
+                onClick={() => setPostTab('prebuild')}
+                className={`py-1.5 rounded-xl transition-all ${postTab === 'prebuild' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400'}`}
               >
-                <FileText size={15} />
+                ⚡ Pre-Built
               </button>
-              <input
-                type="text"
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                placeholder={`Ask: '${profileData.businessName} ke offers...'`}
-                className="flex-1 bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
-              <button type="submit" className="p-2.5 bg-purple-600 text-white rounded-xl font-bold shadow-md">
-                <Send size={15} />
+              <button
+                onClick={() => setPostTab('custom_create')}
+                className={`py-1.5 rounded-xl transition-all ${postTab === 'custom_create' ? 'bg-pink-600 text-white shadow-md' : 'text-gray-400'}`}
+              >
+                ✍️ Create Custom
               </button>
-            </form>
+              <button
+                onClick={() => setPostTab('live_scheduled')}
+                className={`py-1.5 rounded-xl transition-all ${postTab === 'live_scheduled' ? 'bg-teal-600 text-white shadow-md' : 'text-gray-400'}`}
+              >
+                📊 Live & Batch
+              </button>
+            </div>
+
+            {postTab === 'prebuild' && (
+              <div className="space-y-2.5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-gray-400">Pre-designed ready posts for your business:</p>
+                </div>
+
+                {prebuildTemplates.map(tpl => (
+                  <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{tpl.image}</span>
+                        <span className="font-bold text-xs text-white">{tpl.title}</span>
+                      </div>
+                      <span className="text-[10px] text-purple-400 font-mono">{tpl.scheduledTime}</span>
+                    </div>
+                    <p className="text-xs text-gray-300 bg-black/40 p-2.5 rounded-xl leading-relaxed">{tpl.caption}</p>
+                    <button
+                      onClick={() => {
+                        setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: tpl.scheduledTime, status: 'SCHEDULED' }, ...scheduledPosts]);
+                        alert(`Approved & Scheduled: ${tpl.title} 🚀`);
+                      }}
+                      className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs rounded-xl shadow-md"
+                    >
+                      1-Click Schedule This Batch 🚀
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {postTab === 'custom_create' && (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!customPost.caption) return;
+                setScheduledPosts([{ id: 'sp_' + Date.now(), title: customPost.title || 'Custom Post', image: '📸', caption: customPost.caption, platform: 'Instagram & Facebook', date: customPost.date, status: 'SCHEDULED' }, ...scheduledPosts]);
+                setCustomPost({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
+                setPostTab('live_scheduled');
+                alert('Post successfully scheduled! 🚀');
+              }} className="space-y-2.5 text-xs animate-fade-in">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400">Post Title / Topic:</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Weekend Flash Sale"
+                    value={customPost.title}
+                    onChange={(e) => setCustomPost({ ...customPost, title: e.target.value })}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400">Caption & Hashtags:</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Type post caption or ask AI to write..."
+                    value={customPost.caption}
+                    onChange={(e) => setCustomPost({ ...customPost, caption: e.target.value })}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400">Schedule Date & Time:</label>
+                  <input
+                    type="text"
+                    value={customPost.date}
+                    onChange={(e) => setCustomPost({ ...customPost, date: e.target.value })}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                  />
+                </div>
+                <button type="submit" className="w-full py-2.5 bg-pink-600 text-white font-bold rounded-xl shadow-md">
+                  Schedule Post 📅
+                </button>
+              </form>
+            )}
+
+            {postTab === 'live_scheduled' && (
+              <div className="space-y-2 animate-fade-in">
+                {scheduledPosts.map(sp => (
+                  <div key={sp.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1.5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{sp.image}</span>
+                        <span className="font-bold text-xs text-white">{sp.title}</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        {sp.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">{sp.caption}</p>
+                    <div className="text-[10px] text-gray-500 font-mono flex items-center justify-between pt-1">
+                      <span>{sp.platform}</span>
+                      <span>Scheduled for: {sp.date}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1819,7 +1896,21 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 8: Settings & Profile */}
+                  {/* Tool 8: 🧠 AI Smart Assistant */}
+                  <button 
+                    onClick={() => setMenuSubScreen('ai_assistant')}
+                    className="bg-[#0e0e14] border border-teal-500/30 p-3.5 rounded-2xl text-left space-y-2 hover:border-teal-400 transition-all shadow-sm"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-300 flex items-center justify-center">
+                      <Sparkles size={16} />
+                    </div>
+                    <div>
+                      <div className="text-white">AI Assistant</div>
+                      <div className="text-[10px] text-teal-400 font-normal">Train store bot & chat</div>
+                    </div>
+                  </button>
+
+                  {/* Tool 9: Settings & Profile */}
                   <button 
                     onClick={() => setMenuSubScreen('settings_ai_training')}
                     className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl text-left space-y-2 hover:border-indigo-500/40 transition-all"
@@ -2359,6 +2450,75 @@ export default function MobileDashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 5.8: 🧠 AI SMART ASSISTANT & STORE BRAIN */}
+            {menuSubScreen === 'ai_assistant' && (
+              <div className="space-y-3 animate-fade-in flex flex-col h-[74vh]">
+                <div className="bg-[#0e0e14] border border-teal-500/30 rounded-2xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-teal-400" />
+                    <span className="text-xs font-bold text-white">AI Smart Assistant ({profileData.businessName})</span>
+                  </div>
+                  <button
+                    onClick={() => setMenuSubScreen('settings_ai_training')}
+                    className="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] rounded-lg shadow-md flex items-center gap-1"
+                  >
+                    <Edit3 size={11} /> + Train Store AI
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs custom-scrollbar">
+                  {aiChatMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-2xl max-w-[88%] leading-relaxed ${
+                        msg.role === 'ai'
+                          ? 'bg-[#111118] border border-gray-800 text-gray-200 rounded-tl-sm mr-auto shadow-sm'
+                          : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-tr-sm ml-auto shadow-md'
+                      }`}
+                    >
+                      <p className="whitespace-pre-line">{msg.text}</p>
+                      
+                      {msg.action && (
+                        <div className="mt-2.5 pt-2 border-t border-gray-800">
+                          <button
+                            onClick={() => alert(`Success! Action completed: ${msg.action.text} ✅`)}
+                            className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] rounded-lg shadow-md flex items-center justify-center gap-1"
+                          >
+                            <Check size={12} /> {msg.action.text}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {isAiTyping && (
+                    <div className="text-gray-500 text-[11px] animate-pulse flex items-center gap-1">
+                      <span>AI is thinking with {profileData.businessName} store knowledge...</span>
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleAiSubmit} className="flex gap-1.5 pt-2 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => alert('Attach PDF/Brochure for AI context training!')}
+                    className="p-2.5 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white rounded-xl"
+                  >
+                    <FileText size={15} />
+                  </button>
+                  <input
+                    type="text"
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder={`Ask: '${profileData.businessName} ke offers...'`}
+                    className="flex-1 bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
+                  />
+                  <button type="submit" className="p-2.5 bg-teal-600 text-white rounded-xl font-bold shadow-md">
+                    <Send size={15} />
+                  </button>
+                </form>
               </div>
             )}
 
@@ -3458,15 +3618,15 @@ export default function MobileDashboard() {
           <span>Catalog</span>
         </button>
 
-        {/* Tab 4: AI Assistant */}
+        {/* Tab 4: Posts / Social Publisher (1-Tap Direct Access) */}
         <button
-          onClick={() => { setActiveTab('ai_assistant'); setActiveChatThread(null); }}
+          onClick={() => { setActiveTab('posts'); setActiveChatThread(null); }}
           className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'ai_assistant' ? 'text-teal-400 bg-teal-950/40' : 'text-gray-400'
+            activeTab === 'posts' ? 'text-teal-400 bg-teal-950/40' : 'text-gray-400'
           }`}
         >
-          <Sparkles size={17} />
-          <span>AI Assistant</span>
+          <Calendar size={17} />
+          <span>Posts</span>
         </button>
 
         {/* Tab 5: Menu */}
