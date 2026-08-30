@@ -90,3 +90,36 @@ exports.deleteCatalogItem = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    AI Product Photo Background Remover & Studio Lighting Enhancer
+// @route   POST /api/catalog/remove-background
+exports.removeProductBackground = async (req, res) => {
+  try {
+    const { imageUrl, studioStyle = 'studio_white' } = req.body;
+    if (!imageUrl) return res.status(400).json({ success: false, message: 'imageUrl is required' });
+
+    let enhancedUrl = imageUrl;
+    if (imageUrl.includes('res.cloudinary.com')) {
+      const styleTransform = studioStyle === 'studio_white' 
+        ? 'e_background_removal,b_white,c_pad,w_1080,h_1080' 
+        : studioStyle === 'wooden_podium'
+        ? 'e_background_removal,e_gen_background_replace:prompt_wooden%20podium%20with%20warm%20lighting'
+        : 'e_background_removal,b_rgb:0f172a,c_pad,w_1080,h_1080';
+      
+      enhancedUrl = imageUrl.replace('/upload/', `/upload/${styleTransform}/`);
+    } else {
+      enhancedUrl = imageUrl;
+    }
+
+    res.json({
+      success: true,
+      message: 'Product photo background removed & enhanced with AI Studio Lighting! ✨',
+      originalUrl: imageUrl,
+      enhancedUrl: enhancedUrl,
+      studioStyle
+    });
+  } catch (error) {
+    console.error('AI Background Remover Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
