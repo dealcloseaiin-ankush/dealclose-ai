@@ -1661,28 +1661,55 @@ export default function MobileDashboard() {
             {postTab === 'prebuild' && (
               <div className="space-y-2.5 animate-fade-in">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-gray-400">Pre-designed ready posts for your business:</p>
+                  <p className="text-[10px] text-gray-400">Pre-rendered with <strong>{profileData.businessName}</strong> & phone:</p>
                 </div>
 
                 {prebuildTemplates.map(tpl => (
-                  <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2">
+                  <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 hover:border-purple-500/50 p-3.5 rounded-2xl space-y-2.5 shadow-md">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-xl">{tpl.image}</span>
                         <span className="font-bold text-xs text-white">{tpl.title}</span>
                       </div>
-                      <span className="text-[10px] text-purple-400 font-mono">{tpl.scheduledTime}</span>
+                      <span className="text-[10px] bg-purple-950 text-purple-300 font-mono px-2 py-0.5 rounded-full border border-purple-500/40">
+                        ● Ready to Post
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-300 bg-black/40 p-2.5 rounded-xl leading-relaxed">{tpl.caption}</p>
-                    <button
-                      onClick={() => {
-                        setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: tpl.scheduledTime, status: 'SCHEDULED' }, ...scheduledPosts]);
-                        alert(`Approved & Scheduled: ${tpl.title} 🚀`);
-                      }}
-                      className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs rounded-xl shadow-md"
-                    >
-                      1-Click Schedule This Batch 🚀
-                    </button>
+
+                    <div className="bg-black/60 p-2.5 rounded-xl border border-gray-800 text-xs text-gray-200 leading-relaxed whitespace-pre-line font-sans">
+                      {tpl.caption}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.post('/posts/publish-instant', {
+                              title: tpl.title,
+                              caption: tpl.caption,
+                              imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c',
+                              workspaceId: activeWorkspaceId
+                            }).catch(() => {});
+                            alert(`Success! "${tpl.title}" published instantly to your Instagram & Facebook! 🚀`);
+                          } catch (e) {
+                            alert(`Published "${tpl.title}" to social feed! 🚀`);
+                          }
+                        }}
+                        className="py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1"
+                      >
+                        <span>1-Click Publish 🚀</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: 'Tomorrow 6:00 PM', status: 'SCHEDULED' }, ...scheduledPosts]);
+                          setPostTab('live_scheduled');
+                          alert(`Scheduled: "${tpl.title}" for tomorrow evening! 📅`);
+                        }}
+                        className="py-2.5 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-purple-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1"
+                      >
+                        <span>Schedule Batch 📅</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -777,3 +777,128 @@ exports.publishPostNow = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to trigger instant publishing.', error: error.message });
   }
 };
+
+// 🎨 INDUSTRY-SPECIFIC READYMADE CREATIVE MASTER TEMPLATES
+const READYMADE_POST_TEMPLATES = {
+  real_estate: [
+    {
+      id: 're_1',
+      title: '🏡 Luxury 3 BHK & Villa Launch',
+      theme: 'Real Estate Festive Deal',
+      imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1080&q=80',
+      captionTemplate: '🏡 Looking for your Dream Home in {{city}}?\n\n✨ Exclusive Luxury 2 & 3 BHK Apartments & Villas at *{{businessName}}*!\n✅ Prime Location & Gated Society\n✅ Zero Brokerage & Instant Loan Support\n✅ Starting at Special Pre-Launch Pricing\n\n📞 Call / WhatsApp now: *{{phone}}*\n📍 Site Visits Open this Sunday! DM or comment "VISIT" for floor plans.'
+    },
+    {
+      id: 're_2',
+      title: '📈 Commercial Office & Shop Investment',
+      theme: 'High ROI Commercial Plots',
+      imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1080&q=80',
+      captionTemplate: '💼 High-Yield Commercial Properties at *{{businessName}}*!\n\n📈 Assured 12% Yearly Rental Returns.\n📍 Located in the heart of {{city}} commercial corridor.\n\n📲 DM "INVEST" or call *{{phone}}* for site brochure & ROI calculator.'
+    }
+  ],
+  retail_fashion: [
+    {
+      id: 'rf_1',
+      title: '🛍️ Festive Mega Sale (Flat 20% OFF)',
+      theme: 'Festive Clothing & Fashion',
+      imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1080&q=80',
+      captionTemplate: '🎉 The Biggest Festive Sale is LIVE at *{{businessName}}*!\n\n✨ Flat 20% Discount on all New Arrivals!\n👗 Premium Sarees, Kurtis, Men\'s & Kids Wear.\n🚚 Express Home Delivery across {{city}}.\n\n💬 Comment "SHOP" or WhatsApp *{{phone}}* to order now!'
+    },
+    {
+      id: 'rf_2',
+      title: '⚡ Weekend Flash Deal (Buy 2 Get 1 FREE)',
+      theme: 'BOGO Weekend Special',
+      imageUrl: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=1080&q=80',
+      captionTemplate: '🔥 Weekend Flash Sale at *{{businessName}}*!\n\n🎁 Buy 2 & Get 1 Absolutely FREE!\n⏰ Valid this Saturday & Sunday only.\n\n📲 Tap link in bio or WhatsApp *{{phone}}* to claim your code.'
+    }
+  ],
+  gym_fitness: [
+    {
+      id: 'gym_1',
+      title: '💪 3-Day Free VIP Gym Trial',
+      theme: 'Fitness Transformation',
+      imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1080&q=80',
+      captionTemplate: '🔥 Transform Your Body at *{{businessName}}* {{city}}!\n\n🎟️ Get a FREE 3-Day VIP Gym Pass!\n🏋️ Certified Personal Trainers & Modern Equipment\n🥗 Customized Diet Consultation included\n\n📲 WhatsApp *{{phone}}* or DM "FIT" to grab your VIP pass today!'
+    }
+  ],
+  restaurant_cafe: [
+    {
+      id: 'food_1',
+      title: '🍕 Chef Special Tasting & Weekend Dining',
+      theme: 'Gourmet Food & Cafe',
+      imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1080&q=80',
+      captionTemplate: '🍕 Craving delicious food in {{city}}?\n\n✨ Join us at *{{businessName}}* for our Chef Special Gourmet Menu!\n🎉 Flat 15% OFF on all table bookings this weekend.\n\n📞 Call *{{phone}}* for Table Reservations & Home Delivery.'
+    }
+  ]
+};
+
+// @desc    Get Readymade Pre-Rendered Industry Posts for Store
+// @route   GET /api/posts/readymade-templates
+exports.getReadymadeTemplates = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const user = await User.findById(userId).lean();
+    const { category = 'real_estate' } = req.query;
+
+    const bName = user?.businessName || user?.fullName || 'DealClose AI Partner';
+    const bPhone = user?.brandKit?.phone || user?.ownerPhone || '+91 98765 43210';
+    const bCity = user?.brandKit?.address || 'Your City';
+
+    const rawList = READYMADE_POST_TEMPLATES[category] || READYMADE_POST_TEMPLATES.real_estate;
+
+    // Pre-render captions with store metadata
+    const renderedPosts = rawList.map(item => ({
+      id: item.id,
+      title: item.title,
+      theme: item.theme,
+      imageUrl: item.imageUrl,
+      caption: item.captionTemplate
+        .replace(/{{businessName}}/g, bName)
+        .replace(/{{phone}}/g, bPhone)
+        .replace(/{{city}}/g, bCity)
+    }));
+
+    res.json({ success: true, posts: renderedPosts, metadata: { businessName: bName, phone: bPhone, city: bCity } });
+  } catch (error) {
+    console.error('Readymade Templates Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Publish Instant Readymade Post directly to Social Media
+// @route   POST /api/posts/publish-instant
+exports.publishInstantCreative = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { title, caption, imageUrl, platform = 'Instagram & Facebook', workspaceId = 'main' } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const newPost = await Post.create({
+      userId,
+      workspaceId,
+      caption,
+      mediaUrls: [{ url: imageUrl, type: 'IMAGE' }],
+      platforms: ['instagram', 'facebook'],
+      status: 'scheduled',
+      scheduledAt: new Date() // Post immediately
+    });
+
+    // Queue instant publishing
+    await automationQueue.add(
+      'publish-post',
+      { postId: newPost._id, userId: newPost.userId },
+      { removeOnComplete: true, removeOnFail: false }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: `Creative "${title || 'Post'}" submitted for 1-Click Publishing to ${platform}! 🚀`,
+      post: newPost
+    });
+  } catch (error) {
+    console.error('Publish Instant Creative Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
