@@ -649,6 +649,28 @@ res = requests.post(
           <p className="text-xs sm:text-sm text-gray-400">
             14 Days 100% Free Trial • Zero credit card required • Zero markup on Meta conversations.
           </p>
+
+          {/* Duration Selector Tabs: 1 Month vs 6 Months vs 12 Months */}
+          <div className="inline-flex items-center bg-gray-900 border border-gray-800 p-1 rounded-2xl shadow-inner mt-4">
+            <button
+              onClick={() => setBillingCycle('1mo')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${billingCycle === '1mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              1 Month
+            </button>
+            <button
+              onClick={() => setBillingCycle('6mo')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '6mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              6 Months <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[9px] font-black px-1.5 py-0.5 rounded-full">Popular</span>
+            </button>
+            <button
+              onClick={() => setBillingCycle('12mo')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '12mo' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              12 Months (1 Year) <span className="bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">Max Savings 🔥</span>
+            </button>
+          </div>
         </div>
 
         {/* 🏆 SPECIAL VIP EARLY ADOPTER OFFER (FIRST 100 CUSTOMERS ONLY) */}
@@ -662,7 +684,7 @@ res = requests.post(
               <div className="flex items-center gap-2">
                 <span className="text-2xl">👑</span>
                 <h3 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
-                  Early Adopter VIP Lifetime Access
+                  Early Adopter VIP Founder Access
                 </h3>
               </div>
               <p className="text-xs text-gray-300 leading-relaxed">
@@ -710,7 +732,7 @@ res = requests.post(
           </div>
         </div>
 
-        {/* Standard Plans Grid with 50% Slashed Prices */}
+        {/* Standard Plans Grid with Duration-based Prices */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Plan 1: Essential Growth */}
@@ -724,11 +746,33 @@ res = requests.post(
               </div>
               
               <div>
-                <div className="text-sm text-gray-500 line-through font-mono">₹999 / month</div>
-                <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
-                  <span>₹499</span>
-                  <span className="text-xs text-gray-400 font-normal font-sans">/ month (50% OFF)</span>
-                </div>
+                {billingCycle === '1mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹999 / month</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹599</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '6mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹5,994 (₹999/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹3,499</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹583/mo)</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '12mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹11,988 (₹999/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹5,999</span>
+                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (Just ₹499 / mo)</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <p className="text-xs text-gray-400">Perfect for local retail boutiques, salons, cafes & solo shops.</p>
 
@@ -765,11 +809,33 @@ res = requests.post(
               </div>
               
               <div>
-                <div className="text-sm text-gray-500 line-through font-mono">₹1,499 / month</div>
-                <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
-                  <span>₹749</span>
-                  <span className="text-xs text-gray-400 font-normal font-sans">/ month (50% OFF)</span>
-                </div>
+                {billingCycle === '1mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹1,499 / month</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
+                      <span>₹899</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '6mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹8,994 (₹1,499/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
+                      <span>₹4,799</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹799/mo)</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '12mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹17,988 (₹1,499/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300 font-mono flex items-baseline gap-2">
+                      <span>₹8,999</span>
+                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (Just ₹749 / mo)</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <p className="text-xs text-gray-400">For high-growth real estate builders, gym clubs, clinics & e-commerce brands.</p>
 

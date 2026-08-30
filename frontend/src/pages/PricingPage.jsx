@@ -118,19 +118,25 @@ export default function PricingPage() {
           No hidden fees, no markup on Meta messages, and no enterprise lock-ins. Start free for 14 days and scale as you grow.
         </p>
 
-        {/* Monthly vs Annual Toggle */}
-        <div className="inline-flex items-center bg-gray-900 border border-gray-800 p-1 rounded-xl shadow-inner mb-10">
+        {/* 1 Month vs 6 Months vs 12 Months Duration Switcher */}
+        <div className="inline-flex items-center bg-gray-900 border border-gray-800 p-1 rounded-2xl shadow-inner mb-10">
           <button
-            onClick={() => setBillingCycle('monthly')}
-            className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${billingCycle === 'monthly' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            onClick={() => setBillingCycle('1mo')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${billingCycle === '1mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
           >
-            Monthly Billing
+            1 Month
           </button>
           <button
-            onClick={() => setBillingCycle('annual')}
-            className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === 'annual' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            onClick={() => setBillingCycle('6mo')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '6mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
           >
-            Annual Billing <span className="bg-emerald-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">Save 25%</span>
+            6 Months <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[9px] font-black px-1.5 py-0.5 rounded-full">Popular</span>
+          </button>
+          <button
+            onClick={() => setBillingCycle('12mo')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '12mo' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+          >
+            12 Months (1 Year) <span className="bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">Max Savings 🔥</span>
           </button>
         </div>
 
@@ -145,7 +151,7 @@ export default function PricingPage() {
               <div className="flex items-center gap-2">
                 <span className="text-2xl">👑</span>
                 <h3 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
-                  Early Adopter VIP Lifetime Access
+                  Early Adopter VIP Founder Access
                 </h3>
               </div>
               <p className="text-xs text-gray-300 leading-relaxed">
@@ -195,63 +201,130 @@ export default function PricingPage() {
 
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left mb-16 max-w-4xl mx-auto">
-          {plans.map((plan) => {
-            const price = billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly;
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all space-y-6 ${
-                  plan.highlight
-                    ? 'bg-gradient-to-b from-purple-950/40 via-gray-950 to-black border-2 border-purple-500/80 shadow-2xl shadow-purple-500/10'
-                    : 'bg-gray-950 border border-gray-800 hover:border-gray-700'
-                }`}
-              >
-                {plan.badge && (
-                  <div className={`absolute -top-3 left-6 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${plan.highlight ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' : 'bg-gray-800 text-gray-300 border border-gray-700'}`}>
-                    {plan.badge}
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
-                  <p className="text-xs text-gray-400 min-h-[32px]">{plan.tagline}</p>
-
+          
+          {/* Plan 1: Essential Growth */}
+          <div className="bg-gray-950 border border-gray-800 rounded-3xl p-6 sm:p-8 flex flex-col justify-between hover:border-gray-700 transition-all space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider">Essential Growth</span>
+                <span className="text-[10px] font-bold text-purple-400 bg-purple-950/60 border border-purple-500/30 px-2.5 py-0.5 rounded-full">
+                  14 Days Free Trial
+                </span>
+              </div>
+              
+              <div>
+                {billingCycle === '1mo' && (
                   <div>
-                    <div className="text-sm text-gray-500 line-through font-mono">₹{plan.originalPrice} / month</div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-black text-white font-mono">₹{price}</span>
-                      <span className="text-xs text-gray-400 font-sans">/ month (50% OFF)</span>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹999 / month</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹599</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month</span>
                     </div>
                   </div>
-
-                  <Link
-                    to={plan.ctaLink}
-                    className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-lg ${
-                      plan.highlight
-                        ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-emerald-400 text-black hover:opacity-95'
-                        : 'bg-gray-800 hover:bg-gray-700 text-white'
-                    }`}
-                  >
-                    {plan.cta} <ArrowRight size={14} />
-                  </Link>
-
-                  <div className="border-t border-gray-800/80 pt-6 space-y-3">
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-wider mb-2">What's Included:</p>
-                    {plan.features.map((feat, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5 text-xs text-gray-300">
-                        <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
+                )}
+                {billingCycle === '6mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹5,994 (₹999/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹3,499</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹583/mo)</span>
+                    </div>
                   </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-900/60 text-[10px] text-gray-500 text-center">
-                  14 days free trial • Cancel anytime
-                </div>
+                )}
+                {billingCycle === '12mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹11,988 (₹999/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹5,999</span>
+                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (Just ₹499 / mo)</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            );
-          })}
+              <p className="text-xs text-gray-400">WhatsApp API + Instagram Comment-to-DM + Prebuilt Niche Posts</p>
+
+              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4">
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Official WhatsApp Cloud API Access</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Instagram Reel Comment-to-DM Automation</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Prebuilt Niche Industry Social Media Posts</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Visual Drag & Drop Flow & Bot Builder</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Direct Product Catalog & PDF Brochure Sharing</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> 1 Team Staff Access Included</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> 0% Markup on Meta Conversation Rates</div>
+              </div>
+            </div>
+
+            <Link
+              to="/register"
+              className="w-full py-3.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-black text-xs text-center transition-all border border-gray-700"
+            >
+              Start 14-Day Free Trial (₹0) ⚡
+            </Link>
+          </div>
+
+          {/* Plan 2: Omnichannel Pro */}
+          <div className="bg-gradient-to-b from-purple-950/40 via-gray-950 to-black border-2 border-purple-500/80 rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-2xl shadow-purple-500/10 space-y-6 relative">
+            <div className="absolute -top-3 left-8 px-3.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
+              Most Popular ⭐ Recommended
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] font-black text-purple-300 uppercase tracking-wider">Omnichannel Pro Automation</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                  14 Days Free Trial
+                </span>
+              </div>
+              
+              <div>
+                {billingCycle === '1mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹1,499 / month</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
+                      <span>₹899</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '6mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹8,994 (₹1,499/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
+                      <span>₹4,799</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹799/mo)</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '12mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹17,988 (₹1,499/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300 font-mono flex items-baseline gap-2">
+                      <span>₹8,999</span>
+                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (Just ₹749 / mo)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">WhatsApp + Instagram + Google 1-Tap Review Booster + Full CRM</p>
+
+              <div className="space-y-2.5 text-xs text-gray-300 border-t border-gray-800/80 pt-4">
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> <strong>Everything in Essential Growth +</strong></div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> <strong>1-Tap 5-Star Google Review Booster Engine</strong></div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Multi-Agent Shared Team Inbox (3 Staff Included)</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Automated CRM Lead Stages & Distribution</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> Meta Approved Bulk Template Broadcaster</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-emerald-400 shrink-0" /> 1-Click Social Media Batch Publisher</div>
+              </div>
+            </div>
+
+            <Link
+              to="/register"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-amber-400 text-black font-black text-xs text-center transition-all shadow-lg hover:opacity-95"
+            >
+              Start 14-Day Free Trial (₹0) 🚀
+            </Link>
+          </div>
+
         </div>
 
         {/* Modular Add-ons Section */}
