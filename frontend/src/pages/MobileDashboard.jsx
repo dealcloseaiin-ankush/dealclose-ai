@@ -2830,24 +2830,46 @@ export default function MobileDashboard() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-400">Owner Number:</label>
-                      <input
-                        type="text"
-                        value={profileData.ownerPhone}
-                        onChange={(e) => setProfileData({ ...profileData, ownerPhone: e.target.value })}
-                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white font-mono text-[11px] focus:outline-none"
-                      />
+                  {/* 3 Dedicated Phone Channels */}
+                  <div className="space-y-2 pt-1 border-t border-gray-800">
+                    <div className="text-[11px] font-bold text-gray-300 flex items-center justify-between">
+                      <span>Phone Numbers & Call Forwarding</span>
+                      <span className="text-[9px] text-purple-400 font-normal">3 Roles Defined</span>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-400">Manager Number:</label>
-                      <input
-                        type="text"
-                        value={profileData.managerPhone}
-                        onChange={(e) => setProfileData({ ...profileData, managerPhone: e.target.value })}
-                        className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white font-mono text-[11px] focus:outline-none"
-                      />
+
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="bg-black/50 border border-gray-800/80 p-2 rounded-xl">
+                        <label className="text-[9px] font-black text-purple-300 block mb-0.5">👑 1. Primary Owner / Admin Mobile (Login & Alerts)</label>
+                        <input
+                          type="text"
+                          value={profileData.ownerPhone || ''}
+                          onChange={(e) => setProfileData({ ...profileData, ownerPhone: e.target.value })}
+                          placeholder="+91 98765 43210"
+                          className="w-full bg-black border border-gray-800 rounded-lg p-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div className="bg-black/50 border border-gray-800/80 p-2 rounded-xl">
+                        <label className="text-[9px] font-black text-emerald-400 block mb-0.5">💬 2. Official WhatsApp Cloud API Number (Bot & Templates)</label>
+                        <input
+                          type="text"
+                          value={profileData.whatsappNumber || profileData.managerPhone || ''}
+                          onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value, managerPhone: e.target.value })}
+                          placeholder="+91 98765 11223"
+                          className="w-full bg-black border border-gray-800 rounded-lg p-1.5 text-emerald-300 font-mono text-[11px] focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="bg-black/50 border border-gray-800/80 p-2 rounded-xl">
+                        <label className="text-[9px] font-black text-amber-300 block mb-0.5">📞 3. Office Support Helpline & Forwarding (Human Staff)</label>
+                        <input
+                          type="text"
+                          value={profileData.officePhone || profileData.ivrForwardingPhone || ''}
+                          onChange={(e) => setProfileData({ ...profileData, officePhone: e.target.value, ivrForwardingPhone: e.target.value })}
+                          placeholder="+91 98765 99887"
+                          className="w-full bg-black border border-gray-800 rounded-lg p-1.5 text-amber-200 font-mono text-[11px] focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
                     </div>
                   </div>
 

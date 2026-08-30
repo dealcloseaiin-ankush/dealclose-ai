@@ -96,6 +96,8 @@ const userSchema = new Schema({
   apiKey: { type: String, unique: true, sparse: true },
   websiteUrl: { type: String },
   ownerPhone: { type: String }, // Shop owner's personal WhatsApp number
+  officePhone: { type: String }, // Official customer calling & helpline number attended by staff
+  ivrForwardingPhone: { type: String }, // Number to forward customer calls when human assistance is needed
   isOwnerPhoneVerified: { type: Boolean, default: false },
   connectedPlatforms: [{ 
     platformName: { type: String }, // e.g. newpropertyhub, vyaparindia

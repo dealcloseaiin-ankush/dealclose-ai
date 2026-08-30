@@ -16,7 +16,12 @@ const BUSINESS_CATEGORIES = [
   { id: 'salon_beauty', label: '💅 Salon & Beauty Parlour', desc: 'Service rates & slot booking' },
   { id: 'jewellery_luxury', label: '💍 Jewellery & Gold', desc: 'Daily rate card & video call' },
   { id: 'automobile_dealer', label: '🚗 Automobile & Cars', desc: 'Test drives & EMI calculate' },
+  { id: 'hardware_sanitary', label: '🔧 Hardware & Sanitary', desc: 'Paints, tools & cement rates' },
+  { id: 'electricals_electronics', label: '⚡ Electricals & Electronics', desc: 'Appliances, wiring & EMI' },
+  { id: 'mobile_laptops', label: '📱 Mobile & Laptop Store', desc: 'Phone repair, screen & gadgets' },
+  { id: 'furniture_interior', label: '🛋️ Furniture & Interior', desc: 'Sofa, beds & modular design' },
   { id: 'b2b_wholesale', label: '📦 B2B Wholesale', desc: 'Bulk rate lists & GST invoice' },
+  { id: 'other_business', label: '✨ Other Custom Business', desc: 'Custom AI sales automation' },
 ];
 
 export default function Register() {

@@ -1251,6 +1251,8 @@ exports.updateProfile = async (req, res) => {
     if (discountConfig !== undefined) updateData.discountConfig = discountConfig;
     if (metaAdsConfig !== undefined) updateData.metaAdsConfig = metaAdsConfig;
     if (ownerPhone !== undefined) updateData.ownerPhone = ownerPhone;
+    if (req.body.officePhone !== undefined) updateData.officePhone = req.body.officePhone;
+    if (req.body.ivrForwardingPhone !== undefined) updateData.ivrForwardingPhone = req.body.ivrForwardingPhone;
     if (aiAgentEnabled !== undefined) updateData.aiAgentEnabled = aiAgentEnabled;
     if (acceptCollabs !== undefined) updateData.acceptCollabs = acceptCollabs;
     if (workspaces !== undefined) updateData.workspaces = workspaces;

@@ -86,6 +86,78 @@ const INDUSTRY_STARTER_FLOWS = {
         ]
       }
     }
+  ],
+  hardware_sanitary: [
+    {
+      name: 'Paints & Building Material Bulk Estimate Bot',
+      trigger: 'PAINT / CEMENT / PIPE / RATE / QUOTE',
+      description: 'Captures Material Requirement -> Auto Calculates Estimate -> Dispatches Wholesale Rate Card',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Hardware or Material inquiry' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'menu', data: { question: 'Aapko kis material ki requirement hai?', opt1: 'Asian Paints / Texture', opt2: 'Cement & TMT Steel', opt3: 'Pipes & Sanitary Fittings' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'sendMessage', data: { message: 'Great! Hamare wholesale discount rates aapke quantity ke hisab se ready hain. Hamara staff estimate bhej raha hai 🔧' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3' }
+        ]
+      }
+    }
+  ],
+  electricals_electronics: [
+    {
+      name: 'Home Appliance & 0% EMI Finder',
+      trigger: 'AC / TV / FRIDGE / WIRING / EMI',
+      description: 'Customer asks appliance -> Checks 0% EMI availability -> Sends product specs & store warranty',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Electronics inquiry' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'menu', data: { question: 'Aap kaunsa appliance dekh rahe hain?', opt1: 'Inverter AC / Split AC', opt2: 'Smart TV & Soundbar', opt3: 'Home Wiring & Switchboards' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'sendMessage', data: { message: 'Aaj hi buy karein 0% Down Payment par! Free home delivery & same-day installation available ⚡' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3' }
+        ]
+      }
+    }
+  ],
+  mobile_laptops: [
+    {
+      name: 'Mobile Screen Repair & Gadget Quote Bot',
+      trigger: 'SCREEN / REPAIR / IPHONE / BATTERY / GADGET',
+      description: 'Customer enters phone model -> Gives instant repair estimate -> Books technician doorstep slot',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Phone repair or gadget inquiry' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'askQuestion', data: { question: 'Aapke phone ka brand aur model kya hai? (e.g. iPhone 13 / OnePlus 11)', replyType: 'open' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'sendMessage', data: { message: 'Original screen replacement par 6 Months Warranty + Free Temper Glass offer chal raha hai 📱' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }
+        ]
+      }
+    }
+  ],
+  furniture_interior: [
+    {
+      name: 'Custom Sofa & Modular Interior Visualizer',
+      trigger: 'SOFA / BED / MODULAR KITCHEN / INTERIOR',
+      description: 'Customer shares room size -> Sends Lookbook Catalog -> Books Free Designer Site Visit',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Furniture inquiry' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'menu', data: { question: 'Aapko kiske designs dekhne hain?', opt1: 'Custom Luxury Sofa', opt2: 'King Size Beds & Wardrobes', opt3: 'Modular Kitchen 3D Design' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'sendMessage', data: { message: 'Namaste! Ye raha hamara 2026 Interior Lookbook PDF. Free 3D design consultation book ho chuka hai 🛋️' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3' }
+        ]
+      }
+    }
   ]
 };
 
