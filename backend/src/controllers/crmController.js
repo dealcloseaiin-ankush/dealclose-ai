@@ -86,8 +86,23 @@ exports.getPipeline = async (req, res) => {
       console.error("Old chat sync error:", syncErr);
     }
 
+    // 🛡️ ROLE & STAFF SCOPING: If user is staff, only show leads assigned to them!
+    const userRole = req.user?.role || 'owner';
+    const isStaff = userRole === 'staff';
+    let leadFilter = { userId, status: { $ne: 'deleted' } };
+    
+    if (isStaff) {
+      const staffPhone = req.user?.phone || req.user?.phoneNumber;
+      leadFilter.$or = [
+        { assignedTo: userId },
+        { assignedToStaffId: userId },
+        { assignedStaffPhone: staffPhone },
+        { createdBy: userId }
+      ];
+    }
+
     // 🐛 FIX: 'deleted' status wale leads ko yahin se exclude karo (soft-deleted tombstones)
-    const leads = await Lead.find({ userId, status: { $ne: 'deleted' } }).sort({ updatedAt: -1 }).lean();
+    const leads = await Lead.find(leadFilter).sort({ updatedAt: -1 }).lean();
     const contacts = await Contact.find({ userId }).sort({ updatedAt: -1 }).lean();
       
     console.log(`📊 [CRM Debug] Found ${leads.length} Leads and ${contacts.length} Contacts in DB.`);

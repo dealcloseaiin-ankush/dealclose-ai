@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { saveFlow, getFlows, deleteFlow, renameFlow, reassignFlow } = require('../controllers/flowController');
+const { saveFlow, getFlows, deleteFlow, renameFlow, reassignFlow, getIndustryStarterFlows } = require('../controllers/flowController');
 const { protect } = require('../middleware/authMiddleware');
+
+// Industry Flow Blueprints
+router.get('/flows/industry-templates', protect, getIndustryStarterFlows);
 
 // Flow Builder Routes
 router.route('/flows')

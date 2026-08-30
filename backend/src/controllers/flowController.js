@@ -11,23 +11,108 @@ const buildFlowSaveQuery = ({ userId, name, workspaceId, platform }) => {
   return query;
 };
 
+// 🚀 INDUSTRY-SPECIFIC STARTER FLOWS & REUSABLE AUTOMATION BLUEPRINTS
+const INDUSTRY_STARTER_FLOWS = {
+  real_estate: [
+    {
+      name: 'Property Inquiry & Site Visit Auto-Booker',
+      trigger: 'PROPERTY / 2BHK / 3BHK / VILLA',
+      description: 'Incoming property inquiry -> Captures Budget & Preferred Location -> Auto-Sends Project Brochure PDF -> Schedules Sunday Site Visit & Assigns Sales Rep',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Customer asks about Property / Villa' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'askQuestion', data: { question: 'Namaste! Kya aap 2 BHK, 3 BHK ya Luxury Villa dekh rahe hain?', replyType: 'open' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'sendMessage', data: { message: 'Great! Ye raha hamara project brochure aur floor plans 📄', mediaUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c' }, position: { x: 250, y: 220 } },
+          { id: '4', type: 'menu', data: { question: 'Kya aap Sunday 11:00 AM par Site Visit confirm karna chahte hain?', opt1: 'Haan Confirm Karein', opt2: 'Call Back Request', opt3: 'Price Sheet Bhejo' }, position: { x: 250, y: 340 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' },
+          { id: 'e3-4', source: '3', target: '4' }
+        ]
+      }
+    }
+  ],
+  retail_fashion: [
+    {
+      name: 'Festive Catalog & Discount Auto-Closer',
+      trigger: 'PRICE / DISCOUNT / SIZE / BUY',
+      description: 'Customer asks price -> Sends Instant 20% OFF Coupon -> Shares Catalog Link -> Collects Delivery Address',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Customer asks for Price / Collection' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'sendMessage', data: { message: 'Namaste! Aapke liye flat 20% OFF festive coupon code *FESTIVE20* apply ho chuka hai 🛍️' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'askQuestion', data: { question: 'Aap kaunsa size dekh rahe hain (M / L / XL)?', replyType: 'open' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3' }
+        ]
+      }
+    }
+  ],
+  gym_fitness: [
+    {
+      name: 'Free VIP Trial Pass & Fitness Consultation',
+      trigger: 'GYM / MEMBERSHIP / FEES / DIET',
+      description: 'Captures fitness goal -> Sends 3-Day Free VIP Pass QR -> Books slot with Head Trainer',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Fitness Inquiry' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'menu', data: { question: 'Aapka main fitness goal kya hai?', opt1: 'Weight Loss', opt2: 'Muscle Gain', opt3: 'General Fitness' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'sendMessage', data: { message: 'Awesome! Aapka 3-Day Free VIP Workout Pass ready hai. Timings: 6 AM to 10 PM 💪' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3' }
+        ]
+      }
+    }
+  ],
+  restaurant_cafe: [
+    {
+      name: 'Table Reservation & Digital Menu Dispatch',
+      trigger: 'MENU / TABLE / BOOK / ORDER',
+      description: 'Customer says Menu/Book -> Sends Digital Food Menu -> Confirms Table for Guests -> Sends Location Pin',
+      flowData: {
+        nodes: [
+          { id: '1', type: 'trigger', data: { label: 'Dining or Menu inquiry' }, position: { x: 250, y: 0 } },
+          { id: '2', type: 'sendMessage', data: { message: 'Namaste! Ye raha hamara chef special digital menu 🍕' }, position: { x: 250, y: 100 } },
+          { id: '3', type: 'askQuestion', data: { question: 'Kitne guests ke liye table reserve karni hai?', replyType: 'open' }, position: { x: 250, y: 220 } }
+        ],
+        edges: [
+          { id: 'e1-2', source: '1', target: '2' },
+          { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }
+        ]
+      }
+    }
+  ]
+};
+
+exports.getIndustryStarterFlows = async (req, res) => {
+  try {
+    const { category = 'all' } = req.query;
+    if (category !== 'all' && INDUSTRY_STARTER_FLOWS[category]) {
+      return res.json({ success: true, flows: INDUSTRY_STARTER_FLOWS[category] });
+    }
+    res.json({ success: true, flows: INDUSTRY_STARTER_FLOWS });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
-  // 🚀 FINAL FIX v5: This is the most robust and simple query logic.
-  // It correctly combines platform and workspace filters using an explicit $and.
   const query = { $and: [{ userId }] };
 
-  // Platform filter: For WhatsApp, include old flows where 'platform' field doesn't exist.
   if (platform === 'whatsapp') {
     query.$and.push({ $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
   } else if (platform) {
     query.$and.push({ platform });
   }
 
-  // Workspace filter
   if (workspaceId && workspaceId !== 'main') {
     query.$and.push({ workspaceId });
   } else if (workspaceId === 'main') {
-    // For main, find flows with workspaceId 'main', null, or not existing.
     query.$and.push({
       $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }]
     });
