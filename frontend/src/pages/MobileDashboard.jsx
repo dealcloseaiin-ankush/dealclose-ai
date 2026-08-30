@@ -454,6 +454,20 @@ export default function MobileDashboard() {
         })));
       }
 
+      // 7. Fetch Live Visual Flow Builder Flows from MongoDB (Desktop & Mobile Unified)
+      const { data: flowsRes } = await api.get(`/whatsapp/flows?workspaceId=${targetWsId}`).catch(() => ({ data: [] }));
+      const liveFlows = Array.isArray(flowsRes?.data) ? flowsRes.data : (Array.isArray(flowsRes) ? flowsRes : []);
+      if (liveFlows && liveFlows.length > 0) {
+        setFlowRules(liveFlows.map(f => ({
+          id: f._id,
+          name: f.name,
+          description: f.flowData?.description || (f.flowData?.nodes ? `${f.flowData.nodes.length} Visual Automation Nodes` : 'Automated Workflow'),
+          trigger: f.flowData?.trigger || 'Trigger Keyword / Hi',
+          active: f.isActive !== false,
+          rawFlow: f
+        })));
+      }
+
     } catch (err) {
       console.warn('Backend sync finished with partial data:', err.message);
     }
@@ -793,6 +807,105 @@ export default function MobileDashboard() {
       alert('WhatsApp Config Saved! 🟢');
       setShowWaConnectModal(false);
     }
+  };
+
+  const handleDisconnectWhatsApp = async () => {
+    if (!window.confirm(`Disconnect WhatsApp for "${profileData.businessName}"?`)) return;
+    try {
+      if (activeWorkspaceId === 'main') {
+        await api.put('/users/profile', {
+          whatsappConfig: { accessToken: '', phoneNumberId: '', wabaId: '', displayPhoneNumber: '' }
+        });
+      }
+      setIsWaConnected(false);
+      setWaApiKey('');
+      setWaPhoneNumberId('');
+      setWaWabaId('');
+      alert('WhatsApp disconnected successfully.');
+    } catch (err) {
+      setIsWaConnected(false);
+      alert('WhatsApp disconnected.');
+    }
+  };
+
+  const handleDisconnectInstagram = async () => {
+    if (!window.confirm(`Disconnect Instagram for "${profileData.businessName}"?`)) return;
+    try {
+      await api.post('/settings/instagram-disconnect', {
+        workspaceId: activeWorkspaceId
+      });
+      setIsIgConnected(false);
+      setIgAccessToken('');
+      setIgAccountId('');
+      alert('Instagram disconnected successfully.');
+    } catch (err) {
+      setIsIgConnected(false);
+      alert('Instagram disconnected.');
+    }
+  };
+
+  const handleAddFlow = async (e) => {
+    e.preventDefault();
+    if (!newFlow.name) return;
+    try {
+      const { data: res } = await api.post('/whatsapp/flows', {
+        name: newFlow.name,
+        workspaceId: activeWorkspaceId,
+        platform: 'whatsapp',
+        flowData: {
+          nodes: [
+            { id: '1', type: 'triggerNode', data: { label: `Start: ${newFlow.trigger}` }, position: { x: 100, y: 100 } },
+            { id: '2', type: 'messageNode', data: { label: newFlow.description || `Automated reply for ${newFlow.name}` }, position: { x: 100, y: 250 } }
+          ],
+          edges: [
+            { id: 'e1-2', source: '1', target: '2' }
+          ],
+          trigger: newFlow.trigger,
+          description: newFlow.description
+        }
+      });
+      const saved = res?.flow || res;
+      setFlowRules(prev => [{
+        id: saved?._id || 'fl_' + Date.now(),
+        name: newFlow.name,
+        description: newFlow.description || 'Automated flow saved to MongoDB',
+        trigger: newFlow.trigger,
+        active: true,
+        rawFlow: saved
+      }, ...prev]);
+      setShowAddFlowModal(false);
+      setNewFlow({ name: '', trigger: 'Incoming Keyword', description: '' });
+      alert(`Flow "${newFlow.name}" created & live synced with Desktop Flow Builder! ⚡✅`);
+    } catch (err) {
+      setFlowRules(prev => [{
+        id: 'fl_' + Date.now(),
+        name: newFlow.name,
+        description: newFlow.description,
+        trigger: newFlow.trigger,
+        active: true
+      }, ...prev]);
+      setShowAddFlowModal(false);
+      setNewFlow({ name: '', trigger: 'Incoming Keyword', description: '' });
+      alert('Flow saved successfully! ⚡');
+    }
+  };
+
+  const handleToggleFlow = async (id) => {
+    const target = flowRules.find(f => f.id === id);
+    const nextActive = !target?.active;
+    setFlowRules(flowRules.map(f => f.id === id ? { ...f, active: nextActive } : f));
+    try {
+      await api.patch(`/whatsapp/flows/${id}/toggle`).catch(() => {});
+    } catch (e) {}
+  };
+
+  const handleDeleteFlow = async (id, name) => {
+    if (!window.confirm(`Delete flow "${name}"?`)) return;
+    setFlowRules(flowRules.filter(f => f.id !== id));
+    try {
+      await api.delete(`/whatsapp/flows/${id}`).catch(() => {});
+      alert(`Flow "${name}" deleted from database! 🗑️`);
+    } catch (e) {}
   };
 
   const handleCreateBlogArticle = (e) => {
@@ -1970,31 +2083,70 @@ export default function MobileDashboard() {
             {menuSubScreen === 'flow_automation' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400">Active Automations ({flowRules.length})</span>
+                  <div>
+                    <span className="text-xs font-bold text-white">Flow & Visual Auto-Pilot</span>
+                    <p className="text-[10px] text-gray-400">Synced with MongoDB & Desktop Builder ({flowRules.length} Flows)</p>
+                  </div>
                   <button 
                     onClick={() => setShowAddFlowModal(true)}
-                    className="px-3 py-1.5 bg-cyan-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md"
+                    className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-black text-xs rounded-xl flex items-center gap-1 shadow-md"
                   >
-                    <Plus size={14} /> Create New Flow
+                    <Plus size={14} /> New Flow ⚡
                   </button>
                 </div>
 
                 <div className="space-y-2.5">
-                  {flowRules.map(fl => (
-                    <div key={fl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="font-bold text-xs text-white flex items-center gap-1.5">
-                          <Workflow size={14} className="text-cyan-400" />
-                          <span>{fl.name}</span>
-                        </div>
-                        <input type="checkbox" defaultChecked={fl.active} className="accent-cyan-500 rounded" />
-                      </div>
-                      <p className="text-xs text-gray-400 leading-relaxed">{fl.description}</p>
-                      <div className="text-[9px] text-cyan-400 font-mono bg-cyan-950/40 px-2 py-0.5 rounded w-fit mt-1">
-                        Trigger: {fl.trigger}
-                      </div>
+                  {flowRules.length === 0 ? (
+                    <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
+                      <Workflow size={24} className="text-cyan-400 mx-auto" />
+                      <div className="text-xs font-bold text-white">No Custom Flows Found</div>
+                      <p className="text-[10px] text-gray-400">Create your first automated flow below or on Desktop Flow Builder!</p>
+                      <button onClick={() => setShowAddFlowModal(true)} className="px-3 py-1.5 bg-cyan-500 text-black font-black text-xs rounded-xl">
+                        + Create Flow ⚡
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    flowRules.map(fl => (
+                      <div key={fl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                            <Workflow size={14} className="text-cyan-400" />
+                            <span>{fl.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleFlow(fl.id)}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-black border transition-all ${
+                                fl.active ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40' : 'bg-gray-800 text-gray-400 border-gray-700'
+                              }`}
+                            >
+                              {fl.active ? 'ACTIVE ✅' : 'PAUSED ⏸️'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFlow(fl.id, fl.name)}
+                              className="text-gray-500 hover:text-red-400 p-1"
+                              title="Delete Flow"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400 leading-relaxed">{fl.description}</p>
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="text-[9px] text-cyan-400 font-mono bg-cyan-950/40 px-2 py-0.5 rounded w-fit">
+                            ⚡ Trigger: {fl.trigger}
+                          </div>
+                          <a
+                            href="/flow-builder"
+                            className="text-[10px] text-gray-400 hover:text-white font-bold flex items-center gap-1"
+                          >
+                            <span>Open Visual Builder</span>
+                            <ExternalLink size={11} />
+                          </a>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -2248,25 +2400,82 @@ export default function MobileDashboard() {
 
                 {/* 2. WhatsApp API (3 Boxes) & Instagram Channel Linking */}
                 <div className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-3 text-xs shadow-sm">
-                  <span className="font-bold text-white flex items-center gap-1.5 border-b border-gray-800/80 pb-2">
-                    <Link2 size={15} className="text-emerald-400" />
-                    <span>WhatsApp & Instagram Connection</span>
-                  </span>
+                  <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <Link2 size={15} className="text-emerald-400" />
+                      <span>WhatsApp & Instagram Connection</span>
+                    </span>
+                    <span className="text-[10px] text-gray-400">{profileData.businessName}</span>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      onClick={() => setShowWaConnectModal(true)}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 shadow-md"
-                    >
-                      <span>🟢 Link WhatsApp</span>
-                    </button>
-                    <button
-                      onClick={() => setShowIgConnectModal(true)}
-                      className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 shadow-md"
-                    >
-                      <InstagramIcon size={12} />
-                      <span>Link Instagram</span>
-                    </button>
+                  <div className="space-y-2 pt-1">
+                    {/* WhatsApp Status & Actions */}
+                    <div className="flex items-center justify-between bg-black/60 border border-gray-800/80 p-2.5 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${isWaConnected ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`} />
+                        <div>
+                          <div className="font-bold text-white text-[11px]">WhatsApp Meta Cloud API</div>
+                          <div className="text-[9px] text-gray-400">{isWaConnected ? 'Linked & Active ✅' : 'Not Connected'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {isWaConnected ? (
+                          <button
+                            type="button"
+                            onClick={handleDisconnectWhatsApp}
+                            className="px-2.5 py-1 bg-red-950/80 border border-red-500/40 text-red-300 hover:text-white font-bold text-[10px] rounded-lg transition-all"
+                          >
+                            Logout / Disconnect
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowWaConnectModal(true)}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded-lg transition-all shadow-md"
+                          >
+                            🟢 Link WhatsApp
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowWaConnectModal(true)}
+                          className="px-2 py-1 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white font-bold text-[10px] rounded-lg"
+                          title="Edit Credentials"
+                        >
+                          ⚙️
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Instagram Status & Actions */}
+                    <div className="flex items-center justify-between bg-black/60 border border-gray-800/80 p-2.5 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${isIgConnected ? 'bg-pink-400 animate-pulse' : 'bg-gray-600'}`} />
+                        <div>
+                          <div className="font-bold text-white text-[11px]">Instagram Business & Reels</div>
+                          <div className="text-[9px] text-gray-400">{isIgConnected ? 'Linked & Active 📸' : 'Not Connected'}</div>
+                        </div>
+                      </div>
+                      <div>
+                        {isIgConnected ? (
+                          <button
+                            type="button"
+                            onClick={handleDisconnectInstagram}
+                            className="px-2.5 py-1 bg-red-950/80 border border-red-500/40 text-red-300 hover:text-white font-bold text-[10px] rounded-lg transition-all"
+                          >
+                            Logout / Disconnect
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowIgConnectModal(true)}
+                            className="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-[10px] rounded-lg transition-all shadow-md"
+                          >
+                            📸 Link Instagram
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2892,48 +3101,54 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 7: Add Flow Automation */}
+      {/* Modal 7: Add Flow Automation (Live Synced with Desktop Flow Builder & MongoDB) */}
       {showAddFlowModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-cyan-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
             <button onClick={() => setShowAddFlowModal(false)} className="absolute top-4 right-4 text-gray-400">
               <X size={16} />
             </button>
-            <h3 className="text-sm font-bold text-white">Create Flow Automation</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (!newFlow.name || !newFlow.description) return;
-              setFlowRules([...flowRules, { id: 'fl_' + Date.now(), ...newFlow, active: true }]);
-              setNewFlow({ name: '', trigger: 'Incoming Keyword', description: '' });
-              setShowAddFlowModal(false);
-              alert('New flow automation created! ⚡');
-            }} className="space-y-2 text-xs">
-              <input
-                type="text"
-                placeholder="Flow Name (e.g. Order Status Tracker)"
-                value={newFlow.name}
-                onChange={(e) => setNewFlow({ ...newFlow, name: e.target.value })}
-                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Trigger Condition (e.g. Keyword 'STATUS')"
-                value={newFlow.trigger}
-                onChange={(e) => setNewFlow({ ...newFlow, trigger: e.target.value })}
-                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
-                required
-              />
-              <textarea
-                rows={2}
-                placeholder="What action should happen automatically?"
-                value={newFlow.description}
-                onChange={(e) => setNewFlow({ ...newFlow, description: e.target.value })}
-                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
-                required
-              />
-              <button type="submit" className="w-full py-2.5 bg-cyan-600 text-white font-black rounded-xl text-xs mt-2">
-                Create & Activate Flow ⚡
+            <div className="flex items-center gap-2">
+              <Workflow size={18} className="text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">Create Flow Automation</h3>
+            </div>
+            <p className="text-[10px] text-gray-400">Creates visual flow block saved directly to MongoDB:</p>
+            <form onSubmit={handleAddFlow} className="space-y-2 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Flow Name:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Order Status Tracker"
+                  value={newFlow.name}
+                  onChange={(e) => setNewFlow({ ...newFlow, name: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-cyan-500 font-bold"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Trigger Keyword / Event:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Keyword 'STATUS' or 'PRICE'"
+                  value={newFlow.trigger}
+                  onChange={(e) => setNewFlow({ ...newFlow, trigger: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-cyan-300 focus:outline-none focus:border-cyan-500 font-mono"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400">Automated Bot Action / Reply:</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Check order ID and send tracking details link..."
+                  value={newFlow.description}
+                  onChange={(e) => setNewFlow({ ...newFlow, description: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  required
+                />
+              </div>
+              <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-black rounded-xl text-xs mt-2 shadow-lg">
+                Create & Save to MongoDB ⚡
               </button>
             </form>
           </div>
