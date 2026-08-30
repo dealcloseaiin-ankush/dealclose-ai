@@ -1027,7 +1027,7 @@ exports.instagramConnectSelected = async (req, res) => {
 // @route   POST /api/users/register
 exports.register = async (req, res) => {
   try {
-    const { fullName, password, businessName, businessDescription } = req.body;
+    const { fullName, password, businessName, businessDescription, phone, categories } = req.body;
     const email = normalizeEmail(req.body.email);
     
     if (!email || !password) {
@@ -1039,17 +1039,28 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email is already registered. Please login.' });
     }
 
+    const cleanPhone = (phone || '').replace(/[^0-9+]/g, '');
+    const categoryList = Array.isArray(categories) ? categories : (categories ? [categories] : ['retail_fashion']);
+
     const user = await User.create({
       fullName: fullName || 'New User',
       email,
-      password, // Make sure your User model has a pre-save hook to hash this using bcrypt
-      businessName,
-      businessDescription
+      password,
+      businessName: businessName || `${fullName || 'My'} Store`,
+      businessDescription: businessDescription || categoryList.join(', '),
+      ownerPhone: cleanPhone,
+      productCategories: categoryList,
+      brandKit: {
+        businessName: businessName || `${fullName || 'My'} Store`,
+        phone: cleanPhone,
+        email: email,
+        category: categoryList[0] || 'retail_fashion'
+      }
     });
 
-    // 🔥 MAGIC ONBOARDING: Auto-create a default flow based on their business description
+    // 🔥 MAGIC ONBOARDING: Auto-create a default flow based on their business description & categories
     if (user) {
-        await autoCreateDefaultFlow(user._id, user.businessDescription, user.businessName);
+        await autoCreateDefaultFlow(user._id, categoryList.join(' '), user.businessName);
     }
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '30d' });

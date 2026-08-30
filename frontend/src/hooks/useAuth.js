@@ -189,8 +189,20 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const register = async (regPayload) => {
+    const { data } = await api.post('/users/register', regPayload);
+    const token = data.token;
+    const userData = data.user || data.data || data;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setUser(userData);
+    setLoading(false);
+    return data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, resetPassword, logout, clearLocalAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, register, resetPassword, logout, clearLocalAuth }}>
       {children}
     </AuthContext.Provider>
   );
