@@ -228,6 +228,82 @@ export default function MobileDashboard() {
   const [showAddFlowModal, setShowAddFlowModal] = useState(false);
   const [newFlow, setNewFlow] = useState({ name: '', trigger: 'Incoming Keyword', description: '' });
 
+  // 3.5 Stage-Wise Funnel Pipelines & Message Sequences
+  const [funnelStages, setFunnelStages] = useState([
+    {
+      id: 'stg_new',
+      stage: 'New Lead / Outreach',
+      icon: '🆕',
+      color: 'blue',
+      activeTemplate: 'festive_discount_v1',
+      hasAttachment: true,
+      attachmentName: 'Promo_Offer_Banner.jpg',
+      triggerCondition: 'First Incoming Message / Ad Click',
+      nextAction: 'Move to Interested & Send Catalog',
+      autoPauseOnReply: true,
+      leadsCount: 142,
+      sentCount: 500,
+      deliveredCount: 485,
+      readCount: 420,
+      repliedCount: 145,
+      conversionRate: '29%'
+    },
+    {
+      id: 'stg_warm',
+      stage: 'Interested / Discovery',
+      icon: '☀️',
+      color: 'amber',
+      activeTemplate: 'catalog_pricing_sheet',
+      hasAttachment: true,
+      attachmentName: '📄 Product_Catalog_RateList.pdf',
+      triggerCondition: 'Customer replies "Price / Details"',
+      nextAction: 'Schedule Site Visit / Call Rep',
+      autoPauseOnReply: true,
+      leadsCount: 68,
+      sentCount: 145,
+      deliveredCount: 142,
+      readCount: 138,
+      repliedCount: 62,
+      conversionRate: '42%'
+    },
+    {
+      id: 'stg_hot',
+      stage: 'Hot Lead / Site Visit Scheduled',
+      icon: '🔥',
+      color: 'rose',
+      activeTemplate: 'weekend_site_visit_reminder',
+      hasAttachment: true,
+      attachmentName: '📍 Google_Maps_Visit_Pass.png',
+      triggerCondition: 'Visit Confirmed or Call Done',
+      nextAction: 'Send Invoice & UPI Payment Link',
+      autoPauseOnReply: true,
+      leadsCount: 34,
+      sentCount: 62,
+      deliveredCount: 62,
+      readCount: 60,
+      repliedCount: 28,
+      conversionRate: '45%'
+    },
+    {
+      id: 'stg_converted',
+      stage: 'Converted Customer (Deal Closed)',
+      icon: '🏆',
+      color: 'emerald',
+      activeTemplate: 'order_dispatch_alert',
+      hasAttachment: true,
+      attachmentName: '💳 Official_Invoice_Receipt.pdf',
+      triggerCondition: 'Payment Received / Agreement Done',
+      nextAction: 'Ask for Google 5-Star Review',
+      autoPauseOnReply: false,
+      leadsCount: 28,
+      sentCount: 28,
+      deliveredCount: 28,
+      readCount: 28,
+      repliedCount: 18,
+      conversionRate: '100%'
+    }
+  ]);
+
   // 4. Meta Template Approvals & Real Live WhatsApp Preview
   const [metaTemplates, setMetaTemplates] = useState([
     { 
@@ -1682,6 +1758,25 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
+                  {/* Tool 4.5: ⚡ Funnel & Stage Sequences */}
+                  <button 
+                    onClick={() => setMenuSubScreen('stage_funnel')}
+                    className="bg-gradient-to-br from-purple-950/40 to-[#0e0e14] border border-purple-500/40 p-3.5 rounded-2xl text-left space-y-2 hover:border-purple-400 transition-all shadow-md col-span-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
+                        <Sparkles size={16} />
+                      </div>
+                      <span className="text-[10px] font-mono bg-purple-950 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40">
+                        ● 4 Funnel Stages Active
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-white font-black">⚡ Funnel & Stage Sequences</div>
+                      <div className="text-[10px] text-purple-300 font-normal">Auto-trigger templates, PDF brochures & human handover per CRM stage</div>
+                    </div>
+                  </button>
+
                   {/* Tool 5: Contacts & CRM */}
                   <button 
                     onClick={() => setMenuSubScreen('contacts_crm')}
@@ -2147,6 +2242,122 @@ export default function MobileDashboard() {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 5.5: ⚡ STAGE-WISE FUNNEL PIPELINE & AUTOMATION */}
+            {menuSubScreen === 'stage_funnel' && (
+              <div className="space-y-3 pb-6 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
+                  <div>
+                    <h3 className="text-xs font-black text-purple-300 flex items-center gap-1.5">
+                      <Sparkles size={15} />
+                      <span>CRM Stage-Wise Message Funnel</span>
+                    </h3>
+                    <p className="text-[10px] text-gray-400">Auto-sends assigned template when lead enters each stage</p>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-lg font-mono">
+                    ● Auto-Pilot Active
+                  </span>
+                </div>
+
+                {/* Funnel Overview Summary Stats */}
+                <div className="grid grid-cols-4 gap-1.5 bg-[#0e0e14] p-2.5 rounded-2xl border border-gray-800 text-center">
+                  <div>
+                    <div className="text-[13px] font-black text-white">735</div>
+                    <div className="text-[9px] text-gray-400">Total Sent</div>
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-black text-blue-400">717</div>
+                    <div className="text-[9px] text-blue-300">Delivered</div>
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-black text-amber-400">646</div>
+                    <div className="text-[9px] text-amber-300">Read (88%)</div>
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-black text-emerald-400">253</div>
+                    <div className="text-[9px] text-emerald-300">Replied (35%)</div>
+                  </div>
+                </div>
+
+                {/* Stage by Stage Funnel Cards */}
+                <div className="space-y-3">
+                  {funnelStages.map((stageItem, sIdx) => (
+                    <div key={stageItem.id} className="bg-[#0e0e14] border border-gray-800 hover:border-purple-500/50 p-3.5 rounded-2xl space-y-2.5 shadow-md relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{stageItem.icon}</span>
+                          <div>
+                            <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                              <span>Step {sIdx + 1}: {stageItem.stage}</span>
+                            </div>
+                            <div className="text-[9px] text-gray-400 font-mono">
+                              Trigger: <strong className="text-purple-300">{stageItem.triggerCondition}</strong>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black font-mono bg-purple-950/80 text-purple-200 px-2 py-0.5 rounded-lg border border-purple-500/40">
+                          {stageItem.leadsCount} Leads
+                        </span>
+                      </div>
+
+                      {/* Assigned Template & Media */}
+                      <div className="bg-black/60 p-2.5 rounded-xl border border-gray-800/80 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-400">Assigned Template:</span>
+                          <span className="font-bold text-white font-mono">{stageItem.activeTemplate}</span>
+                        </div>
+                        {stageItem.hasAttachment && (
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-gray-400">Attachment:</span>
+                            <span className="text-amber-300 font-mono flex items-center gap-1 truncate max-w-[180px]">
+                              <span>{stageItem.attachmentName}</span>
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-gray-800">
+                          <span className="text-gray-400">On Reply Action:</span>
+                          <span className="text-emerald-400 font-bold">{stageItem.nextAction}</span>
+                        </div>
+                      </div>
+
+                      {/* Live Delivery & Conversion Numbers */}
+                      <div className="grid grid-cols-4 gap-1 text-center bg-gray-900/50 p-2 rounded-xl text-[10px] font-mono">
+                        <div>
+                          <div className="text-gray-400">Sent</div>
+                          <div className="text-white font-bold">{stageItem.sentCount}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400">Read</div>
+                          <div className="text-amber-400 font-bold">{stageItem.readCount}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400">Replied</div>
+                          <div className="text-blue-400 font-bold">{stageItem.repliedCount}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400">Conv.</div>
+                          <div className="text-emerald-400 font-bold">{stageItem.conversionRate}</div>
+                        </div>
+                      </div>
+
+                      {/* Human Handover Indicator */}
+                      <div className="flex items-center justify-between text-[10px] pt-1">
+                        <span className="text-gray-400 flex items-center gap-1">
+                          <CheckCircle2 size={12} className="text-emerald-400" />
+                          <span>Smart Handover: Pauses AI when customer replies</span>
+                        </span>
+                        <button
+                          onClick={() => alert(`Customizing Funnel Step ${sIdx + 1} for ${stageItem.stage}! Select Template or PDF.`)}
+                          className="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-purple-300 font-bold rounded"
+                        >
+                          Edit ⚙️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
