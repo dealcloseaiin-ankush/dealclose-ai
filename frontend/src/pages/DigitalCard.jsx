@@ -10,6 +10,30 @@ export default function DigitalCard() {
   const [loading, setLoading] = useState(false);
   const [cardLinks, setCardLinks] = useState(null);
   const [businessName, setBusinessName] = useState('Our Business');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState('');
+
+  const aiReviewTemplates = [
+    { text: "Outstanding experience at [Business]! Super friendly staff, genuine pricing, and top quality. Highly recommended! ⭐⭐⭐⭐⭐" },
+    { text: "Best customer service and very quick response. 100% satisfied with the quality and hospitality at [Business]. 👍" },
+    { text: "Visited [Business] for the first time. Truly professional, best rates in town, and seamless service. Will visit again! 🌟" }
+  ];
+
+  const handleCopyAndRedirect = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMsg('✅ Review Copied! Opening Google Maps...');
+      setTimeout(() => {
+        if (cardLinks?.googleReview) {
+          window.open(cardLinks.googleReview, '_blank');
+        }
+        setShowReviewModal(false);
+        setCopiedMsg('');
+      }, 1200);
+    } catch (err) {
+      if (cardLinks?.googleReview) window.open(cardLinks.googleReview, '_blank');
+    }
+  };
 
   // Mocking the fetch of the specific business profile links
   // Once Workspaces are implemented, this will fetch that specific workspace's links
@@ -94,11 +118,67 @@ export default function DigitalCard() {
             </a>
           )}
           {cardLinks?.googleReview && (
-            <a href={cardLinks.googleReview} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-3 bg-white text-black rounded-xl font-bold hover:opacity-90 transition">
-              ⭐ Leave a Google Review
-            </a>
+            <button 
+              type="button"
+              onClick={() => setShowReviewModal(true)}
+              className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-black hover:opacity-95 transition shadow-[0_0_20px_rgba(245,158,11,0.3)] cursor-pointer"
+            >
+              ⭐ 1-Tap 5-Star Google Review Booster
+            </button>
           )}
         </div>
+
+        {/* 1-Tap AI Review Booster Modal */}
+        {showReviewModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-[#111116] border border-amber-500/40 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🌟</span>
+                  <div>
+                    <h3 className="font-black text-sm text-white">1-Tap 5-Star Review</h3>
+                    <p className="text-[10px] text-amber-400">Pick any review & it auto-copies to Google!</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowReviewModal(false)}
+                  className="text-gray-500 hover:text-white text-sm p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                {aiReviewTemplates.map((rev, idx) => (
+                  <div 
+                    key={idx}
+                    className="bg-black/60 border border-gray-800 hover:border-amber-500/50 p-3 rounded-2xl space-y-2 transition-all group"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-amber-300">⭐⭐⭐⭐⭐ 5/5 Stars</span>
+                      <span className="text-[9px] text-gray-500">AI Polished</span>
+                    </div>
+                    <p className="text-gray-200 text-xs leading-relaxed italic">
+                      "{rev.text.replace(/\[Business\]/g, businessName)}"
+                    </p>
+                    <button
+                      onClick={() => handleCopyAndRedirect(rev.text.replace(/\[Business\]/g, businessName))}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                    >
+                      <span>📋 Copy & Post on Google Maps 🚀</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {copiedMsg && (
+                <div className="p-2 bg-emerald-950/80 border border-emerald-500 text-emerald-300 rounded-xl text-center text-xs font-bold animate-bounce">
+                  {copiedMsg}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-gray-800 my-6"></div>
 
