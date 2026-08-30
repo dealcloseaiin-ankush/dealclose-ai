@@ -23,6 +23,8 @@ export default function LandingPage() {
   const [scanResult, setScanResult] = useState(null);
   const [faqOpen, setFaqOpen] = useState(null);
   const [billingCycle, setBillingCycle] = useState('monthly');
+  const [otpVolume, setOtpVolume] = useState(25000);
+  const [activeCodeLang, setActiveCodeLang] = useState('curl');
 
   const industriesData = {
     'real-estate': {
@@ -431,6 +433,209 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* B2B WHATSAPP OTP SAAS & INTERACTIVE SAVINGS CALCULATOR */}
+      <section className="max-w-6xl mx-auto px-4 py-14">
+        <div className="bg-gradient-to-b from-[#0e0e14] to-[#08080c] border-2 border-emerald-500/40 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden space-y-8">
+          
+          {/* Header */}
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1 rounded-full text-emerald-400 font-black text-xs uppercase tracking-wider">
+              <Zap size={14} className="text-emerald-400" />
+              <span>B2B WhatsApp OTP API for Developers & Apps</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-white">
+              Cut OTP Costs by 40% with <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">0.8s WhatsApp Delivery</span>
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
+              Ditch expensive SMS gateways and tedious DLT entity approvals. Integrate our high-speed WhatsApp Authentication API into your Website, Mobile App, or CRM with 3 lines of code.
+            </p>
+          </div>
+
+          {/* Calculator Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-black/60 border border-gray-800 rounded-3xl p-6 sm:p-8">
+            
+            {/* Left: Interactive Slider & Savings */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-300">Monthly OTP / Login Volume:</span>
+                  <span className="font-black text-emerald-400 font-mono text-base bg-emerald-950/60 px-3 py-1 rounded-xl border border-emerald-500/40">
+                    {otpVolume.toLocaleString('en-IN')} OTPs / Mo
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5000"
+                  max="200000"
+                  step="5000"
+                  value={otpVolume}
+                  onChange={(e) => setOtpVolume(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-[10px] text-gray-500 font-mono">
+                  <span>5K / month</span>
+                  <span>50K</span>
+                  <span>100K</span>
+                  <span>200K / month</span>
+                </div>
+              </div>
+
+              {/* Comparison Metric Cards */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="bg-red-950/20 border border-red-900/40 p-4 rounded-2xl space-y-1">
+                  <div className="text-[11px] text-red-400 font-bold">Traditional SMS OTP</div>
+                  <div className="text-xl font-black text-white font-mono">
+                    ₹{Math.round(otpVolume * 0.28).toLocaleString('en-IN')}
+                  </div>
+                  <div className="text-[10px] text-gray-400">@ ₹0.28/SMS + DLT compliance</div>
+                  <div className="text-[10px] text-red-400/80 font-bold">⚠️ 82% Avg Delivery Rate</div>
+                </div>
+
+                <div className="bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl space-y-1">
+                  <div className="text-[11px] text-emerald-400 font-bold">DealClose WhatsApp OTP</div>
+                  <div className="text-xl font-black text-emerald-300 font-mono">
+                    ₹{Math.round(otpVolume * 0.18).toLocaleString('en-IN')}
+                  </div>
+                  <div className="text-[10px] text-gray-400">@ ₹0.18/OTP (Zero DLT)</div>
+                  <div className="text-[10px] text-emerald-400 font-bold">⚡ 99.8% 0.8s Instant Delivery</div>
+                </div>
+              </div>
+
+              {/* Monthly Net Savings Banner */}
+              <div className="p-4 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 border border-emerald-500/50 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] text-emerald-300 font-bold uppercase tracking-wider block">Your Monthly Net Savings</span>
+                  <span className="text-2xl font-black text-white font-mono">
+                    ₹{Math.round(otpVolume * 0.10).toLocaleString('en-IN')} <span className="text-xs font-normal text-emerald-300 font-sans">/ month saved</span>
+                  </span>
+                </div>
+                <Link
+                  to="/register"
+                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow-lg transition-all"
+                >
+                  Get API Key 🚀
+                </Link>
+              </div>
+            </div>
+
+            {/* Right: Developer Code Snippet & Live Phone Bubble */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="bg-[#0b0f14] border border-gray-800 rounded-2xl p-4 shadow-xl space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setActiveCodeLang('curl')}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${activeCodeLang === 'curl' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      cURL
+                    </button>
+                    <button
+                      onClick={() => setActiveCodeLang('javascript')}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${activeCodeLang === 'javascript' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Node.js / Fetch
+                    </button>
+                    <button
+                      onClick={() => setActiveCodeLang('python')}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${activeCodeLang === 'python' ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Python
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono">3-Line Setup</span>
+                </div>
+
+                <div className="bg-black/90 p-3 rounded-xl font-mono text-[11px] text-gray-300 overflow-x-auto leading-relaxed border border-gray-900">
+                  {activeCodeLang === 'curl' && (
+                    <pre>
+{`curl -X POST https://dealcloseai.in/api/v1/otp/send \\
+  -H "x-api-key: dcl_live_998822" \\
+  -H "Content-Type: application/json" \\
+  -d '{"phoneNumber": "+919876543210", "appName": "MyStore"}'`}
+                    </pre>
+                  )}
+                  {activeCodeLang === 'javascript' && (
+                    <pre>
+{`// 1-Line WhatsApp OTP Call
+const res = await fetch('https://dealcloseai.in/api/v1/otp/send', {
+  method: 'POST',
+  headers: {
+    'x-api-key': 'dcl_live_998822',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    phoneNumber: '+919876543210',
+    appName: 'MyStore'
+  })
+});`}
+                    </pre>
+                  )}
+                  {activeCodeLang === 'python' && (
+                    <pre>
+{`import requests
+
+res = requests.post(
+  'https://dealcloseai.in/api/v1/otp/send',
+  headers={'x-api-key': 'dcl_live_998822'},
+  json={'phoneNumber': '+919876543210', 'appName': 'MyStore'}
+)`}
+                    </pre>
+                  )}
+                </div>
+
+                {/* WhatsApp Phone Mock Message Bubble with 1-Tap Copy Code */}
+                <div className="bg-[#0b141a] border border-[#202c33] p-3 rounded-2xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                    <span className="text-emerald-400 font-bold">DealClose Verified Authentication</span>
+                    <span>Just Now</span>
+                  </div>
+                  <p className="text-gray-200 text-[11px]">
+                    *8492* is your verification code for MyStore. Valid for 5 minutes. Do not share this code with anyone.
+                  </p>
+                  <button className="w-full py-1.5 bg-[#202c33] hover:bg-[#2a3942] text-[#53bdeb] font-bold text-[11px] rounded-xl flex items-center justify-center gap-1.5 transition-all">
+                    <span>📋 Copy Code</span>
+                    <span className="text-[9px] bg-[#111b21] px-1.5 py-0.5 rounded text-gray-400">8492</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* 4 Core B2B Features Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div className="bg-black/40 border border-gray-800 p-4 rounded-2xl space-y-1">
+              <div className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-emerald-400">⚡</span> 0.8s Instant Delivery
+              </div>
+              <p className="text-gray-400 text-[11px]">Direct tier-1 Meta Cloud pipes ensuring zero OTP queue lag or drop-offs.</p>
+            </div>
+
+            <div className="bg-black/40 border border-gray-800 p-4 rounded-2xl space-y-1">
+              <div className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-purple-400">🛡️</span> Zero DLT Registration
+              </div>
+              <p className="text-gray-400 text-[11px]">No cumbersome Indian telecom DLT portal registration or template delays.</p>
+            </div>
+
+            <div className="bg-black/40 border border-gray-800 p-4 rounded-2xl space-y-1">
+              <div className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-blue-400">📊</span> Live Masked Logs
+              </div>
+              <p className="text-gray-400 text-[11px]">Complete developer audit logs with masked phone numbers for 100% GDPR compliance.</p>
+            </div>
+
+            <div className="bg-black/40 border border-gray-800 p-4 rounded-2xl space-y-1">
+              <div className="font-bold text-white flex items-center gap-1.5">
+                <span className="text-amber-400">💰</span> 40%+ Cost Savings
+              </div>
+              <p className="text-gray-400 text-[11px]">Transparent pay-as-you-go billing with real-time balance recharge alerts.</p>
+            </div>
+          </div>
+
         </div>
       </section>
 
