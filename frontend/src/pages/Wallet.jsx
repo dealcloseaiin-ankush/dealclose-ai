@@ -60,10 +60,10 @@ export default function Wallet() {
       <div className="mb-10">
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-            Billing & AI Wallet
+            Billing & AI Token Wallet
           </span>
         </h1>
-        <p className="text-gray-400 text-sm">Pay-as-you-go AI usage credits with lifetime validity. Zero monthly expiry.</p>
+        <p className="text-gray-400 text-sm">3 Months Base Validity with Automatic Rollover protection whenever &gt;50% balance remains.</p>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 max-w-5xl">
@@ -73,14 +73,14 @@ export default function Wallet() {
           <div className="relative z-10 space-y-4">
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Available AI Credits</h2>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Available AI Token Units</h2>
                 <div className="flex items-end gap-3">
                   <p className="text-5xl font-black text-white font-mono">{aiCredits}</p>
                   <span className="text-xs text-purple-400 font-medium mb-1.5 bg-purple-400/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
-                    Never Expires ♾️
+                    3-Mo Auto-Rollover 🔄
                   </span>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1">1 Credit ≈ 100 AI Tokens / 2-3 Full Chat Inquiries</p>
+                <p className="text-[11px] text-gray-400 mt-1">1 Token Unit = 100 Raw AI Tokens (Enough for 2-3 deep DM sales replies)</p>
               </div>
             </div>
             
@@ -89,9 +89,10 @@ export default function Wallet() {
                 onClick={() => handleAddCredits(99)} 
                 className="p-3 bg-gray-900 border border-purple-500/40 hover:border-purple-400 rounded-xl text-center transition-all group"
               >
-                <div className="text-[10px] text-purple-400 font-bold uppercase">Starter</div>
+                <div className="text-[10px] text-purple-400 font-bold uppercase">Starter Pack</div>
                 <div className="text-lg font-black text-white font-mono">₹99</div>
-                <div className="text-[9px] text-emerald-400 font-bold">+100 Credits</div>
+                <div className="text-[9px] text-emerald-400 font-bold">+100 Tokens</div>
+                <div className="text-[8px] text-gray-500 mt-0.5">3-Mo Rollover</div>
               </button>
 
               <button 
@@ -100,7 +101,8 @@ export default function Wallet() {
               >
                 <div className="text-[10px] text-amber-400 font-bold uppercase">Popular ⭐</div>
                 <div className="text-lg font-black text-white font-mono">₹299</div>
-                <div className="text-[9px] text-emerald-400 font-bold">+400 Credits</div>
+                <div className="text-[9px] text-emerald-400 font-bold">+400 Tokens</div>
+                <div className="text-[8px] text-amber-300/80 mt-0.5">Max Value</div>
               </button>
 
               <button 
@@ -109,8 +111,16 @@ export default function Wallet() {
               >
                 <div className="text-[10px] text-gray-400 font-bold uppercase">Pro Scale</div>
                 <div className="text-lg font-black text-white font-mono">₹499</div>
-                <div className="text-[9px] text-emerald-400 font-bold">+800 Credits</div>
+                <div className="text-[9px] text-emerald-400 font-bold">+800 Tokens</div>
+                <div className="text-[8px] text-gray-500 mt-0.5">High Volume</div>
               </button>
+            </div>
+
+            {/* AI Scope Notice */}
+            <div className="bg-black/60 border border-gray-800 rounded-xl p-3 text-[11px] text-gray-400 space-y-1">
+              <span className="font-bold text-gray-300 block">🎯 AI Token Scope (Zero Tokens Wasted on Comments):</span>
+              <p>• Public post comment shortcuts are <strong>100% Free & Unlimited</strong> (Zero tokens used).</p>
+              <p>• Tokens are used ONLY for <strong>In-Depth DM Sales Chats</strong>, <strong>Google 5-Star Reviews</strong> & <strong>1-Star Negative Review Auto-Recovery</strong>.</p>
             </div>
           </div>
         </div>
