@@ -41,9 +41,10 @@ export default function InstagramAutomation() {
   const [sendingBulkId, setSendingBulkId] = useState(null);
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [iceBreakers, setIceBreakers] = useState('');
+  const [catalogItems, setCatalogItems] = useState([]);
   
   // Post Automation Form State
-  const [newAuto, setNewAuto] = useState({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct' });
+  const [newAuto, setNewAuto] = useState({ postId: '', triggerWord: '', replyMessage: '', fileUrl: '', publicReply: 'Check your DM! 📩', deliveryMode: 'direct', selectedProductIds: [] });
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
   // Insights Modal ke liye state
@@ -57,6 +58,22 @@ export default function InstagramAutomation() {
   const [postLimit, setPostLimit] = useState(20);
 
   const isPremiumUser = user?.isPremium === true || user?.role === 'superadmin' || user?.email === 'ankush.bani@gmail.com';
+
+  const togglePostProduct = (postId, productId) => {
+    setRecentPosts(posts => posts.map(p => {
+      if (p.id !== postId) return p;
+      const current = Array.isArray(p.selectedProductIds) ? p.selectedProductIds : [];
+      if (current.includes(productId)) {
+        return { ...p, selectedProductIds: current.filter(id => id !== productId) };
+      } else {
+        if (current.length >= 4) {
+          toast.error("You can select maximum 4 featured products per Reel!");
+          return p;
+        }
+        return { ...p, selectedProductIds: [...current, productId] };
+      }
+    }));
+  };
 
   const getRuleMode = (rule) => {
     if (!rule) return 'off';
@@ -88,6 +105,7 @@ export default function InstagramAutomation() {
         chatBotKeyword: rule.triggerWord || '',
         chatBotReply: rule.replyMessage || '',
         fileUrl: rule.fileUrl || '',
+        selectedProductIds: Array.isArray(rule.selectedProductIds) ? rule.selectedProductIds : [],
         publicReply: rule.publicReply || post.publicReply || 'Check your DM! 📩',
         stats: {
           ...(post.stats || {}),
@@ -218,6 +236,7 @@ export default function InstagramAutomation() {
         replyMessage: dmText,
         publicReply: publicReply,
         fileUrl: targetLink || '',
+        selectedProductIds: Array.isArray(post.selectedProductIds) ? post.selectedProductIds : [],
         deliveryMode: 'instant_shortcut',
         workspaceId: activeWorkspace
       });
@@ -270,11 +289,15 @@ export default function InstagramAutomation() {
         }).catch(err => console.error("Failed to fetch business insights", err));
         api.get('/instagram/business/insights/history', { params: { workspaceId: activeWorkspace, days: 30 } }).then(res => setInsightHistory(res.data?.snapshots || [])).catch(err => console.error("Failed to fetch analytics history", err));
 
-        const [postsRes, automationsRes] = await Promise.all([
+        const [postsRes, automationsRes, catalogRes] = await Promise.all([
           api.get('/instagram/posts', { params: { workspaceId: activeWorkspace, limit: postLimit } }),
-          api.get('/instagram/automations', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: { automations: [] } }))
+          api.get('/instagram/automations', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: { automations: [] } })),
+          api.get('/catalog').catch(() => ({ data: [] }))
         ]);
         const rules = Array.isArray(automationsRes.data?.automations) ? automationsRes.data.automations : [];
+        setSavedAutomations(rules);
+        const cats = Array.isArray(catalogRes.data) ? catalogRes.data : catalogRes.data?.data || [];
+        setCatalogItems(cats);
         setSavedAutomations(rules);
         console.log('[IG AUTO UI DEBUG] Initial workspace automation hydrate', {
           workspaceId: activeWorkspace,
@@ -794,12 +817,64 @@ export default function InstagramAutomation() {
                           </div>
                         </div>
 
+                        {/* 📦 ATTACH FEATURED CATALOG PRODUCTS (1-4 ITEMS) */}
+                        <div className="space-y-1.5 border-t border-gray-800/80 pt-2.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-amber-400 uppercase flex items-center gap-1">
+                              <span>📦 Attach Featured Products (Max 4 for this Reel)</span>
+                            </label>
+                            <span className="text-[9px] text-gray-500 font-mono">
+                              {(post.selectedProductIds || []).length}/4 Selected
+                            </span>
+                          </div>
+
+                          {catalogItems.length === 0 ? (
+                            <p className="text-[10px] text-gray-500 italic bg-[#0a0a0a] p-2 rounded-lg border border-gray-800">
+                              No products in catalog yet. Add products from the Catalog tab to link them here!
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                              {catalogItems.map(item => {
+                                const isSelected = (post.selectedProductIds || []).includes(item._id || item.id);
+                                return (
+                                  <div 
+                                    key={item._id || item.id}
+                                    onClick={() => togglePostProduct(post.id, item._id || item.id)}
+                                    className={`p-1.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                                      isSelected 
+                                        ? 'bg-amber-950/40 border-amber-500 text-white shadow-sm' 
+                                        : 'bg-[#0a0a0a] border-gray-800 text-gray-400 hover:border-gray-700'
+                                    }`}
+                                  >
+                                    <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-800">
+                                      {item.imageUrl ? (
+                                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <span className="text-xs">🛍️</span>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[10px] font-bold truncate text-white">{item.name}</p>
+                                      <p className="text-[9px] text-emerald-400 font-mono">₹{item.price}</p>
+                                    </div>
+                                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-bold ${
+                                      isSelected ? 'bg-amber-500 border-amber-400 text-black' : 'border-gray-700 text-transparent'
+                                    }`}>
+                                      ✓
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
                         <button 
                           type="button"
                           onClick={() => handleInlineShortcutSave(post)}
                           className="w-full py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-xs font-bold text-white rounded-lg uppercase tracking-wider shadow-md hover:opacity-95 transition-all mt-1 flex items-center justify-center gap-1.5"
                         >
-                          ⚡ Save Automation Rule (Public Reply + DM + PDF)
+                          ⚡ Save Automation Rule (Public Reply + DM + Products)
                         </button>
                       </div>
                     )}
