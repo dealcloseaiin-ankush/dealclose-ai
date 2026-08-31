@@ -42,6 +42,7 @@ export default function ComparePage() {
       summary: 'WATI charges heavy base monthly subscription plus markup fees on WhatsApp messages. DealClose AI delivers official WhatsApp API with 0% markup, plus built-in Instagram DM automation and AI Voice Calling at 1/5th the cost.',
       features: [
         { name: 'Base Monthly Starting Price', competitor: '₹2,900 / month', dealclose: '₹199 - ₹499 / month', better: true },
+        { name: 'AI Smart Replier Pricing', competitor: '₹2,500 / month mandatory AI commitment', dealclose: '₹99 Pay-As-You-Go Micro-Topup (Lifetime Validity)', better: true },
         { name: 'Meta WhatsApp Message Markup', competitor: '₹0.15 - ₹0.30 per msg added', dealclose: '0% Markup (Direct Meta Cost)', better: true },
         { name: 'Meta Green Tick Verification', competitor: '$100 (~₹8,300) Extra Fee', dealclose: 'Free Application Support', better: true },
         { name: 'Instagram Comment-to-DM Automation', competitor: '❌ Not Supported', dealclose: '✅ Built-in Instant AI Reply', better: true },
@@ -63,6 +64,7 @@ export default function ComparePage() {
       summary: 'ManyChat scales exponentially with contact list tiers and lacks seamless official Indian WhatsApp Cloud API broadcasting and local Indian payment / Voice AI integrations. DealClose AI is purpose-built for high-converting Indian businesses.',
       features: [
         { name: 'Pricing Model', competitor: 'Tiers scale aggressively per contact', dealclose: 'Flat, transparent & affordable', better: true },
+        { name: 'AI Smart Replier Pricing', competitor: '$29/mo mandatory AI add-on', dealclose: '₹99 Pay-As-You-Go Micro-Topup (Lifetime Validity)', better: true },
         { name: 'Official WhatsApp Cloud API Engine', competitor: '⚠️ Complex 3rd party setup', dealclose: '✅ 1-Click Meta Cloud Connection', better: true },
         { name: 'Instagram Comment-to-DM & Live Automation', competitor: '✅ Supported', dealclose: '✅ Supported + Dual WA Bridge', better: false },
         { name: 'Inbound & Outbound AI Voice Agent', competitor: '❌ Not Supported', dealclose: '✅ Human-like Voice AI', better: true },
@@ -83,6 +85,7 @@ export default function ComparePage() {
       summary: 'Gallabox requires high upfront commitments and steep monthly plans for multi-channel automation. DealClose AI offers micro-business entry at ₹199/mo and full pro automation with Voice AI at ₹499/mo.',
       features: [
         { name: 'Starting Price Plan', competitor: '₹2,500 / month', dealclose: '₹199 / month (Micro Starter)', better: true },
+        { name: 'AI Smart Replier Pricing', competitor: '₹3,000 / month mandatory AI add-on', dealclose: '₹99 Pay-As-You-Go Micro-Topup (Lifetime Validity)', better: true },
         { name: 'Free Trial', competitor: '7 Days Restricted', dealclose: '14 Days Full Access Free Trial', better: true },
         { name: 'AI Voice Calling & Call Analytics', competitor: '❌ Not Supported', dealclose: '✅ Full Voice AI Suite', better: true },
         { name: 'Instagram Automated Funnels', competitor: 'Limited Add-on', dealclose: '✅ Fully Integrated', better: true },
@@ -102,6 +105,7 @@ export default function ComparePage() {
       summary: 'Interakt is well-known for WhatsApp e-commerce notifications, but charges steep plan upgrades for smart automations and offers no Voice AI or Instagram Comment conversion tools. DealClose AI provides an all-in-one revenue engine.',
       features: [
         { name: 'Monthly Base Price', competitor: '₹1,999 / month', dealclose: '₹199 - ₹499 / month', better: true },
+        { name: 'AI Smart Replier Pricing', competitor: '₹2,499 / month add-on', dealclose: '₹99 Pay-As-You-Go Micro-Topup (Lifetime Validity)', better: true },
         { name: 'Markup on WhatsApp Conversations', competitor: '₹0.10 - ₹0.20 per convo markup', dealclose: '0% Markup (Official Meta rates)', better: true },
         { name: 'AI Inbound Calling Agent', competitor: '❌ No Phone Support AI', dealclose: '✅ Instant Human-like Voice AI', better: true },
         { name: 'Instagram Post Comment-to-DM Bot', competitor: '❌ No Instagram Support', dealclose: '✅ Dedicated IG Auto-DM Funnels', better: true },

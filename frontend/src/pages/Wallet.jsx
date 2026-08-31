@@ -23,30 +23,23 @@ export default function Wallet() {
     }
   };
 
-  const handleAddCredits = async () => {
-    const upgradeAmount = 299; // Fixed price for AI upgrade
-    
+  const handleAddCredits = async (amount = 99) => {
     try {
+      const { data: order } = await api.post('/users/wallet/create-order', { amount });
       
-      // 1. Backend se Order ID create karein
-      const { data: order } = await api.post('/users/wallet/create-order', { amount: upgradeAmount });
-      
-      // 2. Razorpay Window Open karein
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || "YOUR_RAZORPAY_KEY_ID_HERE",
         amount: order.amount,
         currency: "INR",
-        name: "CloseDeal AI",
-        description: "Wallet Recharge",
+        name: "DealClose AI",
+        description: `AI Wallet Recharge (₹${amount})`,
         order_id: order.id,
         handler: async function (response) {
-          // 3. Payment Verify karein backend par
-          // Passing placeholder userId for MVP
-          await api.post('/users/wallet/verify', { ...response, amountToAdd: upgradeAmount, userId: "60d0fe4f5311236168a109ca" });
-          alert("Payment Successful! Credits added.");
-          fetchWalletData(); // Refresh balance
+          await api.post('/users/wallet/verify', { ...response, amountToAdd: amount });
+          alert("Payment Successful! AI Credits added.");
+          fetchWalletData();
         },
-        theme: { color: "#eab308" }
+        theme: { color: "#a855f7" }
       };
       const rzp = new window.Razorpay(options);
       rzp.open();
@@ -66,31 +59,57 @@ export default function Wallet() {
       {/* Header */}
       <div className="mb-10">
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
-            Billing & Wallet
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
+            Billing & AI Wallet
           </span>
         </h1>
-        <p className="text-gray-400 text-lg">Manage your AI credits, view transactions, and top up your balance.</p>
+        <p className="text-gray-400 text-sm">Pay-as-you-go AI usage credits with lifetime validity. Zero monthly expiry.</p>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10 max-w-5xl">
         {/* AI Credits & Balance Card */}
-        <div className="bg-[#111111] border border-gray-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl"></div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-6">
+        <div className="bg-[#111111] border border-gray-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden space-y-6">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+          <div className="relative z-10 space-y-4">
+            <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">AI Smart Replies Left</h2>
-                <div className="flex items-end gap-4">
-                  <p className="text-5xl font-extrabold text-white">{aiCredits}</p>
-                  <span className="text-xs text-purple-400 font-medium mb-2 bg-purple-400/10 px-2 py-1 rounded">Free Trial</span>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Available AI Credits</h2>
+                <div className="flex items-end gap-3">
+                  <p className="text-5xl font-black text-white font-mono">{aiCredits}</p>
+                  <span className="text-xs text-purple-400 font-medium mb-1.5 bg-purple-400/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                    Never Expires ♾️
+                  </span>
                 </div>
+                <p className="text-[11px] text-gray-400 mt-1">1 Credit ≈ 100 AI Tokens / 2-3 Full Chat Inquiries</p>
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button onClick={handleAddCredits} className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transition-all whitespace-nowrap">
-                Upgrade to 2000 Replies (₹299)
+            <div className="grid grid-cols-3 gap-2.5 pt-2">
+              <button 
+                onClick={() => handleAddCredits(99)} 
+                className="p-3 bg-gray-900 border border-purple-500/40 hover:border-purple-400 rounded-xl text-center transition-all group"
+              >
+                <div className="text-[10px] text-purple-400 font-bold uppercase">Starter</div>
+                <div className="text-lg font-black text-white font-mono">₹99</div>
+                <div className="text-[9px] text-emerald-400 font-bold">+100 Credits</div>
+              </button>
+
+              <button 
+                onClick={() => handleAddCredits(299)} 
+                className="p-3 bg-purple-950/40 border border-purple-500 rounded-xl text-center transition-all shadow-md"
+              >
+                <div className="text-[10px] text-amber-400 font-bold uppercase">Popular ⭐</div>
+                <div className="text-lg font-black text-white font-mono">₹299</div>
+                <div className="text-[9px] text-emerald-400 font-bold">+400 Credits</div>
+              </button>
+
+              <button 
+                onClick={() => handleAddCredits(499)} 
+                className="p-3 bg-gray-900 border border-gray-700 hover:border-gray-600 rounded-xl text-center transition-all"
+              >
+                <div className="text-[10px] text-gray-400 font-bold uppercase">Pro Scale</div>
+                <div className="text-lg font-black text-white font-mono">₹499</div>
+                <div className="text-[9px] text-emerald-400 font-bold">+800 Credits</div>
               </button>
             </div>
           </div>
