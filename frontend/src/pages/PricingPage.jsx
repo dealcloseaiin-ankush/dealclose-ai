@@ -118,25 +118,31 @@ export default function PricingPage() {
           No hidden fees, no markup on Meta messages, and no enterprise lock-ins. Start free for 14 days and scale as you grow.
         </p>
 
-        {/* 1 Month vs 6 Months vs 12 Months Duration Switcher */}
-        <div className="inline-flex items-center bg-gray-900 border border-gray-800 p-1 rounded-2xl shadow-inner mb-10">
+        {/* 1 Month vs 3 Months vs 6 Months vs 12 Months Duration Switcher */}
+        <div className="inline-flex items-center bg-gray-900 border border-gray-800 p-1 rounded-2xl shadow-inner mb-10 flex-wrap justify-center gap-1">
           <button
             onClick={() => setBillingCycle('1mo')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${billingCycle === '1mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${billingCycle === '1mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
           >
             1 Month
           </button>
           <button
+            onClick={() => setBillingCycle('3mo')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '3mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+          >
+            3 Months <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black px-1.5 py-0.5 rounded-full">New ⚡</span>
+          </button>
+          <button
             onClick={() => setBillingCycle('6mo')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '6mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '6mo' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
           >
             6 Months <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[9px] font-black px-1.5 py-0.5 rounded-full">Popular</span>
           </button>
           <button
             onClick={() => setBillingCycle('12mo')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '12mo' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${billingCycle === '12mo' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
           >
-            12 Months (1 Year) <span className="bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">Max Savings 🔥</span>
+            12 Months (1 Year) <span className="bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">Unlimited Products 🔥</span>
           </button>
         </div>
 
@@ -217,8 +223,17 @@ export default function PricingPage() {
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹999 / month</div>
                     <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
-                      <span>₹599</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month</span>
+                      <span>₹649</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month (100 Products)</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '3mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹2,997 (₹999/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
+                      <span>₹1,749</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 3 months (~₹583/mo • 250 Products)</span>
                     </div>
                   </div>
                 )}
@@ -226,8 +241,8 @@ export default function PricingPage() {
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹5,994 (₹999/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
-                      <span>₹3,499</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹583/mo)</span>
+                      <span>₹3,399</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹566/mo • 500 Products)</span>
                     </div>
                   </div>
                 )}
@@ -236,7 +251,7 @@ export default function PricingPage() {
                     <div className="text-sm text-gray-500 line-through font-mono">₹11,988 (₹999/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
                       <span>₹5,999</span>
-                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (Just ₹499 / mo)</span>
+                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (₹499/mo • 🌟 UNLIMITED Products)</span>
                     </div>
                   </div>
                 )}
@@ -282,7 +297,16 @@ export default function PricingPage() {
                     <div className="text-sm text-gray-500 line-through font-mono">₹1,499 / month</div>
                     <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
                       <span>₹899</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month (100 Products)</span>
+                    </div>
+                  </div>
+                )}
+                {billingCycle === '3mo' && (
+                  <div>
+                    <div className="text-sm text-gray-500 line-through font-mono">₹4,497 (₹1,499/mo)</div>
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
+                      <span>₹2,499</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 3 months (~₹833/mo • 250 Products)</span>
                     </div>
                   </div>
                 )}
@@ -290,8 +314,8 @@ export default function PricingPage() {
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹8,994 (₹1,499/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
-                      <span>₹4,799</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹799/mo)</span>
+                      <span>₹4,699</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹783/mo • 500 Products)</span>
                     </div>
                   </div>
                 )}
@@ -300,7 +324,7 @@ export default function PricingPage() {
                     <div className="text-sm text-gray-500 line-through font-mono">₹17,988 (₹1,499/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300 font-mono flex items-baseline gap-2">
                       <span>₹8,999</span>
-                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (Just ₹749 / mo)</span>
+                      <span className="text-xs text-emerald-400 font-bold font-sans">/ 1 Year (₹749/mo • 🌟 UNLIMITED Products)</span>
                     </div>
                   </div>
                 )}

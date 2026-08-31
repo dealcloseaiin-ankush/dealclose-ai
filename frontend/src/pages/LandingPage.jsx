@@ -249,24 +249,30 @@ export default function LandingPage() {
           The all-in-one automation platform for Indian builders, boutiques, showrooms, and local businesses. Zero message markup, instant AI document learning, and built-in CRM.
         </p>
 
-        <div className="flex items-center justify-center gap-4 flex-wrap mb-10">
+        <div className="flex items-center justify-center gap-3 flex-wrap mb-10">
           <Link
             to="/register"
-            className="px-8 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-300 text-black font-black text-xs sm:text-sm rounded-xl shadow-xl hover:opacity-95 transition-all flex items-center gap-2"
+            className="px-7 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-300 text-black font-black text-xs sm:text-sm rounded-xl shadow-xl hover:opacity-95 transition-all flex items-center gap-2"
           >
             Start 14-Day Free Trial <ArrowRight size={16} />
           </Link>
           <Link
             to="/mobile"
-            className="px-6 py-3.5 bg-purple-950/80 border border-purple-500/50 text-purple-200 font-black text-xs sm:text-sm rounded-xl hover:bg-purple-900/80 hover:text-white transition-all flex items-center gap-2 shadow-lg"
+            className="px-5 py-3.5 bg-purple-950/80 border border-purple-500/50 text-purple-200 font-black text-xs sm:text-sm rounded-xl hover:bg-purple-900/80 hover:text-white transition-all flex items-center gap-2 shadow-lg"
           >
-            <Smartphone size={16} className="text-emerald-400" /> Open / Install Mobile App 📱
+            <Smartphone size={16} className="text-emerald-400" /> 📱 Mobile App
+          </Link>
+          <Link
+            to="/mobile"
+            className="px-5 py-3.5 bg-blue-950/80 border border-blue-500/50 text-blue-200 font-black text-xs sm:text-sm rounded-xl hover:bg-blue-900/80 hover:text-white transition-all flex items-center gap-2 shadow-lg"
+          >
+            <Monitor size={16} className="text-cyan-400" /> 💻 Desktop App (Win/Mac)
           </Link>
           <button
             onClick={() => setIsScannerOpen(true)}
-            className="px-6 py-3.5 bg-gray-900 border border-gray-800 text-white font-bold text-xs sm:text-sm rounded-xl hover:bg-gray-800 hover:border-gray-700 transition-all flex items-center gap-2"
+            className="px-5 py-3.5 bg-gray-900 border border-gray-800 text-white font-bold text-xs sm:text-sm rounded-xl hover:bg-gray-800 hover:border-gray-700 transition-all flex items-center gap-2"
           >
-            <Search size={15} className="text-amber-400" /> Run Free Competitor Ad Scan
+            <Search size={15} className="text-amber-400" /> Ad Spy Scan
           </button>
         </div>
 
@@ -756,7 +762,7 @@ res = requests.post(
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹999 / month</div>
                     <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
-                      <span>₹599</span>
+                      <span>₹649</span>
                       <span className="text-xs text-gray-400 font-normal font-sans">/ 1 month (100 Products)</span>
                     </div>
                   </div>
@@ -765,8 +771,8 @@ res = requests.post(
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹2,997 (₹999/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
-                      <span>₹1,699</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">for 3 months (~₹566/mo • 250 Products)</span>
+                      <span>₹1,749</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 3 months (~₹583/mo • 250 Products)</span>
                     </div>
                   </div>
                 )}
@@ -774,8 +780,8 @@ res = requests.post(
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹5,994 (₹999/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-white font-mono flex items-baseline gap-2">
-                      <span>₹3,499</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹583/mo • 500 Products)</span>
+                      <span>₹3,399</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹566/mo • 500 Products)</span>
                     </div>
                   </div>
                 )}
@@ -846,8 +852,8 @@ res = requests.post(
                   <div>
                     <div className="text-sm text-gray-500 line-through font-mono">₹8,994 (₹1,499/mo)</div>
                     <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-2">
-                      <span>₹4,799</span>
-                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹799/mo • 500 Products)</span>
+                      <span>₹4,699</span>
+                      <span className="text-xs text-gray-400 font-normal font-sans">for 6 months (~₹783/mo • 500 Products)</span>
                     </div>
                   </div>
                 )}
