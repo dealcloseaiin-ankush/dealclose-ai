@@ -956,19 +956,16 @@ Your Role:
             }
             // ==========================================================
 
-            // ==========================================================
-            // 🚀 FALLBACK: DYNAMIC MAIN MENU & ZERO-COST LEAD CAPTURE
-            // (This runs ONLY if no custom Flow matched the user's input)
-            // ==========================================================
-            if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
+            // 🚀 UNIVERSAL SWITCH & BUSINESS DIVISION SELECTOR (Keywords: menu, switch, 0, change, options, etc.)
+            if (['menu', 'switch', '0', 'change', 'options', 'divisions', 'home', 'stores'].includes(incomingTextLower) || 
+                ((['hi', 'hello', 'hey', 'start'].includes(incomingTextLower)) && user.workspaces && user.workspaces.length > 0 && !currentLeadCheck?.lastSelectedWorkspaceId)) {
               let menuRows = [
                 { 
                   id: `workspace_default`, 
                   title: (user.businessName || "Main Business").substring(0, 24), 
-                  // ⚠️ FIX: Text cutoff problem handled gracefully with "..."
-                  description: (user.businessDescription || "Explore our products and services").length > 69 
-                                ? (user.businessDescription || "Explore our products and services").substring(0, 69) + '...'
-                                : (user.businessDescription || "Explore our products and services")
+                  description: (user.businessDescription || "Explore our automations and CRM").length > 69 
+                                ? (user.businessDescription || "Explore our automations and CRM").substring(0, 69) + '...'
+                                : (user.businessDescription || "Explore our automations and CRM")
                 }
               ];
               
@@ -978,9 +975,9 @@ Your Role:
                   const wsRows = validWs.map(w => ({
                     id: `workspace_${w._id}`, 
                     title: w.name.substring(0, 24), 
-                    description: (w.description || "View our services").length > 69
-                                  ? (w.description || "View our services").substring(0, 69) + '...'
-                                  : (w.description || "View our services")
+                    description: (w.description || "Properties & Site Visits").length > 69
+                                  ? (w.description || "Properties & Site Visits").substring(0, 69) + '...'
+                                  : (w.description || "Properties & Site Visits")
                   }));
                   menuRows = [...menuRows, ...wsRows];
                 }
@@ -988,7 +985,7 @@ Your Role:
               
               menuRows = menuRows.slice(0, 10);
 
-              let bodyText = `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:`;
+              let bodyText = `Welcome to *${user.fullName || user.businessName || 'Our Business'}*! 🏢\n\nPlease select the business division you want to connect with:\n\n1️⃣ *${user.businessName || 'DealClose AI'}* (Automations & CRM)\n2️⃣ *NewPropertyHub.in* (Properties & Real Estate)\n\n_Reply with 1, 2 or tap Select Business below:_`;
               const links = user.digitalCardConfig || {};
               const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
               
