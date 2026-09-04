@@ -80,6 +80,11 @@ export default function MobileDashboard() {
   });
   const [showAiTrainDrawer, setShowAiTrainDrawer] = useState(false);
   const [showSmartQrModal, setShowSmartQrModal] = useState(false);
+  const [smartQrTab, setSmartQrTab] = useState('links'); // 'links' | 'qr' | 'analytics'
+  const [customLinks, setCustomLinks] = useState([]);
+  const [showAddCustomLinkModal, setShowAddCustomLinkModal] = useState(false);
+  const [newLinkData, setNewLinkData] = useState({ title: '', url: '', category: 'General', icon: 'globe' });
+  const [linkAnalyticsStats, setLinkAnalyticsStats] = useState({ totalViews: 0, totalClicks: 0, ctr: '0.0', dailyClicks: [], isPaid: false });
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showAddWorkspaceModal, setShowAddWorkspaceModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -753,6 +758,131 @@ export default function MobileDashboard() {
       { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery on prepaid orders across India.' },
       { id: 'k5', title: 'Property & External Website Sync', content: `Auto posts property listings and synchronizes site visit appointments to ${ws.externalApiUrl || 'external website'}.` }
     ]);
+
+    // Custom Bio Links
+    const rawCustomLinks = ws.customLinks || ws.digitalCardConfig?.customLinks || liveUser?.digitalCardConfig?.customLinks || [];
+    setCustomLinks(rawCustomLinks);
+  };
+
+  // Fetch Link Tracking Analytics
+  const fetchLinkAnalytics = async () => {
+    try {
+      const res = await api.get(`/tracking/link-analytics?ws=${activeWorkspaceId}`);
+      if (res.data) {
+        setLinkAnalyticsStats(res.data);
+      }
+    } catch (e) {
+      console.debug('Link analytics fetch error', e);
+    }
+  };
+
+  // Add Custom Link to Bio Hub
+  const handleAddCustomLink = async (e) => {
+    if (e) e.preventDefault();
+    if (!newLinkData.title || !newLinkData.url) {
+      alert('Please provide link title and URL');
+      return;
+    }
+
+    const isPaid = user?.isPremium || user?.role === 'owner' || user?.role === 'superadmin';
+    const currentActiveCount = customLinks.filter(l => l.isActive !== false).length;
+    if (!isPaid && currentActiveCount >= 3) {
+      alert('⚠️ Free Plan Limit Reached (Max 3 links allowed).\nUpgrade to Pro for Unlimited Links and Automatic CRM Lead Generation!');
+      return;
+    }
+
+    let urlFormatted = newLinkData.url.trim();
+    if (!urlFormatted.startsWith('http://') && !urlFormatted.startsWith('https://') && !urlFormatted.startsWith('upi://') && !urlFormatted.startsWith('tel:') && !urlFormatted.startsWith('mailto:')) {
+      urlFormatted = 'https://' + urlFormatted;
+    }
+
+    const newLink = {
+      id: 'link_' + Date.now(),
+      title: newLinkData.title.trim(),
+      url: urlFormatted,
+      category: newLinkData.category || 'General',
+      icon: newLinkData.icon || 'globe',
+      clicks: 0,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedLinks = [...customLinks, newLink];
+    setCustomLinks(updatedLinks);
+
+    try {
+      const updatedWorkspaces = (workspaces || []).map(w => {
+        if (w.id === activeWorkspaceId || String(w._id) === activeWorkspaceId) {
+          return {
+            ...w,
+            customLinks: updatedLinks,
+            digitalCardConfig: { ...(w.digitalCardConfig || {}), customLinks: updatedLinks }
+          };
+        }
+        return w;
+      });
+
+      await api.put('/users/profile', {
+        workspaces: updatedWorkspaces,
+        digitalCardConfig: { ...(user?.digitalCardConfig || {}), customLinks: updatedLinks }
+      });
+      setShowAddCustomLinkModal(false);
+      setNewLinkData({ title: '', url: '', category: 'General', icon: 'globe' });
+      alert('✅ Smart Link added to your Bio Link Hub!');
+    } catch (err) {
+      console.error('Error adding link:', err);
+    }
+  };
+
+  // Delete Custom Link
+  const handleDeleteCustomLink = async (linkId) => {
+    if (!confirm('Are you sure you want to delete this link?')) return;
+    const updatedLinks = customLinks.filter(l => l.id !== linkId);
+    setCustomLinks(updatedLinks);
+
+    try {
+      const updatedWorkspaces = (workspaces || []).map(w => {
+        if (w.id === activeWorkspaceId || String(w._id) === activeWorkspaceId) {
+          return {
+            ...w,
+            customLinks: updatedLinks,
+            digitalCardConfig: { ...(w.digitalCardConfig || {}), customLinks: updatedLinks }
+          };
+        }
+        return w;
+      });
+
+      await api.put('/users/profile', {
+        workspaces: updatedWorkspaces,
+        digitalCardConfig: { ...(user?.digitalCardConfig || {}), customLinks: updatedLinks }
+      });
+    } catch (err) {
+      console.error('Error deleting link:', err);
+    }
+  };
+
+  // Toggle Custom Link Active State
+  const handleToggleCustomLink = async (linkId) => {
+    const updatedLinks = customLinks.map(l => l.id === linkId ? { ...l, isActive: !l.isActive } : l);
+    setCustomLinks(updatedLinks);
+
+    try {
+      const updatedWorkspaces = (workspaces || []).map(w => {
+        if (w.id === activeWorkspaceId || String(w._id) === activeWorkspaceId) {
+          return {
+            ...w,
+            customLinks: updatedLinks,
+            digitalCardConfig: { ...(w.digitalCardConfig || {}), customLinks: updatedLinks }
+          };
+        }
+        return w;
+      });
+
+      await api.put('/users/profile', {
+        workspaces: updatedWorkspaces,
+        digitalCardConfig: { ...(user?.digitalCardConfig || {}), customLinks: updatedLinks }
+      });
+    } catch (err) {}
   };
 
   // Fetch Filtered Chats by Workspace with Relative Date Labels & Read State Persistence
@@ -3823,101 +3953,366 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 1: Smart All-In-One QR Counter Hub (Live Preview & Share Hub) */}
+      {/* Modal 1: Smart Bio Link & Multi-Link Hub (Linktree Style + QR + Click Tracking) */}
       {showSmartQrModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl text-center max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <button onClick={() => setShowSmartQrModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+          <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3.5 relative shadow-2xl text-left max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <button 
+              onClick={() => setShowSmartQrModal(false)} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-full bg-gray-800/80"
+            >
               <X size={16} />
             </button>
             
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-950 to-purple-950 border border-amber-500/40 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
-              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-xl" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class="text-xl font-bold">🏢</span>'; }} />
-            </div>
-
-            <div>
-              <h3 className="text-sm font-black text-white">{profileData.businessName}</h3>
-              <p className="text-[10px] text-gray-400">1 Scan connects WhatsApp, Instagram, YouTube, Google Review & UPI</p>
-            </div>
-
-            {/* Smart Review Shield Badge */}
-            <div className="bg-amber-950/40 border border-amber-500/40 p-2 rounded-2xl text-[10px] text-amber-300 font-bold space-y-0.5">
-              <div>🛡️ Smart Review Shield Enabled</div>
-              <div className="text-[9px] text-gray-300 font-normal">
-                1-3★ reviews stay private in CRM • 4-5★ reviews auto-boost to Google Maps!
+            {/* Header with Avatar & Title */}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-purple-600 p-0.5 shadow-md shrink-0">
+                <div className="w-full h-full bg-[#111116] rounded-[14px] flex items-center justify-center text-xl font-bold">
+                  🏢
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-white truncate">{profileData.businessName}</h3>
+                <p className="text-[10px] text-gray-400">Bio Link Hub & Smart Multi-Link Manager</p>
               </div>
             </div>
 
-            {/* High-Resolution Visual QR Canvas */}
-            <div className="p-4 bg-white rounded-2xl max-w-[190px] mx-auto shadow-inner flex flex-col items-center justify-center">
-              <QrCode size={140} className="text-black" />
-              <span className="text-[9px] font-mono text-black font-black mt-1 uppercase">SCAN TO CONNECT & PAY</span>
+            {/* Navigation Tabs */}
+            <div className="grid grid-cols-3 gap-1 bg-black/60 p-1 rounded-2xl border border-gray-800 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setSmartQrTab('links')}
+                className={`py-1.5 rounded-xl transition-all ${
+                  smartQrTab === 'links' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                🔗 Bio Links
+              </button>
+              <button
+                type="button"
+                onClick={() => setSmartQrTab('qr')}
+                className={`py-1.5 rounded-xl transition-all ${
+                  smartQrTab === 'qr' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                📱 QR Code
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSmartQrTab('analytics');
+                  fetchLinkAnalytics();
+                }}
+                className={`py-1.5 rounded-xl transition-all ${
+                  smartQrTab === 'analytics' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                📊 Analytics
+              </button>
             </div>
 
-            {/* Live Interactive Action Links Preview */}
-            <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold pt-1">
-              <a href={profileData.googleBusinessLink} target="_blank" rel="noreferrer" className="p-2 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded-xl flex items-center justify-center gap-1">
-                <Star size={12} className="text-amber-400" />
-                <span>Google Review</span>
-              </a>
-              <a href={profileData.instagramLink} target="_blank" rel="noreferrer" className="p-2 bg-pink-950/40 border border-pink-500/30 text-pink-300 rounded-xl flex items-center justify-center gap-1">
-                <InstagramIcon size={12} />
-                <span>Instagram</span>
-              </a>
-              <a href={profileData.youtubeLink} target="_blank" rel="noreferrer" className="p-2 bg-red-950/40 border border-red-500/30 text-red-300 rounded-xl flex items-center justify-center gap-1">
-                <YoutubeIcon size={12} className="text-red-400" />
-                <span>YouTube</span>
-              </a>
-              <div className="p-2 bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 rounded-xl flex items-center justify-center gap-1">
-                <DollarSign size={12} className="text-emerald-400" />
-                <span>UPI: {profileData.upiId.slice(0, 10)}...</span>
+            {/* ─────────────────────────────────────────────────────────────
+                TAB 1: BIO LINKS (LINKTREE MANAGER)
+            ───────────────────────────────────────────────────────────── */}
+            {smartQrTab === 'links' && (
+              <div className="space-y-3 animate-fade-in">
+                
+                {/* Plan Tier Status Badge */}
+                <div className={`p-2.5 rounded-2xl border flex items-center justify-between text-[10px] ${
+                  user?.isPremium || user?.role === 'owner' || user?.role === 'superadmin'
+                    ? 'bg-amber-950/30 border-amber-500/40 text-amber-300'
+                    : 'bg-gray-900/60 border-gray-800 text-gray-300'
+                }`}>
+                  <div>
+                    <span className="font-bold">
+                      {user?.isPremium || user?.role === 'owner' || user?.role === 'superadmin' ? '⭐ PRO TIER ACTIVE' : 'FREE TIER (3 Links Limit)'}
+                    </span>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      {user?.isPremium || user?.role === 'owner' || user?.role === 'superadmin'
+                        ? 'Unlimited links + automatic CRM lead capture'
+                        : `${customLinks.filter(l => l.isActive !== false).length}/3 links used`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomLinkModal(true)}
+                    className="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl text-[10px] shadow-sm hover:opacity-90 active:scale-95"
+                  >
+                    + Add Link
+                  </button>
+                </div>
+
+                {/* Universal Shareable Link Box */}
+                <div className="bg-black/60 border border-gray-800 p-2.5 rounded-2xl space-y-2">
+                  <span className="text-[9px] font-bold uppercase text-gray-400 tracking-wider block">
+                    Your Single Universal Hub Link:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`}
+                      className="bg-black border border-gray-800 rounded-xl px-2 py-1 text-[10px] text-gray-300 flex-1 truncate select-all focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
+                        navigator.clipboard.writeText(cardUrl);
+                        alert(`Universal Bio Link Copied! 📋\n${cardUrl}`);
+                      }}
+                      className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-[10px] font-bold rounded-xl shrink-0"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
+                        const text = `Connect with *${profileData.businessName}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
+                        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                      }}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-xl shrink-0"
+                    >
+                      Share
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom Links List */}
+                <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
+                  {customLinks.length === 0 ? (
+                    <div className="p-5 text-center bg-gray-900/30 border border-dashed border-gray-800 rounded-2xl text-[11px] text-gray-400 space-y-2">
+                      <p>No custom links created yet.</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddCustomLinkModal(true)}
+                        className="px-3 py-1 bg-purple-600 text-white font-bold rounded-xl text-xs"
+                      >
+                        + Create Your First Link
+                      </button>
+                    </div>
+                  ) : (
+                    customLinks.map((l, idx) => (
+                      <div
+                        key={l.id || idx}
+                        className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-white truncate">{l.title}</span>
+                            <span className="px-1.5 py-0.2 bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[9px] font-bold rounded-md shrink-0">
+                              🔥 {l.clicks || 0} clicks
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 block truncate">{l.url}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCustomLink(l.id)}
+                            className={`px-2 py-0.5 rounded-lg text-[9px] font-bold transition-colors ${
+                              l.isActive !== false ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-400'
+                            }`}
+                          >
+                            {l.isActive !== false ? 'Active' : 'Off'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomLink(l.id)}
+                            className="p-1 text-gray-500 hover:text-red-400"
+                            title="Delete Link"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <a
+                  href={`/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-98"
+                >
+                  <Eye size={13} /> Open Live Bio Link Hub ↗
+                </a>
               </div>
+            )}
+
+            {/* ─────────────────────────────────────────────────────────────
+                TAB 2: SMART QR STAND (QR CODE & REVIEW SHIELD)
+            ───────────────────────────────────────────────────────────── */}
+            {smartQrTab === 'qr' && (
+              <div className="space-y-3 animate-fade-in text-center">
+                {/* Smart Review Shield Badge */}
+                <div className="bg-amber-950/40 border border-amber-500/40 p-2 rounded-2xl text-[10px] text-amber-300 font-bold space-y-0.5">
+                  <div>🛡️ Smart Review Shield Active</div>
+                  <div className="text-[9px] text-gray-300 font-normal">
+                    1-3★ reviews stay private in CRM • 4-5★ auto-boost to Google Maps!
+                  </div>
+                </div>
+
+                {/* High-Resolution Visual QR Canvas */}
+                <div className="p-4 bg-white rounded-2xl max-w-[170px] mx-auto shadow-inner flex flex-col items-center justify-center">
+                  <QrCode size={130} className="text-black" />
+                  <span className="text-[8px] font-mono text-black font-black mt-1 uppercase">SCAN TO CONNECT & PAY</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
+                      const text = `Connect with *${profileData.businessName}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
+                      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-md"
+                  >
+                    <span>💬 WhatsApp Share</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alert('Counter Standee QR Print generated successfully!')}
+                    className="py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1"
+                  >
+                    <Download size={13} /> Print Standee
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─────────────────────────────────────────────────────────────
+                TAB 3: LIVE CLICK ANALYTICS & STATS
+            ───────────────────────────────────────────────────────────── */}
+            {smartQrTab === 'analytics' && (
+              <div className="space-y-3 animate-fade-in text-left">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
+                    <span className="text-[9px] text-gray-400 uppercase font-bold">Total Views</span>
+                    <div className="text-lg font-black text-emerald-400 mt-0.5">
+                      {linkAnalyticsStats.totalViews || liveUser?.digitalCardConfig?.totalViews || 0}
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
+                    <span className="text-[9px] text-gray-400 uppercase font-bold">Total Clicks</span>
+                    <div className="text-lg font-black text-blue-400 mt-0.5">
+                      {linkAnalyticsStats.totalClicks || liveUser?.digitalCardConfig?.totalClicks || 0}
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
+                    <span className="text-[9px] text-gray-400 uppercase font-bold">Overall CTR</span>
+                    <div className="text-lg font-black text-purple-400 mt-0.5">
+                      {linkAnalyticsStats.ctr || '0.0'}%
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
+                    <span className="text-[9px] text-gray-400 uppercase font-bold">CRM Leads Generated</span>
+                    <div className="text-lg font-black text-amber-400 mt-0.5">
+                      {linkAnalyticsStats.capturedLeadsCount || 0}
+                    </div>
+                  </div>
+                </div>
+
+                <a
+                  href="/tracking-analytics"
+                  className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-gray-700 mt-1"
+                >
+                  <TrendingUp size={13} className="text-emerald-400" /> Open Full Desktop Analytics ↗
+                </a>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1.5: Add Custom Bio Link Popup */}
+      {showAddCustomLinkModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl animate-scale-up">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+                <Link2 size={16} className="text-purple-400" /> Add Smart Bio Link
+              </h3>
+              <button onClick={() => setShowAddCustomLinkModal(false)} className="text-gray-400 hover:text-white">
+                <X size={16} />
+              </button>
             </div>
 
-            {/* Share & Copy Action Row */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
-                  const text = `Connect with *${profileData.businessName}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
-                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-                }}
-                className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all"
-              >
-                <span>💬 Share on WhatsApp</span>
-              </button>
+            <form onSubmit={handleAddCustomLink} className="space-y-2.5 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 mb-1">Link Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Download Property Brochure / WhatsApp Store"
+                  value={newLinkData.title}
+                  onChange={(e) => setNewLinkData({ ...newLinkData, title: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 mb-1">Destination URL / Action *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="https://... or wa.me/... or upi://..."
+                  value={newLinkData.url}
+                  onChange={(e) => setNewLinkData({ ...newLinkData, url: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 mb-1">Category</label>
+                  <select
+                    value={newLinkData.category}
+                    onChange={(e) => setNewLinkData({ ...newLinkData, category: e.target.value })}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white text-xs focus:outline-none"
+                  >
+                    <option value="General">General</option>
+                    <option value="Catalog">Catalog / Products</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Payment">Payment / UPI</option>
+                    <option value="Offers">Special Offers</option>
+                    <option value="Booking">Appointments</option>
+                    <option value="Social">Social Media</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 mb-1">Icon Style</label>
+                  <select
+                    value={newLinkData.icon}
+                    onChange={(e) => setNewLinkData({ ...newLinkData, icon: e.target.value })}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white text-xs focus:outline-none"
+                  >
+                    <option value="globe">🌐 Globe / Website</option>
+                    <option value="whatsapp">💬 WhatsApp</option>
+                    <option value="catalog">🛍️ Catalog / Shop</option>
+                    <option value="upi">💳 UPI / Payment</option>
+                    <option value="instagram">📸 Instagram</option>
+                    <option value="youtube">▶ YouTube</option>
+                    <option value="review">⭐ Google Review</option>
+                    <option value="location">📍 Location / Map</option>
+                    <option value="phone">📞 Phone Call</option>
+                  </select>
+                </div>
+              </div>
 
               <button
-                type="button"
-                onClick={() => {
-                  const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
-                  navigator.clipboard.writeText(cardUrl);
-                  alert(`Smart Digital Card Link Copied! 📋\n${cardUrl}`);
-                }}
-                className="py-2.5 bg-gray-900 border border-gray-700 text-gray-200 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 active:scale-98 transition-all"
+                type="submit"
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:opacity-90 text-white font-bold text-xs rounded-xl shadow-lg mt-2 active:scale-98"
               >
-                <span>📋 Copy Card Link</span>
+                + Save Link to Bio Hub
               </button>
-            </div>
-
-            {/* View Live Card & Standee Download */}
-            <div className="flex gap-2">
-              <a
-                href={`/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 py-2 bg-gray-800 border border-gray-700 text-gray-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1"
-              >
-                <Eye size={13} /> View Live Card ↗
-              </a>
-              <button
-                onClick={() => alert('Counter Standee QR Image ready for printing!')}
-                className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1"
-              >
-                <Download size={13} /> Print Standee QR
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

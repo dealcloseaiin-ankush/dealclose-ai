@@ -164,7 +164,21 @@ const userSchema = new Schema({
     // --- Social links for each specific workspace ---
     instagram: { type: String },
     facebook: { type: String },
-    website: { type: String }
+    website: { type: String },
+    digitalCardConfig: {
+      type: Schema.Types.Mixed,
+      default: () => ({ customLinks: [], totalViews: 0, totalClicks: 0 })
+    },
+    customLinks: [{
+      id: { type: String },
+      title: { type: String },
+      url: { type: String },
+      icon: { type: String, default: 'globe' },
+      category: { type: String, default: 'General' },
+      clicks: { type: Number, default: 0 },
+      isActive: { type: Boolean, default: true },
+      createdAt: { type: Date, default: Date.now }
+    }]
   }],
   savedMedia: [{
     mediaId: { type: String },
@@ -245,6 +259,27 @@ const userSchema = new Schema({
     // 🚀 NEW: Centralized Google Config for Sheets, Drive, etc.
     backupFolderId: { type: String }, // ID of the 'DealClose AI Backups' folder in user's Drive
     lastBackupAt: { type: Date }
+  },
+  // --- Smart Bio Link & Digital Card Hub Config ---
+  digitalCardConfig: {
+    type: Schema.Types.Mixed,
+    default: () => ({
+      businessName: '',
+      tagline: '',
+      themeColor: 'emerald',
+      avatarUrl: '',
+      coverUrl: '',
+      instagram: '',
+      youtube: '',
+      facebook: '',
+      googleBusiness: '',
+      upiId: '',
+      website: '',
+      whatsapp: '',
+      customLinks: [],
+      totalViews: 0,
+      totalClicks: 0
+    })
   },
 });
 
