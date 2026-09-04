@@ -347,12 +347,28 @@ async function reassignFlow(req, res) {
   }
 }
 
+// @desc    Get Industry Reusable Starter Automation Flows
+// @route   GET /api/whatsapp/flows/industry-templates
+async function getIndustryStarterFlows(req, res) {
+  try {
+    const { industry } = req.query;
+    if (industry && INDUSTRY_STARTER_FLOWS[industry]) {
+      return res.status(200).json({ success: true, templates: INDUSTRY_STARTER_FLOWS[industry] });
+    }
+    return res.status(200).json({ success: true, templates: INDUSTRY_STARTER_FLOWS });
+  } catch (error) {
+    console.error('❌ [DEBUG] Get Industry Starter Flows Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
   saveFlow,
   getFlows,
   deleteFlow,
   renameFlow,
   reassignFlow,
+  getIndustryStarterFlows,
   buildFlowSaveQuery,
   buildFlowListQuery
 };
