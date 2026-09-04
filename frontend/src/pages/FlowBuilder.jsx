@@ -126,6 +126,8 @@ function FlowBuilder() {
     document.removeEventListener('mouseup', handleChatDragEnd);
   };
 
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
     // Fetch workspaces so users can assign flows to different businesses
     api.get('/users/profile').then(res => {
@@ -139,15 +141,107 @@ function FlowBuilder() {
         setMainBusinessName(bName);
       }
     }).catch(console.error);
+
+    // Check URL parameters for flowId, workspaceId, platform
+    const urlParams = new URLSearchParams(window.location.search);
+    const flowIdParam = urlParams.get('flowId');
+    const wsParam = urlParams.get('workspaceId');
+    const platformParam = urlParams.get('platform');
+
+    if (wsParam) setSelectedWorkspace(wsParam);
+    if (platformParam) setPlatform(platformParam);
+
+    if (flowIdParam) {
+      api.get(`/whatsapp/flows?flowId=${flowIdParam}`)
+        .then(res => {
+          const fullFlow = res.data?.data?.[0];
+          if (fullFlow && fullFlow.flowData) {
+            const flowPlatform = fullFlow.platform || platformParam || 'whatsapp';
+            const normalizedNodes = (fullFlow.flowData.nodes || []).map((node) => ({
+              ...node,
+              data: { ...(node.data || {}), platform: flowPlatform },
+            }));
+            setNodes(normalizedNodes);
+            setEdges(fullFlow.flowData.edges || []);
+            setFlowName(fullFlow.name || '');
+            if (fullFlow.platform) setPlatform(fullFlow.platform);
+            if (fullFlow.workspaceId) setSelectedWorkspace(fullFlow.workspaceId);
+            toast.success(`Loaded Flow: ${fullFlow.name}`);
+            setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
+          }
+        })
+        .catch(err => console.error("Error loading flow by flowId:", err));
+    } else {
+      // Auto-load latest saved flow for active workspace
+      api.get('/whatsapp/flows', {
+        params: { workspaceId: wsParam || 'main', platform: platformParam || 'whatsapp' }
+      })
+        .then(res => {
+          const flows = res.data?.data || [];
+          if (flows.length > 0) {
+            const target = flows.find(f => f.name !== 'Flow-343') || flows[0];
+            if (target) {
+              api.get(`/whatsapp/flows?flowId=${target._id}`).then(fRes => {
+                const full = fRes.data?.data?.[0];
+                if (full && full.flowData && full.flowData.nodes && full.flowData.nodes.length > 0) {
+                  const flowPlatform = full.platform || 'whatsapp';
+                  const normalizedNodes = (full.flowData.nodes || []).map((node) => ({
+                    ...node,
+                    data: { ...(node.data || {}), platform: flowPlatform },
+                  }));
+                  setNodes(normalizedNodes);
+                  setEdges(full.flowData.edges || []);
+                  setFlowName(full.name || '');
+                  setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
+                }
+              });
+            }
+          }
+        })
+        .catch(err => console.error("Error auto-loading flow:", err));
+    }
   }, []);
 
-  // 🚀 FIX: When workspace or platform changes, reset the canvas to a clean state.
+  // When workspace or platform is changed manually after initial load, fetch the flows or reset
   useEffect(() => {
-    setNodes(initialNodes);
-    setEdges([]);
-    setFlowName('');
-    setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
-  }, [selectedWorkspace, platform, setNodes, setEdges, fitView]);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    api.get('/whatsapp/flows', {
+      params: { workspaceId: selectedWorkspace, platform }
+    }).then(res => {
+      const flows = res.data?.data || [];
+      if (flows.length > 0) {
+        const target = flows.find(f => f.name !== 'Flow-343') || flows[0];
+        if (target) {
+          api.get(`/whatsapp/flows?flowId=${target._id}`).then(fRes => {
+            const full = fRes.data?.data?.[0];
+            if (full && full.flowData && full.flowData.nodes && full.flowData.nodes.length > 0) {
+              const flowPlatform = full.platform || platform;
+              const normalizedNodes = (full.flowData.nodes || []).map((node) => ({
+                ...node,
+                data: { ...(node.data || {}), platform: flowPlatform },
+              }));
+              setNodes(normalizedNodes);
+              setEdges(full.flowData.edges || []);
+              setFlowName(full.name || '');
+              setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
+            }
+          });
+        }
+      } else {
+        setNodes(initialNodes);
+        setEdges([]);
+        setFlowName('');
+        setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
+      }
+    }).catch(() => {
+      setNodes(initialNodes);
+      setEdges([]);
+      setFlowName('');
+    });
+  }, [selectedWorkspace, platform]);
 
   useEffect(() => {
     api.get('/whatsapp/templates')

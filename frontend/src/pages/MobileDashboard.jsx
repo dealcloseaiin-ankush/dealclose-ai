@@ -1224,13 +1224,24 @@ export default function MobileDashboard() {
     } catch (e) {}
   };
 
-  const handleDeleteFlow = async (id, name) => {
-    if (!window.confirm(`Delete flow "${name}"?`)) return;
-    setFlowRules(flowRules.filter(f => f.id !== id));
+  const handleInspectFlow = async (fl) => {
     try {
-      await api.delete(`/whatsapp/flows/${id}`).catch(() => {});
-      alert(`Flow "${name}" deleted from database! 🗑️`);
-    } catch (e) {}
+      if (fl.id && !String(fl.id).startsWith('fl_starter')) {
+        const res = await api.get(`/whatsapp/flows?flowId=${fl.id}`).catch(() => null);
+        const fullFlow = res?.data?.data?.[0];
+        if (fullFlow && fullFlow.flowData && Array.isArray(fullFlow.flowData.nodes)) {
+          setSelectedFlowForInspect({
+            ...fl,
+            rawNodes: fullFlow.flowData.nodes,
+            rawEdges: fullFlow.flowData.edges || []
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Inspect flow error:", err);
+    }
+    setSelectedFlowForInspect(fl);
   };
 
   const handleSingleCatalogImageUpload = async (e) => {
@@ -2867,7 +2878,7 @@ export default function MobileDashboard() {
                       <div key={fl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 shadow-sm">
                         <div className="flex items-center justify-between">
                           <div 
-                            onClick={() => setSelectedFlowForInspect(fl)}
+                            onClick={() => handleInspectFlow(fl)}
                             className="font-bold text-xs text-white flex items-center gap-1.5 cursor-pointer hover:text-cyan-300"
                           >
                             <Workflow size={14} className="text-cyan-400" />
@@ -2898,15 +2909,15 @@ export default function MobileDashboard() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setSelectedFlowForInspect(fl)}
+                              onClick={() => handleInspectFlow(fl)}
                               className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 bg-cyan-950/50 px-2 py-1 rounded-lg border border-cyan-500/30"
                             >
                               <Sparkles size={11} />
                               <span>Inspect Steps</span>
                             </button>
                             <a
-                              href="/flow-builder"
-                              className="text-[10px] text-gray-400 hover:text-white font-bold flex items-center gap-1"
+                              href={`/flow-builder?flowId=${fl.id}&workspaceId=${activeWorkspaceId}&platform=whatsapp`}
+                              className="text-[10px] text-cyan-400 hover:text-white font-bold flex items-center gap-1 bg-cyan-950/30 hover:bg-cyan-900/50 px-2 py-1 rounded-lg border border-cyan-500/40 transition"
                             >
                               <span>Visual</span>
                               <ExternalLink size={11} />
@@ -4427,64 +4438,96 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             <div className="flex items-center gap-2">
-              <Workflow size={18} className="text-cyan-400" />
+              <Workflow size={18} className="text-cyan-400 shrink-0" />
               <div>
-                <h3 className="text-sm font-bold text-white">{selectedFlowForInspect.name}</h3>
-                <span className="text-[10px] text-cyan-300 font-mono">Mobile Step Sequence Inspector</span>
+                <h3 className="text-sm font-bold text-white leading-tight">{selectedFlowForInspect.name}</h3>
+                <span className="text-[10px] text-cyan-300 font-mono">
+                  {selectedFlowForInspect.rawNodes ? `${selectedFlowForInspect.rawNodes.length} Step Complete Flow` : 'Mobile Step Inspector'}
+                </span>
               </div>
             </div>
 
             {/* Sequence Graph Steps */}
             <div className="space-y-2 pt-2">
-              <div className="bg-black/60 border border-cyan-500/30 p-2.5 rounded-xl space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-bold text-cyan-400">
-                  <span>⚡ STEP 1: INCOMING TRIGGER</span>
-                  <span className="bg-cyan-950 px-1.5 py-0.5 rounded text-[9px] font-mono">TRIGGER NODE</span>
-                </div>
-                <div className="text-xs text-white font-bold bg-[#14141f] p-2 rounded-lg border border-gray-800">
-                  Customer sends: <span className="text-cyan-300">"{selectedFlowForInspect.trigger || 'ANY MESSAGE'}"</span>
-                </div>
-              </div>
+              {selectedFlowForInspect.rawNodes && selectedFlowForInspect.rawNodes.length > 0 ? (
+                selectedFlowForInspect.rawNodes.map((n, idx) => (
+                  <div key={n.id || idx} className="space-y-1">
+                    <div className="bg-black/60 border border-gray-800 p-2.5 rounded-xl space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-bold">
+                        <span className="text-cyan-400">⚡ STEP {idx + 1}: {n.type?.toUpperCase() || 'STEP'}</span>
+                        <span className="bg-gray-800 px-1.5 py-0.5 rounded text-[9px] font-mono text-gray-300">
+                          {n.type === 'trigger' ? 'TRIGGER' : n.type === 'askQuestion' ? 'QUESTION' : n.type === 'menu' ? 'MENU' : n.type === 'message' || n.type === 'sendMessage' ? 'MESSAGE' : n.type}
+                        </span>
+                      </div>
+                      <div className="text-xs text-white font-medium bg-[#14141f] p-2 rounded-lg border border-gray-800 leading-relaxed">
+                        {n.type === 'trigger' && (
+                          <span>Keywords: <strong className="text-cyan-300">"{n.data?.keyword || selectedFlowForInspect.trigger || 'Any message'}"</strong></span>
+                        )}
+                        {n.type === 'askQuestion' && (
+                          <span>❓ {n.data?.question || 'Asks customer detail'}</span>
+                        )}
+                        {n.type === 'menu' && (
+                          <div className="space-y-1">
+                            <div>💬 {n.data?.message || n.data?.question || 'Choose an option:'}</div>
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {n.data?.opt1 && <span className="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">🔘 {n.data.opt1}</span>}
+                              {n.data?.opt2 && <span className="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">🔘 {n.data.opt2}</span>}
+                              {n.data?.opt3 && <span className="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">🔘 {n.data.opt3}</span>}
+                            </div>
+                          </div>
+                        )}
+                        {(n.type === 'message' || n.type === 'sendMessage') && (
+                          <div>
+                            <div>💬 {n.data?.message || n.data?.text || 'Automated message'}</div>
+                            {n.data?.mediaUrl && <div className="text-[10px] text-purple-400 mt-1">📎 Attachment: {n.data.mediaUrl}</div>}
+                          </div>
+                        )}
+                        {n.type === 'condition' && (
+                          <span className="text-amber-300">⚖️ Condition / Branch: {n.data?.condition || 'Evaluates customer intent'}</span>
+                        )}
+                      </div>
+                    </div>
+                    {idx < selectedFlowForInspect.rawNodes.length - 1 && (
+                      <div className="flex justify-center text-gray-600 text-[10px] font-mono">⬇️ Next Step</div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="bg-black/60 border border-cyan-500/30 p-2.5 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-cyan-400">
+                      <span>⚡ STEP 1: INCOMING TRIGGER</span>
+                      <span className="bg-cyan-950 px-1.5 py-0.5 rounded text-[9px] font-mono">TRIGGER NODE</span>
+                    </div>
+                    <div className="text-xs text-white font-bold bg-[#14141f] p-2 rounded-lg border border-gray-800">
+                      Customer sends: <span className="text-cyan-300">"{selectedFlowForInspect.trigger || 'ANY MESSAGE'}"</span>
+                    </div>
+                  </div>
 
-              <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Condition Evaluated</div>
+                  <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Condition Evaluated</div>
 
-              <div className="bg-black/60 border border-purple-500/30 p-2.5 rounded-xl space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-bold text-purple-400">
-                  <span>🎯 STEP 2: AUTO-PILOT ACTION</span>
-                  <span className="bg-purple-950 px-1.5 py-0.5 rounded text-[9px] font-mono">MESSAGE NODE</span>
-                </div>
-                <div className="text-xs text-gray-200 bg-[#14141f] p-2 rounded-lg border border-gray-800 leading-relaxed">
-                  {selectedFlowForInspect.description || 'Sends automated reply and dynamic product/service cards'}
-                </div>
-              </div>
-
-              <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Database Updates</div>
-
-              <div className="bg-black/60 border border-emerald-500/30 p-2.5 rounded-xl space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-bold text-emerald-400">
-                  <span>📊 STEP 3: CRM PIPELINE SYNC</span>
-                  <span className="bg-emerald-950 px-1.5 py-0.5 rounded text-[9px] font-mono">CRM NODE</span>
-                </div>
-                <div className="text-xs text-gray-300 bg-[#14141f] p-2 rounded-lg border border-gray-800">
-                  Lead stage updated to <span className="text-emerald-300 font-bold">"Engaged Lead"</span> and tagged with flow source.
-                </div>
-              </div>
-
-              <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Exception Fallback</div>
-
-              <div className="bg-black/60 border border-amber-500/30 p-2.5 rounded-xl space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-bold text-amber-400">
-                  <span>🧠 STEP 4: AI FALLBACK</span>
-                  <span className="bg-amber-950 px-1.5 py-0.5 rounded text-[9px] font-mono">AI BRAIN</span>
-                </div>
-                <div className="text-xs text-gray-300 bg-[#14141f] p-2 rounded-lg border border-gray-800">
-                  If lead asks custom questions, handover seamlessly to Store AI Assistant.
-                </div>
-              </div>
+                  <div className="bg-black/60 border border-purple-500/30 p-2.5 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-purple-400">
+                      <span>🎯 STEP 2: AUTO-PILOT ACTION</span>
+                      <span className="bg-purple-950 px-1.5 py-0.5 rounded text-[9px] font-mono">MESSAGE NODE</span>
+                    </div>
+                    <div className="text-xs text-gray-200 bg-[#14141f] p-2 rounded-lg border border-gray-800 leading-relaxed">
+                      {selectedFlowForInspect.description || 'Sends automated reply and dynamic product/service cards'}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Actions */}
             <div className="pt-2 space-y-2">
+              <a
+                href={`/flow-builder?flowId=${selectedFlowForInspect.id}&workspaceId=${activeWorkspaceId}&platform=whatsapp`}
+                className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+              >
+                <ExternalLink size={14} />
+                <span>Open Full Visual Flow in Canvas 🎨</span>
+              </a>
               <button
                 onClick={() => {
                   alert(`🧪 Test Trigger Fired! Trigger "${selectedFlowForInspect.trigger}" processed successfully by Auto-Pilot.`);
