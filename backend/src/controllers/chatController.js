@@ -198,6 +198,15 @@ exports.sendManualMessage = async (req, res) => {
         timestamp: new Date()
       });
 
+      // 🚀 NEW: PAUSE AI FOR THIS INSTAGRAM CUSTOMER (HUMAN TAKEOVER)
+      const pauseUntilIg = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+      await Lead.findOneAndUpdate(
+        { phoneNumber: customerPhone, userId: userId },
+        { $set: { isAiPaused: true, aiPausedUntil: pauseUntilIg } },
+        { upsert: true }
+      );
+      console.log(`⏸️ [DEBUG Chat Flow] AI Paused for IG customer ${customerPhone} for 24 hours.`);
+
       // Dispatch IG message via Meta Graph API
       try {
         let recipientId = customerPhone.replace('IG_', '');
