@@ -599,23 +599,25 @@ function FlowBuilder() {
     <div className="flex flex-col h-[100dvh] bg-[#050505] text-gray-100 font-sans select-none overflow-hidden">
       
       {/* 🚀 UNIFIED RESPONSIVE HEADER */}
-      <header className="bg-[#0f0f13] border-b border-gray-800 px-3 py-2.5 z-40 flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="bg-[#0f0f13] border-b border-gray-800 px-3 py-2.5 z-40 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <button 
             onClick={handleBackToMobile}
-            className="p-2 rounded-xl bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors shrink-0"
             title="Back to Mobile App"
           >
             <ArrowLeft size={16} />
           </button>
 
-          <input 
-            type="text" 
-            value={flowName} 
-            onChange={(e) => setFlowName(e.target.value)} 
-            placeholder="Flow Name..." 
-            className="bg-black/60 border border-gray-700 text-white text-xs md:text-sm rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 font-semibold w-28 md:w-44 truncate"
-          />
+          <div className="relative flex-1 max-w-xs min-w-[110px]">
+            <input 
+              type="text" 
+              value={flowName} 
+              onChange={(e) => setFlowName(e.target.value)} 
+              placeholder="Flow Name..." 
+              className="w-full bg-black/60 border border-gray-700 text-white text-xs md:text-sm rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 font-semibold truncate"
+            />
+          </div>
 
           <select 
             value={platform} 
@@ -629,7 +631,7 @@ function FlowBuilder() {
           <select 
             value={selectedWorkspace} 
             onChange={(e) => setSelectedWorkspace(e.target.value)} 
-            className="hidden sm:block bg-black/60 border border-gray-700 text-white text-xs rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 cursor-pointer font-semibold max-w-[140px] truncate"
+            className="hidden sm:block bg-black/60 border border-gray-700 text-white text-xs rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 cursor-pointer font-semibold max-w-[140px] truncate shrink-0"
           >
             <option value="main">🏢 {mainBusinessName}</option>
             {workspaces.map(ws => (
@@ -638,7 +640,7 @@ function FlowBuilder() {
           </select>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           <button 
             onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} 
             className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
@@ -657,10 +659,10 @@ function FlowBuilder() {
           <button 
             onClick={handleSave} 
             disabled={isSaving} 
-            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50"
+            className="flex items-center gap-1 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50"
           >
             <Save size={14} />
-            <span>{isSaving ? '...' : 'Save'}</span>
+            <span>{isSaving ? 'Saving...' : 'Save Flow 💾'}</span>
           </button>
         </div>
       </header>

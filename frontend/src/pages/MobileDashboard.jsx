@@ -182,32 +182,12 @@ export default function MobileDashboard() {
     conversionRate: '0%'
   });
 
-  // Blog & SEO Articles List
-  const [blogArticles, setBlogArticles] = useState([
-    {
-      id: 'blog_1',
-      title: 'Top 10 Trends in Handcrafted Festive Sarees & Kurtas 2026',
-      slug: 'top-festive-saree-trends-2026',
-      seoKeywords: 'designer saree, buy kurta online, festive collection',
-      readTime: '3 min read',
-      status: 'PUBLISHED'
-    },
-    {
-      id: 'blog_2',
-      title: 'How DealClose AI Automates 24/7 WhatsApp Store Inquiries',
-      slug: 'how-ai-automates-whatsapp-sales',
-      seoKeywords: 'whatsapp business api, ai chatbot, automate orders',
-      readTime: '4 min read',
-      status: 'LIVE ON GOOGLE'
-    }
-  ]);
+  // Blog & SEO Articles List (Dynamic from Workspace)
+  const [blogArticles, setBlogArticles] = useState([]);
   const [newBlog, setNewBlog] = useState({ title: '', content: '', seoKeywords: '' });
 
-  // Staff Members List
-  const [staffList, setStaffList] = useState([
-    { id: 'st_1', name: 'Aman Sharma (Sales Manager)', phone: '+91 98260 11223', role: 'Sales Lead Manager', assignedLeads: 18 },
-    { id: 'st_2', name: 'Rohit Verma (Support Rep)', phone: '+91 94250 88990', role: 'Customer Support', assignedLeads: 9 }
-  ]);
+  // Staff Members List (Dynamic from Workspace)
+  const [staffList, setStaffList] = useState([]);
   const [newStaff, setNewStaff] = useState({ name: '', phone: '', role: 'Sales Agent' });
 
   // Chats Tab State (PERSISTED ON REFRESH)
@@ -607,7 +587,17 @@ export default function MobileDashboard() {
 
       // 7. Fetch Live Visual Flow Builder Flows from MongoDB (Desktop & Mobile Unified)
       const { data: flowsRes } = await api.get(`/whatsapp/flows?workspaceId=${currentWsId}`).catch(() => ({ data: [] }));
-      const liveFlows = Array.isArray(flowsRes?.data) ? flowsRes.data : (Array.isArray(flowsRes) ? flowsRes : []);
+      let liveFlows = Array.isArray(flowsRes?.data) ? flowsRes.data : (Array.isArray(flowsRes) ? flowsRes : []);
+      
+      // If no flows in this sub-workspace, also try main workspace or provide starter template flows
+      if ((!liveFlows || liveFlows.length === 0) && currentWsId !== 'main') {
+        const { data: mainFlowsRes } = await api.get('/whatsapp/flows?workspaceId=main').catch(() => ({ data: [] }));
+        const mainFlows = Array.isArray(mainFlowsRes?.data) ? mainFlowsRes.data : (Array.isArray(mainFlowsRes) ? mainFlowsRes : []);
+        if (mainFlows && mainFlows.length > 0) {
+          liveFlows = mainFlows;
+        }
+      }
+
       if (liveFlows && liveFlows.length > 0) {
         setFlowRules(liveFlows.map(f => ({
           id: f._id,
@@ -618,7 +608,47 @@ export default function MobileDashboard() {
           rawFlow: f
         })));
       } else {
-        setFlowRules([]);
+        // Ready-made Starter Flow for the business type
+        const isPropertyWorkspace = /property|estate|hub|flat|plot/i.test(profileData.businessName || '') || /property|estate|hub/i.test(currentWsId || '');
+        if (isPropertyWorkspace) {
+          setFlowRules([
+            {
+              id: 'fl_starter_1',
+              name: '🏡 Real Estate Lead Capture & Brochure Flow',
+              description: 'Auto-sends 2/3 BHK floor plans, price sheet PDF and asks for preferred site visit time.',
+              trigger: 'PROPERTY, PRICE, VISIT',
+              active: true,
+              isStarter: true
+            },
+            {
+              id: 'fl_starter_2',
+              name: '📍 Site Visit Confirmation & Location Pin',
+              description: 'Sends Google Map location, project address and confirms visit with sales manager.',
+              trigger: 'LOCATION, SITE VISIT',
+              active: true,
+              isStarter: true
+            }
+          ]);
+        } else {
+          setFlowRules([
+            {
+              id: 'fl_starter_1',
+              name: '🛍️ Store Catalog & 24/7 AI Sales Flow',
+              description: 'Sends digital product catalog link, answers pricing inquiries, and qualifies buyers.',
+              trigger: 'HI, PRICE, CATALOG',
+              active: true,
+              isStarter: true
+            },
+            {
+              id: 'fl_starter_2',
+              name: '📦 Order Status & VIP Support Auto-Pilot',
+              description: 'Tracks order shipments, shares tracking links, and auto-notifies support staff.',
+              trigger: 'STATUS, ORDER, TRACK',
+              active: true,
+              isStarter: true
+            }
+          ]);
+        }
       }
 
       // 8. Fetch Real WhatsApp Auto-Reply Rules for Selected Workspace
@@ -1168,7 +1198,13 @@ export default function MobileDashboard() {
       });
       const url = res.data?.url || res.data?.imageUrl;
       if (url) {
-        setNewProduct(prev => ({ ...prev, image: url }));
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+        const suggestedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+        setNewProduct(prev => ({
+          ...prev,
+          image: url,
+          name: prev.name && prev.name.trim() !== '' ? prev.name : suggestedName
+        }));
       }
     } catch (err) {
       console.error("Image upload failed:", err);
@@ -2528,26 +2564,40 @@ export default function MobileDashboard() {
                 </div>
 
                 <div className="space-y-2.5">
-                  {blogArticles.map(article => (
-                    <div key={article.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-white">{article.title}</span>
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono">
-                          ● {article.status}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-gray-400 flex items-center justify-between font-mono bg-black/40 p-2 rounded-xl">
-                        <span>Keywords: <strong className="text-amber-300">{article.seoKeywords}</strong></span>
-                        <span>{article.readTime}</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] text-purple-400 font-mono">slug: /{article.slug}</span>
-                        <button onClick={() => alert(`Opening Blog: https://dealcloseai.in/blog/${article.slug}`)} className="text-[10px] font-bold text-gray-300 hover:text-white flex items-center gap-1">
-                          <Eye size={12} /> View Live on Web
-                        </button>
-                      </div>
+                  {blogArticles.length === 0 ? (
+                    <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
+                      <FileText size={24} className="text-amber-400 mx-auto" />
+                      <div className="text-xs font-bold text-white">No Blog Articles Published Yet</div>
+                      <p className="text-[10px] text-gray-400">Write your first SEO article for <strong>{profileData.businessName}</strong> to rank on Google search and generate organic leads!</p>
+                      <button 
+                        onClick={() => setShowCreateBlogModal(true)} 
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-xs rounded-xl shadow-md"
+                      >
+                        + Write First Article ✍️
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    blogArticles.map(article => (
+                      <div key={article.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-white">{article.title}</span>
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono">
+                            ● {article.status}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-400 flex items-center justify-between font-mono bg-black/40 p-2 rounded-xl">
+                          <span>Keywords: <strong className="text-amber-300">{article.seoKeywords}</strong></span>
+                          <span>{article.readTime}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-purple-400 font-mono">slug: /{article.slug}</span>
+                          <button onClick={() => alert(`Opening Blog: https://dealcloseai.in/blog/${article.slug}`)} className="text-[10px] font-bold text-gray-300 hover:text-white flex items-center gap-1">
+                            <Eye size={12} /> View Live on Web
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -4355,25 +4405,82 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 9: Add Product / Item to Catalog with Single & Bulk Image Upload */}
+      {/* Modal 9: Add Product / Item to Catalog with Primary Top Photo Upload & Bulk Support */}
       {showAddProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <button onClick={() => setShowAddProductModal(false)} className="absolute top-4 right-4 text-gray-400">
-              <X size={16} />
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3.5 relative shadow-2xl max-h-[92vh] overflow-y-auto custom-scrollbar">
+            <button 
+              onClick={() => {
+                setShowAddProductModal(false);
+                setNewProduct({ name: '', price: '', image: '🛍️' });
+              }} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1"
+            >
+              <X size={18} />
             </button>
             <div className="flex items-center gap-2">
-              <ShoppingBag size={18} className="text-purple-400" />
-              <h3 className="text-sm font-bold text-white">Add Item to Catalog</h3>
+              <ShoppingBag size={20} className="text-purple-400" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Add Item to Catalog</h3>
+                <p className="text-[10px] text-gray-400">Store: <strong>{profileData.businessName}</strong></p>
+              </div>
             </div>
-            <p className="text-[10px] text-gray-400">Adding product for <strong>{profileData.businessName}</strong>:</p>
 
-            {/* Quick Bulk Upload Action */}
-            <div className="bg-purple-950/40 border border-purple-500/30 p-2.5 rounded-2xl space-y-1.5 text-center">
-              <div className="text-[11px] font-bold text-purple-300">📦 Multiple Photos at once?</div>
-              <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 w-full py-2 bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-600 hover:to-pink-600 text-white font-black text-xs rounded-xl shadow-md">
-                <ImageIcon size={14} />
-                <span>{isUploadingCatalogImage ? (bulkUploadProgress || 'Uploading...') : '📦 Bulk Upload Photos'}</span>
+            {/* 📸 #1 PROMINENT TOP PHOTO UPLOAD CARD */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-300 block">Step 1: Choose Product Photo 📸</label>
+              
+              {newProduct.image && newProduct.image.startsWith('http') ? (
+                <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500/60 bg-black h-36 flex items-center justify-center group shadow-md">
+                  <img src={newProduct.image} alt="Uploaded Item" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all gap-2">
+                    <label className="cursor-pointer px-3 py-1.5 bg-purple-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-lg">
+                      <Camera size={13} />
+                      <span>Change Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSingleCatalogImageUpload}
+                        disabled={isUploadingCatalogImage}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  <div className="absolute bottom-2 left-2 bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1">
+                    <Check size={11} /> Photo Uploaded
+                  </div>
+                </div>
+              ) : (
+                <label className={`cursor-pointer flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed transition-all ${
+                  isUploadingCatalogImage ? 'border-purple-500 bg-purple-950/30 animate-pulse' : 'border-purple-500/50 hover:border-purple-400 bg-purple-950/20 hover:bg-purple-950/40'
+                }`}>
+                  <div className="w-10 h-10 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center mb-1.5">
+                    {isUploadingCatalogImage ? <RefreshCw size={20} className="animate-spin" /> : <Camera size={20} />}
+                  </div>
+                  <div className="text-xs font-black text-white">
+                    {isUploadingCatalogImage ? 'Uploading Image to Cloud...' : '📸 Tap to Select Photo from Phone'}
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Supports Camera, Gallery & Files (JPG, PNG, WebP)</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSingleCatalogImageUpload}
+                    disabled={isUploadingCatalogImage}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* 📦 QUICK BULK UPLOAD ACTION */}
+            <div className="bg-gradient-to-r from-purple-950/60 to-pink-950/60 border border-purple-500/30 p-2.5 rounded-2xl flex items-center justify-between gap-2">
+              <div className="text-[10px] text-purple-200">
+                <span className="font-bold block">📦 Multiple Photos at once?</span>
+                <span className="text-gray-400 text-[9px]">Select 5-20 photos to bulk create catalog</span>
+              </div>
+              <label className="cursor-pointer shrink-0 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1">
+                <ImageIcon size={13} />
+                <span>{isUploadingCatalogImage ? (bulkUploadProgress || 'Uploading...') : 'Bulk Upload'}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -4383,15 +4490,9 @@ export default function MobileDashboard() {
                   className="hidden"
                 />
               </label>
-              <div className="text-[9px] text-gray-400">Auto-creates catalog entries for all selected photos!</div>
             </div>
 
-            <div className="flex items-center gap-2 my-1">
-              <div className="flex-1 h-px bg-gray-800"></div>
-              <span className="text-[9px] text-gray-500 uppercase font-mono">OR Add Single Product</span>
-              <div className="flex-1 h-px bg-gray-800"></div>
-            </div>
-
+            {/* Step 2: Name and Price Form */}
             <form onSubmit={async (e) => {
               e.preventDefault();
               if (!newProduct.name || !newProduct.price) return;
@@ -4407,7 +4508,7 @@ export default function MobileDashboard() {
                   id: savedItem._id || ('p_' + Date.now()),
                   name: savedItem.name,
                   price: `₹${savedItem.price}`,
-                  image: savedItem.imageUrl || '🛍️',
+                  image: savedItem.imageUrl || newProduct.image || '🛍️',
                   inStock: true
                 }, ...catalogItems]);
               } catch(err) {
@@ -4421,20 +4522,21 @@ export default function MobileDashboard() {
               }
               setNewProduct({ name: '', price: '', image: '🛍️' });
               setShowAddProductModal(false);
-            }} className="space-y-2 text-xs">
+            }} className="space-y-2.5 text-xs pt-1">
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Item / Property Name:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">Step 2: Item / Property Title:</label>
                 <input
                   type="text"
-                  placeholder="e.g. 3 BHK Luxury Flat or Kurta"
+                  placeholder="e.g. 3 BHK Luxury Flat or Designer Saree"
                   value={newProduct.name}
                   onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500 font-bold"
                   required
                 />
               </div>
+
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Price (in ₹):</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">Step 3: Price (₹):</label>
                 <input
                   type="text"
                   placeholder="e.g. ₹1,499 or ₹45,00,000"
@@ -4444,35 +4546,23 @@ export default function MobileDashboard() {
                   required
                 />
               </div>
+
               <div>
-                <div className="flex items-center justify-between pb-1">
-                  <label className="text-[10px] font-bold text-gray-400">Product Image:</label>
-                  <label className="cursor-pointer text-[10px] text-purple-400 font-bold hover:text-purple-300 flex items-center gap-1">
-                    <ImageIcon size={12} />
-                    <span>{isUploadingCatalogImage ? 'Uploading...' : '📸 Upload Photo'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleSingleCatalogImageUpload}
-                      disabled={isUploadingCatalogImage}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
+                <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Optional Emoji or Image URL:</label>
                 <input
                   type="text"
                   placeholder="e.g. 🏢 or 👗 or https://..."
                   value={newProduct.image}
                   onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none text-[11px]"
                 />
-                {newProduct.image && newProduct.image.startsWith('http') && (
-                  <div className="mt-2 rounded-xl overflow-hidden border border-gray-800 h-24 bg-black flex items-center justify-center">
-                    <img src={newProduct.image} alt="Preview" className="h-full w-full object-cover" />
-                  </div>
-                )}
               </div>
-              <button type="submit" disabled={isUploadingCatalogImage} className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black rounded-xl text-xs mt-2 shadow-lg">
+
+              <button 
+                type="submit" 
+                disabled={isUploadingCatalogImage} 
+                className="w-full py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:from-purple-500 hover:to-pink-500 text-white font-black rounded-xl text-xs mt-2 shadow-lg shadow-purple-600/20 disabled:opacity-50"
+              >
                 Add to Store Catalog 🛍️
               </button>
             </form>
