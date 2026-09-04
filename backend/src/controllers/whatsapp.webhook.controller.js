@@ -587,13 +587,42 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               }
 
-              // 5️⃣ OWNER MANUAL REPORT / MANAGER COMMANDS (Only if specifically asking for admin operations)
-              if (['admin', 'manager', 'copilot'].includes(incomingTextLower)) {
-                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *DealClose AI Operations Manager* hoon.\n\n📌 *Available Quick Commands:*\n• *REPORT* ya *LEADS* - Multi-channel live reporting dekhne ke liye\n• *RULES* - Active WhatsApp & Instagram automations check karne ke liye\n• *HOT LEADS* - Turant call karne ke liye top buyer leads dekhne ke liye\n• *PAUSE AI <Phone>* - Customer ke liye AI pause karne ke liye\n• *RESUME AI <Phone>* - Customer ke liye AI resume karne ke liye\n\n💡 *Tip:* Customer Automation Flow test karne ke liye bas *"HI"*, *"MENU"* ya koi bhi trigger keyword type karein!`;
+              // 5️⃣ GREETING & OWNER OPERATIONS MANAGER MENU
+              if (['hi', 'hello', 'hey', 'start', 'menu', 'admin', 'manager', 'copilot', 'help'].includes(incomingTextLower)) {
+                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *DealClose AI Operations Manager* hoon. Aap WhatsApp se hi apna business CRM, leads aur AI control kar sakte hain.\n\n📌 *Quick Commands:*\n• *REPORT* ya *LEADS* - Aaj ki Live WhatsApp & IG Report 📊\n• *HOT LEADS* - Top high-intent buyer leads list 🔥\n• *RULES* - Active WhatsApp & Instagram rules ⚙️\n• *TEST* - Customer Automation Flow test karne ke liye 🧪\n• *PAUSE AI <Phone>* - Kisi lead ke liye AI pause karein ⏸️\n• *RESUME AI <Phone>* - Lead ke liye AI resume karein ▶️\n\n💬 *AI Co-pilot se baat karein:*\nAap mujhse business growth ya automations par koi bhi sawal pooch sakte hain!`;
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerMenu);
                 await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerMenu, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue;
+              }
+
+              // 6️⃣ TEST FLOW PASSTHROUGH (If owner wants to test customer flows)
+              if (['test', 'test flow', 'flow test', 'flow', 'run flow'].includes(incomingTextLower)) {
+                console.log(`🧪 [Owner Mode] Owner requested to test customer flow.`);
+                // Allow execution to pass through to the Customer Flow Engine below!
+              } else {
+                // 7️⃣ OWNER AI CO-PILOT CHAT MODE (Ask questions, strategy & instructions)
+                const adminContext = `You are the executive AI Operations Manager & Co-pilot for ${user.businessName || 'the business'}. 
+The business owner/staff is texting you directly on WhatsApp. 
+Business Description: ${user.businessDescription || 'Modern business using omnichannel AI automations'}.
+Workspaces: ${(user.workspaces || []).map(w => w.name).join(', ') || 'Main Workspace'}.
+Connected Channels: WhatsApp Business API (Active), Instagram Marketing (Connected), Flow Builder Engine, Product Catalog.
+
+Your Role:
+1. Answer the owner professionally, warmly, concisely and actionably in natural Hinglish/English.
+2. If the owner asks how to change or add automations, explain step-by-step how to configure keyword rules in WhatsApp Rules (/whatsapp-rules), create visual drag-and-drop funnels in Flow Builder (/flow-builder), or set post triggers in Instagram Automation (/instagram-automation).
+3. If they ask about business growth, suggest high-converting follow-up tips, Meta ad click-to-WhatsApp strategies, or discount triggers.
+4. Keep responses crisp and easy to read on mobile with bullet points.`;
+
+                try {
+                  const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
+                  console.log(`✅ [DEBUG] Owner custom query. Sending AI Admin reply.`);
+                  await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`);
+                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  continue;
+                } catch (aiErr) {
+                  console.error('Owner AI error:', aiErr.message);
+                }
               }
             }
 
