@@ -139,6 +139,7 @@ const userSchema = new Schema({
     },
     instagramConfig: instagramConfigSchema, // ✅ USE: Using the new comprehensive schema
     // --- Separate AI Brain for each Workspace ---
+    aiName: { type: String, default: '' }, // Custom AI Agent Name for this workspace (falls back to main aiName)
     businessDescription: { type: String, default: '' }, // AI Training Data
     aiRules: { type: String, default: '' }, // Custom rules for AI
     aiAgentEnabled: { type: Boolean, default: false },
@@ -211,6 +212,7 @@ const userSchema = new Schema({
   },
   // --- New AI-related fields ---
   businessName: { type: String, default: '' },
+  aiName: { type: String, default: 'DealClose AI' }, // 🚀 Custom AI Agent Name (Default fallback: DealClose AI)
   businessDescription: { type: String, default: '' }, // AI Training Data
   aiRules: { type: String, default: '' }, // Custom rules for AI
   fallbackAction: { type: String, enum: ['notify_owner', 'wait_for_human'], default: 'notify_owner' }, // AI fallback

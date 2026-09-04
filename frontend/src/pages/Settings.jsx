@@ -136,6 +136,7 @@ export default function Settings() {
             const isProp = ws.name && ws.name.toLowerCase().includes('property');
             return {
               ...ws,
+              aiName: ws.aiName || '',
               instagramConfig: ws.instagramConfig || {},
               externalApiUrl: ws.externalApiUrl || (isProp ? 'https://newpropertyhub.in' : ''),
               externalApiPostUrl: ws.externalApiPostUrl || (isProp ? 'https://newpropertyhub.in/api/post' : ''),
@@ -146,6 +147,7 @@ export default function Settings() {
           }),
           aiAgentEnabled: savedData.aiAgentEnabled !== false,
           acceptCollabs: savedData.acceptCollabs || false,
+          aiName: savedData.aiName || 'DealClose AI',
           businessDescription: savedData.businessDescription || '',
           aiRules: savedData.aiRules || '',
           metaPixelId: savedData.metaAdsConfig?.pixelId || prevConfig.metaPixelId,
@@ -575,10 +577,17 @@ export default function Settings() {
                     </div>
                     
                     <div className="relative z-10">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">Primary Business Name</label>
                           <input type="text" name="businessName" value={config.businessName} onChange={handleChange} placeholder="e.g. DealClose AI" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-purple-500 outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-purple-300 mb-2 flex items-center justify-between">
+                            <span>🤖 AI Agent Name</span>
+                            <span className="text-[10px] text-gray-400 font-normal">Default: DealClose AI</span>
+                          </label>
+                          <input type="text" name="aiName" value={config.aiName || ''} onChange={handleChange} placeholder="e.g. Maya, Aarav, DealClose AI" className="w-full bg-[#0a0a0a] border border-purple-900/50 rounded-xl p-3 text-purple-200 focus:border-purple-500 outline-none" />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">Owner WhatsApp (For AI Alerts) <span className="text-rose-500">*</span></label>
@@ -979,7 +988,14 @@ export default function Settings() {
                       <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Short Menu Description *</label>
                       <input type="text" required value={activeWs.description} onChange={(e) => handleWorkspaceChange(wsIndex, 'description', e.target.value)} placeholder="e.g. Real Estate Sales" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
+                      <label className="block text-sm font-bold text-blue-400 uppercase mb-2 flex items-center justify-between">
+                        <span>🤖 Branch AI Agent Name</span>
+                        <span className="text-[10px] text-gray-500 font-normal">Default: {config.aiName || 'DealClose AI'}</span>
+                      </label>
+                      <input type="text" value={activeWs.aiName || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'aiName', e.target.value)} placeholder={`e.g. Property Mitra, Maya (Default: ${config.aiName || 'DealClose AI'})`} className="w-full bg-[#0a0a0a] border border-blue-900/50 rounded-xl p-3 text-blue-200 focus:border-blue-500 outline-none" />
+                    </div>
+                    <div>
                       <label className="block text-sm font-bold text-gray-500 uppercase mb-2">Branch Email ID</label>
                       <input type="email" value={activeWs.email || ''} onChange={(e) => handleWorkspaceChange(wsIndex, 'email', e.target.value)} placeholder="branch@yourbusiness.com" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none" />
                     </div>

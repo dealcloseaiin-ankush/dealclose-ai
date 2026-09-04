@@ -587,9 +587,11 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               }
 
+              const effectiveAiName = user.aiName || 'DealClose AI';
+
               // 5️⃣ GREETING & OWNER OPERATIONS MANAGER MENU
               if (['hi', 'hello', 'hey', 'start', 'menu', 'admin', 'manager', 'copilot', 'help'].includes(incomingTextLower)) {
-                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *DealClose AI Operations Manager* hoon. Aap WhatsApp se hi apna business CRM, leads aur AI control kar sakte hain.\n\n📌 *Quick Commands:*\n• *REPORT* ya *LEADS* - Aaj ki Live WhatsApp & IG Report 📊\n• *HOT LEADS* - Top high-intent buyer leads list 🔥\n• *RULES* - Active WhatsApp & Instagram rules ⚙️\n• *TEST* - Customer Automation Flow test karne ke liye 🧪\n• *PAUSE AI <Phone>* - Kisi lead ke liye AI pause karein ⏸️\n• *RESUME AI <Phone>* - Lead ke liye AI resume karein ▶️\n\n💬 *AI Co-pilot se baat karein:*\nAap mujhse business growth ya automations par koi bhi sawal pooch sakte hain!`;
+                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *${effectiveAiName} Operations Manager* hoon. Aap WhatsApp se hi apna business CRM, leads aur AI control kar sakte hain.\n\n📌 *Quick Commands:*\n• *REPORT* ya *LEADS* - Aaj ki Live WhatsApp & IG Report 📊\n• *HOT LEADS* - Top high-intent buyer leads list 🔥\n• *RULES* - Active WhatsApp & Instagram rules ⚙️\n• *TEST* - Customer Automation Flow test karne ke liye 🧪\n• *PAUSE AI <Phone>* - Kisi lead ke liye AI pause karein ⏸️\n• *RESUME AI <Phone>* - Lead ke liye AI resume karein ▶️\n\n💬 *AI Co-pilot se baat karein:*\nAap mujhse business growth ya automations par koi bhi sawal pooch sakte hain!`;
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerMenu);
                 await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerMenu, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
@@ -602,14 +604,15 @@ exports.handleWhatsApp = async (req, res) => {
                 // Allow execution to pass through to the Customer Flow Engine below!
               } else {
                 // 7️⃣ OWNER AI CO-PILOT CHAT MODE (Ask questions, strategy & instructions)
-                const adminContext = `You are the executive AI Operations Manager & Co-pilot for ${user.businessName || 'the business'}. 
+                const adminContext = `You are "${effectiveAiName}", the executive AI Operations Manager & Co-pilot for ${user.businessName || 'the business'}. 
 The business owner/staff is texting you directly on WhatsApp. 
+When introducing yourself, always refer to yourself as "${effectiveAiName}".
 Business Description: ${user.businessDescription || 'Modern business using omnichannel AI automations'}.
 Workspaces: ${(user.workspaces || []).map(w => w.name).join(', ') || 'Main Workspace'}.
 Connected Channels: WhatsApp Business API (Active), Instagram Marketing (Connected), Flow Builder Engine, Product Catalog.
 
 Your Role:
-1. Answer the owner professionally, warmly, concisely and actionably in natural Hinglish/English.
+1. Answer the owner professionally, warmly, concisely and actionably in natural Hinglish/English as their AI manager "${effectiveAiName}".
 2. If the owner asks how to change or add automations, explain step-by-step how to configure keyword rules in WhatsApp Rules (/whatsapp-rules), create visual drag-and-drop funnels in Flow Builder (/flow-builder), or set post triggers in Instagram Automation (/instagram-automation).
 3. If they ask about business growth, suggest high-converting follow-up tips, Meta ad click-to-WhatsApp strategies, or discount triggers.
 4. Keep responses crisp and easy to read on mobile with bullet points.`;
@@ -617,8 +620,8 @@ Your Role:
                 try {
                   const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
                   console.log(`✅ [DEBUG] Owner custom query. Sending AI Admin reply.`);
-                  await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`);
-                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *${effectiveAiName} Manager:*\n\n${aiAdminResponse}`);
+                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *${effectiveAiName} Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
                   continue;
                 } catch (aiErr) {
                   console.error('Owner AI error:', aiErr.message);
@@ -1122,7 +1125,29 @@ Your Role:
                 const customerNameContext = isNameKnown ? lead.name : "Unknown";
                 const customerNotesContext = lead && lead.notes ? lead.notes : "No previous history.";
 
-                let aiContext = `You are a highly efficient AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES:\n${ownerRules}\n\nCUSTOMER INFO:\nName: ${customerNameContext}\nCustomer History/Notes: ${customerNotesContext}\n\nCRITICAL BEHAVIOR RULES:\n1. Review the Customer History/Notes. If they answered bot questions (like City, Buyer or Seller), use that context to personalize your reply.\n2. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.\n3. Do NOT engage in irrelevant, personal, or non-business small talk.\n4. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.\n5. LEAD CAPTURE: If the user provides new details, use the 'update_customer_profile' tool.\nIf you don't know the answer, use the 'escalate_to_staff' tool.`;
+                const selectedWs = (user.workspaces || []).find(w => w._id?.toString() === workspaceId || w.id === workspaceId);
+                const effectiveAiName = (selectedWs && selectedWs.aiName) || user.aiName || 'DealClose AI';
+                const businessDisplayName = selectedWs ? selectedWs.name : (user.businessName || user.fullName || 'our business');
+
+                let aiContext = `You are "${effectiveAiName}", the official AI sales & customer support representative for "${businessDisplayName}".
+When introducing yourself or greeting customers, refer to yourself as "${effectiveAiName}".
+Business details: ${businessInfo}.
+
+STRICT OWNER RULES:
+${ownerRules}
+
+CUSTOMER INFO:
+Name: ${customerNameContext}
+Customer History/Notes: ${customerNotesContext}
+
+CRITICAL BEHAVIOR RULES:
+1. Greet the customer warmly and introduce yourself as "${effectiveAiName}" from "${businessDisplayName}" if this is the start of the conversation.
+2. Review the Customer History/Notes. If they answered bot questions (like City, Buyer or Seller), use that context to personalize your reply.
+3. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.
+4. Do NOT engage in irrelevant, personal, or non-business small talk.
+5. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.
+6. LEAD CAPTURE: If the user provides new details, use the 'update_customer_profile' tool.
+If you don't know the answer, use the 'escalate_to_staff' tool.`;
                 
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
                 if (user.aiCredits > 0 && user.aiCredits <= 200) {

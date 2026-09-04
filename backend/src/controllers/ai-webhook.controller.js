@@ -226,9 +226,10 @@ exports.handleWhatsApp = async (req, res) => {
             const normalizePhone = (phone) => (phone || '').replace(/\D/g, '').slice(-10);
             const isOwnerOrStaff = (user.ownerPhone && normalizePhone(user.ownerPhone) === normalizePhone(fromNumber)) || (user.staff && user.staff.some(s => s.phone && normalizePhone(s.phone) === normalizePhone(fromNumber)));
             if (isOwnerOrStaff) {
-              const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
+              const effectiveAiName = user.aiName || 'DealClose AI';
+              const adminContext = `You are "${effectiveAiName}", the backend AI assistant for the business owner of ${user.businessName || 'the business'}. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
               const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
-              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Admin:*\n\n${aiAdminResponse}`);
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *${effectiveAiName} Admin:*\n\n${aiAdminResponse}`);
               continue; 
             }
 
@@ -412,7 +413,11 @@ exports.handleWhatsApp = async (req, res) => {
                   }
                 }
 
-                let aiContext = `You are a helpful AI assistant for ${user.fullName}'s business. \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nCRITICAL: Never cut off your responses mid-sentence. Always finish your thoughts.\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons.\n4. LEAD CAPTURE: If the user provides their name, city, or business details, ALWAYS use the 'update_customer_profile' tool and extract as much info as possible.`;
+                const selectedWs = (user.workspaces || []).find(w => w._id?.toString() === workspaceId || w.id === workspaceId);
+                const effectiveAiName = (selectedWs && selectedWs.aiName) || user.aiName || 'DealClose AI';
+                const businessDisplayName = selectedWs ? selectedWs.name : (user.businessName || user.fullName || 'our business');
+
+                let aiContext = `You are "${effectiveAiName}", the official AI sales & support assistant for "${businessDisplayName}". \nBusiness details: ${businessInfo}.\n\nSTRICT OWNER RULES TO FOLLOW:\n${ownerRules}\n\nCRITICAL: Never cut off your responses mid-sentence. Always finish your thoughts.\nYou have a tool 'send_whatsapp_menu' to send WhatsApp buttons.\n4. LEAD CAPTURE: If the user provides their name, city, or business details, ALWAYS use the 'update_customer_profile' tool and extract as much info as possible.`;
                 
                 // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number)
                 if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {

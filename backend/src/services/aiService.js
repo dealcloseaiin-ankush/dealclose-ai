@@ -33,6 +33,7 @@ const MODELS = {
  */
 exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp") => {
   try {
+    let finalContext = systemContext || "You are a helpful AI assistant.";
     // 🎯 DEALCLOSE AI ULTRA SALES-CLOSING & HINGLISH TONE POLISH
     finalContext += `\n\n[CONVERSATIONAL TONE & LANGUAGE]:
 - Default to polite, warm, professional, natural Hinglish (mix of Hindi + English) which Indian customers love. If customer writes pure English, reply in crisp English.

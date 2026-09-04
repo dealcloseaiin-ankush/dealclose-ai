@@ -148,6 +148,7 @@ export default function MobileDashboard() {
   // Active Business Channel Profile, SEO & 🔗 Custom Webhooks
   const [profileData, setProfileData] = useState({
     businessName: 'DealClose AI',
+    aiName: 'DealClose AI',
     ownerPhone: '+91 98765 43210',
     managerPhone: '+91 98260 99887',
     logoUrl: '/logo.png',
@@ -462,6 +463,7 @@ export default function MobileDashboard() {
             externalApiSearchUrl: liveUser.externalApiSearchUrl || 'https://dealcloseai.in/api/search',
             externalApiVisitUrl: liveUser.externalApiVisitUrl || 'https://dealcloseai.in/api/visit',
             externalApiBlogUrl: liveUser.externalApiBlogUrl || 'https://dealcloseai.in/api/blog',
+            aiName: liveUser.aiName || 'DealClose AI',
             aiRules: liveUser.aiRules || '',
             businessDescription: liveUser.businessDescription || ''
           }
@@ -486,6 +488,7 @@ export default function MobileDashboard() {
                 externalApiSearchUrl: ws.externalApiSearchUrl || `https://${defaultDomain}/api/search`,
                 externalApiVisitUrl: ws.externalApiVisitUrl || `https://${defaultDomain}/api/visit`,
                 externalApiBlogUrl: ws.externalApiBlogUrl || `https://${defaultDomain}/api/blog`,
+                aiName: ws.aiName || '',
                 aiRules: ws.aiRules || '',
                 businessDescription: ws.businessDescription || ''
               });
@@ -724,6 +727,7 @@ export default function MobileDashboard() {
 
     setProfileData({
       businessName: ws.name,
+      aiName: ws.aiName || (isMain ? liveUser?.aiName : '') || liveUser?.aiName || 'DealClose AI',
       ownerPhone: ws.whatsappConfig?.displayPhoneNumber || liveUser?.phone || liveUser?.ownerPhone || '+91 98765 43210',
       managerPhone: '+91 98260 99887',
       logoUrl: liveUser?.logo || '/logo.png',
@@ -1223,7 +1227,8 @@ export default function MobileDashboard() {
           externalApiVisitUrl: profileData.externalApiVisitUrl,
           externalApiBlogUrl: profileData.externalApiBlogUrl,
           externalApiToken: profileData.externalApiToken,
-          customWebhooks: profileData.customWebhooks
+          customWebhooks: profileData.customWebhooks,
+          aiName: profileData.aiName
         });
       } else {
         const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
@@ -1231,6 +1236,7 @@ export default function MobileDashboard() {
             return {
               ...w,
               name: profileData.businessName,
+              aiName: profileData.aiName,
               logoUrl: profileData.logoUrl,
               externalApiUrl: profileData.externalApiUrl,
               externalApiPostUrl: profileData.externalApiPostUrl,
@@ -3779,6 +3785,24 @@ export default function MobileDashboard() {
                       onChange={(e) => setProfileData({ ...profileData, businessName: e.target.value })}
                       className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none"
                     />
+                  </div>
+
+                  <div className="bg-purple-950/20 border border-purple-800/40 p-2.5 rounded-xl space-y-1">
+                    <label className="text-[10px] font-bold text-purple-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Sparkles size={11} className="text-purple-400" />
+                        <span>🤖 AI Agent Name</span>
+                      </span>
+                      <span className="text-[9px] text-gray-400 font-normal">Default: DealClose AI</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={profileData.aiName || ''}
+                      onChange={(e) => setProfileData({ ...profileData, aiName: e.target.value })}
+                      placeholder="e.g. Maya, Aarav, DealClose AI"
+                      className="w-full bg-black border border-purple-900/50 rounded-lg p-1.5 text-purple-200 text-xs font-semibold focus:outline-none focus:border-purple-500"
+                    />
+                    <div className="text-[9px] text-gray-400">AI will introduce itself with this name to customers & owner.</div>
                   </div>
 
                   {/* 3 Dedicated Phone Channels */}

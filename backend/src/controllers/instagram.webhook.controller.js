@@ -791,11 +791,14 @@ exports.handleInstagramWebhook = async (req, res) => {
                 try {
                   let businessInfo = activeWorkspace ? activeWorkspace.description : (user.businessDescription || "an Instagram Creator");
                   let ownerRules = activeWorkspace ? activeWorkspace.aiRules : (user.aiRules || "Be professional and negotiate politely.");
+                  const effectiveAiName = (activeWorkspace && activeWorkspace.aiName) || user.aiName || 'DealClose AI';
+                  const businessDisplayName = activeWorkspace ? activeWorkspace.name : (user.businessName || 'this business');
                   
                   let aiContext = "";
                   
                   if (isCreator) {
-                    aiContext = `You are a professional Talent Manager AI for an influencer. 
+                    aiContext = `You are "${effectiveAiName}", a professional Talent Manager AI for an influencer. 
+When introducing yourself, refer to yourself as "${effectiveAiName}".
 Influencer Details/Media Kit: ${businessInfo}.
 Rules: ${ownerRules}.
 IMPORTANT: If the user's message is just "1", ask for brand name and deliverables first. 
@@ -804,7 +807,8 @@ As soon as you have the brand name (even without budget), call the extract_brand
 with whatever information is available (leave budget field empty/null if not provided).`;
                    
                  } else {
-                    aiContext = `You are a highly skilled Sales AI Assistant for ${activeWorkspace ? activeWorkspace.name : (user.businessName || 'this business')}. 
+                    aiContext = `You are "${effectiveAiName}", a highly skilled Sales AI Assistant for ${businessDisplayName}. 
+                    When introducing yourself, refer to yourself as "${effectiveAiName}".
                     Business Details/Catalog: ${businessInfo}.
                     Rules: ${ownerRules}.
                     IMPORTANT RULES: ALWAYS ask for Name, City, and WhatsApp Number before requirements tool execution.`;
@@ -1211,7 +1215,8 @@ with whatever information is available (leave budget field empty/null if not pro
              }
 
              try {
-                 let aiContext = `You are the friendly social media manager for ${user.businessName || 'this page'}. Reply to this Instagram comment: "${commentText}".`;
+                 const effectiveAiName = user.aiName || 'DealClose AI';
+                 let aiContext = `You are "${effectiveAiName}", the friendly social media AI manager for ${user.businessName || 'this page'}. Reply to this Instagram comment: "${commentText}".`;
                  aiContext += "\n\n[COMMENT AI RULES]: If the comment is just emoji, generic praise, spam, or does not need a response, reply with exactly NO_REPLY_NEEDED. Do not repeat similar phrasing to your last replies in this thread. Only answer what was actually asked, and do not initiate a new topic.";
                  aiContext += "\n\nKeep your reply extremely short, polite, and focused only on the comment. If you are sending a public reply, keep it under 15 words.";
                  const aiReply = await aiService.generateAIResponse(commentText, aiContext, 'instagram');

@@ -36,6 +36,7 @@ exports.getTrainingData = async (req, res) => {
     res.status(200).json({ 
       success: true, 
       data: user?.trainingData || [],
+      aiName: user?.aiName || 'DealClose AI',
       aiRules: user?.aiRules || '',
       businessDescription: user?.businessDescription || '',
       fallbackAction: user?.fallbackAction || 'notify_owner',
@@ -104,7 +105,7 @@ exports.trainAI = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
-    const { question, answer, aiRules, businessDescription, fallbackAction, workspaceId, type, triggerWord, replyMessage } = req.body;
+    const { question, answer, aiName, aiRules, businessDescription, fallbackAction, workspaceId, type, triggerWord, replyMessage } = req.body;
     let updateQuery = {};
     let setQuery = {};
 
@@ -116,6 +117,7 @@ exports.trainAI = async (req, res) => {
     }
     
     if (workspaceId && workspaceId !== 'main' && workspaceId !== 'main_business') {
+      if (aiName !== undefined) setQuery["workspaces.$.aiName"] = aiName;
       if (aiRules !== undefined) setQuery["workspaces.$.aiRules"] = aiRules;
       if (businessDescription !== undefined) setQuery["workspaces.$.businessDescription"] = businessDescription;
       
@@ -127,6 +129,7 @@ exports.trainAI = async (req, res) => {
         console.log(`✅ [DEBUG] AI Brain / Rules successfully saved to Workspace ${workspaceId}!`);
       }
     } else {
+      if (aiName !== undefined) setQuery.aiName = aiName.trim() === '' ? 'DealClose AI' : aiName.trim();
       if (aiRules !== undefined) setQuery.aiRules = aiRules;
       if (businessDescription !== undefined) setQuery.businessDescription = businessDescription;
       if (fallbackAction !== undefined) setQuery.fallbackAction = fallbackAction;

@@ -10,6 +10,7 @@ export default function AIAgent() {
   const { activeWorkspaceId } = useWorkspaceStore(); // 🚀 NEW: Use global state
   const [mainRules, setMainRules] = useState('');
   const [mainBusinessName, setMainBusinessName] = useState('Main Business');
+  const [aiName, setAiName] = useState('DealClose AI');
   const [aiCredits, setAiCredits] = useState(0);
 
   // 🚀 NEW: Trending queries state for 1-Click Auto Flow
@@ -22,6 +23,7 @@ export default function AIAgent() {
         setQueries(Array.isArray(data.data) ? data.data : []);
         setMainRules(data.aiRules || '');
         setMainBusinessName(data.businessName || 'Main Business');
+        setAiName(data.aiName || 'DealClose AI');
         setAiCredits(data.aiCredits || 0);
         
         // Page load hone par purana saved knowledge box me dikhana
@@ -58,8 +60,8 @@ export default function AIAgent() {
   const handleSaveKnowledge = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/ai/train', { aiRules: trainingText, workspaceId: activeWorkspaceId });
-      toast.success("Knowledge Base updated! AI is processing the new rules. 🧠");
+      await api.post('/ai/train', { aiName, aiRules: trainingText, workspaceId: activeWorkspaceId });
+      toast.success("Knowledge Base & AI Name updated! 🧠");
     } catch (error) {
       console.error("Failed to save knowledge:", error);
       toast.error("Failed to train AI. Please try again.");
@@ -88,13 +90,13 @@ export default function AIAgent() {
         <div>
           <div className="flex flex-wrap items-center gap-4 mb-2">
             <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">
-              AI Master Agent
+              AI Master Agent ({aiName || 'DealClose AI'})
             </h1>
             <span className="bg-purple-600/20 text-purple-400 border border-purple-500/30 px-4 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-purple-500/20">
               ⚡ AI Credits Left: {aiCredits}
             </span>
           </div>
-          <p className="text-gray-400">View smart insights and train your AI to handle complex customer queries.</p>
+          <p className="text-gray-400">View smart insights and train your AI to handle complex customer queries under your custom persona.</p>
         </div>
       </div>
 
@@ -102,10 +104,25 @@ export default function AIAgent() {
       <div className="mb-10 bg-[#111] p-6 md:p-8 rounded-3xl border border-purple-500/30 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="relative z-10">
-          <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">📚 Train AI (Knowledge Base)</h2>
-          <p className="text-gray-400 text-sm mb-6">Type your business rules, return policies, or paste text data here. AI will memorize this to answer customers.</p>
+          <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">📚 Train AI (Knowledge Base & Identity)</h2>
+          <p className="text-gray-400 text-sm mb-6">Configure your AI Agent's name and business knowledge. AI will introduce itself by this name when replying to customers and owner.</p>
 
           <form onSubmit={handleSaveKnowledge}>
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-purple-300 mb-2 flex items-center justify-between">
+                <span>🤖 AI Agent Name</span>
+                <span className="text-xs text-gray-400 font-normal">Default fallback: DealClose AI</span>
+              </label>
+              <input 
+                type="text"
+                value={aiName}
+                onChange={(e) => setAiName(e.target.value)}
+                placeholder="e.g. Maya, DealClose AI, Sarah"
+                className="w-full bg-[#0a0a0a] border border-purple-800/60 rounded-xl p-3 text-purple-200 focus:border-purple-500 outline-none font-semibold text-sm"
+              />
+            </div>
+
+            <label className="block text-sm font-bold text-gray-300 mb-2">Business Knowledge & Rules</label>
             <textarea 
               rows="4" 
               value={trainingText}

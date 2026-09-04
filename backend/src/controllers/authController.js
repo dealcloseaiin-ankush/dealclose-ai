@@ -1208,6 +1208,7 @@ exports.updateProfile = async (req, res) => {
 
     const { 
       businessName,
+      aiName,
       businessDescription, 
       aiRules, 
       fallbackAction,
@@ -1243,6 +1244,7 @@ exports.updateProfile = async (req, res) => {
     // Build the update object dynamically and safely
     const updateData = {};
     if (businessName !== undefined) updateData.businessName = businessName.trim() === '' ? 'Main Business' : businessName;
+    if (aiName !== undefined) updateData.aiName = aiName.trim() === '' ? 'DealClose AI' : aiName.trim();
     if (businessDescription !== undefined) updateData.businessDescription = businessDescription;
     if (aiRules !== undefined) updateData.aiRules = aiRules;
     if (fallbackAction !== undefined) updateData.fallbackAction = fallbackAction;
