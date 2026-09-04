@@ -77,13 +77,21 @@ const MobileDashboard = lazyWithRetry(() => import('./pages/MobileDashboard'));
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
-  return user ? <Navigate to="/dashboard" replace /> : children;
+  if (user) {
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || localStorage.getItem('dealclose_mobile_view') === 'true');
+    return <Navigate to={isMobile ? "/mobile" : "/dashboard"} replace />;
+  }
+  return children;
 };
 
 const RootRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
-  return user ? <Navigate to="/dashboard" replace /> : children;
+  if (user) {
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || localStorage.getItem('dealclose_mobile_view') === 'true');
+    return <Navigate to={isMobile ? "/mobile" : "/dashboard"} replace />;
+  }
+  return children;
 };
 
 // 🚀 GLOBAL NOTIFICATION SYSTEM: Plays sound and shows popup on ALL pages

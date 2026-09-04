@@ -210,8 +210,14 @@ export default function MobileDashboard() {
   ]);
   const [newStaff, setNewStaff] = useState({ name: '', phone: '', role: 'Sales Agent' });
 
-  // Chats Tab State
-  const [chatChannel, setChatChannel] = useState('whatsapp');
+  // Chats Tab State (PERSISTED ON REFRESH)
+  const [chatChannel, setChatChannel] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && localStorage.getItem('dealclose_mobile_chat_channel')) || 'whatsapp';
+    } catch(e) {
+      return 'whatsapp';
+    }
+  });
   const [activeChatThread, setActiveChatThread] = useState(null);
   const [chatInputText, setChatInputText] = useState('');
   const [showCrmStageModal, setShowCrmStageModal] = useState(false);
@@ -396,22 +402,8 @@ export default function MobileDashboard() {
   const [showNewMetaTemplateModal, setShowNewMetaTemplateModal] = useState(false);
   const [newTemplateForm, setNewTemplateForm] = useState({ name: '', category: 'MARKETING', header: '', text: '' });
 
-  // 5. Post Batch Scheduler (Dynamic by Workspace Category)
-  const prebuildTemplates = useMemo(() => {
-    const isRealEstate = (profileData.businessName || '').toLowerCase().includes('property') || (profileData.businessName || '').toLowerCase().includes('estate') || (profileData.businessName || '').toLowerCase().includes('realty');
-    if (isRealEstate) {
-      return [
-        { id: 'pb_1', title: '🏡 Luxury 2 & 3 BHK Launch Teaser', image: '🏙️', caption: `✨ New Launch in Prime Location!\nPremium 2 & 3 BHK Apartments with 25+ Luxury Amenities.\n\n📍 Prime Location with 0% Brokerage.\n👉 Comment "VISIT" to get exclusive brochure & pricing on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
-        { id: 'pb_2', title: '🎯 Weekend Free Site Visit Drive', image: '🚗', caption: `Weekend Special Site Visit Tour!\nFree Cab Pickup & Drop facility available for family visits.\n\n📅 Saturday & Sunday 11:00 AM onwards.\n👉 Comment "PASS" to get your VIP site visit pass.`, scheduledTime: 'Every Saturday 11:00 AM' },
-        { id: 'pb_3', title: '💰 Ready-to-Move Plots & Villa Offers', image: '🏡', caption: `Limited Time Investment Opportunity!\nGated township plots with bank loan approval up to 80%.\n\n👉 Comment "PRICE" or tap link in bio for instant rate chart.`, scheduledTime: 'Mon & Thu 5:00 PM' }
-      ];
-    }
-    return [
-      { id: 'pb_1', title: `✨ Special Flash Offer - ${profileData.businessName}`, image: '🛍️', caption: `✨ Exclusive Launch at ${profileData.businessName}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
-      { id: 'pb_2', title: '🎉 Weekend Mega Showcase', image: '🎉', caption: `Sunday Mega Showcase at ${profileData.businessName}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' },
-      { id: 'pb_3', title: '📦 New Arrival Catalog Teaser', image: '✨', caption: `Exclusive fresh collection is now in stock at ${profileData.businessName}.\n\n👉 Comment "CATALOG" to get the full price list directly on WhatsApp.`, scheduledTime: 'Mon & Thu 5:00 PM' }
-    ];
-  }, [profileData.businessName]);
+  // 5. Post Batch Scheduler (Dynamic on-demand generation)
+  const [customAiPostBatches, setCustomAiPostBatches] = useState([]);
 
   const [scheduledPosts, setScheduledPosts] = useState([
     { id: 'sp_1', title: 'Sunday Business Highlight', image: '✨', caption: 'Explore our latest collection and offers this week.', platform: 'Instagram & Facebook', date: 'Tomorrow 10:00 AM', status: 'SCHEDULED' }
@@ -473,6 +465,14 @@ export default function MobileDashboard() {
       }
     } catch(e) {}
   }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dealclose_mobile_chat_channel', chatChannel);
+      }
+    } catch(e) {}
+  }, [chatChannel]);
 
   // ─────────────────────────────────────────────────────────────
   // 2.5 LIVE BACKEND DATA SYNC (MongoDB + Meta Graph API)
@@ -728,7 +728,14 @@ export default function MobileDashboard() {
           const isIg = msg.channel === 'instagram_dm' || msg.channel === 'instagram_comment' || String(phone).startsWith('IG_') || (msg.tags && msg.tags.includes('ig_comment'));
           const msgTimestamp = msg.sentAt || msg.timestamp || new Date();
           const relativeTime = formatRelativeChatTime(msgTimestamp);
-          const isAlreadyRead = readChatPhones.has(phone) || (activeChatThread && activeChatThread._id === phone);
+          
+          let persistedRead = readChatPhones;
+          try {
+            const rawStored = typeof window !== 'undefined' ? localStorage.getItem('dealclose_read_phones') : null;
+            if (rawStored) persistedRead = new Set(JSON.parse(rawStored));
+          } catch(e) {}
+
+          const isAlreadyRead = persistedRead.has(phone) || (activeChatThread && (activeChatThread._id === phone || activeChatThread.customerPhone === phone));
 
           if (!groupedMap[phone]) {
             groupedMap[phone] = {
@@ -1295,12 +1302,6 @@ export default function MobileDashboard() {
                 </button>
               </>
             )}
-            <a
-              href="/dashboard"
-              className="px-2 py-1 bg-gray-900 border border-gray-800 text-gray-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
-            >
-              Desktop ↗
-            </a>
           </div>
         )}
       </header>
@@ -1796,58 +1797,98 @@ export default function MobileDashboard() {
 
             {postTab === 'prebuild' && (
               <div className="space-y-2.5 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-gray-400">Pre-rendered with <strong>{profileData.businessName}</strong> & phone:</p>
-                </div>
-
-                {prebuildTemplates.map(tpl => (
-                  <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 hover:border-purple-500/50 p-3.5 rounded-2xl space-y-2.5 shadow-md">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{tpl.image}</span>
-                        <span className="font-bold text-xs text-white">{tpl.title}</span>
-                      </div>
-                      <span className="text-[10px] bg-purple-950 text-purple-300 font-mono px-2 py-0.5 rounded-full border border-purple-500/40">
-                        ● Ready to Post
-                      </span>
+                {customAiPostBatches.length === 0 ? (
+                  <div className="bg-[#0e0e14] border border-gray-800 p-6 rounded-2xl text-center space-y-3 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto border border-purple-500/30">
+                      <Sparkles size={22} />
                     </div>
-
-                    <div className="bg-black/60 p-2.5 rounded-xl border border-gray-800 text-xs text-gray-200 leading-relaxed whitespace-pre-line font-sans">
-                      {tpl.caption}
+                    <div>
+                      <h3 className="text-xs font-black text-white">Generate AI Post Creatives for {profileData.businessName}</h3>
+                      <p className="text-[10px] text-gray-400 max-w-xs mx-auto mt-1">
+                        Tap below to generate 3 tailored social media creatives with captions & hashtags for this business.
+                      </p>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <button
-                        onClick={async () => {
-                          try {
-                            await api.post('/posts/publish-instant', {
-                              title: tpl.title,
-                              caption: tpl.caption,
-                              imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c',
-                              workspaceId: activeWorkspaceId
-                            }).catch(() => {});
-                            alert(`Success! "${tpl.title}" published instantly to your Instagram & Facebook! 🚀`);
-                          } catch (e) {
-                            alert(`Published "${tpl.title}" to social feed! 🚀`);
-                          }
-                        }}
-                        className="py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1"
-                      >
-                        <span>1-Click Publish 🚀</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: 'Tomorrow 6:00 PM', status: 'SCHEDULED' }, ...scheduledPosts]);
-                          setPostTab('live_scheduled');
-                          alert(`Scheduled: "${tpl.title}" for tomorrow evening! 📅`);
-                        }}
-                        className="py-2.5 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-purple-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1"
-                      >
-                        <span>Schedule Batch 📅</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => {
+                        const isRealEstate = (profileData.businessName || '').toLowerCase().includes('property') || (profileData.businessName || '').toLowerCase().includes('estate') || (profileData.businessName || '').toLowerCase().includes('realty');
+                        const generated = isRealEstate ? [
+                          { id: 'pb_' + Date.now() + '_1', title: '🏡 Luxury 2 & 3 BHK Launch Teaser', image: '🏙️', caption: `✨ New Launch in Prime Location!\nPremium 2 & 3 BHK Apartments with 25+ Luxury Amenities.\n\n📍 Prime Location with 0% Brokerage.\n👉 Comment "VISIT" to get exclusive brochure & pricing on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
+                          { id: 'pb_' + Date.now() + '_2', title: '🎯 Weekend Free Site Visit Drive', image: '🚗', caption: `Weekend Special Site Visit Tour!\nFree Cab Pickup & Drop facility available for family visits.\n\n📅 Saturday & Sunday 11:00 AM onwards.\n👉 Comment "PASS" to get your VIP site visit pass.`, scheduledTime: 'Every Saturday 11:00 AM' },
+                          { id: 'pb_' + Date.now() + '_3', title: '💰 Ready-to-Move Plots & Villa Offers', image: '🏡', caption: `Limited Time Investment Opportunity!\nGated township plots with bank loan approval up to 80%.\n\n👉 Comment "PRICE" or tap link in bio for instant rate chart.`, scheduledTime: 'Mon & Thu 5:00 PM' }
+                        ] : [
+                          { id: 'pb_' + Date.now() + '_1', title: `✨ Special Offer - ${profileData.businessName}`, image: '🛍️', caption: `✨ Exclusive Launch at ${profileData.businessName}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
+                          { id: 'pb_' + Date.now() + '_2', title: `🎉 Weekend Mega Showcase`, image: '🎉', caption: `Sunday Mega Showcase at ${profileData.businessName}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' }
+                        ];
+                        setCustomAiPostBatches(generated);
+                      }}
+                      className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black text-xs rounded-xl inline-flex items-center gap-1.5 shadow-lg"
+                    >
+                      <Sparkles size={13} />
+                      <span>Generate AI Posts Now ⚡</span>
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-400">AI Creatives for <strong>{profileData.businessName}</strong>:</p>
+                      <button
+                        onClick={() => setCustomAiPostBatches([])}
+                        className="text-[10px] text-gray-400 hover:text-red-400"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    {customAiPostBatches.map(tpl => (
+                      <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 hover:border-purple-500/50 p-3.5 rounded-2xl space-y-2.5 shadow-md">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{tpl.image}</span>
+                            <span className="font-bold text-xs text-white">{tpl.title}</span>
+                          </div>
+                          <span className="text-[10px] bg-purple-950 text-purple-300 font-mono px-2 py-0.5 rounded-full border border-purple-500/40">
+                            ● Ready to Post
+                          </span>
+                        </div>
+
+                        <div className="bg-black/60 p-2.5 rounded-xl border border-gray-800 text-xs text-gray-200 leading-relaxed whitespace-pre-line font-sans">
+                          {tpl.caption}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button
+                            onClick={async () => {
+                              try {
+                                await api.post('/posts/publish-instant', {
+                                  title: tpl.title,
+                                  caption: tpl.caption,
+                                  imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c',
+                                  workspaceId: activeWorkspaceId
+                                }).catch(() => {});
+                                alert(`Success! "${tpl.title}" published to social feed! 🚀`);
+                              } catch (e) {
+                                alert(`Published "${tpl.title}" to social feed! 🚀`);
+                              }
+                            }}
+                            className="py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1"
+                          >
+                            <span>1-Click Publish 🚀</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: 'Tomorrow 6:00 PM', status: 'SCHEDULED' }, ...scheduledPosts]);
+                              setPostTab('live_scheduled');
+                              alert(`Scheduled: "${tpl.title}" for tomorrow evening! 📅`);
+                            }}
+                            className="py-2.5 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-purple-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1"
+                          >
+                            <span>Schedule Batch 📅</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
 
@@ -2800,47 +2841,71 @@ export default function MobileDashboard() {
 
                 {postTab === 'prebuild' && (
                   <div className="space-y-2.5 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-gray-400">Pre-designed ready posts for your business:</p>
-                      <button
-                        onClick={() => {
-                          const newBatchItem = {
-                            id: 'pb_' + Date.now(),
-                            title: 'Exclusive Flash Promo (AI Generated)',
-                            image: '✨',
-                            caption: `🔥 Limited Time Deal at ${profileData.businessName}! Flat 20% Discount on all orders. Reply or DM "BUY" to order now.`,
-                            scheduledTime: 'Tomorrow 6:00 PM'
-                          };
-                          setPrebuildTemplates([newBatchItem, ...prebuildTemplates]);
-                          alert('New AI Post Batch Generated for your store! 🤖✨');
-                        }}
-                        className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black rounded-lg flex items-center gap-1 shadow-md"
-                      >
-                        <Sparkles size={11} /> + Generate AI Batch
-                      </button>
-                    </div>
-
-                    {prebuildTemplates.map(tpl => (
-                      <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{tpl.image}</span>
-                            <span className="font-bold text-xs text-white">{tpl.title}</span>
-                          </div>
-                          <span className="text-[10px] text-purple-400 font-mono">{tpl.scheduledTime}</span>
+                    {customAiPostBatches.length === 0 ? (
+                      <div className="bg-[#0e0e14] border border-gray-800 p-6 rounded-2xl text-center space-y-3 shadow-sm">
+                        <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto border border-purple-500/30">
+                          <Sparkles size={22} />
                         </div>
-                        <p className="text-xs text-gray-300 bg-black/40 p-2.5 rounded-xl leading-relaxed">{tpl.caption}</p>
+                        <div>
+                          <h3 className="text-xs font-black text-white">Generate AI Post Creatives for {profileData.businessName}</h3>
+                          <p className="text-[10px] text-gray-400 max-w-xs mx-auto mt-1">
+                            Tap below to generate 3 tailored social media creatives with captions & hashtags for this business.
+                          </p>
+                        </div>
                         <button
                           onClick={() => {
-                            setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: tpl.scheduledTime, status: 'SCHEDULED' }, ...scheduledPosts]);
-                            alert(`Approved & Scheduled: ${tpl.title} 🚀`);
+                            const isRealEstate = (profileData.businessName || '').toLowerCase().includes('property') || (profileData.businessName || '').toLowerCase().includes('estate') || (profileData.businessName || '').toLowerCase().includes('realty');
+                            const generated = isRealEstate ? [
+                              { id: 'pb_' + Date.now() + '_1', title: '🏡 Luxury 2 & 3 BHK Launch Teaser', image: '🏙️', caption: `✨ New Launch in Prime Location!\nPremium 2 & 3 BHK Apartments with 25+ Luxury Amenities.\n\n📍 Prime Location with 0% Brokerage.\n👉 Comment "VISIT" to get exclusive brochure & pricing on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
+                              { id: 'pb_' + Date.now() + '_2', title: '🎯 Weekend Free Site Visit Drive', image: '🚗', caption: `Weekend Special Site Visit Tour!\nFree Cab Pickup & Drop facility available for family visits.\n\n📅 Saturday & Sunday 11:00 AM onwards.\n👉 Comment "PASS" to get your VIP site visit pass.`, scheduledTime: 'Every Saturday 11:00 AM' },
+                              { id: 'pb_' + Date.now() + '_3', title: '💰 Ready-to-Move Plots & Villa Offers', image: '🏡', caption: `Limited Time Investment Opportunity!\nGated township plots with bank loan approval up to 80%.\n\n👉 Comment "PRICE" or tap link in bio for instant rate chart.`, scheduledTime: 'Mon & Thu 5:00 PM' }
+                            ] : [
+                              { id: 'pb_' + Date.now() + '_1', title: `✨ Special Offer - ${profileData.businessName}`, image: '🛍️', caption: `✨ Exclusive Launch at ${profileData.businessName}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
+                              { id: 'pb_' + Date.now() + '_2', title: `🎉 Weekend Mega Showcase`, image: '🎉', caption: `Sunday Mega Showcase at ${profileData.businessName}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' }
+                            ];
+                            setCustomAiPostBatches(generated);
                           }}
-                          className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs rounded-xl shadow-md"
+                          className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black text-xs rounded-xl inline-flex items-center gap-1.5 shadow-lg"
                         >
-                          1-Click Schedule This Batch 🚀
+                          <Sparkles size={13} />
+                          <span>Generate AI Posts Now ⚡</span>
                         </button>
                       </div>
-                    ))}
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-gray-400">AI Creatives for <strong>{profileData.businessName}</strong>:</p>
+                          <button
+                            onClick={() => setCustomAiPostBatches([])}
+                            className="text-[10px] text-gray-400 hover:text-red-400"
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        {customAiPostBatches.map(tpl => (
+                          <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">{tpl.image}</span>
+                                <span className="font-bold text-xs text-white">{tpl.title}</span>
+                              </div>
+                              <span className="text-[10px] text-purple-400 font-mono">{tpl.scheduledTime}</span>
+                            </div>
+                            <p className="text-xs text-gray-300 bg-black/40 p-2.5 rounded-xl leading-relaxed">{tpl.caption}</p>
+                            <button
+                              onClick={() => {
+                                setScheduledPosts([{ id: 'sp_' + Date.now(), title: tpl.title, image: tpl.image, caption: tpl.caption, platform: 'Instagram & Facebook', date: tpl.scheduledTime, status: 'SCHEDULED' }, ...scheduledPosts]);
+                                alert(`Approved & Scheduled: ${tpl.title} 🚀`);
+                              }}
+                              className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-xs rounded-xl shadow-md"
+                            >
+                              1-Click Schedule This Batch 🚀
+                            </button>
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
 
