@@ -25,20 +25,28 @@ class GlobalErrorBoundary extends React.Component {
           <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#ef444420', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', marginBottom: '16px' }}>
             ⚠️
           </div>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>DealClose AI Recovery Mode</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>DealClose AI</h2>
           <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '6px', maxWidth: '350px' }}>
-            A temporary session error occurred. Tap the button below to recover immediately.
+            A temporary screen refresh is needed. Tap below to reload seamlessly.
           </p>
-          <button
-            onClick={() => {
-              localStorage.clear();
-              sessionStorage.clear();
-              window.location.href = '/login';
-            }}
-            style={{ marginTop: '20px', padding: '12px 24px', background: '#10b981', color: '#000', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-          >
-            Reset Session & Launch App
-          </button>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <button
+              onClick={() => {
+                window.location.reload();
+              }}
+              style={{ padding: '10px 20px', background: '#10b981', color: '#000', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
+            >
+              🔄 Reload Screen
+            </button>
+            <button
+              onClick={() => {
+                window.location.href = '/mobile';
+              }}
+              style={{ padding: '10px 20px', background: '#374151', color: '#fff', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
+            >
+              📱 Mobile Home
+            </button>
+          </div>
         </div>
       );
     }

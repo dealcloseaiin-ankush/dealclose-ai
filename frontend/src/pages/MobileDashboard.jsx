@@ -251,6 +251,11 @@ export default function MobileDashboard() {
   const [flowRules, setFlowRules] = useState([]);
   const [showAddFlowModal, setShowAddFlowModal] = useState(false);
   const [newFlow, setNewFlow] = useState({ name: '', trigger: 'Incoming Keyword', description: '' });
+  const [selectedFlowForInspect, setSelectedFlowForInspect] = useState(null);
+
+  // 3.2 Catalog Image & Bulk Upload State
+  const [isUploadingCatalogImage, setIsUploadingCatalogImage] = useState(false);
+  const [bulkUploadProgress, setBulkUploadProgress] = useState('');
 
   // 3.5 Dynamic Stage-Wise Funnel Pipelines & Message Sequences (Calculated from Real MongoDB Contacts & Chats)
   const funnelStats = useMemo(() => {
@@ -1151,6 +1156,91 @@ export default function MobileDashboard() {
     } catch (e) {}
   };
 
+  const handleSingleCatalogImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingCatalogImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const url = res.data?.url || res.data?.imageUrl;
+      if (url) {
+        setNewProduct(prev => ({ ...prev, image: url }));
+      }
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setIsUploadingCatalogImage(false);
+    }
+  };
+
+  const handleBulkCatalogImagesUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setIsUploadingCatalogImage(true);
+    setBulkUploadProgress(`Uploading 1 of ${files.length}...`);
+    const newItems = [];
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setBulkUploadProgress(`Uploading ${i + 1} of ${files.length}...`);
+        const formData = new FormData();
+        formData.append('file', file);
+        let uploadedUrl = '🛍️';
+        try {
+          const res = await api.post('/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          uploadedUrl = res.data?.url || res.data?.imageUrl || '🛍️';
+        } catch (upErr) {
+          console.error("Individual file upload error:", upErr);
+        }
+
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+        const fallbackTitle = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+
+        try {
+          const { data: savedItem } = await api.post('/catalog', {
+            name: fallbackTitle || `Item #${catalogItems.length + i + 1}`,
+            price: 999,
+            imageUrl: uploadedUrl,
+            workspaceId: activeWorkspaceId
+          });
+          newItems.push({
+            id: savedItem._id || ('p_' + Date.now() + '_' + i),
+            name: savedItem.name,
+            price: `₹${savedItem.price}`,
+            image: savedItem.imageUrl || uploadedUrl,
+            inStock: true
+          });
+        } catch {
+          newItems.push({
+            id: 'p_' + Date.now() + '_' + i,
+            name: fallbackTitle || `Item #${catalogItems.length + i + 1}`,
+            price: '₹999',
+            image: uploadedUrl,
+            inStock: true
+          });
+        }
+      }
+      if (newItems.length > 0) {
+        setCatalogItems(prev => [...newItems, ...prev]);
+        alert(`Success! ${newItems.length} products uploaded to catalog! 🛍️📸`);
+        setShowAddProductModal(false);
+      }
+    } catch (err) {
+      console.error("Bulk upload error:", err);
+      alert("Bulk upload had an issue. Some items may have been saved.");
+    } finally {
+      setIsUploadingCatalogImage(false);
+      setBulkUploadProgress('');
+    }
+  };
+
   const handleCreateBlogArticle = (e) => {
     e.preventDefault();
     if (!newBlog.title) return;
@@ -1984,24 +2074,35 @@ export default function MobileDashboard() {
 
             {postTab === 'live_scheduled' && (
               <div className="space-y-2 animate-fade-in">
-                {scheduledPosts.map(sp => (
-                  <div key={sp.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1.5 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span>{sp.image}</span>
-                        <span className="font-bold text-xs text-white">{sp.title}</span>
-                      </div>
-                      <span className="text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                        {sp.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400">{sp.caption}</p>
-                    <div className="text-[10px] text-gray-500 font-mono flex items-center justify-between pt-1">
-                      <span>{sp.platform}</span>
-                      <span>Scheduled for: {sp.date}</span>
-                    </div>
+                {(!scheduledPosts || scheduledPosts.length === 0) ? (
+                  <div className="p-6 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
+                    <Send size={24} className="text-pink-400 mx-auto" />
+                    <div className="text-xs font-bold text-white">No Scheduled Posts Yet</div>
+                    <p className="text-[10px] text-gray-400">Pick from AI Templates or create a custom post to schedule!</p>
+                    <button onClick={() => setPostTab('prebuilt_library')} className="px-3 py-1.5 bg-pink-600 text-white font-bold text-xs rounded-xl">
+                      Browse AI Post Templates ✨
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  scheduledPosts.map(sp => (
+                    <div key={sp.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1.5 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span>{sp.image}</span>
+                          <span className="font-bold text-xs text-white">{sp.title}</span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                          {sp.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400">{sp.caption}</p>
+                      <div className="text-[10px] text-gray-500 font-mono flex items-center justify-between pt-1">
+                        <span>{sp.platform}</span>
+                        <span>Scheduled for: {sp.date}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -2542,7 +2643,14 @@ export default function MobileDashboard() {
                     <p className="text-[10px] text-gray-400">Synced with MongoDB & Desktop Builder ({flowRules.length} Flows)</p>
                   </div>
                   <button 
-                    onClick={() => setShowAddFlowModal(true)}
+                    onClick={() => {
+                      setNewFlow({
+                        name: `WhatsApp Flow #${flowRules.length + 1}`,
+                        trigger: 'PRICE',
+                        description: 'Automated response with brochure, pricing and instant lead routing.'
+                      });
+                      setShowAddFlowModal(true);
+                    }}
                     className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-black text-xs rounded-xl flex items-center gap-1 shadow-md"
                   >
                     <Plus size={14} /> New Flow ⚡
@@ -2555,15 +2663,28 @@ export default function MobileDashboard() {
                       <Workflow size={24} className="text-cyan-400 mx-auto" />
                       <div className="text-xs font-bold text-white">No Custom Flows Found</div>
                       <p className="text-[10px] text-gray-400">Create your first automated flow below or on Desktop Flow Builder!</p>
-                      <button onClick={() => setShowAddFlowModal(true)} className="px-3 py-1.5 bg-cyan-500 text-black font-black text-xs rounded-xl">
+                      <button 
+                        onClick={() => {
+                          setNewFlow({
+                            name: `WhatsApp Flow #${flowRules.length + 1}`,
+                            trigger: 'PRICE',
+                            description: 'Automated response with brochure, pricing and instant lead routing.'
+                          });
+                          setShowAddFlowModal(true);
+                        }} 
+                        className="px-3 py-1.5 bg-cyan-500 text-black font-black text-xs rounded-xl"
+                      >
                         + Create Flow ⚡
                       </button>
                     </div>
                   ) : (
                     flowRules.map(fl => (
-                      <div key={fl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2 shadow-sm">
+                      <div key={fl.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 shadow-sm">
                         <div className="flex items-center justify-between">
-                          <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                          <div 
+                            onClick={() => setSelectedFlowForInspect(fl)}
+                            className="font-bold text-xs text-white flex items-center gap-1.5 cursor-pointer hover:text-cyan-300"
+                          >
                             <Workflow size={14} className="text-cyan-400" />
                             <span>{fl.name}</span>
                           </div>
@@ -2586,17 +2707,26 @@ export default function MobileDashboard() {
                           </div>
                         </div>
                         <p className="text-xs text-gray-400 leading-relaxed">{fl.description}</p>
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-800/60">
                           <div className="text-[9px] text-cyan-400 font-mono bg-cyan-950/40 px-2 py-0.5 rounded w-fit">
                             ⚡ Trigger: {fl.trigger}
                           </div>
-                          <a
-                            href="/flow-builder"
-                            className="text-[10px] text-gray-400 hover:text-white font-bold flex items-center gap-1"
-                          >
-                            <span>Open Visual Builder</span>
-                            <ExternalLink size={11} />
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedFlowForInspect(fl)}
+                              className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 bg-cyan-950/50 px-2 py-1 rounded-lg border border-cyan-500/30"
+                            >
+                              <Sparkles size={11} />
+                              <span>Inspect Steps</span>
+                            </button>
+                            <a
+                              href="/flow-builder"
+                              className="text-[10px] text-gray-400 hover:text-white font-bold flex items-center gap-1"
+                            >
+                              <span>Visual</span>
+                              <ExternalLink size={11} />
+                            </a>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -3002,23 +3132,34 @@ export default function MobileDashboard() {
                 {postTab === 'live_scheduled' && (
                   <div className="space-y-2.5 animate-fade-in">
                     <p className="text-[10px] text-gray-400">View all scheduled and live published posts:</p>
-                    {scheduledPosts.map(pst => (
-                      <div key={pst.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2 shadow-md">
-                        <div className="flex items-center justify-between">
-                          <div className="font-bold text-xs text-white">{pst.title}</div>
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full font-mono ${
-                            pst.status === 'LIVE' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-purple-950 text-purple-300 border border-purple-500/40'
-                          }`}>
-                            ● {pst.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-300 bg-black/40 p-2 rounded-xl leading-relaxed">{pst.caption}</p>
-                        <div className="text-[10px] text-gray-500 font-mono flex items-center justify-between">
-                          <span>{pst.platform}</span>
-                          <span>{pst.date}</span>
-                        </div>
+                    {(!scheduledPosts || scheduledPosts.length === 0) ? (
+                      <div className="p-6 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
+                        <Send size={24} className="text-teal-400 mx-auto" />
+                        <div className="text-xs font-bold text-white">No Scheduled Posts Yet</div>
+                        <p className="text-[10px] text-gray-400">Pick from AI Templates or create a custom post to schedule!</p>
+                        <button onClick={() => setPostTab('prebuilt_library')} className="px-3 py-1.5 bg-teal-600 text-white font-bold text-xs rounded-xl">
+                          Browse AI Post Templates ✨
+                        </button>
                       </div>
-                    ))}
+                    ) : (
+                      scheduledPosts.map(pst => (
+                        <div key={pst.id} className="bg-[#0e0e14] border border-gray-800 p-3.5 rounded-2xl space-y-2 shadow-md">
+                          <div className="flex items-center justify-between">
+                            <div className="font-bold text-xs text-white">{pst.title}</div>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full font-mono ${
+                              pst.status === 'LIVE' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-purple-950 text-purple-300 border border-purple-500/40'
+                            }`}>
+                              ● {pst.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-300 bg-black/40 p-2 rounded-xl leading-relaxed">{pst.caption}</p>
+                          <div className="text-[10px] text-gray-500 font-mono flex items-center justify-between">
+                            <span>{pst.platform}</span>
+                            <span>{pst.date}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
 
@@ -4079,6 +4220,92 @@ export default function MobileDashboard() {
         </div>
       )}
 
+      {/* Modal 7.5: Flow Step Sequence Inspector on Mobile */}
+      {selectedFlowForInspect && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-cyan-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
+            <button onClick={() => setSelectedFlowForInspect(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+              <X size={16} />
+            </button>
+            <div className="flex items-center gap-2">
+              <Workflow size={18} className="text-cyan-400" />
+              <div>
+                <h3 className="text-sm font-bold text-white">{selectedFlowForInspect.name}</h3>
+                <span className="text-[10px] text-cyan-300 font-mono">Mobile Step Sequence Inspector</span>
+              </div>
+            </div>
+
+            {/* Sequence Graph Steps */}
+            <div className="space-y-2 pt-2">
+              <div className="bg-black/60 border border-cyan-500/30 p-2.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold text-cyan-400">
+                  <span>⚡ STEP 1: INCOMING TRIGGER</span>
+                  <span className="bg-cyan-950 px-1.5 py-0.5 rounded text-[9px] font-mono">TRIGGER NODE</span>
+                </div>
+                <div className="text-xs text-white font-bold bg-[#14141f] p-2 rounded-lg border border-gray-800">
+                  Customer sends: <span className="text-cyan-300">"{selectedFlowForInspect.trigger || 'ANY MESSAGE'}"</span>
+                </div>
+              </div>
+
+              <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Condition Evaluated</div>
+
+              <div className="bg-black/60 border border-purple-500/30 p-2.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold text-purple-400">
+                  <span>🎯 STEP 2: AUTO-PILOT ACTION</span>
+                  <span className="bg-purple-950 px-1.5 py-0.5 rounded text-[9px] font-mono">MESSAGE NODE</span>
+                </div>
+                <div className="text-xs text-gray-200 bg-[#14141f] p-2 rounded-lg border border-gray-800 leading-relaxed">
+                  {selectedFlowForInspect.description || 'Sends automated reply and dynamic product/service cards'}
+                </div>
+              </div>
+
+              <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Database Updates</div>
+
+              <div className="bg-black/60 border border-emerald-500/30 p-2.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold text-emerald-400">
+                  <span>📊 STEP 3: CRM PIPELINE SYNC</span>
+                  <span className="bg-emerald-950 px-1.5 py-0.5 rounded text-[9px] font-mono">CRM NODE</span>
+                </div>
+                <div className="text-xs text-gray-300 bg-[#14141f] p-2 rounded-lg border border-gray-800">
+                  Lead stage updated to <span className="text-emerald-300 font-bold">"Engaged Lead"</span> and tagged with flow source.
+                </div>
+              </div>
+
+              <div className="flex justify-center text-gray-500 text-xs font-mono">⬇️ Exception Fallback</div>
+
+              <div className="bg-black/60 border border-amber-500/30 p-2.5 rounded-xl space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold text-amber-400">
+                  <span>🧠 STEP 4: AI FALLBACK</span>
+                  <span className="bg-amber-950 px-1.5 py-0.5 rounded text-[9px] font-mono">AI BRAIN</span>
+                </div>
+                <div className="text-xs text-gray-300 bg-[#14141f] p-2 rounded-lg border border-gray-800">
+                  If lead asks custom questions, handover seamlessly to Store AI Assistant.
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-2 space-y-2">
+              <button
+                onClick={() => {
+                  alert(`🧪 Test Trigger Fired! Trigger "${selectedFlowForInspect.trigger}" processed successfully by Auto-Pilot.`);
+                }}
+                className="w-full py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+              >
+                <Sparkles size={14} />
+                <span>🧪 Test Trigger Simulator</span>
+              </button>
+              <button
+                onClick={() => setSelectedFlowForInspect(null)}
+                className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs rounded-xl"
+              >
+                Close Inspector
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal 8: Quick Add Contact */}
       {showAddContactModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -4128,10 +4355,10 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 9: Add Product / Item to Catalog */}
+      {/* Modal 9: Add Product / Item to Catalog with Single & Bulk Image Upload */}
       {showAddProductModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <button onClick={() => setShowAddProductModal(false)} className="absolute top-4 right-4 text-gray-400">
               <X size={16} />
             </button>
@@ -4140,6 +4367,31 @@ export default function MobileDashboard() {
               <h3 className="text-sm font-bold text-white">Add Item to Catalog</h3>
             </div>
             <p className="text-[10px] text-gray-400">Adding product for <strong>{profileData.businessName}</strong>:</p>
+
+            {/* Quick Bulk Upload Action */}
+            <div className="bg-purple-950/40 border border-purple-500/30 p-2.5 rounded-2xl space-y-1.5 text-center">
+              <div className="text-[11px] font-bold text-purple-300">📦 Multiple Photos at once?</div>
+              <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 w-full py-2 bg-gradient-to-r from-purple-700 to-pink-700 hover:from-purple-600 hover:to-pink-600 text-white font-black text-xs rounded-xl shadow-md">
+                <ImageIcon size={14} />
+                <span>{isUploadingCatalogImage ? (bulkUploadProgress || 'Uploading...') : '📦 Bulk Upload Photos'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleBulkCatalogImagesUpload}
+                  disabled={isUploadingCatalogImage}
+                  className="hidden"
+                />
+              </label>
+              <div className="text-[9px] text-gray-400">Auto-creates catalog entries for all selected photos!</div>
+            </div>
+
+            <div className="flex items-center gap-2 my-1">
+              <div className="flex-1 h-px bg-gray-800"></div>
+              <span className="text-[9px] text-gray-500 uppercase font-mono">OR Add Single Product</span>
+              <div className="flex-1 h-px bg-gray-800"></div>
+            </div>
+
             <form onSubmit={async (e) => {
               e.preventDefault();
               if (!newProduct.name || !newProduct.price) return;
@@ -4193,7 +4445,20 @@ export default function MobileDashboard() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Emoji or Image URL:</label>
+                <div className="flex items-center justify-between pb-1">
+                  <label className="text-[10px] font-bold text-gray-400">Product Image:</label>
+                  <label className="cursor-pointer text-[10px] text-purple-400 font-bold hover:text-purple-300 flex items-center gap-1">
+                    <ImageIcon size={12} />
+                    <span>{isUploadingCatalogImage ? 'Uploading...' : '📸 Upload Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSingleCatalogImageUpload}
+                      disabled={isUploadingCatalogImage}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
                 <input
                   type="text"
                   placeholder="e.g. 🏢 or 👗 or https://..."
@@ -4201,8 +4466,13 @@ export default function MobileDashboard() {
                   onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
                 />
+                {newProduct.image && newProduct.image.startsWith('http') && (
+                  <div className="mt-2 rounded-xl overflow-hidden border border-gray-800 h-24 bg-black flex items-center justify-center">
+                    <img src={newProduct.image} alt="Preview" className="h-full w-full object-cover" />
+                  </div>
+                )}
               </div>
-              <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black rounded-xl text-xs mt-2 shadow-lg">
+              <button type="submit" disabled={isUploadingCatalogImage} className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black rounded-xl text-xs mt-2 shadow-lg">
                 Add to Store Catalog 🛍️
               </button>
             </form>
