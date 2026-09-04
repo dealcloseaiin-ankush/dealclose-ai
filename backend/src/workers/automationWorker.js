@@ -343,25 +343,36 @@ const automationWorker = new Worker('automationQueue', async job => {
     for (const user of users) {
       if (!user.ownerPhone) continue;
 
-      const hotLeads = await Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating'] } });
-      const warmLeads = await Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested'] } });
-      const coldLeads = await Lead.countDocuments({ userId: user._id, status: 'cold' });
-      const existingCustomers = await Lead.countDocuments({ userId: user._id, status: 'existing' });
-      const followUpsToday = await Lead.find({ userId: user._id, nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } });
+      const [totalLeads, newLeadsToday, activeLeadsToday, hotLeads, warmLeads, coldLeads, existingCustomers, followUpsToday] = await Promise.all([
+        Lead.countDocuments({ userId: user._id }),
+        Lead.countDocuments({ userId: user._id, createdAt: { $gte: startOfDay } }),
+        Lead.find({ userId: user._id, $or: [{ createdAt: { $gte: startOfDay } }, { lastInteractionAt: { $gte: startOfDay } }, { updatedAt: { $gte: startOfDay } }] }).limit(5),
+        Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating'] } }),
+        Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested'] } }),
+        Lead.countDocuments({ userId: user._id, status: 'cold' }),
+        Lead.countDocuments({ userId: user._id, status: 'existing' }),
+        Lead.find({ userId: user._id, nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } })
+      ]);
 
-      let msg = `🤖 *DealClose AI: Daily CRM Summary*\nGood Morning! Here is your lead status update:\n\n`;
-      msg += `🔥 *${hotLeads}* Hot Leads\n`;
-      msg += `🌟 *${warmLeads}* Warm Leads\n`;
-      msg += `❄️ *${coldLeads}* Cold Leads\n`;
-      msg += `💼 *${existingCustomers}* Existing Customers\n\n`;
+      let msg = `🤖 *DealClose AI: Daily Morning Briefing* ☀️\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n\n`;
+      msg += `📈 *Live Status:*\n`;
+      msg += `• 🆕 *New Leads:* ${newLeadsToday}\n`;
+      msg += `• 💬 *Active Inquiries:* ${activeLeadsToday.length}\n`;
+      msg += `• 👥 *Total CRM Database:* ${totalLeads}\n\n`;
+      msg += `🔥 *Pipeline Breakdown:*\n`;
+      msg += `• Hot Leads: *${hotLeads}* 🔥\n`;
+      msg += `• Warm Leads: *${warmLeads}* 🌟\n`;
+      msg += `• Cold Leads: *${coldLeads}* ❄️\n`;
+      msg += `• Existing Customers: *${existingCustomers}* 💼\n\n`;
 
       if (followUpsToday.length > 0) {
         msg += `📅 *Today's Follow-ups (${followUpsToday.length}):*\n`;
         followUpsToday.slice(0, 5).forEach(l => { msg += `- ${l.name} (${l.phoneNumber})\n`; });
-        if (followUpsToday.length > 5) msg += `+ ${followUpsToday.length - 5} more... Please check your CRM dashboard.`;
+        if (followUpsToday.length > 5) msg += `+ ${followUpsToday.length - 5} more... Please check your CRM dashboard.\n`;
       } else {
-        msg += `📅 No follow-ups scheduled for today.`;
+        msg += `📅 No follow-ups scheduled for today.\n`;
       }
+      msg += `━━━━━━━━━━━━━━━━━━━\n💡 Reply *"LEADS"* or *"REPORT"* anytime for an instant update.`;
 
       let formattedPhone = user.ownerPhone.replace(/\D/g, ''); 
       if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;
@@ -450,54 +461,56 @@ const automationWorker = new Worker('automationQueue', async job => {
   }
 }, { 
   connection,
-  // 🔴 TRICK: Stop the "Tick-Tick" polling!
   settings: {
-    drainDelay: 60000,      // Jab queue khali ho, toh agla check 60 seconds baad kare (Default 5s hota hai)
-    stalledInterval: 300000 // Stalled jobs ko har 5 minute me check kare, bar-bar nahi
+    drainDelay: 60000,      // Jab queue khali ho, toh agla check 60 seconds baad kare
+    stalledInterval: 300000 // Stalled jobs ko har 5 minute me check kare
   }
 });
 
-// 🔴 PREVENT CRASH: Worker fail hone par process kill hone se bachayega
 automationWorker.on('error', err => {
   console.error('⚠️ [BullMQ Worker Error]:', err.message);
 });
 
-// 🚀 NEW: Start the Daily Cron Job for Auto Backups
-// This runs every day at 10:00 AM automatically
+// 🚀 RECURRING CRON SCHEDULES WITH ASIA/KOLKATA TIMEZONE (Fixes 6-8 Hours Delay!)
 automationQueue.add('daily_auto_backup', {}, {
   repeat: {
-    pattern: '0 10 * * *' // Cron syntax for 10:00 AM daily
+    pattern: '0 10 * * *',
+    tz: 'Asia/Kolkata'
   },
   jobId: 'system_daily_backup'
 });
 
-// 🚀 NEW: Start the Daily Cron Job for Token Refresh
-// Runs every day at 02:00 AM automatically (Low traffic time)
 automationQueue.add('daily_token_refresh', {}, {
   repeat: {
-    pattern: '0 2 * * *' // Cron syntax for 02:00 AM daily
+    pattern: '0 2 * * *',
+    tz: 'Asia/Kolkata'
   },
   jobId: 'system_token_refresh'
 });
 
-// Store account metrics every day so follower/reach growth is available even
-// when the user does not open the dashboard.
 automationQueue.add('capture_instagram_insights', {}, {
-  repeat: { pattern: '10 0 * * *' },
+  repeat: { 
+    pattern: '10 0 * * *',
+    tz: 'Asia/Kolkata'
+  },
   jobId: 'daily_instagram_insight_snapshot'
 });
 
-// 🚀 NEW: Start the Daily Cron Job for CRM Summary & Follow-ups
-// Runs every day at 09:00 AM automatically
+// 09:00 AM IST Morning Briefing
 automationQueue.add('daily_crm_summary', {}, {
-  repeat: { pattern: '0 9 * * *' }, // Cron syntax for 09:00 AM daily
+  repeat: { 
+    pattern: '0 9 * * *',
+    tz: 'Asia/Kolkata'
+  },
   jobId: 'daily_crm_summary_job'
 });
 
-// 🚀 NEW: Start the Daily Cron Job for Auto-Pilot Marketer (Social Media)
-// Runs every day at 10:00 AM automatically
+// 10:00 AM IST Auto-Pilot Social Post
 automationQueue.add('generate_social_post', {}, {
-  repeat: { pattern: '0 10 * * *' }, // Cron syntax for 10:00 AM daily
+  repeat: { 
+    pattern: '0 10 * * *',
+    tz: 'Asia/Kolkata'
+  },
   jobId: 'generate_social_post_job'
 });
 

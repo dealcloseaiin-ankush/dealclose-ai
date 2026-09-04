@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
+import useWorkspaceStore from '../store/workspaceStore';
 import { Link } from 'react-router-dom';
 import { Bot, RefreshCw, Layers, Grid, Sliders, MessageSquare, Zap, Heart, Eye, Inbox, FileText, BarChart3, Sparkles, BrainCircuit } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
@@ -10,8 +11,9 @@ import PostInsightsModal from '../components/PostInsightsModal'; // Naya compone
 
 export default function InstagramAutomation() {
   const { user } = useAuth() || {};
+  const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore();
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
-  const [activeWorkspace, setActiveWorkspace] = useState('main');
+  const [activeWorkspace, setActiveWorkspace] = useState(() => localStorage.getItem('dealclose_active_workspace') || activeWorkspaceId || 'main');
   const [activeTab, setActiveTab] = useState('posts'); 
 
   const [insights, setInsights] = useState({
@@ -458,7 +460,13 @@ export default function InstagramAutomation() {
             </h1>
             <select
               value={activeWorkspace} 
-              onChange={(e) => setActiveWorkspace(e.target.value)} 
+              onChange={(e) => {
+                const newWs = e.target.value;
+                setActiveWorkspace(newWs);
+                setActiveWorkspaceId(newWs);
+                localStorage.setItem('dealclose_active_workspace', newWs);
+                localStorage.setItem('active_workspace_id', newWs);
+              }} 
               className="bg-[#111] border border-gray-800 text-white text-sm font-semibold rounded-lg px-3 py-1.5 outline-none focus:border-pink-500 cursor-pointer shadow-sm"
             >
               {workspaces.map(ws => (

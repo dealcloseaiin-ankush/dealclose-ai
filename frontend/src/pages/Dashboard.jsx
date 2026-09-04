@@ -134,8 +134,55 @@ export default function Dashboard() {
           </div>
           <p className="text-gray-400 text-lg">Welcome back. Here is how your AI Agent is performing today.</p>
         </div>
-        <Link to="/automations" className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/30 transition-all text-center">
-          View Automations
+        <div className="flex flex-wrap gap-2.5">
+          <Link to="/flow-builder" className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-black font-extrabold rounded-xl shadow-lg transition-all text-sm flex items-center gap-1.5">
+            <span>⚡ Flow Builder</span>
+          </Link>
+          <Link to="/automations" className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/30 transition-all text-sm flex items-center gap-1.5">
+            <span>All Automations</span>
+          </Link>
+          <Link to="/mobile" className="px-4 py-2 bg-gray-900 border border-gray-700 hover:border-gray-500 text-gray-200 font-bold rounded-xl transition-all text-sm flex items-center gap-1.5">
+            <span>📱 Mobile App</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* 🚀 QUICK AUTOMATION WORKFLOWS LAUNCHPAD */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Link to="/flow-builder" className="p-4 bg-gradient-to-br from-[#0e1713] to-[#111] border border-emerald-500/30 hover:border-emerald-500/70 rounded-2xl transition-all group shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-2xl">🤖</span>
+            <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">Visual Builder</span>
+          </div>
+          <h4 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">Flow Automation Builder</h4>
+          <p className="text-[11px] text-gray-400 mt-1">Build keyword questions, branching logic & CRM tags</p>
+        </Link>
+
+        <Link to="/instagram-automation" className="p-4 bg-gradient-to-br from-[#180e1a] to-[#111] border border-pink-500/30 hover:border-pink-500/70 rounded-2xl transition-all group shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-2xl">📸</span>
+            <span className="text-[10px] font-extrabold bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full">Reel & DM</span>
+          </div>
+          <h4 className="text-sm font-bold text-white group-hover:text-pink-400 transition-colors">Instagram AI Automation</h4>
+          <p className="text-[11px] text-gray-400 mt-1">Comment-to-DM funnels & multi-product reel linker</p>
+        </Link>
+
+        <Link to="/whatsapp-rules" className="p-4 bg-gradient-to-br from-[#0e161a] to-[#111] border border-blue-500/30 hover:border-blue-500/70 rounded-2xl transition-all group shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-2xl">💬</span>
+            <span className="text-[10px] font-extrabold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">WhatsApp API</span>
+          </div>
+          <h4 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">WhatsApp Rules & Catalog</h4>
+          <p className="text-[11px] text-gray-400 mt-1">Price lists, instant shortcuts & broadcast templates</p>
+        </Link>
+
+        <Link to="/ai-agent" className="p-4 bg-gradient-to-br from-[#1a140e] to-[#111] border border-amber-500/30 hover:border-amber-500/70 rounded-2xl transition-all group shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-2xl">🧠</span>
+            <span className="text-[10px] font-extrabold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">AI Sales Closer</span>
+          </div>
+          <h4 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">AI Knowledge & Rules</h4>
+          <p className="text-[11px] text-gray-400 mt-1">Hindi conversational assistant & business policies</p>
         </Link>
       </div>
       

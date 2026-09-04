@@ -1,18 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, LayoutDashboard, ShoppingBag, Sparkles, Menu,
-  Send, Phone, Image as ImageIcon, FileText, MoreVertical, 
+  Send, Phone, PhoneCall, Image as ImageIcon, FileText, MoreVertical, 
   Check, CheckCheck, Plus, ArrowLeft, X, SlidersHorizontal,
   Users, Zap, QrCode, ShieldCheck, CreditCard, Settings as SettingsIcon,
   Upload, Radio, Flame, Clock, TrendingUp, AlertCircle, Trash2, Calendar,
   Paperclip, Camera, CheckCircle2, ChevronRight, Download, Filter, Share2,
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
   Link, Eye, EyeOff, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
-  Facebook, Star, Globe, DollarSign, ChevronDown, LogIn, LogOut, User, BookOpen, Search, Webhook,
+  Star, Globe, DollarSign, ChevronDown, LogIn, LogOut, User, BookOpen, Search, Webhook,
   Heart, MessageCircle as CommentIcon, ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+
+// Native-style Facebook Logo Icon
+const FacebookIcon = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+  </svg>
+);
 
 // Native-style YouTube Logo Icon
 const YoutubeIcon = ({ size = 20, className = '' }) => (
@@ -112,7 +119,9 @@ export default function MobileDashboard() {
       customWebhooks: ''
     }
   ]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState('main');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('dealclose_active_workspace')) || 'main';
+  });
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
   // Active Business Channel Profile, SEO & 🔗 Custom Webhooks
@@ -670,6 +679,10 @@ export default function MobileDashboard() {
       return;
     }
     setActiveWorkspaceId(selectedId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dealclose_active_workspace', selectedId);
+      localStorage.setItem('active_workspace_id', selectedId);
+    }
     applyWorkspaceConfig(selectedId);
     fetchLiveBackendData(selectedId);
     setActiveChatThread(null);

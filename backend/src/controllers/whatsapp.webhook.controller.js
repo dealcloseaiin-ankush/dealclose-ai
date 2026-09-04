@@ -166,6 +166,7 @@ exports.handleWhatsApp = async (req, res) => {
               savedLead = await Lead.create({
                 userId: user._id, workspaceId, phoneNumber: fromNumber, name: `User #${seqId}`,
                 source: leadSource, status: 'new', createdBy: user._id,
+                lastInteractionAt: new Date(),
                 customFields: adReferral ? {
                   adId: String(adReferral.source_id || ''),
                   adHeadline: String(adReferral.headline || ''),
@@ -177,10 +178,30 @@ exports.handleWhatsApp = async (req, res) => {
                   ...(adReferral ? [{ eventType: 'Ad Click Tracking', description: `Customer clicked Meta Ad: ${adReferral.headline}`, timestamp: new Date() }] : []),
                 ]
               });
-            } else if (adReferral) {
-               // 🚀 UPDATE EXISTING LEAD: If old customer clicks a new Ad!
-               const newSource = `Meta Ad (${adReferral.headline || 'Click-to-WA'})`;
-               await Lead.updateOne({ _id: savedLead._id }, { $set: { source: newSource, "customFields.adId": String(adReferral.source_id || ''), "customFields.adHeadline": String(adReferral.headline || ''), "customFields.sourceUrl": String(adReferral.source_url || '') }, $push: { timeline: { eventType: 'Ad Click Tracking', description: `Customer re-engaged via Meta Ad: ${adReferral.headline}`, timestamp: new Date() } } });
+            } else {
+               // 🚀 UPDATE EXISTING LEAD: Always update lastInteractionAt so daily active leads are never 0!
+               const newSource = adReferral ? `Meta Ad (${adReferral.headline || 'Click-to-WA'})` : savedLead.source;
+               await Lead.updateOne(
+                 { _id: savedLead._id }, 
+                 { 
+                   $set: { 
+                     lastInteractionAt: new Date(),
+                     source: newSource,
+                     ...(adReferral ? { 
+                       "customFields.adId": String(adReferral.source_id || ''), 
+                       "customFields.adHeadline": String(adReferral.headline || ''), 
+                       "customFields.sourceUrl": String(adReferral.source_url || '') 
+                     } : {}) 
+                   }, 
+                   $push: { 
+                     timeline: { 
+                       eventType: 'Customer Interaction', 
+                       description: `Customer messaged on WhatsApp: "${msg.type === 'text' ? (msg.text?.body || '').slice(0, 50) : msg.type}"`, 
+                       timestamp: new Date() 
+                     } 
+                   } 
+                 }
+               );
             }
             
             // 🚀 NEW: Auto-Sync New WhatsApp Leads to Google Sheets
@@ -311,9 +332,7 @@ exports.handleWhatsApp = async (req, res) => {
 
                 if (postToApprove) {
                   try {
-                    // Handle Model naming variations (instagramConfig vs 
-                    const igSettings = user.instagramConfig || user.igConfig || {}; // Legacy fallback
-                    // 🚀 FIX: Use the correct account ID priority order.
+                    const igSettings = user.instagramConfig || user.igConfig || {};
                     const igAccountId = igSettings?.instagramBusinessAccountId || igSettings?.instagramAccountId || igSettings?.accountId;
                     const loginType = igSettings?.loginType || 'facebook_business';
                     
@@ -341,13 +360,55 @@ exports.handleWhatsApp = async (req, res) => {
               }
             }
 
+            // ==========================================================
+            // 👑 OWNER REAL-TIME CRM BRIEFING & COMMANDS
+            // ==========================================================
             if (isOwnerOrStaff) {
-              const adminContext = `You are the backend AI assistant for the business owner. The owner is texting you. You can help them manage leads, send bulk templates, or give stats. Answer professionally as their personal AI manager.`;
-              const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
-              console.log(`✅ [DEBUG] Owner/Staff message detected. Sending AI Admin reply.`);
-              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Admin:*\n\n${aiAdminResponse}`);
-              // 🐛 FIX: Removed 'continue' to allow owner messages to be saved in the chat history.
-              // The 'continue' was preventing the Message.create() call below from running for owner/staff.
+              const incomingTextLower = incomingText.toLowerCase();
+              const isGreetingOrReportCmd = ['hi', 'hello', 'hey', 'report', 'leads', 'stats', 'status', 'summary', 'today'].includes(incomingTextLower);
+
+              if (isGreetingOrReportCmd) {
+                const todayStart = new Date(); 
+                todayStart.setHours(0, 0, 0, 0);
+
+                const [newLeadsToday, totalLeads, hotLeads, warmLeads, activeLeadsToday, followUpsToday] = await Promise.all([
+                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart } }),
+                  Lead.countDocuments({ userId: user._id }),
+                  Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating'] } }),
+                  Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested'] } }),
+                  Lead.find({ 
+                    userId: user._id, 
+                    $or: [
+                      { createdAt: { $gte: todayStart } }, 
+                      { lastInteractionAt: { $gte: todayStart } }, 
+                      { updatedAt: { $gte: todayStart } }
+                    ] 
+                  }).sort({ lastInteractionAt: -1, updatedAt: -1 }).limit(5),
+                  Lead.find({ userId: user._id, nextFollowUpDate: { $gte: todayStart } })
+                ]);
+
+                let recentSnippet = '';
+                if (activeLeadsToday.length > 0) {
+                  recentSnippet = activeLeadsToday.map((l, i) => `${i+1}. *${l.name}* (${l.phoneNumber}) - ${l.status || 'Active'}`).join('\n');
+                } else {
+                  recentSnippet = '• No customer inquiries received yet today.';
+                }
+
+                const ownerBriefing = `👑 *DealClose AI: Live Business Briefing* 📊\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n\n📈 *Today's Activity:*\n• 🆕 *New Leads:* ${newLeadsToday}\n• 💬 *Active Inquiries Today:* ${activeLeadsToday.length}\n• 👥 *Total CRM Database:* ${totalLeads}\n\n🔥 *Pipeline Status:*\n• Hot Leads: *${hotLeads}* 🔥\n• Warm Leads: *${warmLeads}* 🌟\n• Follow-ups Due: *${followUpsToday.length}* 📅\n\n📋 *Recent Inquiries:*\n${recentSnippet}\n\n💡 *Quick Actions:*\n• Reply *"LEADS"* to refresh\n• Reply *"APPROVE <ID>"* to post AI Reel\n• Ask any business question to consult AI Manager\n━━━━━━━━━━━━━━━━━━━`;
+
+                console.log(`✅ [DEBUG] Owner briefing generated with ${activeLeadsToday.length} active leads. Sending directly to owner.`);
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerBriefing);
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerBriefing, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                continue; // 🚀 STOP EXECUTION so customer menu is NEVER sent to the owner!
+              } else {
+                // Owner asked a specific question or instruction
+                const adminContext = `You are the executive AI Operations Manager for ${user.businessName || 'the business'}. The business owner is texting you. Answer professionally, concisely and in helpful Hinglish/English.`;
+                const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
+                console.log(`✅ [DEBUG] Owner/Staff custom query. Sending AI Admin reply.`);
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`);
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                continue; // 🚀 STOP EXECUTION!
+              }
             }
 
             console.log(`💾 [DEBUG] Saving incoming message to database...`);

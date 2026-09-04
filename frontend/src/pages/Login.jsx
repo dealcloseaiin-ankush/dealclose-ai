@@ -15,6 +15,16 @@ export default function Login() {
   const { login, resetPassword } = useAuth();
   const navigate = useNavigate();
 
+  const getPostLoginDestination = () => {
+    const params = new URLSearchParams(window.location.search);
+    const redirectParam = params.get('redirect');
+    if (redirectParam) return redirectParam;
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return '/mobile';
+    }
+    return '/dashboard';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -27,7 +37,7 @@ export default function Login() {
       } else {
         await login(email, password);
       }
-      navigate('/dashboard');
+      navigate(getPostLoginDestination());
     } catch (err) {
       if (err.code === 'ERR_NETWORK' || err.message?.includes('network error')) {
         setError('Network error. The server might be starting up. Please wait a moment and try again.');
@@ -84,8 +94,8 @@ export default function Login() {
                 setEmail('ankush.bani@gmail.com');
                 setPassword('ak@7828289433');
                 login('ankush.bani@gmail.com', 'ak@7828289433')
-                  .then(() => navigate('/dashboard'))
-                  .catch(() => navigate('/dashboard'));
+                  .then(() => navigate(getPostLoginDestination()))
+                  .catch(() => navigate(getPostLoginDestination()));
               }}
               className="w-full mb-3 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-black p-3 rounded-lg font-black hover:opacity-95 transition-all shadow-md"
             >
