@@ -691,15 +691,20 @@ Your Role:
             // Workspace routing for Flows
             const workspaceIdToUse = (currentLeadCheck && currentLeadCheck.lastSelectedWorkspaceId) ? currentLeadCheck.lastSelectedWorkspaceId : 'main';
             
-            let flowQuery = { userId: user._id };
-            if (workspaceIdToUse !== 'main') {
-               flowQuery.workspaceId = workspaceIdToUse;
+            let userFlows = [];
+            if (workspaceIdToUse && workspaceIdToUse !== 'main') {
+              userFlows = await Flow.find({ userId: user._id, $or: [{ workspaceId: workspaceIdToUse }, { platform: 'whatsapp' }] });
             }
-            const userFlows = await Flow.find(flowQuery);
+            if (!userFlows || userFlows.length === 0) {
+              userFlows = await Flow.find({ userId: user._id, $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
+            }
+            if (!userFlows || userFlows.length === 0) {
+              userFlows = await Flow.find({ userId: user._id });
+            }
 
             // STEP 1: Check if customer is currently inside an active "Ask Question" Flow block
             if (currentLeadCheck && currentLeadCheck.activeFlowState && currentLeadCheck.activeFlowState.flowId) {
-              const activeFlow = userFlows.find(f => f._id.toString() === currentLeadCheck.activeFlowState.flowId);
+              const activeFlow = userFlows.find(f => f._id.toString() === currentLeadCheck.activeFlowState.flowId) || await Flow.findById(currentLeadCheck.activeFlowState.flowId);
               if (activeFlow && activeFlow.flowData) {
                 const nodes = activeFlow.flowData.nodes || [];
                 const edges = activeFlow.flowData.edges || [];
@@ -845,18 +850,23 @@ Your Role:
             // STEP 2: Check for Keyword Triggers (If not already inside an active flow)
             if (!flowReplyHandled) {
               for (const flow of userFlows) {
-                if (!flow.flowData) continue;
+                if (!flow.flowData || flow.isActive === false) continue;
                 const nodes = flow.flowData.nodes || [];
                 const edges = flow.flowData.edges || [];
                 
-                const triggerNodes = nodes.filter(n => n.type === 'trigger' && n.data.triggerType === 'keyword');
+                const triggerNodes = nodes.filter(n => n.type === 'trigger');
                 
                 let matchedTrigger = null;
                 for (const trigger of triggerNodes) {
-                  const keywords = (trigger.data.keyword || "").split(',').map(k => k.trim().toLowerCase());
+                  const kwStr = trigger.data?.keyword || trigger.data?.keywords || trigger.data?.trigger;
+                  if (!kwStr || kwStr.trim() === '' || kwStr.includes('*') || kwStr.toLowerCase().includes('any')) {
+                    matchedTrigger = trigger;
+                    break;
+                  }
+                  const keywords = kwStr.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
                   const words = incomingTextLower.split(/[\s,]+/);
                   // 🚀 SMART KEYWORD MATCHING
-                  if (keywords.some(k => incomingTextLower === k || words.includes(k))) {
+                  if (keywords.length === 0 || keywords.some(k => incomingTextLower === k || incomingTextLower.includes(k) || words.includes(k))) {
                     matchedTrigger = trigger;
                     break;
                   }

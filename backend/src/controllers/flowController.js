@@ -197,50 +197,56 @@ const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
 // @route   POST /api/whatsapp/flows
 async function saveFlow(req, res) {
   try {
-    console.log("\n➡️ [DEBUG] POST /api/whatsapp/flows called!");
-    console.log("➡️ [DEBUG] Request Body:", JSON.stringify(req.body).substring(0, 150) + "...");
-    
-    let { name, flowData, workspaceId, platform } = req.body; // 🚀 NEW: Get platform from request
+    let { flowId, _id, name, flowData, workspaceId, platform } = req.body;
     const userId = req.user?._id || req.user?.id;
 
-    console.log(`➡️ [DEBUG] User ID from Auth: ${userId}`);
-
     if (!userId) {
-      console.log("❌ [DEBUG] Unauthorized: User ID is missing.");
       return res.status(401).json({ success: false, message: 'Unauthorized. Please login again.' });
     }
 
     if (!flowData) {
-      console.log("❌ [DEBUG] Error: Flow data is missing.");
       return res.status(400).json({ success: false, message: 'Flow data is required' });
     }
 
-    // Auto-generate name if it's missing or empty
     if (!name || name.trim() === '') {
       name = `Flow-${Math.floor(Math.random() * 10000)}`;
     }
 
-    // Safe check to prevent MongoDB CastError for "main" string
     const isMainWorkspace = !workspaceId || workspaceId === 'main';
-    const query = buildFlowSaveQuery({ userId, name, workspaceId, platform });
+    const targetWorkspaceId = isMainWorkspace ? 'main' : workspaceId;
+    const targetPlatform = platform || 'whatsapp';
 
-    // 🚀 STRICT BYPASS: Use findOneAndUpdate to force save workspaceId and flowData even if Model is outdated
-    const updatePayload = { flowData, platform: platform || 'whatsapp' };
-    if (!isMainWorkspace) updatePayload.workspaceId = workspaceId;
+    const updatePayload = { 
+      name, 
+      flowData, 
+      platform: targetPlatform,
+      workspaceId: targetWorkspaceId,
+      isActive: true 
+    };
 
-    console.log("➡️ [DEBUG] MongoDB Query:", query);
+    let flow = null;
+    const targetFlowId = flowId || _id;
 
-    let flow = await Flow.findOneAndUpdate(
-      query,
-      { $set: updatePayload },
-      { upsert: true, new: true, setDefaultsOnInsert: true, strict: false }
-    );
+    if (targetFlowId) {
+      flow = await Flow.findOneAndUpdate(
+        { _id: targetFlowId, userId },
+        { $set: updatePayload },
+        { new: true }
+      );
+    }
 
-    console.log("✅ [DEBUG] Flow saved successfully in MongoDB. Flow ID:", flow._id);
+    if (!flow) {
+      // Try to find by userId, name, workspaceId and platform
+      flow = await Flow.findOneAndUpdate(
+        { userId, name, workspaceId: targetWorkspaceId, platform: targetPlatform },
+        { $set: updatePayload },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
 
     res.status(200).json({ success: true, message: 'Flow saved successfully', flow });
   } catch (error) {
-    console.error('❌ [DEBUG] Save Flow Error details:', error);
+    console.error('❌ Save Flow Error details:', error);
     res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
   }
 }
