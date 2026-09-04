@@ -1,4 +1,5 @@
 const axios = require('axios'); // 🛠️ BUG FIX: axios was used in many places below (search_external_catalog, real-estate tools, publish_blog, etc.) but was never imported. This caused a silent ReferenceError crash on every one of those AI tool calls.
+const whatsappService = require('../services/whatsappService');
 const aiService = require('../services/aiService');
 const ocrService = require('../services/ocrService');
 const Lead = require('../models/leadModel');
@@ -586,65 +587,45 @@ exports.handleWhatsApp = async (req, res) => {
                 }
               }
 
-              // 5️⃣ GREETING / MENU COMMAND (Friendly Owner Assistant Menu - Not full report)
-              if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(incomingTextLower)) {
-                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *DealClose AI Operations Manager* hoon. Aap WhatsApp se hi apne poor business automation aur CRM ko control kar sakte hain.\n\n📌 *Available Quick Commands:*\n• *REPORT* ya *LEADS* - Aaj ki multi-channel live reporting dekhne ke liye\n• *RULES* - Active WhatsApp & Instagram automations check karne ke liye\n• *HOT LEADS* - Turant call karne ke liye top buyer leads dekhne ke liye\n• *PAUSE AI <Phone>* - Kisi customer ke liye AI ko pause karne ke liye\n• *RESUME AI <Phone>* - Customer ke liye AI ko resume karne ke liye\n• *APPROVE <ID>* - Pending AI Instagram Post publish karne ke liye\n\n💬 *Aap mujhse koi bhi sawal pooch sakte hain:*\nJaise: _"Mera conversion kaise improve karein?"_, _"Naya auto-reply trigger kaise add karein?"_, ya kisi bhi customer inquiry ke baare me!`;
+              // 5️⃣ OWNER MANUAL REPORT / MANAGER COMMANDS (Only if specifically asking for admin operations)
+              if (['admin', 'manager', 'copilot'].includes(incomingTextLower)) {
+                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *DealClose AI Operations Manager* hoon.\n\n📌 *Available Quick Commands:*\n• *REPORT* ya *LEADS* - Multi-channel live reporting dekhne ke liye\n• *RULES* - Active WhatsApp & Instagram automations check karne ke liye\n• *HOT LEADS* - Turant call karne ke liye top buyer leads dekhne ke liye\n• *PAUSE AI <Phone>* - Customer ke liye AI pause karne ke liye\n• *RESUME AI <Phone>* - Customer ke liye AI resume karne ke liye\n\n💡 *Tip:* Customer Automation Flow test karne ke liye bas *"HI"*, *"MENU"* ya koi bhi trigger keyword type karein!`;
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerMenu);
                 await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerMenu, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue;
               }
-
-              // 6️⃣ OWNER AI OPERATIONS MANAGER CHAT MODE (Ask questions, automation guidance & co-pilot advice)
-              const adminContext = `You are the executive AI Operations Manager & Co-pilot for ${user.businessName || 'the business'}. 
-The business owner/staff is texting you directly on WhatsApp. 
-Business Description: ${user.businessDescription || 'Modern business using omnichannel AI automations'}.
-Workspaces: ${(user.workspaces || []).map(w => w.name).join(', ') || 'Main Workspace'}.
-Connected Channels: WhatsApp Business API (Active), Instagram Marketing (Connected), Flow Builder Engine, Product Catalog.
-
-Your Role:
-1. Answer the owner professionally, warmly, concisely and actionably in natural Hinglish/English.
-2. If the owner asks how to change or add automations, explain step-by-step how to configure keyword rules in WhatsApp Rules (/whatsapp-rules), create visual drag-and-drop funnels in Flow Builder (/flow-builder), or set post triggers in Instagram Automation (/instagram-automation).
-3. If they ask about business growth, suggest high-converting follow-up tips, Meta ad click-to-WhatsApp strategies, or discount triggers.
-4. Keep responses crisp and easy to read on mobile with bullet points.`;
-
-              const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
-              console.log(`✅ [DEBUG] Owner/Staff custom query. Sending AI Admin reply.`);
-              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`);
-              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
-              continue; // 🚀 STOP EXECUTION so customer flow is NEVER sent to the owner!
             }
 
             console.log(`💾 [DEBUG] Saving incoming message to database...`);
             const incomingMsg = await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
             console.log(`✅ [DEBUG] Message saved with ID: ${incomingMsg._id}`);
 
-            // 🚀 NEW: Broadcast the incoming message to all connected chat dashboards
+            // 🚀 Broadcast the incoming message to all connected chat dashboards
             const wssChat = req.app.get('wssChat');
             if (wssChat) {
               wssChat.clients.forEach(client => {
                 if (client.readyState === require('ws').OPEN) {
                   client.send(JSON.stringify({ type: 'NEW_MESSAGE', payload: incomingMsg }));
-                  console.log(`📡 [DEBUG] Broadcasting new message via WebSocket to a connected client.`);
                 }
               });
             }
             
-            // 🚀 NEW: CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED)
+            const incomingTextLower = incomingText.toLowerCase();
+
+            // 🚀 CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED) WITH AUTO-UNPAUSE ON TRIGGER
             const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
-            const isCurrentlyPaused = currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date();
-            
-            if (isCurrentlyPaused) {
+            const isTriggerWord = ['hi', 'hello', 'hey', 'start', 'menu', 'reset', 'restart', '0', '1', '2', 'property', 'collab', 'offer', 'price'].includes(incomingTextLower) || (user.autoReplies && user.autoReplies.some(r => r.triggerWord && incomingTextLower.includes(r.triggerWord.toLowerCase())));
+
+            if (isTriggerWord && currentLeadCheck && currentLeadCheck.isAiPaused) {
+              console.log(`▶️ [Webhook] Keyword trigger received for ${fromNumber}. Auto-unpausing lead and activating automation flow.`);
+              await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: false, aiPausedUntil: null } });
+            } else if (currentLeadCheck && currentLeadCheck.isAiPaused && currentLeadCheck.aiPausedUntil > new Date()) {
               console.log(`⏸️ [Webhook] Human has taken over the chat for ${fromNumber}. AI is currently paused. Skipping AI reply.`);
-              continue; // Yahan se nikal jayega aur koi auto-reply nahi karega
+              continue;
             } else if (currentLeadCheck && currentLeadCheck.isAiPaused) {
-              // 🔥 NEW: The pause has expired. Let's reset the flag so the AI can resume normally.
-              // This makes the system state clean and prevents any future confusion.
-              console.log(`▶️ [Webhook] AI pause has expired for ${fromNumber}. Resuming AI and resetting the flag.`);
               await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: false, aiPausedUntil: null } });
             }
-
-            const incomingTextLower = incomingText.toLowerCase();
 
             // 🚀 ZERO-COST AI FEEDBACK CAPTURE (Catching 1-5 Ratings)
             if (currentLeadCheck && currentLeadCheck.awaitingFeedback) {
@@ -781,7 +762,6 @@ Your Role:
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                       await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
