@@ -56,7 +56,7 @@ const loadChatHistory = () => {
 
 function FlowBuilder() {
   // 🚀 ReactFlow hooks
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, zoomTo, setViewport } = useReactFlow();
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -515,6 +515,24 @@ function FlowBuilder() {
     }
   };
 
+  const handleAutoAlignNodes = () => {
+    setNodes(prevNodes => {
+      let currentY = 50;
+      return prevNodes.map((node) => {
+        const updated = {
+          ...node,
+          position: { x: 250, y: currentY }
+        };
+        currentY += 240;
+        return updated;
+      });
+    });
+    setTimeout(() => {
+      fitView({ padding: 0.25, duration: 300 });
+    }, 100);
+    toast.success('Flow nodes neatly aligned! ✨');
+  };
+
   const workspaceExists = (id) => id === 'main' || workspaces.some(ws => ws._id === id);
 
   return (
@@ -823,20 +841,61 @@ function FlowBuilder() {
             </div>
           )}
 
+          {/* 🚀 FLOATING DESKTOP CANVAS NAVIGATION TOOLBAR (TOP RIGHT) */}
+          <div className="hidden md:flex absolute top-4 right-4 z-40 items-center gap-1.5 bg-[#111116]/95 backdrop-blur-md border border-gray-700/80 p-1.5 rounded-2xl shadow-2xl">
+            <button
+              onClick={() => zoomIn({ duration: 250 })}
+              className="p-2 bg-gray-800/80 hover:bg-gray-700 text-gray-200 hover:text-white rounded-xl transition-all active:scale-95"
+              title="Zoom In (+)"
+            >
+              <ZoomIn size={16} />
+            </button>
+            <button
+              onClick={() => zoomOut({ duration: 250 })}
+              className="p-2 bg-gray-800/80 hover:bg-gray-700 text-gray-200 hover:text-white rounded-xl transition-all active:scale-95"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut size={16} />
+            </button>
+            <button
+              onClick={() => zoomTo(1.0, { duration: 300 })}
+              className="px-2.5 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-bold rounded-xl transition-all active:scale-95"
+              title="Reset Zoom to 100%"
+            >
+              100%
+            </button>
+            <button
+              onClick={() => fitView({ padding: 0.25, duration: 350 })}
+              className="p-2 bg-gray-800/80 hover:bg-gray-700 text-gray-200 hover:text-white rounded-xl transition-all active:scale-95"
+              title="Fit Whole Flow on Screen"
+            >
+              <Maximize2 size={16} />
+            </button>
+            <div className="h-4 w-px bg-gray-700 mx-0.5" />
+            <button
+              onClick={handleAutoAlignNodes}
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95"
+              title="Neatly Auto-Align All Flow Nodes"
+            >
+              <Sparkles size={14} />
+              <span>Auto Align</span>
+            </button>
+          </div>
+
           {/* 🚀 FLOATING MOBILE CONTROLS & BOTTOM BAR */}
-          <div className="md:hidden absolute bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-[#111116]/95 backdrop-blur-md border border-gray-700/80 px-3 py-2 rounded-2xl shadow-2xl">
+          <div className="md:hidden absolute bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-[#111116]/95 backdrop-blur-md border border-gray-700/80 px-2.5 py-1.5 rounded-2xl shadow-2xl">
             <button 
               onClick={() => setIsMobileDrawerOpen(true)} 
-              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-95 text-white font-black text-xs rounded-xl shadow-md"
+              className="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 active:scale-95 text-white font-black text-xs rounded-xl shadow-md"
             >
               <Plus size={16} />
-              <span>Add Step</span>
+              <span>Add</span>
             </button>
 
             <div className="h-5 w-px bg-gray-700 mx-0.5" />
 
             <button 
-              onClick={() => fitView({ padding: 0.2, duration: 300 })} 
+              onClick={() => fitView({ padding: 0.25, duration: 300 })} 
               className="p-2 bg-gray-800 active:bg-gray-700 text-gray-200 rounded-xl" 
               title="Fit to Screen"
             >
@@ -860,11 +919,19 @@ function FlowBuilder() {
             </button>
 
             <button 
+              onClick={handleAutoAlignNodes}
+              className="p-2 bg-indigo-600 active:bg-indigo-500 text-white rounded-xl shadow-sm" 
+              title="Auto Align Flow"
+            >
+              <Sparkles size={15} />
+            </button>
+
+            <button 
               onClick={() => setIsAiChatOpen(!isAiChatOpen)} 
               className="p-2 bg-gradient-to-r from-purple-600 to-pink-600 active:scale-95 text-white rounded-xl shadow-md" 
               title="AI Generator"
             >
-              <Sparkles size={15} />
+              <Bot size={15} />
             </button>
           </div>
 
@@ -926,16 +993,29 @@ function FlowBuilder() {
             onDragOver={onDragOver} 
             nodeTypes={nodeTypes} 
             fitView 
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            selectNodesOnDrag={false}
+            panOnDrag={true}
+            panOnScroll={false}
             zoomOnScroll={true}
             zoomOnPinch={true}
-            panOnScroll={false}
-            panOnDrag={true}
-            minZoom={0.1}
-            maxZoom={2}
+            zoomOnDoubleClick={false}
+            minZoom={0.05}
+            maxZoom={3.5}
+            translateExtent={[[-8000, -8000], [8000, 8000]]}
+            nodeExtent={[[-8000, -8000], [8000, 8000]]}
+            snapToGrid={false}
+            fitViewOptions={{ padding: 0.25, duration: 300 }}
           >
-            <Background color="#333" gap={16} size={1} />
-            <Controls className="hidden md:flex bg-[#111] border border-gray-800 text-white fill-white" />
-            <MiniMap className="hidden md:block" style={{ backgroundColor: '#111', border: '1px solid #333' }} nodeColor="#4B5563" maskColor="rgba(0,0,0,0.7)" />
+            <Background color="#2a2a35" gap={20} size={1.2} />
+            <MiniMap 
+              className="hidden md:block" 
+              style={{ backgroundColor: '#0e0e14', border: '1px solid #2a2a35', borderRadius: '14px' }} 
+              nodeColor={(n) => n.type === 'trigger' ? '#10b981' : (n.type === 'message' ? '#3b82f6' : '#8b5cf6')} 
+              maskColor="rgba(0,0,0,0.6)" 
+            />
           </ReactFlow>
         </div>
       </div>
