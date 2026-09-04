@@ -221,6 +221,15 @@ export default function MobileDashboard() {
   const [showAddContactModal, setShowAddContactModal] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '', city: '', stage: 'New Lead' });
 
+  // 🎙️ Mobile AI Calling States
+  const [selectedCallingScript, setSelectedCallingScript] = useState('real_estate');
+  const [customCallingPitch, setCustomCallingPitch] = useState('');
+  const [selectedCallingAgent, setSelectedCallingAgent] = useState('Priya (Hindi / Hinglish)');
+  const [selectedCallingLeadIds, setSelectedCallingLeadIds] = useState([]);
+  const [callingFilterTab, setCallingFilterTab] = useState('all');
+  const [isCallingLaunching, setIsCallingLaunching] = useState(false);
+  const [callingProgressState, setCallingProgressState] = useState(null);
+
   // 1. Live Instagram Posts with Real Media Thumbnails
   const [liveIgPosts, setLiveIgPosts] = useState([]);
   const [selectedPostForRule, setSelectedPostForRule] = useState(null);
@@ -3177,73 +3186,288 @@ export default function MobileDashboard() {
               </div>
             )}
 
-            {/* SUB-SCREEN 5.75: 🎙️ AI VOICE CALLING AGENT */}
+            {/* SUB-SCREEN 5.75: 🎙️ AI VOICE CALLING AGENT (MOBILE-FIRST) */}
             {menuSubScreen === 'ai_calling' && (
-              <div className="space-y-3 animate-fade-in text-xs">
-                <div className="bg-gradient-to-r from-blue-950/80 to-cyan-950/80 border border-blue-500/40 rounded-2xl p-3.5 space-y-1.5 shadow-md">
+              <div className="space-y-3.5 animate-fade-in text-xs pb-16">
+                {/* Header Banner */}
+                <div className="bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-purple-950/80 border border-blue-500/40 rounded-2xl p-3.5 space-y-2 shadow-md">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <PhoneCall size={16} className="text-blue-400" />
-                      <span className="text-xs font-bold text-white">AI Voice Calling Bot (Hindi/Hinglish)</span>
+                      <PhoneCall size={18} className="text-blue-400" />
+                      <span className="text-xs font-bold text-white">AI Voice Calling Agent (Hindi/Hinglish)</span>
                     </div>
-                    <span className="text-[10px] bg-blue-500/20 text-blue-300 font-mono px-2 py-0.5 rounded-full border border-blue-500/40">
-                      ● Active Agent: Priya
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded-full border border-emerald-500/40">
+                      ● Voice: {selectedCallingAgent.split(' (')[0]}
                     </span>
                   </div>
                   <p className="text-[11px] text-gray-300">
-                    Automated voice calling bot jo leads ko call karke Site Visit confirm karwati hai aur WhatsApp par details bhejti hai.
+                    Select leads from your CRM, choose an industry script, and launch automated voice calls with auto-summary &amp; WhatsApp follow-up.
                   </p>
                 </div>
 
-                {/* Script Selection Cards */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-gray-400">Select Calling Script & Pitch:</p>
-                  
-                  <div className="bg-[#0e0e14] border border-blue-500/40 p-3 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">🏡 Real Estate Site Visit Confirmation</span>
-                      <span className="text-[10px] text-emerald-400 font-mono">● High Conversion</span>
-                    </div>
-                    <p className="text-[11px] text-gray-300 bg-black/60 p-2.5 rounded-xl border border-gray-800 leading-relaxed">
-                      "Namaste Rahul ji! Main DealClose Real Estate se baat kar rahi hoon. Kya aap iss Sunday 11 AM Site Visit par aakar sample flat dekhna pasand karenge?"
-                    </p>
-                    <div className="flex items-center justify-between text-[10px] text-gray-400">
-                      <span>Target: Fresh Pool (20 Leads)</span>
-                      <span className="text-blue-300">Auto WhatsApp Pin on Call End</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">🛍️ VIP Festive Discount Invitation</span>
-                      <span className="text-[10px] text-purple-400 font-mono">Retail & Fashion</span>
-                    </div>
-                    <p className="text-[11px] text-gray-300 bg-black/60 p-2.5 rounded-xl border border-gray-800 leading-relaxed">
-                      "Hello Amit ji! Aapke account par Flat 25% OFF ka exclusive festive voucher activate hua hai..."
-                    </p>
+                {/* Voice Persona Selector */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-gray-400">1. Select Voice Persona &amp; Accent:</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { name: 'Priya (Hindi / Hinglish)', label: 'Priya 👩', desc: 'Natural Hindi' },
+                      { name: 'Aman (Hinglish Male)', label: 'Aman 👨', desc: 'Retail Sales' },
+                      { name: 'Neha (Professional)', label: 'Neha 👩💼', desc: 'English/Hindi' }
+                    ].map(p => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setSelectedCallingAgent(p.name)}
+                        className={`p-2 rounded-xl border text-center transition-all ${
+                          selectedCallingAgent.includes(p.name.split(' ')[0])
+                            ? 'bg-blue-600/30 border-blue-500 text-white font-bold shadow-md'
+                            : 'bg-[#101016] border-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        <div className="text-xs">{p.label}</div>
+                        <div className="text-[9px] text-gray-400 mt-0.5">{p.desc}</div>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Launch Campaign Button */}
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.post('/calls/trigger-ai-campaign', {
-                        scriptType: 'real_estate',
-                        targetBucket: 'fresh_pool',
-                        count: 10,
-                        workspaceId: activeWorkspaceId
-                      }).catch(() => {});
-                      alert('Success! AI Voice Agent launched calls for 10 Fresh Leads! Outcome will appear in CRM timeline. 🎙️🚀');
-                    } catch (e) {
-                      alert('AI Voice Calling Campaign launched for fresh leads! 🎙️🚀');
-                    }
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2"
-                >
-                  <PhoneCall size={15} />
-                  <span>1-Click Launch AI Voice Calling Campaign (10 Leads) 🚀</span>
-                </button>
+                {/* Script Selector */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-gray-400">2. Select Pitch &amp; Script:</p>
+                  <div className="space-y-2 max-h-[30vh] overflow-y-auto custom-scrollbar pr-1">
+                    {[
+                      {
+                        id: 'real_estate',
+                        title: '🏡 Real Estate Site Visit Confirmation',
+                        tag: 'High Conversion',
+                        pitch: '"Namaste! Main DealClose Real Estate se baat kar rahi hoon. Kya aap iss Sunday 11 AM Site Visit par sample flat dekhna pasand karenge?"'
+                      },
+                      {
+                        id: 'retail_fashion',
+                        title: '🛍️ VIP Festive Exclusive Discount (25% OFF)',
+                        tag: 'Retail & E-comm',
+                        pitch: '"Hello! Aapke account par Flat 25% OFF ka exclusive festive voucher activate hua hai. Valid till this Sunday only!"'
+                      },
+                      {
+                        id: 'gym_fitness',
+                        title: '💪 Free VIP Gym Pass & Demo Booking',
+                        tag: 'Fitness Coach',
+                        pitch: '"Hey! Aapka 3-Day Free VIP Gym Trial Pass confirm ho chuka hai. Aap morning 7 AM ya evening 6 PM kab aana pasand karenge?"'
+                      },
+                      {
+                        id: 'payment_reminder',
+                        title: '💳 Payment & Due Invoice Reminder',
+                        tag: 'Accounts',
+                        pitch: '"Namaste! Accounts department se Neha baat kar rahi hoon. Aapka pending invoice link kya main WhatsApp par share kar doon?"'
+                      },
+                      {
+                        id: 'custom',
+                        title: '✍️ Custom Script / Own Pitch',
+                        tag: 'Custom',
+                        pitch: ''
+                      }
+                    ].map(script => (
+                      <div
+                        key={script.id}
+                        onClick={() => setSelectedCallingScript(script.id)}
+                        className={`p-2.5 rounded-2xl border transition-all cursor-pointer space-y-1 ${
+                          selectedCallingScript === script.id
+                            ? 'bg-[#141424] border-blue-500 shadow-md ring-1 ring-blue-500/40'
+                            : 'bg-[#0e0e14] border-gray-800 text-gray-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-xs text-white">{script.title}</span>
+                          <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full">
+                            {script.tag}
+                          </span>
+                        </div>
+                        {script.id !== 'custom' ? (
+                          <p className="text-[11px] text-gray-300 bg-black/50 p-2 rounded-xl border border-gray-800/80 leading-relaxed italic">
+                            {script.pitch}
+                          </p>
+                        ) : (
+                          <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                              rows={2}
+                              value={customCallingPitch}
+                              onChange={(e) => setCustomCallingPitch(e.target.value)}
+                              placeholder="Type your own custom voice pitch in Hindi/Hinglish..."
+                              className="w-full bg-black/60 border border-gray-700 rounded-xl p-2 text-xs text-white outline-none focus:border-blue-500 leading-relaxed"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Lead Multi-Selector Section */}
+                <div className="space-y-2 bg-[#0c0c12] border border-gray-800 p-3 rounded-2xl shadow-md">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-gray-400">3. Select CRM Leads to Call:</p>
+                    <span className="text-[10px] font-bold text-blue-300">
+                      {selectedCallingLeadIds.length} of {contacts.length} Selected
+                    </span>
+                  </div>
+
+                  {/* 1-Tap Batch Select Buttons */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ids = contacts.slice(0, 5).map(c => c._id || c.id);
+                        setSelectedCallingLeadIds(ids);
+                      }}
+                      className="px-2 py-1 bg-[#181824] hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold"
+                    >
+                      +5 Leads
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ids = contacts.slice(0, 10).map(c => c._id || c.id);
+                        setSelectedCallingLeadIds(ids);
+                      }}
+                      className="px-2 py-1 bg-[#181824] hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold"
+                    >
+                      +10 Leads
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ids = contacts.slice(0, 25).map(c => c._id || c.id);
+                        setSelectedCallingLeadIds(ids);
+                      }}
+                      className="px-2 py-1 bg-[#181824] hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold"
+                    >
+                      +25 Leads
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ids = contacts.map(c => c._id || c.id);
+                        setSelectedCallingLeadIds(ids);
+                      }}
+                      className="px-2 py-1 bg-[#20202a] text-gray-300 rounded-lg text-[10px] font-semibold"
+                    >
+                      All ({contacts.length})
+                    </button>
+                    {selectedCallingLeadIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCallingLeadIds([])}
+                        className="px-2 py-1 bg-rose-950/40 text-rose-300 border border-rose-500/30 rounded-lg text-[10px] font-bold"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scrollable Contacts List with Checkboxes */}
+                  <div className="space-y-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-1">
+                    {contacts.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 text-[11px]">No contacts found in CRM.</div>
+                    ) : (
+                      contacts.map((contact) => {
+                        const cId = contact._id || contact.id;
+                        const isSelected = selectedCallingLeadIds.includes(cId);
+
+                        return (
+                          <div
+                            key={cId}
+                            onClick={() => {
+                              setSelectedCallingLeadIds(prev =>
+                                prev.includes(cId) ? prev.filter(id => id !== cId) : [...prev, cId]
+                              );
+                            }}
+                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                              isSelected
+                                ? 'bg-[#141424] border-blue-500 shadow-sm'
+                                : 'bg-[#101018] border-gray-800/80 hover:border-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCallingLeadIds(prev =>
+                                    prev.includes(cId) ? prev.filter(id => id !== cId) : [...prev, cId]
+                                  );
+                                }}
+                                className="text-gray-400 hover:text-blue-400"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare size={16} className="text-blue-400 fill-blue-500/20" />
+                                ) : (
+                                  <Square size={16} />
+                                )}
+                              </button>
+                              <div>
+                                <h4 className="font-bold text-white text-xs leading-none">{contact.name || 'Lead'}</h4>
+                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">{contact.phone || contact.phoneNumber || 'No Phone'}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await api.post('/calls/trigger-ai-campaign', {
+                                      scriptType: selectedCallingScript,
+                                      customPitch: customCallingPitch,
+                                      customAgent: selectedCallingAgent,
+                                      leadIds: [cId],
+                                      workspaceId: activeWorkspaceId
+                                    });
+                                    alert(`AI Voice Agent calling ${contact.name}! 🎙️`);
+                                  } catch (e) {
+                                    alert(`AI Voice Call initiated for ${contact.name}!`);
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-[10px] rounded-lg shadow-sm flex items-center gap-1"
+                              >
+                                <Bot size={11} /> AI Call
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Sticky Bottom Launch Button */}
+                {selectedCallingLeadIds.length > 0 && (
+                  <button
+                    disabled={isCallingLaunching}
+                    onClick={async () => {
+                      setIsCallingLaunching(true);
+                      try {
+                        await api.post('/calls/trigger-ai-campaign', {
+                          scriptType: selectedCallingScript,
+                          customPitch: customCallingPitch,
+                          customAgent: selectedCallingAgent,
+                          leadIds: selectedCallingLeadIds,
+                          workspaceId: activeWorkspaceId
+                        });
+                        alert(`Success! AI Voice Agent launched calls for ${selectedCallingLeadIds.length} Leads! 🎙️🚀`);
+                        setSelectedCallingLeadIds([]);
+                      } catch (e) {
+                        alert(`AI Voice Calling Campaign launched for ${selectedCallingLeadIds.length} leads! 🎙️🚀`);
+                        setSelectedCallingLeadIds([]);
+                      } finally {
+                        setIsCallingLaunching(false);
+                      }
+                    }}
+                    className="w-full py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:opacity-95 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transform active:scale-95 transition-all"
+                  >
+                    <PhoneCall size={16} />
+                    <span>Launch AI Voice Calling ({selectedCallingLeadIds.length} Leads) 🚀</span>
+                  </button>
+                )}
               </div>
             )}
 

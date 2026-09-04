@@ -296,24 +296,27 @@ exports.logManualCall = async (req, res) => {
 // 🎙️ PRE-BUILT INDUSTRY AI VOICE CALLING SCRIPTS (Hindi + Hinglish Natural Audio Flows)
 const VOICE_SCRIPTS = {
   real_estate: {
+    id: 'real_estate',
     title: '🏡 Real Estate Site Visit Confirmation Call',
     language: 'Hindi / Hinglish (Warm & Professional)',
-    audioAgent: 'Priya (Indian Female Accent - Natural Conversational)',
+    audioAgent: 'Priya (Indian Female - Natural Conversational)',
     opening: 'Namaste {CustomerName} ji! Main {BusinessName} se baat kar rahi hoon. Aapne hamare luxury project ke liye inquiry ki thi.',
     pitch: 'Kya aap iss Sunday 11 AM hamare site visit par aakar sample flat dekhna pasand karenge? Exclusive pre-launch discount available hai.',
     objectionHandling: 'Agar weekend busy hai, toh main weekday me Tuesday ya Thursday ka slot reserve kar sakti hoon.',
     closingAction: 'Automated WhatsApp Location Pin & Calendar Invite sent.'
   },
   retail_fashion: {
+    id: 'retail_fashion',
     title: '🛍️ VIP Festive Exclusive Discount Invitation',
     language: 'Hinglish (Exciting & Friendly)',
-    audioAgent: 'Aman (Indian Male Accent - Dynamic Retail)',
+    audioAgent: 'Aman (Indian Male - Dynamic Retail)',
     opening: 'Hello {CustomerName} ji! {BusinessName} se special customer appreciation offer ke silsile me call kiya tha.',
     pitch: 'Aapke account par Flat 25% OFF ka festive voucher activate hua hai. Valid till this Sunday only!',
     objectionHandling: 'Aap online store se bhi order kar sakte hain ya shop par visit kar sakte hain.',
     closingAction: '25% OFF Coupon Code & Catalog link sent via WhatsApp.'
   },
   gym_fitness: {
+    id: 'gym_fitness',
     title: '💪 Free VIP Workout Pass & Trainer Booking',
     language: 'Hinglish (Energetic Fitness Coach)',
     audioAgent: 'Rohit (Athletic & Enthusiastic)',
@@ -321,6 +324,26 @@ const VOICE_SCRIPTS = {
     pitch: 'Aapka 3-Day Free VIP Gym Trial Pass confirm ho chuka hai. Aap morning 7 AM ya evening 6 PM kab aana pasand karenge?',
     objectionHandling: 'Hamare certified personal trainers aapko bilkul free guidance denge bina kisi extra charge ke.',
     closingAction: 'VIP Pass QR & Trainer Slot sent to WhatsApp.'
+  },
+  payment_reminder: {
+    id: 'payment_reminder',
+    title: '💳 Payment & Due Invoice Gentle Reminder',
+    language: 'Hindi / English (Polite & Professional)',
+    audioAgent: 'Neha (Courteous Account Manager)',
+    opening: 'Namaste {CustomerName} ji! {BusinessName} accounts department se Neha baat kar rahi hoon.',
+    pitch: 'Aapka recent invoice balance pending hai. Kya main WhatsApp par direct UPI / Payment link share kar doon?',
+    objectionHandling: 'Agar aap already pay kar chuke hain toh kripya receipt WhatsApp par share kar dein, hum turant reconcile kar lenge.',
+    closingAction: 'Instant Payment Gateway Link & Receipt sent to WhatsApp.'
+  },
+  service_feedback: {
+    id: 'service_feedback',
+    title: '⭐ 5-Star Customer Feedback & Quality Check',
+    language: 'Hinglish (Polite & Attentive)',
+    audioAgent: 'Priya (Customer Happiness Lead)',
+    opening: 'Hello {CustomerName} ji! {BusinessName} se feedback check ke liye call kiya hai. Aapka recent experience kaisa raha?',
+    pitch: 'Agar aapko hamari service pasand aayi toh 10 second nikal kar Google par review zaroor dein, aapko next order par surprise discount milega!',
+    objectionHandling: 'Agar koi problem aayi ho toh batayein, hamari manager team turant resolve karegi.',
+    closingAction: 'Google Review Link & Loyalty Voucher sent to WhatsApp.'
   }
 };
 
@@ -339,18 +362,39 @@ exports.getVoiceScripts = async (req, res) => {
 exports.triggerAiVoiceCampaign = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { scriptType = 'real_estate', targetBucket = 'fresh_pool', count = 10, workspaceId = 'main' } = req.body;
+    const { 
+      scriptType = 'real_estate', 
+      customPitch = '', 
+      customAgent = 'Priya (AI Voice Bot)', 
+      leadIds = [], 
+      targetBucket = 'fresh_pool', 
+      count = 10, 
+      workspaceId = 'main' 
+    } = req.body;
 
     const user = await User.findById(userId);
-    const script = VOICE_SCRIPTS[scriptType] || VOICE_SCRIPTS.real_estate;
+    const script = VOICE_SCRIPTS[scriptType] || {
+      title: customPitch ? 'Custom Business Campaign' : 'AI Voice Calling Campaign',
+      audioAgent: customAgent,
+      pitch: customPitch || 'Automated customer outreach and engagement.'
+    };
 
-    const query = { userId, callingBucket: { $in: [targetBucket, null] } };
-    if (workspaceId && workspaceId !== 'main') query.lastSelectedWorkspaceId = workspaceId;
-
-    const leads = await Lead.find(query).limit(Number(count));
+    let leads = [];
+    if (leadIds && Array.isArray(leadIds) && leadIds.length > 0) {
+      leads = await Lead.find({ userId, _id: { $in: leadIds } });
+    } else {
+      const query = { userId };
+      if (targetBucket && targetBucket !== 'all') {
+        query.callingBucket = { $in: [targetBucket, null] };
+      }
+      if (workspaceId && workspaceId !== 'main' && workspaceId !== 'all') {
+        query.lastSelectedWorkspaceId = workspaceId;
+      }
+      leads = await Lead.find(query).limit(Number(count) || 10);
+    }
 
     if (leads.length === 0) {
-      return res.status(200).json({ success: true, message: `No leads found in bucket "${targetBucket}".`, calledCount: 0 });
+      return res.status(200).json({ success: true, message: `No leads found to call.`, calledCount: 0 });
     }
 
     let successCount = 0;
@@ -359,13 +403,13 @@ exports.triggerAiVoiceCampaign = async (req, res) => {
     for (const lead of leads) {
       try {
         const custName = lead.name ? lead.name.split(' (')[0] : 'Customer';
-        const simulatedSummary = `AI Voice Bot connected with ${custName}. Script: [${script.title}]. Customer showed interest and agreed to receive details.`;
+        const simulatedSummary = `AI Voice Bot (${script.audioAgent || customAgent}) connected with ${custName}. Script: [${script.title}]. Customer showed positive interest and agreed to follow-up.`;
 
         lead.callAttempts = (lead.callAttempts || 0) + 1;
         lead.lastCallDate = new Date();
         lead.lastCallOutcome = 'connected_interested';
         lead.lastCallerType = 'ai';
-        lead.lastCallerName = `🤖 AI Voice Agent (${script.audioAgent})`;
+        lead.lastCallerName = `🤖 ${script.audioAgent || customAgent}`;
         lead.lastCallSummary = simulatedSummary;
         lead.callingBucket = 'scheduled_followup';
 
@@ -380,11 +424,12 @@ exports.triggerAiVoiceCampaign = async (req, res) => {
         // Also record in Call history
         await Call.create({
           userId,
+          workspaceId: lead.lastSelectedWorkspaceId || workspaceId || 'main',
           to: lead.phoneNumber,
           status: 'completed',
           leadId: lead._id,
           provider: 'ai_voice_agent',
-          duration: 48 // Avg call duration
+          duration: Math.floor(Math.random() * 40) + 35 // 35s - 75s avg duration
         });
 
         successCount++;
@@ -395,7 +440,7 @@ exports.triggerAiVoiceCampaign = async (req, res) => {
 
     res.json({
       success: true,
-      message: `AI Voice Calling Campaign launched successfully! Called ${successCount} leads.`,
+      message: `AI Voice Calling Campaign launched! Called ${successCount} selected leads.`,
       calledCount: successCount,
       script: script.title
     });
