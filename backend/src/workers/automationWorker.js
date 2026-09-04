@@ -334,45 +334,73 @@ const automationWorker = new Worker('automationQueue', async job => {
   // 6. DAILY CRM AI SUMMARY & FOLLOW-UPS ALERTS
   // ==========================================
   if (job.name === 'daily_crm_summary') {
-    console.log(`⏳ [Worker Started] Generating Daily AI CRM Summary...`);
+    console.log(`⏳ [Worker Started] Generating Daily Multi-Channel CRM Summary...`);
     const users = await User.find({ "whatsappConfig.accessToken": { $exists: true } });
     
-    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(now.getTime() + istOffset);
+    const startOfDay = new Date(Date.UTC(istDate.getUTCFullYear(), istDate.getUTCMonth(), istDate.getUTCDate(), 0, 0, 0) - istOffset);
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
 
     for (const user of users) {
       if (!user.ownerPhone) continue;
 
-      const [totalLeads, newLeadsToday, activeLeadsToday, hotLeads, warmLeads, coldLeads, existingCustomers, followUpsToday] = await Promise.all([
-        Lead.countDocuments({ userId: user._id }),
-        Lead.countDocuments({ userId: user._id, createdAt: { $gte: startOfDay } }),
-        Lead.find({ userId: user._id, $or: [{ createdAt: { $gte: startOfDay } }, { lastInteractionAt: { $gte: startOfDay } }, { updatedAt: { $gte: startOfDay } }] }).limit(5),
-        Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating'] } }),
-        Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested'] } }),
-        Lead.countDocuments({ userId: user._id, status: 'cold' }),
-        Lead.countDocuments({ userId: user._id, status: 'existing' }),
-        Lead.find({ userId: user._id, nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } })
+      const [
+        totalLeads,
+        newLeadsToday,
+        returningLeadsToday,
+        activeLeadsToday,
+        hotLeads,
+        warmLeads,
+        followUpsToday,
+        autoHandledMsgs,
+        aiHandledMsgs,
+        staffHandledMsgs,
+        waLeadsCount,
+        igLeadsCount
+      ] = await Promise.all([
+        Lead.countDocuments({ userId: user._id, status: { $ne: 'deleted' } }),
+        Lead.countDocuments({ userId: user._id, createdAt: { $gte: startOfDay }, status: { $ne: 'deleted' } }),
+        Lead.countDocuments({ userId: user._id, createdAt: { $lt: startOfDay }, lastInteractionAt: { $gte: startOfDay }, status: { $ne: 'deleted' } }),
+        Lead.find({ userId: user._id, status: { $ne: 'deleted' }, $or: [{ createdAt: { $gte: startOfDay } }, { lastInteractionAt: { $gte: startOfDay } }, { updatedAt: { $gte: startOfDay } }] }).sort({ lastInteractionAt: -1 }).limit(5),
+        Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating', 'vip'] } }),
+        Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested', 'contacted'] } }),
+        Lead.find({ userId: user._id, status: { $ne: 'deleted' }, $or: [{ nextFollowUpDate: { $gte: startOfDay, $lte: endOfDay } }, { followUpDate: { $gte: startOfDay, $lte: endOfDay } }] }),
+        Message.countDocuments({ userId: user._id, timestamp: { $gte: startOfDay }, direction: 'outgoing', sentBy: { $in: ['auto-reply', 'system'] } }),
+        Message.countDocuments({ userId: user._id, timestamp: { $gte: startOfDay }, direction: 'outgoing', sentBy: 'ai' }),
+        Message.countDocuments({ userId: user._id, timestamp: { $gte: startOfDay }, direction: 'outgoing', sentBy: { $in: ['staff', 'owner_app'] } }),
+        Lead.countDocuments({ userId: user._id, phoneNumber: { $not: /^IG_/ }, status: { $ne: 'deleted' }, $or: [{ createdAt: { $gte: startOfDay } }, { lastInteractionAt: { $gte: startOfDay } }] }),
+        Lead.countDocuments({ userId: user._id, phoneNumber: /^IG_/, status: { $ne: 'deleted' }, $or: [{ createdAt: { $gte: startOfDay } }, { lastInteractionAt: { $gte: startOfDay } }] })
       ]);
 
-      let msg = `🤖 *DealClose AI: Daily Morning Briefing* ☀️\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n\n`;
-      msg += `📈 *Live Status:*\n`;
+      const totalActiveToday = newLeadsToday + returningLeadsToday;
+
+      let msg = `👑 *DealClose AI: Daily Morning Briefing* ☀️\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n📅 *Date:* ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}\n\n`;
+      msg += `📈 *Live Summary:*\n`;
       msg += `• 🆕 *New Leads:* ${newLeadsToday}\n`;
-      msg += `• 💬 *Active Inquiries:* ${activeLeadsToday.length}\n`;
+      msg += `• 🔄 *Returning Inquiries:* ${returningLeadsToday}\n`;
+      msg += `• 💬 *Total Active Inquiries:* ${totalActiveToday}\n`;
       msg += `• 👥 *Total CRM Database:* ${totalLeads}\n\n`;
+      msg += `⚙️ *Handled Today:*\n`;
+      msg += `• Flow Automation: *${autoHandledMsgs}* msgs\n`;
+      msg += `• AI Assistant: *${aiHandledMsgs}* msgs\n`;
+      msg += `• Staff/Manual: *${staffHandledMsgs}* msgs\n\n`;
+      msg += `📡 *Channels Active:*\n`;
+      msg += `• 📱 WhatsApp: *${waLeadsCount}* leads\n`;
+      msg += `• 📸 Instagram: *${igLeadsCount}* leads\n\n`;
       msg += `🔥 *Pipeline Breakdown:*\n`;
       msg += `• Hot Leads: *${hotLeads}* 🔥\n`;
       msg += `• Warm Leads: *${warmLeads}* 🌟\n`;
-      msg += `• Cold Leads: *${coldLeads}* ❄️\n`;
-      msg += `• Existing Customers: *${existingCustomers}* 💼\n\n`;
+      msg += `• Follow-ups Due Today: *${followUpsToday.length}* 📅\n\n`;
 
       if (followUpsToday.length > 0) {
-        msg += `📅 *Today's Follow-ups (${followUpsToday.length}):*\n`;
-        followUpsToday.slice(0, 5).forEach(l => { msg += `- ${l.name} (${l.phoneNumber})\n`; });
-        if (followUpsToday.length > 5) msg += `+ ${followUpsToday.length - 5} more... Please check your CRM dashboard.\n`;
-      } else {
-        msg += `📅 No follow-ups scheduled for today.\n`;
+        msg += `📋 *Today's Follow-up Calls:*\n`;
+        followUpsToday.slice(0, 5).forEach(l => { msg += `• ${l.name} (${l.phoneNumber})\n`; });
+        if (followUpsToday.length > 5) msg += `+ ${followUpsToday.length - 5} more in CRM.\n`;
       }
-      msg += `━━━━━━━━━━━━━━━━━━━\n💡 Reply *"LEADS"* or *"REPORT"* anytime for an instant update.`;
+
+      msg += `━━━━━━━━━━━━━━━━━━━\n💡 Reply *"LEADS"* or *"REPORT"* for live update\n💡 Reply *"RULES"* to check automations\n💡 Ask any question to chat with AI Manager`;
 
       let formattedPhone = user.ownerPhone.replace(/\D/g, ''); 
       if (formattedPhone.length === 10) formattedPhone = '91' + formattedPhone;

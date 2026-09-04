@@ -361,54 +361,261 @@ exports.handleWhatsApp = async (req, res) => {
             }
 
             // ==========================================================
-            // 👑 OWNER REAL-TIME CRM BRIEFING & COMMANDS
+            // 👑 OWNER REAL-TIME CRM BRIEFING, MULTI-CHANNEL REPORT & AI ASSISTANT
             // ==========================================================
             if (isOwnerOrStaff) {
-              const incomingTextLower = incomingText.toLowerCase();
-              const isGreetingOrReportCmd = ['hi', 'hello', 'hey', 'report', 'leads', 'stats', 'status', 'summary', 'today'].includes(incomingTextLower);
+              const incomingTextLower = incomingText.toLowerCase().trim();
+              const incomingTextUpper = incomingText.toUpperCase().trim();
 
-              if (isGreetingOrReportCmd) {
-                const todayStart = new Date(); 
-                todayStart.setHours(0, 0, 0, 0);
+              // Helper: Calculate IST Start of Day
+              const getStartOfTodayIST = () => {
+                const now = new Date();
+                const istOffset = 5.5 * 60 * 60 * 1000;
+                const istDate = new Date(now.getTime() + istOffset);
+                return new Date(Date.UTC(istDate.getUTCFullYear(), istDate.getUTCMonth(), istDate.getUTCDate(), 0, 0, 0) - istOffset);
+              };
 
-                const [newLeadsToday, totalLeads, hotLeads, warmLeads, activeLeadsToday, followUpsToday] = await Promise.all([
-                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart } }),
-                  Lead.countDocuments({ userId: user._id }),
-                  Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating'] } }),
-                  Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested'] } }),
+              const todayStart = getStartOfTodayIST();
+
+              // 1️⃣ EXPLICIT REPORT & LEADS COMMANDS (Multi-Channel Full Automated Reporting - 0 AI Token Cost)
+              const isReportCommand = [
+                'report', 'reports', 'leads', 'stats', 'status', 'summary', 
+                'today', 'all report', 'all reports', 'chanels', 'channels', 
+                'channel report', 'daily report', 'daily stats'
+              ].includes(incomingTextLower);
+
+              if (isReportCommand) {
+                // 📊 Comprehensive CRM & Multi-Channel Aggregations
+                const [
+                  totalLeads,
+                  newLeadsToday,
+                  returningLeadsToday,
+                  activeLeadsList,
+                  hotLeads,
+                  warmLeads,
+                  followUpsToday,
+                  // Overall Message Handlers Breakdown
+                  autoHandledMsgs,
+                  aiHandledMsgs,
+                  staffHandledMsgs,
+                  incomingMsgsToday,
+                  // WhatsApp Specific
+                  waNewLeads,
+                  waReturningLeads,
+                  waAutoReplies,
+                  waAiReplies,
+                  waStaffReplies,
+                  // Instagram Specific
+                  igNewLeads,
+                  igReturningLeads,
+                  igAutoReplies,
+                  igAiReplies
+                ] = await Promise.all([
+                  Lead.countDocuments({ userId: user._id, status: { $ne: 'deleted' } }),
+                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart }, status: { $ne: 'deleted' } }),
+                  Lead.countDocuments({ userId: user._id, createdAt: { $lt: todayStart }, lastInteractionAt: { $gte: todayStart }, status: { $ne: 'deleted' } }),
                   Lead.find({ 
                     userId: user._id, 
+                    status: { $ne: 'deleted' },
                     $or: [
                       { createdAt: { $gte: todayStart } }, 
                       { lastInteractionAt: { $gte: todayStart } }, 
                       { updatedAt: { $gte: todayStart } }
                     ] 
                   }).sort({ lastInteractionAt: -1, updatedAt: -1 }).limit(5),
-                  Lead.find({ userId: user._id, nextFollowUpDate: { $gte: todayStart } })
+                  Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating', 'vip'] } }),
+                  Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested', 'contacted'] } }),
+                  Lead.find({ 
+                    userId: user._id, 
+                    status: { $ne: 'deleted' },
+                    $or: [{ nextFollowUpDate: { $gte: todayStart } }, { followUpDate: { $gte: todayStart } }] 
+                  }),
+                  // Overall Handlers
+                  Message.countDocuments({ userId: user._id, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['auto-reply', 'system'] } }),
+                  Message.countDocuments({ userId: user._id, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: 'ai' }),
+                  Message.countDocuments({ userId: user._id, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['staff', 'owner_app'] } }),
+                  Message.countDocuments({ userId: user._id, timestamp: { $gte: todayStart }, direction: 'incoming' }),
+                  // WhatsApp Channel
+                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart }, phoneNumber: { $not: /^IG_/ }, status: { $ne: 'deleted' } }),
+                  Lead.countDocuments({ userId: user._id, createdAt: { $lt: todayStart }, lastInteractionAt: { $gte: todayStart }, phoneNumber: { $not: /^IG_/ }, status: { $ne: 'deleted' } }),
+                  Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['auto-reply', 'system'] } }),
+                  Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: 'ai' }),
+                  Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['staff', 'owner_app'] } }),
+                  // Instagram Channel
+                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart }, phoneNumber: /^IG_/, status: { $ne: 'deleted' } }),
+                  Lead.countDocuments({ userId: user._id, createdAt: { $lt: todayStart }, lastInteractionAt: { $gte: todayStart }, phoneNumber: /^IG_/, status: { $ne: 'deleted' } }),
+                  Message.countDocuments({ userId: user._id, channel: { $in: ['instagram_dm', 'instagram_comment'] }, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['auto-reply', 'system'] } }),
+                  Message.countDocuments({ userId: user._id, channel: { $in: ['instagram_dm', 'instagram_comment'] }, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: 'ai' })
                 ]);
 
+                const totalActiveToday = newLeadsToday + returningLeadsToday;
+
+                // Recent active inquiries snippet
                 let recentSnippet = '';
-                if (activeLeadsToday.length > 0) {
-                  recentSnippet = activeLeadsToday.map((l, i) => `${i+1}. *${l.name}* (${l.phoneNumber}) - ${l.status || 'Active'}`).join('\n');
+                if (activeLeadsList.length > 0) {
+                  recentSnippet = activeLeadsList.map((l, i) => {
+                    const chIcon = l.phoneNumber && l.phoneNumber.startsWith('IG_') ? '📸 IG' : '📱 WA';
+                    return `${i+1}. ${chIcon} *${l.name || 'Lead'}* (${l.phoneNumber}) - _${l.status || 'Active'}_`;
+                  }).join('\n');
                 } else {
                   recentSnippet = '• No customer inquiries received yet today.';
                 }
 
-                const ownerBriefing = `👑 *DealClose AI: Live Business Briefing* 📊\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n\n📈 *Today's Activity:*\n• 🆕 *New Leads:* ${newLeadsToday}\n• 💬 *Active Inquiries Today:* ${activeLeadsToday.length}\n• 👥 *Total CRM Database:* ${totalLeads}\n\n🔥 *Pipeline Status:*\n• Hot Leads: *${hotLeads}* 🔥\n• Warm Leads: *${warmLeads}* 🌟\n• Follow-ups Due: *${followUpsToday.length}* 📅\n\n📋 *Recent Inquiries:*\n${recentSnippet}\n\n💡 *Quick Actions:*\n• Reply *"LEADS"* to refresh\n• Reply *"APPROVE <ID>"* to post AI Reel\n• Ask any business question to consult AI Manager\n━━━━━━━━━━━━━━━━━━━`;
+                // Workspace breakdowns (if multi-branches exist)
+                let workspaceBreakdownSection = '';
+                if (user.workspaces && user.workspaces.length > 0) {
+                  const wsStats = await Promise.all(user.workspaces.map(async (ws) => {
+                    const wsLeads = await Lead.countDocuments({ 
+                      userId: user._id, 
+                      workspaceId: ws._id.toString(), 
+                      status: { $ne: 'deleted' },
+                      $or: [{ createdAt: { $gte: todayStart } }, { lastInteractionAt: { $gte: todayStart } }] 
+                    });
+                    return `• 🏬 *${ws.name}:* ${wsLeads} active leads today`;
+                  }));
+                  workspaceBreakdownSection = `\n🏢 *BRANCHES / WORKSPACES:*\n${wsStats.join('\n')}\n`;
+                }
 
-                console.log(`✅ [DEBUG] Owner briefing generated with ${activeLeadsToday.length} active leads. Sending directly to owner.`);
+                const ownerBriefing = `👑 *DealClose AI: Multi-Channel Live Reporting* 📊\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n📅 *Date:* ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}\n\n📈 *OVERALL TODAY'S SUMMARY:*\n• 🆕 *New Leads Today:* ${newLeadsToday}\n• 🔄 *Returning Active Customers:* ${returningLeadsToday}\n• 💬 *Total Active Inquiries:* ${totalActiveToday}\n• 👥 *Total CRM Database:* ${totalLeads}\n\n⚙️ *HANDLED BY SYSTEM TODAY:*\n• 🤖 Handled by Automation Flow: *${autoHandledMsgs}* msgs\n• 🧠 Handled by AI Assistant: *${aiHandledMsgs}* msgs\n• 👨‍💼 Handled by Staff/Human: *${staffHandledMsgs}* msgs\n• 📥 Total Inbound Queries: *${incomingMsgsToday}* msgs\n\n🔥 *PIPELINE HEALTH:*\n• Hot Leads: *${hotLeads}* 🔥\n• Warm Leads: *${warmLeads}* 🌟\n• Follow-ups Due: *${followUpsToday.length}* 📅\n━━━━━━━━━━━━━━━━━━━\n📡 *CHANNEL BREAKDOWN:*\n\n🟢 *WhatsApp Channel:*\n• Leads Today: *${waNewLeads + waReturningLeads}* (New: ${waNewLeads} | Returning: ${waReturningLeads})\n• Handled: Flow: ${waAutoReplies} | AI: ${waAiReplies} | Staff: ${waStaffReplies}\n\n🟣 *Instagram Funnel (DMs & Comments):*\n• Leads Today: *${igNewLeads + igReturningLeads}* (New: ${igNewLeads} | Returning: ${igReturningLeads})\n• Handled: Auto DM: ${igAutoReplies} | AI: ${igAiReplies}\n${workspaceBreakdownSection}━━━━━━━━━━━━━━━━━━━\n📋 *RECENT ACTIVE INQUIRIES:*\n${recentSnippet}\n\n💡 *Owner Shortcuts:*\n• Reply *"RULES"* - Check active automations\n• Reply *"HOT LEADS"* - Get buyer calling list\n• Reply *"PAUSE AI <Phone>"* - Stop AI for a lead\n• Ask any business question to chat with AI Manager\n━━━━━━━━━━━━━━━━━━━`;
+
+                console.log(`✅ [DEBUG] Multi-channel briefing sent to owner (${totalActiveToday} active leads).`);
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerBriefing);
                 await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerBriefing, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
-                continue; // 🚀 STOP EXECUTION so customer menu is NEVER sent to the owner!
-              } else {
-                // Owner asked a specific question or instruction
-                const adminContext = `You are the executive AI Operations Manager for ${user.businessName || 'the business'}. The business owner is texting you. Answer professionally, concisely and in helpful Hinglish/English.`;
-                const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
-                console.log(`✅ [DEBUG] Owner/Staff custom query. Sending AI Admin reply.`);
-                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
-                continue; // 🚀 STOP EXECUTION!
+                continue;
               }
+
+              // 2️⃣ RULES & AUTOMATION CONFIGURATION COMMAND
+              if (['rules', 'automations', 'flows', 'triggers', 'automation'].includes(incomingTextLower)) {
+                const userFlows = await Flow.find({ userId: user._id });
+                const autoReplies = user.autoReplies || [];
+                const postAutos = user.postAutomations || [];
+
+                let rulesMsg = `⚙️ *DealClose AI: Active Automations Overview*\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n\n`;
+                
+                rulesMsg += `🤖 *AI Assistant:* ${user.aiAgentEnabled !== false ? '✅ Enabled' : '⏸️ Paused'}\n`;
+                rulesMsg += `💬 *Instagram Comment AI:* ${user.commentAiReplyEnabled ? '✅ Enabled' : '⏸️ Disabled'}\n\n`;
+
+                rulesMsg += `📋 *WhatsApp Auto-Reply Rules (${autoReplies.length}):*\n`;
+                if (autoReplies.length > 0) {
+                  autoReplies.slice(0, 5).forEach((r, idx) => {
+                    rulesMsg += `${idx+1}. Trigger: *"${r.triggerWord}"* ➔ Reply: "${(r.replyMessage || '').slice(0, 35)}..."\n`;
+                  });
+                  if (autoReplies.length > 5) rulesMsg += `+ ${autoReplies.length - 5} more rules active.\n`;
+                } else {
+                  rulesMsg += `• No custom keyword triggers added yet.\n`;
+                }
+
+                rulesMsg += `\n🌊 *Flow Builder Automations (${userFlows.length}):*\n`;
+                if (userFlows.length > 0) {
+                  userFlows.slice(0, 5).forEach((f, idx) => {
+                    rulesMsg += `${idx+1}. Flow: *${f.name || 'Untitled Flow'}* (Triggers: ${f.triggerKeywords ? f.triggerKeywords.join(', ') : 'None'})\n`;
+                  });
+                } else {
+                  rulesMsg += `• No custom visual flows created yet.\n`;
+                }
+
+                rulesMsg += `\n📸 *Instagram Post Automations (${postAutos.length}):*\n`;
+                if (postAutos.length > 0) {
+                  postAutos.slice(0, 3).forEach((p, idx) => {
+                    rulesMsg += `${idx+1}. Post Trigger: *"${p.triggerWord || 'Keyword'}"* ➔ Mode: ${p.deliveryMode || 'direct'}\n`;
+                  });
+                } else {
+                  rulesMsg += `• No active Instagram comment-to-DM triggers.\n`;
+                }
+
+                rulesMsg += `\n━━━━━━━━━━━━━━━━━━━\n💡 *Tip:* Ask me: _"Naya WhatsApp rule kaise banayein?"_ ya _"Instagram automation kaise set karein?"_ aur main aapki poori madad karunga!`;
+
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, rulesMsg);
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: rulesMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                continue;
+              }
+
+              // 3️⃣ HOT LEADS CALLING LIST COMMAND
+              if (['hot leads', 'hot', 'hot buyers', 'buyers'].includes(incomingTextLower)) {
+                const hotLeadsList = await Lead.find({ 
+                  userId: user._id, 
+                  status: { $in: ['hot', 'negotiating', 'vip'] } 
+                }).sort({ lastInteractionAt: -1 }).limit(7);
+
+                let hotMsg = `🔥 *DealClose AI: High-Intent Hot Leads* 🔥\n━━━━━━━━━━━━━━━━━━━\n`;
+                if (hotLeadsList.length > 0) {
+                  hotLeadsList.forEach((lead, idx) => {
+                    const cleanPhone = lead.phoneNumber.replace(/\D/g, '');
+                    const waLink = cleanPhone.startsWith('91') ? `https://wa.me/${cleanPhone}` : (cleanPhone.length === 10 ? `https://wa.me/91${cleanPhone}` : `https://wa.me/${cleanPhone}`);
+                    hotMsg += `${idx+1}. *${lead.name || 'Hot Lead'}*\n   📞 Phone: ${lead.phoneNumber}\n   💰 Deal: ₹${lead.dealValue || 0}\n   💬 Status: ${lead.status.toUpperCase()}\n   🔗 Direct Chat: ${waLink}\n\n`;
+                  });
+                } else {
+                  hotMsg += `Currently no leads marked as 'Hot' or 'Negotiating'. All new leads will be auto-categorized by AI as they engage!`;
+                }
+                hotMsg += `━━━━━━━━━━━━━━━━━━━\n💡 Reply *"REPORT"* for full business statistics.`;
+
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, hotMsg);
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: hotMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                continue;
+              }
+
+              // 4️⃣ PAUSE / RESUME AI COMMANDS FOR SPECIFIC LEADS
+              if (incomingTextLower.startsWith('pause ai ') || incomingTextLower.startsWith('stop ai ')) {
+                const targetPhone = incomingText.split(/\s+/).slice(2).join('').replace(/\D/g, '');
+                if (targetPhone) {
+                  const updated = await Lead.findOneAndUpdate(
+                    { userId: user._id, phoneNumber: { $regex: `${targetPhone.slice(-10)}$` } },
+                    { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }
+                  );
+                  const replyText = updated 
+                    ? `⏸️ *AI Paused Successfully* for ${updated.name} (${updated.phoneNumber}) for 24 hours. You can now chat directly with them without AI auto-replies.`
+                    : `⚠️ Lead with phone containing *${targetPhone}* was not found in your CRM.`;
+                  
+                  await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyText);
+                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  continue;
+                }
+              }
+
+              if (incomingTextLower.startsWith('resume ai ') || incomingTextLower.startsWith('start ai ')) {
+                const targetPhone = incomingText.split(/\s+/).slice(2).join('').replace(/\D/g, '');
+                if (targetPhone) {
+                  const updated = await Lead.findOneAndUpdate(
+                    { userId: user._id, phoneNumber: { $regex: `${targetPhone.slice(-10)}$` } },
+                    { $set: { isAiPaused: false, aiPausedUntil: null } }
+                  );
+                  const replyText = updated 
+                    ? `▶️ *AI Resumed Successfully* for ${updated.name} (${updated.phoneNumber}). AI will now automatically assist them.`
+                    : `⚠️ Lead with phone containing *${targetPhone}* was not found in your CRM.`;
+                  
+                  await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyText);
+                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  continue;
+                }
+              }
+
+              // 5️⃣ GREETING / MENU COMMAND (Friendly Owner Assistant Menu - Not full report)
+              if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(incomingTextLower)) {
+                const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *DealClose AI Operations Manager* hoon. Aap WhatsApp se hi apne poor business automation aur CRM ko control kar sakte hain.\n\n📌 *Available Quick Commands:*\n• *REPORT* ya *LEADS* - Aaj ki multi-channel live reporting dekhne ke liye\n• *RULES* - Active WhatsApp & Instagram automations check karne ke liye\n• *HOT LEADS* - Turant call karne ke liye top buyer leads dekhne ke liye\n• *PAUSE AI <Phone>* - Kisi customer ke liye AI ko pause karne ke liye\n• *RESUME AI <Phone>* - Customer ke liye AI ko resume karne ke liye\n• *APPROVE <ID>* - Pending AI Instagram Post publish karne ke liye\n\n💬 *Aap mujhse koi bhi sawal pooch sakte hain:*\nJaise: _"Mera conversion kaise improve karein?"_, _"Naya auto-reply trigger kaise add karein?"_, ya kisi bhi customer inquiry ke baare me!`;
+
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerMenu);
+                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerMenu, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                continue;
+              }
+
+              // 6️⃣ OWNER AI OPERATIONS MANAGER CHAT MODE (Ask questions, automation guidance & co-pilot advice)
+              const adminContext = `You are the executive AI Operations Manager & Co-pilot for ${user.businessName || 'the business'}. 
+The business owner/staff is texting you directly on WhatsApp. 
+Business Description: ${user.businessDescription || 'Modern business using omnichannel AI automations'}.
+Workspaces: ${(user.workspaces || []).map(w => w.name).join(', ') || 'Main Workspace'}.
+Connected Channels: WhatsApp Business API (Active), Instagram Marketing (Connected), Flow Builder Engine, Product Catalog.
+
+Your Role:
+1. Answer the owner professionally, warmly, concisely and actionably in natural Hinglish/English.
+2. If the owner asks how to change or add automations, explain step-by-step how to configure keyword rules in WhatsApp Rules (/whatsapp-rules), create visual drag-and-drop funnels in Flow Builder (/flow-builder), or set post triggers in Instagram Automation (/instagram-automation).
+3. If they ask about business growth, suggest high-converting follow-up tips, Meta ad click-to-WhatsApp strategies, or discount triggers.
+4. Keep responses crisp and easy to read on mobile with bullet points.`;
+
+              const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
+              console.log(`✅ [DEBUG] Owner/Staff custom query. Sending AI Admin reply.`);
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`);
+              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *DealClose AI Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              continue; // 🚀 STOP EXECUTION so customer flow is NEVER sent to the owner!
             }
 
             console.log(`💾 [DEBUG] Saving incoming message to database...`);
