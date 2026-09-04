@@ -645,68 +645,6 @@ Your Role:
             }
 
             const incomingTextLower = incomingText.toLowerCase();
-            if (['hi', 'hello', 'hey', 'menu', 'options', 'help'].includes(incomingTextLower)) {
-              
-              // 🚀 DYNAMIC MENU GENERATOR
-              let menuRows = [
-                { 
-                  id: `workspace_default`, 
-                  title: (user.businessName || "Main Business").substring(0, 24), 
-                  description: (user.businessDescription || "Explore our products and services").substring(0, 72) 
-                }
-              ];
-
-              if (user.workspaces && user.workspaces.length > 0) {
-                // Safe Filter: Only map valid workspaces that have a name
-                const validWs = user.workspaces.filter(w => w && w.name && w.name.trim() !== '');
-                if (validWs.length > 0) {
-                  const wsRows = validWs.map(w => ({
-                    id: `workspace_${w._id}`, 
-                    title: w.name.substring(0, 24), 
-                    description: (w.description || "View our services").substring(0, 72)
-                  }));
-                  menuRows = [...menuRows, ...wsRows];
-                }
-              } 
-              
-              // WhatsApp API limits a section to maximum 10 rows
-              menuRows = menuRows.slice(0, 10);
-
-              // 🚀 SMART LINKS INJECTION
-              let bodyText = `Welcome to the official central support channel for *${user.fullName || user.businessName || 'Our Business'}*.\n\nPlease select the specific business division you want to interact with today:`;
-              const links = user.digitalCardConfig || {};
-              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
-              
-              let socialLinks = [];
-              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
-              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
-              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
-              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
-              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
-              
-              if (socialLinks.length > 0) {
-                bodyText += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
-              }
-
-                const interactiveObj = {
-                  type: "list",
-                  header: { type: "text", text: `Welcome to ${user.fullName || 'Our Business'}` },
-                  body: { text: bodyText },
-                  footer: { text: "Powered by DealClose AI" },
-                  action: {
-                    button: "Select Business",
-                    sections: [
-                      {
-                        title: "Our Divisions",
-                        rows: menuRows
-                      }
-                    ]
-                  }
-                };
-              await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj); 
-              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
-                continue; 
-            }
 
             // 🚀 ZERO-COST AI FEEDBACK CAPTURE (Catching 1-5 Ratings)
             if (currentLeadCheck && currentLeadCheck.awaitingFeedback) {
