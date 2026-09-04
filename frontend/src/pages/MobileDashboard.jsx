@@ -3472,11 +3472,11 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 1: Smart All-In-One QR Counter Hub (Live Preview) */}
+      {/* Modal 1: Smart All-In-One QR Counter Hub (Live Preview & Share Hub) */}
       {showSmartQrModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl text-center max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <button onClick={() => setShowSmartQrModal(false)} className="absolute top-4 right-4 text-gray-400">
+            <button onClick={() => setShowSmartQrModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
               <X size={16} />
             </button>
             
@@ -3484,8 +3484,18 @@ export default function MobileDashboard() {
               <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
             </div>
 
-            <h3 className="text-sm font-black text-white">{profileData.businessName}</h3>
-            <p className="text-[10px] text-gray-400">1 Scan connects WhatsApp, Instagram, YouTube, Google Review & UPI</p>
+            <div>
+              <h3 className="text-sm font-black text-white">{profileData.businessName}</h3>
+              <p className="text-[10px] text-gray-400">1 Scan connects WhatsApp, Instagram, YouTube, Google Review & UPI</p>
+            </div>
+
+            {/* Smart Review Shield Badge */}
+            <div className="bg-amber-950/40 border border-amber-500/40 p-2 rounded-2xl text-[10px] text-amber-300 font-bold space-y-0.5">
+              <div>🛡️ Smart Review Shield Enabled</div>
+              <div className="text-[9px] text-gray-300 font-normal">
+                1-3★ reviews stay private in CRM • 4-5★ reviews auto-boost to Google Maps!
+              </div>
+            </div>
 
             {/* High-Resolution Visual QR Canvas */}
             <div className="p-4 bg-white rounded-2xl max-w-[190px] mx-auto shadow-inner flex flex-col items-center justify-center">
@@ -3493,7 +3503,7 @@ export default function MobileDashboard() {
               <span className="text-[9px] font-mono text-black font-black mt-1 uppercase">SCAN TO CONNECT & PAY</span>
             </div>
 
-            {/* Live Interactive Action Links */}
+            {/* Live Interactive Action Links Preview */}
             <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold pt-1">
               <a href={profileData.googleBusinessLink} target="_blank" rel="noreferrer" className="p-2 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded-xl flex items-center justify-center gap-1">
                 <Star size={12} className="text-amber-400" />
@@ -3513,20 +3523,48 @@ export default function MobileDashboard() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-1">
+            {/* Share & Copy Action Row */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
+                  const text = `Connect with *${profileData.businessName}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all"
+              >
+                <span>💬 Share on WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
+                  navigator.clipboard.writeText(cardUrl);
+                  alert(`Smart Digital Card Link Copied! 📋\n${cardUrl}`);
+                }}
+                className="py-2.5 bg-gray-900 border border-gray-700 text-gray-200 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 active:scale-98 transition-all"
+              >
+                <span>📋 Copy Card Link</span>
+              </button>
+            </div>
+
+            {/* View Live Card & Standee Download */}
+            <div className="flex gap-2">
               <a
                 href={`/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 py-2 bg-gray-900 border border-gray-800 text-gray-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1"
+                className="flex-1 py-2 bg-gray-800 border border-gray-700 text-gray-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1"
               >
                 <Eye size={13} /> View Live Card ↗
               </a>
               <button
-                onClick={() => alert('Counter Standee QR Image downloaded for printing!')}
+                onClick={() => alert('Counter Standee QR Image ready for printing!')}
                 className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1"
               >
-                <Download size={13} /> Download QR
+                <Download size={13} /> Print Standee QR
               </button>
             </div>
           </div>
