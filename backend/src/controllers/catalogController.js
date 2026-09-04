@@ -30,13 +30,21 @@ exports.addCatalogItem = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { name, price, description, imageUrl, workspaceId } = req.body;
+    const { name, price, description, imageUrl, images, workspaceId } = req.body;
 
     if (!name || !price) {
       return res.status(400).json({ message: 'Name and price are required' });
     }
 
-    const newItem = await Catalog.create({ userId, name, price, description, imageUrl, workspaceId: workspaceId || 'main' });
+    const newItem = await Catalog.create({
+      userId,
+      name,
+      price,
+      description: description || '',
+      imageUrl: imageUrl || '',
+      images: Array.isArray(images) ? images : (imageUrl ? [imageUrl] : []),
+      workspaceId: workspaceId || 'main'
+    });
 
     res.status(201).json(newItem);
   } catch (error) {
@@ -52,11 +60,19 @@ exports.updateCatalogItem = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { name, price, description, imageUrl } = req.body;
+    const { name, price, description, imageUrl, images, inStock } = req.body;
     
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (price !== undefined) updateFields.price = price;
+    if (description !== undefined) updateFields.description = description;
+    if (imageUrl !== undefined) updateFields.imageUrl = imageUrl;
+    if (images !== undefined) updateFields.images = images;
+    if (inStock !== undefined) updateFields.inStock = inStock;
+
     const updatedItem = await Catalog.findOneAndUpdate(
       { _id: req.params.id, userId },
-      { name, price, description, imageUrl },
+      updateFields,
       { new: true }
     );
 

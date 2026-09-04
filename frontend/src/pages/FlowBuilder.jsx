@@ -598,9 +598,10 @@ function FlowBuilder() {
     {/* MAIN BUILDER LAYOUT */}
     <div className="flex flex-col h-[100dvh] bg-[#050505] text-gray-100 font-sans select-none overflow-hidden">
       
-      {/* 🚀 UNIFIED RESPONSIVE HEADER */}
-      <header className="bg-[#0f0f13] border-b border-gray-800 px-3 py-2.5 z-40 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+      {/* 🚀 TWO-ROW CLEAN RESPONSIVE HEADER */}
+      <header className="bg-[#0f0f13] border-b border-gray-800 px-3 py-2 z-40 flex flex-col gap-2 shrink-0">
+        {/* ROW 1: Navigation & Flow Title */}
+        <div className="flex items-center gap-2 w-full">
           <button 
             onClick={handleBackToMobile}
             className="p-2 rounded-xl bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors shrink-0"
@@ -609,57 +610,59 @@ function FlowBuilder() {
             <ArrowLeft size={16} />
           </button>
 
-          <div className="relative flex-1 max-w-xs min-w-[110px]">
-            <input 
-              type="text" 
-              value={flowName} 
-              onChange={(e) => setFlowName(e.target.value)} 
-              placeholder="Flow Name..." 
-              className="w-full bg-black/60 border border-gray-700 text-white text-xs md:text-sm rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 font-semibold truncate"
-            />
-          </div>
+          <input 
+            type="text" 
+            value={flowName} 
+            onChange={(e) => setFlowName(e.target.value)} 
+            placeholder="Enter Flow Name..." 
+            className="flex-1 bg-black/60 border border-gray-700 text-white text-xs md:text-sm rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 font-semibold min-w-0"
+          />
 
           <select 
             value={platform} 
             onChange={(e) => setPlatform(e.target.value)} 
             className="bg-black/60 border border-gray-700 text-white text-xs rounded-xl px-2 py-1.5 outline-none focus:border-blue-500 cursor-pointer font-semibold shrink-0"
           >
-            <option value="whatsapp">🟩 WA</option>
-            <option value="instagram">🟪 Insta</option>
-          </select>
-
-          <select 
-            value={selectedWorkspace} 
-            onChange={(e) => setSelectedWorkspace(e.target.value)} 
-            className="hidden sm:block bg-black/60 border border-gray-700 text-white text-xs rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500 cursor-pointer font-semibold max-w-[140px] truncate shrink-0"
-          >
-            <option value="main">🏢 {mainBusinessName}</option>
-            {workspaces.map(ws => (
-              <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
-            ))}
+            <option value="whatsapp">🟩 WhatsApp</option>
+            <option value="instagram">🟪 Instagram</option>
           </select>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-          <button 
-            onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} 
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
-          >
-            <FolderOpen size={14} />
-            <span className="hidden xs:inline">Flows</span>
-          </button>
+        {/* ROW 2: Action Buttons (Flows, Templates, AI, Save) */}
+        <div className="flex items-center justify-between gap-1.5 w-full pt-1 border-t border-gray-800/60">
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} 
+              className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
+            >
+              <FolderOpen size={13} />
+              <span>My Flows</span>
+            </button>
 
-          <button 
-            onClick={() => setIsGuideOpen(true)} 
-            className="hidden sm:flex items-center gap-1 px-2 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl font-bold text-xs transition-colors"
-          >
-            <HelpCircle size={14} />
-          </button>
-          
+            <button 
+              onClick={() => setIsAiChatOpen(prev => !prev)} 
+              className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
+            >
+              <Sparkles size={13} />
+              <span>AI Copilot</span>
+            </button>
+
+            <select 
+              value={selectedWorkspace} 
+              onChange={(e) => setSelectedWorkspace(e.target.value)} 
+              className="bg-black/60 border border-gray-700 text-white text-[11px] rounded-xl px-2 py-1 outline-none focus:border-blue-500 cursor-pointer font-semibold max-w-[120px] truncate"
+            >
+              <option value="main">🏢 {mainBusinessName}</option>
+              {workspaces.map(ws => (
+                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
+              ))}
+            </select>
+          </div>
+
           <button 
             onClick={handleSave} 
             disabled={isSaving} 
-            className="flex items-center gap-1 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/30 disabled:opacity-50 shrink-0"
           >
             <Save size={14} />
             <span>{isSaving ? 'Saving...' : 'Save Flow 💾'}</span>

@@ -1264,6 +1264,11 @@ exports.updateProfile = async (req, res) => {
     if (externalApiBlogUrl !== undefined) updateData.externalApiBlogUrl = externalApiBlogUrl;
     if (externalApiVisitUrl !== undefined) updateData.externalApiVisitUrl = externalApiVisitUrl;
     if (customWebhooks !== undefined) updateData.customWebhooks = customWebhooks;
+    if (req.body.logoUrl !== undefined) {
+      updateData.logo = req.body.logoUrl;
+      updateData['brandKit.logoUrl'] = req.body.logoUrl;
+    }
+    if (req.body.brandKit !== undefined) updateData.brandKit = req.body.brandKit;
 
     // 🐛 FIX for "MulterError: Field value too long"
     // Agar designJson field request me hai, to use alag se handle karo.

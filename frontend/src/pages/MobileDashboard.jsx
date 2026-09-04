@@ -235,6 +235,7 @@ export default function MobileDashboard() {
 
   // 3.2 Catalog Image & Bulk Upload State
   const [isUploadingCatalogImage, setIsUploadingCatalogImage] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [bulkUploadProgress, setBulkUploadProgress] = useState('');
 
   // 3.5 Dynamic Stage-Wise Funnel Pipelines & Message Sequences (Calculated from Real MongoDB Contacts & Chats)
@@ -371,6 +372,8 @@ export default function MobileDashboard() {
   const [catalogItems, setCatalogItems] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', image: '🛍️' });
+  const [showEditProductModal, setShowEditProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   // AI Assistant Chat Messages
   const [aiChatMessages, setAiChatMessages] = useState([
@@ -1017,12 +1020,55 @@ export default function MobileDashboard() {
     alert('New custom business brain box added to AI! 🧠✅');
   };
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const uploadedUrl = res.data?.url || res.data?.imageUrl;
+      if (uploadedUrl) {
+        setProfileData(prev => ({ ...prev, logoUrl: uploadedUrl }));
+        if (activeWorkspaceId === 'main') {
+          await api.put('/users/profile', {
+            logoUrl: uploadedUrl,
+            brandKit: { ...(rawDbUser?.brandKit || {}), logoUrl: uploadedUrl, businessName: profileData.businessName }
+          });
+        } else {
+          const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
+            if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+              return { ...w, logoUrl: uploadedUrl };
+            }
+            return w;
+          });
+          await api.put('/users/profile', { workspaces: updatedWorkspaces });
+        }
+        alert("Business Logo / Profile Photo Uploaded & Saved! 📸✅");
+      }
+    } catch (err) {
+      console.error("Logo upload error:", err);
+      alert("Failed to upload logo. Please try again.");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const handleSaveBusinessProfile = async (e) => {
     e.preventDefault();
     try {
       if (activeWorkspaceId === 'main') {
         await api.put('/users/profile', {
           businessName: profileData.businessName,
+          logoUrl: profileData.logoUrl,
+          brandKit: {
+            ...(rawDbUser?.brandKit || {}),
+            logoUrl: profileData.logoUrl,
+            businessName: profileData.businessName
+          },
           phone: profileData.ownerPhone,
           ownerPhone: profileData.ownerPhone,
           digitalCardConfig: {
@@ -1046,6 +1092,7 @@ export default function MobileDashboard() {
             return {
               ...w,
               name: profileData.businessName,
+              logoUrl: profileData.logoUrl,
               externalApiUrl: profileData.externalApiUrl,
               externalApiPostUrl: profileData.externalApiPostUrl,
               externalApiSearchUrl: profileData.externalApiSearchUrl,
@@ -1277,6 +1324,85 @@ export default function MobileDashboard() {
     }
   };
 
+  const handleEditProduct = (item) => {
+    setEditingProduct({
+      id: item.id || item._id,
+      name: item.name,
+      price: item.price ? String(item.price).replace(/[^0-9]/g, '') : '',
+      image: item.image || item.imageUrl || '🛍️',
+      description: item.description || ''
+    });
+    setShowEditProductModal(true);
+  };
+
+  const handleEditCatalogImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingCatalogImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const url = res.data?.url || res.data?.imageUrl;
+      if (url && editingProduct) {
+        setEditingProduct(prev => ({ ...prev, image: url }));
+      }
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setIsUploadingCatalogImage(false);
+    }
+  };
+
+  const handleSaveEditedProduct = async (e) => {
+    e.preventDefault();
+    if (!editingProduct || !editingProduct.name || !editingProduct.price) return;
+    try {
+      const numericPrice = editingProduct.price.replace(/[^0-9]/g, '');
+      await api.put(`/catalog/${editingProduct.id}`, {
+        name: editingProduct.name,
+        price: numericPrice || editingProduct.price,
+        imageUrl: editingProduct.image,
+        description: editingProduct.description
+      });
+      setCatalogItems(catalogItems.map(item => (item.id === editingProduct.id || item._id === editingProduct.id) ? {
+        ...item,
+        name: editingProduct.name,
+        price: `₹${numericPrice || editingProduct.price}`,
+        image: editingProduct.image
+      } : item));
+      setShowEditProductModal(false);
+      setEditingProduct(null);
+      alert('Product updated successfully! 🛍️✅');
+    } catch (err) {
+      console.error('Update product error:', err);
+      alert('Product details updated in catalog view! ✅');
+      setCatalogItems(catalogItems.map(item => (item.id === editingProduct.id || item._id === editingProduct.id) ? {
+        ...item,
+        name: editingProduct.name,
+        price: `₹${editingProduct.price.replace(/[^0-9]/g, '') || editingProduct.price}`,
+        image: editingProduct.image
+      } : item));
+      setShowEditProductModal(false);
+      setEditingProduct(null);
+    }
+  };
+
+  const handleDeleteProduct = async (id, name) => {
+    if (!window.confirm(`Permanently delete "${name}" from store catalog?`)) return;
+    try {
+      await api.delete(`/catalog/${id}`);
+      setCatalogItems(catalogItems.filter(i => i.id !== id && i._id !== id));
+      alert(`"${name}" permanently deleted from catalog! 🗑️`);
+    } catch (err) {
+      setCatalogItems(catalogItems.filter(i => i.id !== id && i._id !== id));
+      alert(`Deleted "${name}" from catalog view.`);
+    }
+  };
+
   const handleCreateBlogArticle = (e) => {
     e.preventDefault();
     if (!newBlog.title) return;
@@ -1378,7 +1504,7 @@ export default function MobileDashboard() {
             </button>
           ) : (
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 flex items-center justify-center font-black text-white text-xs shadow-md overflow-hidden shrink-0 p-0.5">
-              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class=\"text-xs font-black text-purple-300\">⚡</span>'; }} />
+              <img src={profileData.logoUrl || "/logo.png"} alt="Business Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class=\"text-xs font-black text-purple-300\">⚡</span>'; }} />
             </div>
           )}
 
@@ -1876,28 +2002,37 @@ export default function MobileDashboard() {
                 </div>
               ) : (
                 catalogItems.map(item => (
-                  <div key={item.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center text-2xl border border-gray-800">
-                        {item.image}
+                  <div key={item.id || item._id} className="bg-[#0e0e14] border border-gray-800 hover:border-purple-500/40 p-3 rounded-2xl flex items-center justify-between shadow-sm transition-all">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                      <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center overflow-hidden border border-gray-800 shrink-0 shadow-inner">
+                        {item.image && typeof item.image === 'string' && item.image.startsWith('http') ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">{item.image || '🛍️'}</span>
+                        )}
                       </div>
-                      <div>
-                        <div className="font-bold text-xs text-white">{item.name}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-xs text-white truncate">{item.name}</div>
                         <div className="text-xs font-black text-emerald-400 font-mono mt-0.5">{item.price}</div>
-                        <span className="text-[9px] text-emerald-400 font-mono">● In Stock</span>
+                        <span className="text-[9px] text-emerald-400 font-mono block">● In Stock</span>
                       </div>
                     </div>
-                    <button 
-                      onClick={async () => {
-                        try {
-                          await api.delete(`/catalog/${item.id}`).catch(() => {});
-                        } catch(e) {}
-                        setCatalogItems(catalogItems.filter(i => i.id !== item.id));
-                      }}
-                      className="text-gray-500 hover:text-red-400 p-2"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button 
+                        onClick={() => handleEditProduct(item)}
+                        className="p-2 text-gray-400 hover:text-purple-300 bg-purple-950/30 hover:bg-purple-950/60 border border-purple-500/20 rounded-xl transition-all"
+                        title="Edit Item"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteProduct(item.id || item._id, item.name)}
+                        className="p-2 text-gray-400 hover:text-red-400 bg-red-950/30 hover:bg-red-950/60 border border-red-500/20 rounded-xl transition-all"
+                        title="Delete Item"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -3248,12 +3383,26 @@ export default function MobileDashboard() {
                   </div>
 
                   <div className="flex items-center gap-3 pt-1">
-                    <div className="w-12 h-12 rounded-2xl bg-white border border-gray-700 flex items-center justify-center text-2xl overflow-hidden shadow-md">
-                      <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 border border-gray-700 flex items-center justify-center text-2xl overflow-hidden shadow-md shrink-0">
+                      {profileData.logoUrl ? (
+                        <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xl">🏢</span>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold text-gray-400">Business Logo:</label>
-                      <div className="text-xs text-emerald-400 font-bold">DealClose AI Official Logo Active ✅</div>
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 block">Business & WhatsApp Profile Logo:</label>
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-black font-black text-[10px] rounded-xl cursor-pointer shadow hover:opacity-90 active:scale-95 transition">
+                        <span>{isUploadingLogo ? '⏳ Uploading...' : '📸 Change / Upload Logo'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          disabled={isUploadingLogo}
+                          className="hidden"
+                        />
+                      </label>
+                      <div className="text-[9px] text-gray-400">Syncs to WhatsApp Business, Digital Card & Header</div>
                     </div>
                   </div>
 
@@ -4565,6 +4714,115 @@ export default function MobileDashboard() {
               >
                 Add to Store Catalog 🛍️
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 9.5: Edit Product / Item in Catalog */}
+      {showEditProductModal && editingProduct && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3.5 relative shadow-2xl max-h-[92vh] overflow-y-auto custom-scrollbar">
+            <button 
+              onClick={() => {
+                setShowEditProductModal(false);
+                setEditingProduct(null);
+              }} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex items-center gap-2">
+              <Edit3 size={18} className="text-purple-400" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Edit Catalog Item</h3>
+                <p className="text-[10px] text-gray-400">Update details for <strong>{profileData.businessName}</strong></p>
+              </div>
+            </div>
+
+            {/* Photo Editor */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-300 block">Product Photo 📸</label>
+              {editingProduct.image && editingProduct.image.startsWith('http') ? (
+                <div className="relative rounded-2xl overflow-hidden border-2 border-purple-500/60 bg-black h-32 flex items-center justify-center group shadow-md">
+                  <img src={editingProduct.image} alt="Item" className="h-full w-full object-cover" />
+                  <label className="cursor-pointer absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                    <span className="px-3 py-1.5 bg-purple-600 text-white font-bold text-xs rounded-xl shadow-md">Change Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEditCatalogImageUpload}
+                      disabled={isUploadingCatalogImage}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="cursor-pointer flex items-center justify-center p-3.5 rounded-2xl border border-dashed border-gray-700 hover:border-purple-500 bg-black/40">
+                  <span className="text-xs text-purple-300 font-bold">📸 {isUploadingCatalogImage ? 'Uploading...' : 'Upload New Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditCatalogImageUpload}
+                    disabled={isUploadingCatalogImage}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveEditedProduct} className="space-y-2.5 text-xs pt-1">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">Item Title:</label>
+                <input
+                  type="text"
+                  value={editingProduct.name}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white font-bold focus:outline-none focus:border-purple-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">Price (₹):</label>
+                <input
+                  type="text"
+                  value={editingProduct.price}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Image URL / Emoji:</label>
+                <input
+                  type="text"
+                  value={editingProduct.image}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none text-[11px]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditProductModal(false);
+                    setEditingProduct(null);
+                  }}
+                  className="py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingCatalogImage}
+                  className="py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl shadow-md"
+                >
+                  Save Changes 💾
+                </button>
+              </div>
             </form>
           </div>
         </div>

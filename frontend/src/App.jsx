@@ -147,10 +147,39 @@ const GlobalNotification = () => {
 
           const sender = latest.customerName || latest.customerPhone || 'Customer';
           const text = latest.messageText || latest.text || 'New incoming message';
-          toast(`💬 ${sender}: "${text}"`, {
+          
+          toast.custom((t) => (
+            <div
+              onClick={() => {
+                toast.dismiss(t.id);
+                if (window.location.pathname !== '/mobile' && window.location.pathname !== '/chats') {
+                  window.location.href = '/mobile';
+                }
+              }}
+              className="bg-[#0e0e14] border border-emerald-500/60 p-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 max-w-sm w-full cursor-pointer animate-fade-in backdrop-blur-md"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  💬
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-black text-white truncate">{sender}</div>
+                  <div className="text-[11px] text-gray-300 truncate">{text}</div>
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toast.dismiss(t.id);
+                }}
+                className="text-gray-400 hover:text-white p-1 rounded-lg bg-gray-800/80 hover:bg-gray-700 text-xs shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          ), {
             id: `msg-${latest._id || latest.id || Date.now()}`,
-            duration: 4000,
-            style: { background: '#111', color: '#fff', border: '1px solid #333' }
+            duration: 3500
           });
         }
 
