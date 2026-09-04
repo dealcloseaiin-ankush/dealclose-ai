@@ -240,22 +240,15 @@ export default function MobileDashboard() {
   const [liveIgPosts, setLiveIgPosts] = useState([]);
   const [selectedPostForRule, setSelectedPostForRule] = useState(null);
   const [showIgPostRuleModal, setShowIgPostRuleModal] = useState(false);
+  const [isUploadingPostFile, setIsUploadingPostFile] = useState(false);
 
-  // 2. WhatsApp Auto-Replies Rules State
-  const [autoReplies, setAutoReplies] = useState([
-    { id: 'ar_1', trigger: 'PRICE / RATE / CATALOG', reply: 'Namaste! Summer collection catalog rate card yahan hai: https://dealcloseai.in/catalog. Free delivery ke liye size bhejein.', active: true },
-    { id: 'ar_2', trigger: 'OFFER / DISCOUNT', reply: 'Namaste! Weekend special flat 20% OFF coupon code "DEAL20" use karein!', active: true },
-    { id: 'ar_3', trigger: 'ADDRESS / LOCATION', reply: '📍 Hamara store address: Shop #14, City Center Mall. Timings: 10 AM - 9 PM daily.', active: true }
-  ]);
+  // 2. WhatsApp Auto-Replies Rules State (Clean Real Sync)
+  const [autoReplies, setAutoReplies] = useState([]);
   const [showAddAutoReplyModal, setShowAddAutoReplyModal] = useState(false);
   const [newAutoReply, setNewAutoReply] = useState({ trigger: '', reply: '' });
 
-  // 3. Flow Automations State
-  const [flowRules, setFlowRules] = useState([
-    { id: 'fl_1', name: 'Auto Greeting & Name Capture', description: 'When new customer says Hi -> Ask name & city -> Save to CRM automatically', trigger: 'New Incoming Chat', active: true },
-    { id: 'fl_2', name: 'Out-of-Hours Away Reply', description: 'Replies with store opening hours when customer texts after 9:00 PM', trigger: 'After 9 PM', active: true },
-    { id: 'fl_3', name: 'Property / Product Auto Poster', description: 'Syncs customer inquiry to external website API & books site visits automatically', trigger: 'Keyword "PROPERTY / BOOK"', active: true }
-  ]);
+  // 3. Flow Automations State (Synced with MongoDB)
+  const [flowRules, setFlowRules] = useState([]);
   const [showAddFlowModal, setShowAddFlowModal] = useState(false);
   const [newFlow, setNewFlow] = useState({ name: '', trigger: 'Incoming Keyword', description: '' });
 
@@ -277,16 +270,16 @@ export default function MobileDashboard() {
       totalReplied += repliedMsgs;
     });
 
-    const totalDelivered = Math.round(totalSent * 0.98);
-    const totalRead = Math.round(totalSent * 0.88);
+    const totalDelivered = totalSent > 0 ? Math.round(totalSent * 0.98) : 0;
+    const totalRead = totalSent > 0 ? Math.round(totalSent * 0.88) : 0;
     const overallConvRate = totalSent > 0 ? `${Math.round((totalReplied / totalSent) * 100)}%` : (totalLeads > 0 ? `${Math.round((stageConverted / totalLeads) * 100)}%` : '0%');
 
     return {
       totalLeads,
-      totalSent: totalSent || totalLeads,
-      totalDelivered: totalDelivered || totalLeads,
-      totalRead: totalRead || totalLeads,
-      totalReplied: totalReplied || (stageWarm + stageHot + stageConverted),
+      totalSent,
+      totalDelivered,
+      totalRead,
+      totalReplied,
       overallConvRate,
       stages: [
         {
@@ -294,27 +287,27 @@ export default function MobileDashboard() {
           stage: 'New Lead / Outreach',
           icon: '🆕',
           color: 'blue',
-          activeTemplate: 'festive_discount_v1',
+          activeTemplate: 'Welcome Intro & Brochure',
           hasAttachment: true,
-          attachmentName: 'Promo_Offer_Banner.jpg',
+          attachmentName: 'Welcome_Catalog.pdf',
           triggerCondition: 'First Incoming Message / Ad Click',
-          nextAction: 'Move to Interested & Send Catalog',
+          nextAction: 'Move to Interested & Send Pricing',
           autoPauseOnReply: true,
           leadsCount: stageNew,
-          sentCount: Math.max(stageNew, totalSent > 0 ? Math.round(totalSent * 0.5) : stageNew),
-          deliveredCount: Math.max(stageNew, totalSent > 0 ? Math.round(totalSent * 0.48) : stageNew),
-          readCount: Math.max(stageNew, totalSent > 0 ? Math.round(totalSent * 0.42) : stageNew),
+          sentCount: stageNew,
+          deliveredCount: stageNew > 0 ? Math.round(stageNew * 0.98) : 0,
+          readCount: stageNew > 0 ? Math.round(stageNew * 0.85) : 0,
           repliedCount: stageWarm + stageHot + stageConverted,
-          conversionRate: stageNew > 0 ? `${Math.round(((stageWarm + stageHot + stageConverted) / Math.max(totalLeads, 1)) * 100)}%` : '0%'
+          conversionRate: totalLeads > 0 ? `${Math.round(((stageWarm + stageHot + stageConverted) / totalLeads) * 100)}%` : '0%'
         },
         {
           id: 'stg_warm',
           stage: 'Interested / Discovery',
           icon: '☀️',
           color: 'amber',
-          activeTemplate: 'catalog_pricing_sheet',
+          activeTemplate: 'Pricing & Catalog Sheet',
           hasAttachment: true,
-          attachmentName: '📄 Product_Catalog_RateList.pdf',
+          attachmentName: 'Pricing_RateList.pdf',
           triggerCondition: 'Customer replies "Price / Details"',
           nextAction: 'Schedule Site Visit / Call Rep',
           autoPauseOnReply: true,
@@ -330,9 +323,9 @@ export default function MobileDashboard() {
           stage: 'Hot Lead / Site Visit Scheduled',
           icon: '🔥',
           color: 'rose',
-          activeTemplate: 'weekend_site_visit_reminder',
+          activeTemplate: 'Site Visit / Appointment Reminder',
           hasAttachment: true,
-          attachmentName: '📍 Google_Maps_Visit_Pass.png',
+          attachmentName: 'Location_Pass.png',
           triggerCondition: 'Visit Confirmed or Call Done',
           nextAction: 'Send Invoice & UPI Payment Link',
           autoPauseOnReply: true,
@@ -348,9 +341,9 @@ export default function MobileDashboard() {
           stage: 'Converted Customer (Deal Closed)',
           icon: '🏆',
           color: 'emerald',
-          activeTemplate: 'order_dispatch_alert',
+          activeTemplate: 'Order Receipt & Review Request',
           hasAttachment: true,
-          attachmentName: '💳 Official_Invoice_Receipt.pdf',
+          attachmentName: 'Official_Receipt.pdf',
           triggerCondition: 'Payment Received / Agreement Done',
           nextAction: 'Ask for Google 5-Star Review',
           autoPauseOnReply: false,
@@ -365,39 +358,8 @@ export default function MobileDashboard() {
     };
   }, [contacts, chats]);
 
-  // 4. Meta Template Approvals & Real Live WhatsApp Preview
-  const [metaTemplates, setMetaTemplates] = useState([
-    { 
-      id: 'mt_1', 
-      name: 'festive_discount_v1', 
-      category: 'MARKETING', 
-      language: 'hi', 
-      status: 'APPROVED', 
-      header: '🎉 FESTIVE SPECIAL DISCOUNT',
-      text: 'Namaste Priya! DealClose AI par festive mega offer chalu hai. Aapke cart par Flat 20% discount apply ho chuka hai.',
-      buttons: [{ label: '🛍️ Claim 20% OFF Now', type: 'url' }, { label: '💬 Chat with Support', type: 'quick_reply' }]
-    },
-    { 
-      id: 'mt_2', 
-      name: 'order_dispatch_alert', 
-      category: 'UTILITY', 
-      language: 'en', 
-      status: 'APPROVED', 
-      header: '📦 ORDER OUT FOR DELIVERY',
-      text: 'Hello Priya, your order #4092 has been dispatched with our delivery executive.',
-      buttons: [{ label: '📍 Track Live Delivery', type: 'url' }]
-    },
-    { 
-      id: 'mt_3', 
-      name: 'weekend_site_visit_reminder', 
-      category: 'MARKETING', 
-      language: 'hi', 
-      status: 'PENDING', 
-      header: '🏡 SITE VISIT REMINDER',
-      text: 'Namaste Priya Ji! Aapka luxury villa site visit Sunday 11:00 AM par scheduled hai.',
-      buttons: [{ label: '✅ Confirm Visit', type: 'quick_reply' }, { label: '📅 Reschedule', type: 'quick_reply' }]
-    }
-  ]);
+  // 4. Meta Template Approvals & Real Live WhatsApp Preview (Clean Real Sync)
+  const [metaTemplates, setMetaTemplates] = useState([]);
   const [selectedTemplateForPreview, setSelectedTemplateForPreview] = useState(null);
   const [showNewMetaTemplateModal, setShowNewMetaTemplateModal] = useState(false);
   const [newTemplateForm, setNewTemplateForm] = useState({ name: '', category: 'MARKETING', header: '', text: '' });
@@ -405,9 +367,7 @@ export default function MobileDashboard() {
   // 5. Post Batch Scheduler (Dynamic on-demand generation)
   const [customAiPostBatches, setCustomAiPostBatches] = useState([]);
 
-  const [scheduledPosts, setScheduledPosts] = useState([
-    { id: 'sp_1', title: 'Sunday Business Highlight', image: '✨', caption: 'Explore our latest collection and offers this week.', platform: 'Instagram & Facebook', date: 'Tomorrow 10:00 AM', status: 'SCHEDULED' }
-  ]);
+  const [scheduledPosts, setScheduledPosts] = useState([]);
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [customPost, setCustomPost] = useState({ title: '', caption: '', date: 'Tomorrow 5:00 PM' });
 
@@ -652,6 +612,40 @@ export default function MobileDashboard() {
           active: f.isActive !== false,
           rawFlow: f
         })));
+      } else {
+        setFlowRules([]);
+      }
+
+      // 8. Fetch Real WhatsApp Auto-Reply Rules for Selected Workspace
+      const { data: rulesRes } = await api.get(`/whatsapp/rules?workspaceId=${currentWsId}`).catch(() => ({ data: [] }));
+      const liveRules = Array.isArray(rulesRes?.data) ? rulesRes.data : (Array.isArray(rulesRes) ? rulesRes : (rulesRes?.rules || []));
+      if (liveRules && liveRules.length > 0) {
+        setAutoReplies(liveRules.map(r => ({
+          id: r._id || r.id,
+          trigger: r.keyword || r.trigger || 'KEYWORD',
+          reply: r.replyText || r.reply || '',
+          active: r.isActive !== false
+        })));
+      } else {
+        setAutoReplies([]);
+      }
+
+      // 9. Fetch Real Meta WhatsApp Templates for Selected Workspace
+      const { data: templatesRes } = await api.get(`/whatsapp/templates?workspaceId=${currentWsId}`).catch(() => ({ data: [] }));
+      const liveTemplates = Array.isArray(templatesRes?.data) ? templatesRes.data : (Array.isArray(templatesRes) ? templatesRes : []);
+      if (liveTemplates && liveTemplates.length > 0) {
+        setMetaTemplates(liveTemplates.map(t => ({
+          id: t.id || t._id,
+          name: t.name,
+          category: t.category || 'MARKETING',
+          language: t.language || 'en',
+          status: t.status || 'APPROVED',
+          header: t.components?.find(c => c.type === 'HEADER')?.text || '',
+          text: t.components?.find(c => c.type === 'BODY')?.text || t.text || '',
+          buttons: t.components?.find(c => c.type === 'BUTTONS')?.buttons || []
+        })));
+      } else {
+        setMetaTemplates([]);
       }
 
     } catch (err) {
@@ -665,24 +659,35 @@ export default function MobileDashboard() {
     const ws = listToSearch.find(w => String(w.id) === String(wsId) || String(w.name).toLowerCase() === String(wsId).toLowerCase()) || listToSearch[0];
     if (!ws) return;
 
+    const isMain = ws.id === 'main' || String(ws.name).toLowerCase().includes('dealclose');
+    const isProperty = String(ws.name).toLowerCase().includes('property');
+    const cleanName = ws.name.toLowerCase().replace(/\s+/g, '');
+
+    const defaultExternalDomain = isMain ? 'dealcloseai.in' : (isProperty ? 'newpropertyhub.in' : `${cleanName}.in`);
+    const defaultGoogleReview = ws.googleBusinessLink || (isMain ? (liveUser?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review') : (isProperty ? 'https://g.page/r/newpropertyhub-review' : `https://g.page/r/${cleanName}-review`));
+    const defaultInstaLink = ws.instagramLink || (isMain ? (liveUser?.digitalCardConfig?.instagram || 'https://instagram.com/dealclose_official') : `https://instagram.com/${cleanName}`);
+    const defaultYoutubeLink = ws.youtubeLink || (isMain ? (liveUser?.digitalCardConfig?.youtube || 'https://youtube.com/@dealclose') : `https://youtube.com/@${cleanName}`);
+    const defaultFbLink = ws.facebookLink || (isMain ? (liveUser?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose') : `https://facebook.com/${cleanName}`);
+    const defaultUpi = ws.upiId || (isMain ? (liveUser?.digitalCardConfig?.upiId || 'dealclose@upi') : `${cleanName}@upi`);
+
     setProfileData({
       businessName: ws.name,
       ownerPhone: ws.whatsappConfig?.displayPhoneNumber || liveUser?.phone || liveUser?.ownerPhone || '+91 98765 43210',
       managerPhone: '+91 98260 99887',
       logoUrl: liveUser?.logo || '/logo.png',
-      address: 'Shop #14, City Center Mall, Main Road',
-      instagramLink: liveUser?.digitalCardConfig?.instagram || 'https://instagram.com/dealclose_official',
-      youtubeLink: liveUser?.digitalCardConfig?.youtube || 'https://youtube.com/@dealclose',
-      facebookLink: liveUser?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose',
-      googleBusinessLink: liveUser?.digitalCardConfig?.googleBusiness || 'https://g.page/r/dealclose-review',
-      upiId: liveUser?.digitalCardConfig?.upiId || 'dealclose@upi',
+      address: isProperty ? 'Prime Property Zone, Ring Road' : 'Shop #14, City Center Mall, Main Road',
+      instagramLink: defaultInstaLink,
+      youtubeLink: defaultYoutubeLink,
+      facebookLink: defaultFbLink,
+      googleBusinessLink: defaultGoogleReview,
+      upiId: defaultUpi,
       // Webhooks for this specific store (Distinct per workspace)
-      externalApiUrl: ws.externalApiUrl || (ws.id === 'main' ? 'https://dealcloseai.in' : 'https://newpropertyhub.in'),
+      externalApiUrl: ws.externalApiUrl || `https://${defaultExternalDomain}`,
       externalApiToken: ws.externalApiToken || '',
-      externalApiPostUrl: ws.externalApiPostUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/post' : 'https://newpropertyhub.in/api/post'),
-      externalApiSearchUrl: ws.externalApiSearchUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/search' : 'https://newpropertyhub.in/api/search'),
-      externalApiVisitUrl: ws.externalApiVisitUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/visit' : 'https://newpropertyhub.in/api/visit'),
-      externalApiBlogUrl: ws.externalApiBlogUrl || (ws.id === 'main' ? 'https://dealcloseai.in/api/blog' : 'https://newpropertyhub.in/api/blog'),
+      externalApiPostUrl: ws.externalApiPostUrl || `https://${defaultExternalDomain}/api/post`,
+      externalApiSearchUrl: ws.externalApiSearchUrl || `https://${defaultExternalDomain}/api/search`,
+      externalApiVisitUrl: ws.externalApiVisitUrl || `https://${defaultExternalDomain}/api/visit`,
+      externalApiBlogUrl: ws.externalApiBlogUrl || `https://${defaultExternalDomain}/api/blog`,
       customWebhooks: ws.customWebhooks || ''
     });
 
@@ -903,6 +908,43 @@ export default function MobileDashboard() {
     setSelectedContactForTransfer(null);
   };
 
+  const handleToggleProductForIgRule = (prodId) => {
+    if (!selectedPostForRule) return;
+    const current = selectedPostForRule.selectedProductIds || [];
+    let updated;
+    if (current.includes(prodId)) {
+      updated = current.filter(id => id !== prodId);
+    } else {
+      if (current.length >= 4) {
+        alert("You can select up to 4 featured products for this post.");
+        return;
+      }
+      updated = [...current, prodId];
+    }
+    setSelectedPostForRule({ ...selectedPostForRule, selectedProductIds: updated });
+  };
+
+  const handleIgPostFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploadingPostFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const uploadedUrl = uploadRes.data.url || uploadRes.data.imageUrl;
+      setSelectedPostForRule(prev => ({ ...prev, fileUrl: uploadedUrl }));
+      alert("File uploaded successfully! 📎");
+    } catch (err) {
+      console.error("Upload Error:", err);
+      alert("Failed to upload file. Check connection.");
+    } finally {
+      setIsUploadingPostFile(false);
+    }
+  };
+
   const handleSaveIgPostRule = async (e) => {
     e.preventDefault();
     if (!selectedPostForRule) return;
@@ -911,10 +953,13 @@ export default function MobileDashboard() {
       await api.post('/instagram/automations', {
         postId: selectedPostForRule.id,
         triggerWord: selectedPostForRule.keyword,
-        replyMessage: selectedPostForRule.replyMessage,
+        replyMessage: selectedPostForRule.replyMessage || selectedPostForRule.dmText,
         publicReply: selectedPostForRule.publicReply,
-        fileUrl: selectedPostForRule.fileUrl,
-        deliveryMode: selectedPostForRule.deliveryMode,
+        fileUrl: selectedPostForRule.fileUrl || selectedPostForRule.customLink,
+        deliveryMode: selectedPostForRule.deliveryMode || 'instant_shortcut',
+        commentAiReplyEnabled: selectedPostForRule.commentAiReplyEnabled !== false,
+        actionGoal: selectedPostForRule.actionGoal || 'direct',
+        selectedProductIds: selectedPostForRule.selectedProductIds || [],
         thumbnailUrl: selectedPostForRule.thumbnail_url || selectedPostForRule.media_url,
         workspaceId: activeWorkspaceId
       });
@@ -3235,7 +3280,10 @@ export default function MobileDashboard() {
             {menuSubScreen === 'auto_reply' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400">Keyword Auto-Replies ({autoReplies.length})</span>
+                  <div>
+                    <span className="text-xs font-bold text-white">Keyword Auto-Replies ({autoReplies.length})</span>
+                    <p className="text-[10px] text-gray-400">For: <strong>{profileData.businessName}</strong></p>
+                  </div>
                   <button 
                     onClick={() => setShowAddAutoReplyModal(true)}
                     className="px-3 py-1.5 bg-emerald-500 text-black font-black text-xs rounded-xl flex items-center gap-1 shadow-md"
@@ -3245,17 +3293,28 @@ export default function MobileDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  {autoReplies.map(ar => (
-                    <div key={ar.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-emerald-400 font-mono">🔑 "{ar.trigger}"</span>
-                        <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded font-mono">● Active</span>
-                      </div>
-                      <p className="text-xs text-gray-300 bg-black/40 p-2 rounded-xl leading-relaxed">
-                        {ar.reply}
-                      </p>
+                  {autoReplies.length === 0 ? (
+                    <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
+                      <Zap size={24} className="text-emerald-400 mx-auto" />
+                      <div className="text-xs font-bold text-white">No Auto-Replies Configured</div>
+                      <p className="text-[10px] text-gray-400">Add keywords like 'PRICE', 'OFFER', 'VISIT' to reply automatically on WhatsApp for {profileData.businessName}.</p>
+                      <button onClick={() => setShowAddAutoReplyModal(true)} className="px-3 py-1.5 bg-emerald-500 text-black font-black text-xs rounded-xl shadow-md">
+                        + Add First Keyword ⚡
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    autoReplies.map(ar => (
+                      <div key={ar.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-emerald-400 font-mono">🔑 "{ar.trigger}"</span>
+                          <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded font-mono">● Active</span>
+                        </div>
+                        <p className="text-xs text-gray-300 bg-black/40 p-2 rounded-xl leading-relaxed">
+                          {ar.reply}
+                        </p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -3266,7 +3325,7 @@ export default function MobileDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-white">Meta WhatsApp Templates</span>
-                    <p className="text-[10px] text-gray-400">Official Cloud API approved templates</p>
+                    <p className="text-[10px] text-gray-400">Cloud API templates for <strong>{profileData.businessName}</strong> ({metaTemplates.length})</p>
                   </div>
                   <button 
                     onClick={() => setShowNewMetaTemplateModal(true)}
@@ -3277,52 +3336,63 @@ export default function MobileDashboard() {
                 </div>
 
                 <div className="space-y-3">
-                  {metaTemplates.map(tpl => (
-                    <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 hover:border-blue-500/40 p-3.5 rounded-2xl space-y-3 shadow-md">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-white font-mono">{tpl.name}</span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                          tpl.status === 'APPROVED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-amber-950 text-amber-300 border border-amber-500/40'
-                        }`}>
-                          ● {tpl.status}
-                        </span>
-                      </div>
-
-                      {/* Real Interactive WhatsApp Phone Message Preview Bubble */}
-                      <div className="bg-[#0b141a] p-3 rounded-2xl border border-[#202c33] space-y-2 text-xs shadow-inner">
-                        {tpl.header && (
-                          <div className="font-black text-white text-[11px] border-b border-[#202c33] pb-1">
-                            {tpl.header}
-                          </div>
-                        )}
-                        <p className="text-gray-200 leading-relaxed">
-                          {tpl.text}
-                        </p>
-                        
-                        {/* Call To Action Buttons */}
-                        {tpl.buttons && tpl.buttons.length > 0 && (
-                          <div className="pt-2 border-t border-[#202c33] space-y-1.5">
-                            {tpl.buttons.map((btn, bIdx) => (
-                              <div key={bIdx} className="bg-[#202c33] text-[#53bdeb] text-center font-bold text-[11px] py-1.5 rounded-xl flex items-center justify-center gap-1 shadow-sm">
-                                <span>{btn.label}</span>
-                                {btn.type === 'url' && <ExternalLink size={12} />}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
-                        <span>Category: {tpl.category}</span>
-                        <button 
-                          onClick={() => alert(`1-Click WhatsApp Broadcast launched for: ${tpl.name} 🚀`)}
-                          className="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500"
-                        >
-                          Send Broadcast 📢
-                        </button>
-                      </div>
+                  {metaTemplates.length === 0 ? (
+                    <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
+                      <CheckCircle2 size={24} className="text-blue-400 mx-auto" />
+                      <div className="text-xs font-bold text-white">No Meta Templates Found</div>
+                      <p className="text-[10px] text-gray-400">No approved WhatsApp Cloud API templates registered yet for {profileData.businessName}. Submit one below to get Meta verification.</p>
+                      <button onClick={() => setShowNewMetaTemplateModal(true)} className="px-3 py-1.5 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md">
+                        + Submit New Template 💬
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    metaTemplates.map(tpl => (
+                      <div key={tpl.id} className="bg-[#0e0e14] border border-gray-800 hover:border-blue-500/40 p-3.5 rounded-2xl space-y-3 shadow-md">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-white font-mono">{tpl.name}</span>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            tpl.status === 'APPROVED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                          }`}>
+                            ● {tpl.status}
+                          </span>
+                        </div>
+
+                        {/* Real Interactive WhatsApp Phone Message Preview Bubble */}
+                        <div className="bg-[#0b141a] p-3 rounded-2xl border border-[#202c33] space-y-2 text-xs shadow-inner">
+                          {tpl.header && (
+                            <div className="font-black text-white text-[11px] border-b border-[#202c33] pb-1">
+                              {tpl.header}
+                            </div>
+                          )}
+                          <p className="text-gray-200 leading-relaxed">
+                            {tpl.text}
+                          </p>
+                          
+                          {/* Call To Action Buttons */}
+                          {tpl.buttons && tpl.buttons.length > 0 && (
+                            <div className="pt-2 border-t border-[#202c33] space-y-1.5">
+                              {tpl.buttons.map((btn, bIdx) => (
+                                <div key={bIdx} className="bg-[#202c33] text-[#53bdeb] text-center font-bold text-[11px] py-1.5 rounded-xl flex items-center justify-center gap-1 shadow-sm">
+                                  <span>{btn.label}</span>
+                                  {btn.type === 'url' && <ExternalLink size={12} />}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+                          <span>Category: {tpl.category}</span>
+                          <button 
+                            onClick={() => alert(`1-Click WhatsApp Broadcast launched for: ${tpl.name} 🚀`)}
+                            className="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500"
+                          >
+                            Send Broadcast 📢
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -3445,7 +3515,7 @@ export default function MobileDashboard() {
 
             <div className="flex gap-2 pt-1">
               <a
-                href={`/card/${user?._id || user?.id || 'demo'}`}
+                href={`/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 py-2 bg-gray-900 border border-gray-800 text-gray-300 hover:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1"
@@ -3683,17 +3753,20 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 5: Instagram Real Post Trigger Setup */}
+      {/* Modal 5: Instagram Real Post Trigger Setup (Full Feature Parity with Desktop) */}
       {showIgPostRuleModal && selectedPostForRule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl max-h-[88vh] overflow-y-auto custom-scrollbar">
-            <button onClick={() => setShowIgPostRuleModal(false)} className="absolute top-4 right-4 text-gray-400">
+            <button onClick={() => setShowIgPostRuleModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
               <X size={16} />
             </button>
             
             <div className="flex items-center gap-2">
               <InstagramIcon size={18} className="text-pink-400" />
-              <h3 className="text-sm font-black text-white">Setup Reel / Post Comment-DM</h3>
+              <div>
+                <h3 className="text-sm font-black text-white">Setup Reel / Post Comment-DM</h3>
+                <p className="text-[10px] text-gray-400">Automate replies and direct messages</p>
+              </div>
             </div>
             
             <div className="flex items-center gap-3 bg-black/60 p-2.5 rounded-2xl border border-gray-800">
@@ -3706,70 +3779,173 @@ export default function MobileDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-bold text-white line-clamp-2">{selectedPostForRule.title}</div>
-                <div className="text-[10px] text-pink-400 font-mono mt-0.5">❤️ {selectedPostForRule.likesCount} • 💬 {selectedPostForRule.commentsCount} comments</div>
+                <div className="text-[10px] text-pink-400 font-mono mt-0.5">❤️ {selectedPostForRule.likesCount || 0} • 💬 {selectedPostForRule.commentsCount || 0} comments</div>
               </div>
             </div>
 
-            <form onSubmit={handleSaveIgPostRule} className="space-y-2.5 text-xs">
+            <form onSubmit={handleSaveIgPostRule} className="space-y-3 text-xs">
+              {/* 1. Routing Delivery Mode */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Comment Trigger Keyword:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">1. Bot Routing Mode:</label>
+                <select
+                  value={selectedPostForRule.deliveryMode || 'instant_shortcut'}
+                  onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, deliveryMode: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white font-bold focus:outline-none focus:border-pink-500 text-xs"
+                >
+                  <option value="instant_shortcut">Instant Keyword (Shortcut ⚡)</option>
+                  <option value="chatbot">Keyword Engine Only (Advanced ⚙️)</option>
+                  <option value="hybrid">Keyword + AI Intent Recovery (🔒 Pro)</option>
+                  <option value="off">Off (Disable Bot)</option>
+                </select>
+              </div>
+
+              {/* 2. AI Comment Reply Toggle */}
+              <div className="flex items-center justify-between bg-black/50 p-2.5 rounded-xl border border-gray-800">
+                <div>
+                  <div className="text-[11px] font-bold text-white">AI Public Comment Replies</div>
+                  <div className="text-[9px] text-gray-400">Auto reply to user's comment under post</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPostForRule({ ...selectedPostForRule, commentAiReplyEnabled: selectedPostForRule.commentAiReplyEnabled === false ? true : false })}
+                  className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${
+                    selectedPostForRule.commentAiReplyEnabled !== false ? 'bg-emerald-500 text-black shadow-md' : 'bg-gray-800 text-gray-400'
+                  }`}
+                >
+                  {selectedPostForRule.commentAiReplyEnabled !== false ? 'ON ✅' : 'OFF'}
+                </button>
+              </div>
+
+              {/* 3. Action Goal Selector */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">2. Automation Goal / Action Type:</label>
+                <select
+                  value={selectedPostForRule.actionGoal || 'direct'}
+                  onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, actionGoal: e.target.value })}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white font-bold focus:outline-none focus:border-pink-500 text-xs"
+                >
+                  <option value="direct">Direct Link & File Delivery 🔗</option>
+                  <option value="lead_gen">Lead Capture & CRM Extractor 📋</option>
+                  <option value="catalog">Featured Catalog Products 🛍️</option>
+                  <option value="visit_booking">Store Visit & Booking 📅</option>
+                </select>
+              </div>
+
+              {/* 4. Trigger Keyword */}
+              <div>
+                <label className="text-[10px] font-bold text-pink-400 block mb-1">3. Comment Trigger Keyword *:</label>
                 <input
                   type="text"
                   placeholder="e.g. LINK, PRICE, BOOK, BUY"
-                  value={selectedPostForRule.keyword}
+                  value={selectedPostForRule.keyword || ''}
                   onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, keyword: e.target.value })}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white uppercase font-mono focus:outline-none focus:border-pink-500 font-bold"
                   required
                 />
               </div>
 
+              {/* 5. Public Comment Reply */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400">Delivery Mode:</label>
-                <select
-                  value={selectedPostForRule.deliveryMode || 'instant_shortcut'}
-                  onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, deliveryMode: e.target.value })}
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white font-bold focus:outline-none"
-                >
-                  <option value="instant_shortcut">Instant Keyword (Shortcut ⚡)</option>
-                  <option value="direct">Direct DM Delivery</option>
-                  <option value="hybrid">Keyword + AI Intent Recovery</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-400">Public Comment Reply:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">4. Public Comment Reply (Optional):</label>
                 <input
                   type="text"
-                  placeholder="e.g. Check your DM! 📩"
-                  value={selectedPostForRule.publicReply || 'Check your DM! Details sent. 📩'}
+                  placeholder="e.g. Check your DM! Details sent. 📩"
+                  value={selectedPostForRule.publicReply !== undefined ? selectedPostForRule.publicReply : 'Check your DM! Details sent. 📩'}
                   onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, publicReply: e.target.value })}
                   className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-pink-500"
                 />
               </div>
 
+              {/* 6. DM Message Body */}
               <div>
-                <label className="text-[10px] font-bold text-gray-400">DM Message Body (Customer Inbox):</label>
+                <label className="text-[10px] font-bold text-purple-400 block mb-1">5. DM Message Body (Customer Inbox) *:</label>
                 <textarea
                   rows={2}
+                  placeholder="Here is the link and details you requested:"
                   value={selectedPostForRule.replyMessage || selectedPostForRule.dmText || ''}
                   onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, replyMessage: e.target.value, dmText: e.target.value })}
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-purple-500"
                   required
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-gray-400">Catalog Link / Cloudinary PDF URL:</label>
-                <input
-                  type="text"
-                  value={selectedPostForRule.fileUrl || selectedPostForRule.customLink || ''}
-                  onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, fileUrl: e.target.value, customLink: e.target.value })}
-                  placeholder="https://dealcloseai.in/shop or PDF url"
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-pink-300 font-mono focus:outline-none text-[11px]"
-                />
+              {/* 7. Attach Featured Catalog Products (Max 4 Items) */}
+              <div className="space-y-1.5 border-t border-gray-800/80 pt-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-amber-400 uppercase flex items-center gap-1">
+                    <span>📦 Attach Catalog Products</span>
+                  </label>
+                  <span className="text-[9px] text-gray-500 font-mono">
+                    {(selectedPostForRule.selectedProductIds || []).length}/4 Selected
+                  </span>
+                </div>
+
+                {catalogItems.length === 0 ? (
+                  <p className="text-[10px] text-gray-500 italic bg-black/60 p-2 rounded-lg border border-gray-800">
+                    No products in store catalog yet. Add products to link them to this post!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                    {catalogItems.map(item => {
+                      const isSelected = (selectedPostForRule.selectedProductIds || []).includes(item.id || item._id);
+                      return (
+                        <div
+                          key={item.id || item._id}
+                          onClick={() => handleToggleProductForIgRule(item.id || item._id)}
+                          className={`p-1.5 rounded-xl border flex items-center gap-1.5 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-amber-950/40 border-amber-500 text-white shadow-sm'
+                              : 'bg-black border-gray-800 text-gray-400 hover:border-gray-700'
+                          }`}
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-800 text-xs">
+                            {item.image && item.image.startsWith('http') ? (
+                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{item.image || '🛍️'}</span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-bold truncate text-white">{item.name}</p>
+                            <p className="text-[9px] text-emerald-400 font-mono">{item.price}</p>
+                          </div>
+                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[8px] font-bold ${
+                            isSelected ? 'bg-amber-500 border-amber-400 text-black' : 'border-gray-700 text-transparent'
+                          }`}>
+                            ✓
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              <button type="submit" className="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-black rounded-xl text-xs mt-1 shadow-lg">
+              {/* 8. Link URL / Upload PDF File */}
+              <div className="border-t border-gray-800/80 pt-2.5">
+                <label className="text-[10px] font-bold text-gray-300 block mb-1">6. Link URL / Upload PDF/Image:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={selectedPostForRule.fileUrl || selectedPostForRule.customLink || ''}
+                    onChange={(e) => setSelectedPostForRule({ ...selectedPostForRule, fileUrl: e.target.value, customLink: e.target.value })}
+                    placeholder="https://... or upload below"
+                    className="flex-1 bg-black border border-gray-800 rounded-xl p-2.5 text-pink-300 font-mono focus:outline-none text-[11px]"
+                  />
+                  <label className="bg-gray-900 hover:bg-gray-800 text-gray-200 font-bold px-3 rounded-xl cursor-pointer flex items-center justify-center border border-gray-700 whitespace-nowrap text-[11px] shadow-sm">
+                    {isUploadingPostFile ? '⏳...' : '📎 Upload'}
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      className="hidden"
+                      onChange={handleIgPostFileUpload}
+                      disabled={isUploadingPostFile}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-black rounded-xl text-xs mt-2 shadow-lg hover:opacity-90 active:scale-98 transition-all">
                 Save & Activate Reel Trigger 🚀
               </button>
             </form>

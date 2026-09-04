@@ -40,16 +40,33 @@ export default function DigitalCard() {
   useEffect(() => {
     const getLinks = async () => {
       try {
-        // Use the correct profile endpoint to avoid 404 error
         const { data } = await api.get('/users/profile');
         const savedData = data.user || data.data || data;
         
         const queryParams = new URLSearchParams(location.search);
-        const wsIndex = queryParams.get('ws');
+        const wsParam = queryParams.get('workspaceId') || queryParams.get('ws');
         
-        if (wsIndex !== null && savedData.workspaces && savedData.workspaces[wsIndex]) {
-          setCardLinks(savedData.workspaces[wsIndex]);
-          setBusinessName(savedData.workspaces[wsIndex].name || 'Our Business');
+        let targetWs = null;
+        if (wsParam && savedData.workspaces && Array.isArray(savedData.workspaces)) {
+          targetWs = savedData.workspaces.find(
+            w => String(w._id) === String(wsParam) || 
+                 String(w.id) === String(wsParam) || 
+                 String(w.name).toLowerCase() === String(wsParam).toLowerCase()
+          ) || (savedData.workspaces[parseInt(wsParam, 10)] || null);
+        }
+        
+        if (targetWs) {
+          const isProperty = targetWs.name.toLowerCase().includes('property');
+          const cleanName = targetWs.name.toLowerCase().replace(/\s+/g, '');
+          setCardLinks({
+            instagram: targetWs.instagramLink || `https://instagram.com/${cleanName}`,
+            youtube: targetWs.youtubeLink || `https://youtube.com/@${cleanName}`,
+            facebook: targetWs.facebookLink || `https://facebook.com/${cleanName}`,
+            googleReview: targetWs.googleBusinessLink || (isProperty ? 'https://g.page/r/newpropertyhub-review' : `https://g.page/r/${cleanName}-review`),
+            upiId: targetWs.upiId || `${cleanName}@upi`,
+            ...(targetWs.digitalCardConfig || {})
+          });
+          setBusinessName(targetWs.name || 'Our Business');
         } else {
           if (savedData?.digitalCardConfig) setCardLinks(savedData.digitalCardConfig);
           setBusinessName(savedData?.businessName || 'Our Business');
