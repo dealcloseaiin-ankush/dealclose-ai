@@ -94,17 +94,18 @@ const RootRoute = ({ children }) => {
   return children;
 };
 
-// 🚀 GLOBAL NOTIFICATION SYSTEM: Plays sound and shows popup on ALL pages
+// 🚀 GLOBAL NOTIFICATION SYSTEM: Plays sound once and shows single popup per new message
 const GlobalNotification = () => {
   const auth = useAuth();
   const user = auth?.user;
-  const [lastMsgId, setLastMsgId] = useState(null);
-  // Use a ref so the interval callback always reads the latest value without re-registering
+  const isFirstCheckRef = React.useRef(true);
+  const seenMessageIdsRef = React.useRef(new Set());
   const shouldPoll = React.useRef(true);
 
   useEffect(() => {
     if (!user) return;
     shouldPoll.current = true;
+    isFirstCheckRef.current = true;
 
     const checkMessages = async () => {
       if (!shouldPoll.current) return;
@@ -113,39 +114,65 @@ const GlobalNotification = () => {
         if (!shouldPoll.current) return;
         const messages = Array.isArray(data) ? data : data.data || [];
         if (messages.length === 0) return;
-        
-        const latest = messages[messages.length - 1];
-        
-        if (latest.direction === 'incoming' && lastMsgId && latest._id !== lastMsgId) {
-          const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-          audio.play().catch(() => {});
-          toast(`💬 New message from ${latest.customerName || latest.customerPhone}:\n"${latest.messageText}"`, {
-            duration: 5000,
+
+        // On first app load, seed existing message IDs into seenMessageIdsRef so they DON'T trigger old notifications
+        if (isFirstCheckRef.current) {
+          messages.forEach(m => {
+            if (m._id) seenMessageIdsRef.current.add(String(m._id));
+            if (m.id) seenMessageIdsRef.current.add(String(m.id));
+          });
+          isFirstCheckRef.current = false;
+          return;
+        }
+
+        // Find genuinely NEW incoming messages that have NOT been seen or notified yet
+        const newIncoming = messages.filter(m => {
+          const msgId = String(m._id || m.id || '');
+          return msgId && !seenMessageIdsRef.current.has(msgId) && m.direction === 'incoming';
+        });
+
+        // Mark all current message IDs as seen
+        messages.forEach(m => {
+          if (m._id) seenMessageIdsRef.current.add(String(m._id));
+          if (m.id) seenMessageIdsRef.current.add(String(m.id));
+        });
+
+        // If there are new incoming messages, notify ONLY ONCE per message
+        if (newIncoming.length > 0) {
+          const latest = newIncoming[newIncoming.length - 1];
+          try {
+            const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+            audio.play().catch(() => {});
+          } catch (e) {}
+
+          const sender = latest.customerName || latest.customerPhone || 'Customer';
+          const text = latest.messageText || latest.text || 'New incoming message';
+          toast(`💬 ${sender}: "${text}"`, {
+            id: `msg-${latest._id || latest.id || Date.now()}`,
+            duration: 4000,
             style: { background: '#111', color: '#fff', border: '1px solid #333' }
           });
         }
-        if (!lastMsgId || latest._id !== lastMsgId) setLastMsgId(latest._id);
-        
-        // 🚀 GLOBAL BLUE DOT EVENT: Broadcasts unread status so your Sidebar can catch it globally
-        const hasUnread = messages.some(m => m.direction === 'incoming');
+
+        // 🚀 GLOBAL BLUE DOT EVENT: Broadcasts unread status so Sidebar can catch it globally
+        const hasUnread = messages.some(m => m.direction === 'incoming' && m.status !== 'read');
         window.dispatchEvent(new CustomEvent('update_unread_badge', { detail: { hasUnread } }));
       } catch(error) {
         if (error.response?.status === 401) {
-          // 401 = expired/invalid token — permanently stop ALL future poll calls
           shouldPoll.current = false;
-          clearInterval(intervalRef.current);
         }
         console.debug('Background chat check skipped.', error.message);
       }
     };
 
     checkMessages();
-    const intervalRef = { current: setInterval(checkMessages, 8000) }; // Increased to 8s to reduce server load
+    const interval = setInterval(checkMessages, 10000);
     return () => {
       shouldPoll.current = false;
-      clearInterval(intervalRef.current);
+      clearInterval(interval);
     };
-  }, [user]); // Removed lastMsgId from deps so interval doesn't restart on every message
+  }, [user]);
+
   return null;
 };
 

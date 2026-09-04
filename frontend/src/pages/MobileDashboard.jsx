@@ -778,10 +778,10 @@ export default function MobileDashboard() {
     fetchLiveBackendData(activeWorkspaceId);
   }, [user, activeWorkspaceId]);
 
-  // Unread Calculations
-  const totalWaUnread = chats.filter(c => c.channel === 'whatsapp').reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-  const totalIgUnread = chats.filter(c => c.channel === 'instagram').reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-  const totalGlobalUnread = totalWaUnread + totalIgUnread;
+  // Unread Calculations: Exactly like WhatsApp, count distinct contacts/chats who have unread messages
+  const totalWaUnread = chats.filter(c => c.channel === 'whatsapp' && (c.unreadCount > 0)).length;
+  const totalIgUnread = chats.filter(c => c.channel === 'instagram' && (c.unreadCount > 0)).length;
+  const totalGlobalUnread = chats.filter(c => (c.unreadCount > 0)).length;
 
   // ─────────────────────────────────────────────────────────────
   // 3. HANDLERS
@@ -1251,8 +1251,8 @@ export default function MobileDashboard() {
               <ArrowLeft size={16} />
             </button>
           ) : (
-            <div className="w-8 h-8 rounded-xl bg-white border border-gray-700 flex items-center justify-center font-black text-black text-sm shadow-md overflow-hidden shrink-0">
-              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-cover" />
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 flex items-center justify-center font-black text-white text-xs shadow-md overflow-hidden shrink-0 p-0.5">
+              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class=\"text-xs font-black text-purple-300\">⚡</span>'; }} />
             </div>
           )}
 
@@ -3414,8 +3414,8 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             
-            <div className="w-10 h-10 rounded-2xl bg-white border border-gray-700 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-950 to-emerald-950 border border-emerald-500/40 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-xl" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class="text-xl font-bold">⚡</span>'; }} />
             </div>
 
             <div className="text-center">
@@ -3480,8 +3480,8 @@ export default function MobileDashboard() {
               <X size={16} />
             </button>
             
-            <div className="w-12 h-12 rounded-2xl bg-white border border-gray-700 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
-              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-950 to-purple-950 border border-amber-500/40 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
+              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-xl" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class="text-xl font-bold">🏢</span>'; }} />
             </div>
 
             <div>
