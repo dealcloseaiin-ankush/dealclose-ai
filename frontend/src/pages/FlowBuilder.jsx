@@ -442,11 +442,65 @@ function FlowBuilder() {
   const loadTemplate = (type) => {
     let newNodes = [];
     let newEdges = [];
+    let targetPlatform = 'whatsapp';
+    let targetName = 'New Flow';
     
-    if (type === 'influencer_collab') {
+    if (type === 'ig_business_promo') {
+      targetPlatform = 'instagram';
+      targetName = 'Instagram Business Offer & DM Flow';
       newNodes = [
-        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, hi' }, position: { x: 250, y: 50 } },
-        { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 250, y: 200 } },
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, offer, discount, buy, catalog, link' }, position: { x: 250, y: 50 } },
+        { id: '2', type: 'menu', data: { message: `Welcome to ${mainBusinessName}! 🎉 How can we help you on Instagram today?`, opt1: 'Get 15% OFF Coupon 🎁', opt2: 'Browse Catalog / Services 🛍️', opt3: 'Talk to Support 💬' }, position: { x: 250, y: 200 } },
+        { id: '3', type: 'message', data: { message: '🎉 Here is your special 15% discount coupon: *WELCOME15*! Use it on our website during checkout.' }, position: { x: 50, y: 480 } },
+        { id: '4', type: 'message', data: { message: '🌐 Browse our complete collection and pricing here: [Your Store Link]. Let us know what you love!' }, position: { x: 380, y: 480 } },
+        { id: '5', type: 'askQuestion', data: { question: 'Please share your query or order details, and our support team will assist you shortly.', replyType: 'open' }, position: { x: 700, y: 480 } },
+        { id: '6', type: 'message', data: { message: 'Thank you! Our support agent has received your request and will DM you soon. 🙏' }, position: { x: 700, y: 720 } }
+      ];
+      newEdges = [
+        { id: 'e1-2', source: '1', target: '2' },
+        { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' },
+        { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' },
+        { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' },
+        { id: 'e5-6', source: '5', target: '6', sourceHandle: 'replied' }
+      ];
+    } else if (type === 'real_estate_inquiry') {
+      targetPlatform = platform || 'whatsapp';
+      targetName = 'Real Estate Property Finder';
+      newNodes = [
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent, flat, plot, site visit' }, position: { x: 250, y: 50 } },
+        { id: '2', type: 'askQuestion', data: { question: `Welcome to ${mainBusinessName}! 🏢 Are you looking to Buy or Rent a property?`, replyType: 'open' }, position: { x: 250, y: 200 } },
+        { id: '3', type: 'askQuestion', data: { question: 'Great! Please share your preferred City and Budget.', replyType: 'open' }, position: { x: 250, y: 440 } },
+        { id: '4', type: 'message', data: { message: 'Thanks {{name}}! We have noted your preferences. Our property expert will contact you with top verified properties! ⏳' }, position: { x: 250, y: 680 } }
+      ];
+      newEdges = [
+        { id: 'e1-2', source: '1', target: '2' },
+        { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' },
+        { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' }
+      ];
+    } else if (type === 'ecommerce_store') {
+      targetPlatform = 'whatsapp';
+      targetName = 'E-Commerce Catalog & Support';
+      newNodes = [
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, catalog, buy, order, track, store' }, position: { x: 250, y: 50 } },
+        { id: '2', type: 'menu', data: { message: `Welcome to ${mainBusinessName}! 🛍️ What would you like to do?`, opt1: 'View Catalog 📦', opt2: 'Track Order 🚚', opt3: 'Talk to Sales 📞' }, position: { x: 250, y: 200 } },
+        { id: '3', type: 'message', data: { message: 'Here is our latest collection: [Store Link]. Let us know what you like!' }, position: { x: 50, y: 480 } },
+        { id: '4', type: 'askQuestion', data: { question: 'Please share your Order ID or registered mobile number to track status.', replyType: 'open' }, position: { x: 380, y: 480 } },
+        { id: '5', type: 'message', data: { message: 'A sales representative will connect with you in 2 minutes! 📞' }, position: { x: 700, y: 480 } },
+        { id: '6', type: 'message', data: { message: 'Thanks! Fetching your live shipment tracking details now...' }, position: { x: 380, y: 720 } }
+      ];
+      newEdges = [
+        { id: 'e1-2', source: '1', target: '2' },
+        { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' },
+        { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' },
+        { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' },
+        { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' }
+      ];
+    } else if (type === 'influencer_collab') {
+      targetPlatform = 'instagram';
+      targetName = 'Creator Brand Collab & PR Flow';
+      newNodes = [
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, rate' }, position: { x: 250, y: 50 } },
+        { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR 🤝', opt2: 'Brand Promotion 🚀', opt3: 'Just a Fan ❤️' }, position: { x: 250, y: 200 } },
         { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 50, y: 520 } },
         { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 380, y: 520 } },
         { id: '5', type: 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 520 } },
@@ -460,12 +514,14 @@ function FlowBuilder() {
         { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' },
         { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' }
       ];
-      setFlowName("Creator Collab Flow");
-    } else if (type === 'lead_gen') {
+    } else {
+      // default: lead_gen
+      targetPlatform = 'whatsapp';
+      targetName = 'WhatsApp Business Lead Flow';
       newNodes = [
-        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog' }, position: { x: 250, y: 50 } },
+        { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, wholesale, b2b, catalog, info' }, position: { x: 250, y: 50 } },
         { id: '2', type: 'askQuestion', data: { question: `Welcome to ${mainBusinessName}! 🏢 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 250, y: 200 } },
-        { id: '3', type: 'askQuestion', data: { question: 'Thanks! What products are you looking for today?', replyType: 'open' }, position: { x: 250, y: 440 } },
+        { id: '3', type: 'askQuestion', data: { question: 'Thanks! What products/services are you looking for today?', replyType: 'open' }, position: { x: 250, y: 440 } },
         { id: '4', type: 'message', data: { message: 'Great! Our sales team has been notified and will contact you shortly!' }, position: { x: 250, y: 680 } }
       ];
       newEdges = [
@@ -473,13 +529,14 @@ function FlowBuilder() {
         { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' },
         { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' }
       ];
-      setFlowName("B2B Lead Capture Flow");
     }
 
+    setPlatform(targetPlatform);
+    setFlowName(targetName);
     setNodes(newNodes);
     setEdges(newEdges);
     setIsMobileDrawerOpen(false);
-    toast.success("Template Loaded! You can now customize or save it.");
+    toast.success(`Loaded ${targetName} (${targetPlatform === 'instagram' ? 'Instagram' : 'WhatsApp'})!`);
     setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50);
   };
 
@@ -691,17 +748,31 @@ function FlowBuilder() {
           </div>
 
           <div className="pt-2 border-t border-gray-800 space-y-2">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">1-Click Prebuilt Flows:</span>
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">🏢 Business Flow Templates:</span>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => loadTemplate('influencer_collab')} className="bg-pink-500/10 border border-pink-500/30 p-2.5 rounded-xl text-left hover:bg-pink-500/20">
-                <p className="text-pink-400 font-bold text-xs">📸 Creator Collab</p>
-                <p className="text-[9px] text-gray-400">Auto-negotiate PR deals</p>
-              </button>
               <button onClick={() => loadTemplate('lead_gen')} className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl text-left hover:bg-emerald-500/20">
-                <p className="text-emerald-400 font-bold text-xs">🧲 B2B Lead Gen</p>
+                <p className="text-emerald-400 font-bold text-xs">💬 WA Lead Gen</p>
                 <p className="text-[9px] text-gray-400">Capture name & city</p>
               </button>
+              <button onClick={() => loadTemplate('ig_business_promo')} className="bg-pink-500/10 border border-pink-500/30 p-2.5 rounded-xl text-left hover:bg-pink-500/20">
+                <p className="text-pink-400 font-bold text-xs">🎁 IG Offer & DM</p>
+                <p className="text-[9px] text-gray-400">Coupon & catalog</p>
+              </button>
+              <button onClick={() => loadTemplate('real_estate_inquiry')} className="bg-blue-500/10 border border-blue-500/30 p-2.5 rounded-xl text-left hover:bg-blue-500/20">
+                <p className="text-blue-400 font-bold text-xs">🏠 Real Estate</p>
+                <p className="text-[9px] text-gray-400">Buy/Rent & budget</p>
+              </button>
+              <button onClick={() => loadTemplate('ecommerce_store')} className="bg-purple-500/10 border border-purple-500/30 p-2.5 rounded-xl text-left hover:bg-purple-500/20">
+                <p className="text-purple-400 font-bold text-xs">🛍️ E-Commerce</p>
+                <p className="text-[9px] text-gray-400">Orders & support</p>
+              </button>
             </div>
+
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block pt-1">📸 Creator / Influencer:</span>
+            <button onClick={() => loadTemplate('influencer_collab')} className="w-full bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-left hover:bg-amber-500/20">
+              <p className="text-amber-400 font-bold text-xs">🤝 Creator Collab & PR</p>
+              <p className="text-[9px] text-gray-400">Sponsorship, brand budget & media kit</p>
+            </button>
           </div>
         </div>
       </div>
@@ -814,16 +885,30 @@ function FlowBuilder() {
 
             {/* Pre-built Templates */}
             <div className="mt-4 border-t border-gray-800 pt-4">
-              <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">Templates</h3>
-              <div className="space-y-2">
-                <div onClick={() => loadTemplate('influencer_collab')} className="bg-pink-500/10 border border-pink-500/30 p-2.5 rounded-xl cursor-pointer hover:bg-pink-500/20 transition-colors">
-                  <p className="text-pink-400 font-bold text-xs">📸 Influencer Collab</p>
-                  <p className="text-[10px] text-gray-400">Auto-negotiate PR deals</p>
-                </div>
+              <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">🏢 Business Templates</h3>
+              <div className="space-y-1.5">
                 <div onClick={() => loadTemplate('lead_gen')} className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl cursor-pointer hover:bg-emerald-500/20 transition-colors">
-                  <p className="text-emerald-400 font-bold text-xs">🧲 B2B Lead Gen</p>
-                  <p className="text-[10px] text-gray-400">Ask name & city</p>
+                  <p className="text-emerald-400 font-bold text-xs">💬 WhatsApp Lead Gen</p>
+                  <p className="text-[10px] text-gray-400">Capture name & city</p>
                 </div>
+                <div onClick={() => loadTemplate('ig_business_promo')} className="bg-pink-500/10 border border-pink-500/30 p-2.5 rounded-xl cursor-pointer hover:bg-pink-500/20 transition-colors">
+                  <p className="text-pink-400 font-bold text-xs">🎁 IG Offer & DM</p>
+                  <p className="text-[10px] text-gray-400">Coupon & catalog</p>
+                </div>
+                <div onClick={() => loadTemplate('real_estate_inquiry')} className="bg-blue-500/10 border border-blue-500/30 p-2.5 rounded-xl cursor-pointer hover:bg-blue-500/20 transition-colors">
+                  <p className="text-blue-400 font-bold text-xs">🏠 Real Estate Finder</p>
+                  <p className="text-[10px] text-gray-400">Buy/Rent & budget</p>
+                </div>
+                <div onClick={() => loadTemplate('ecommerce_store')} className="bg-purple-500/10 border border-purple-500/30 p-2.5 rounded-xl cursor-pointer hover:bg-purple-500/20 transition-colors">
+                  <p className="text-purple-400 font-bold text-xs">🛍️ E-Commerce Store</p>
+                  <p className="text-[10px] text-gray-400">Order tracking & menu</p>
+                </div>
+              </div>
+
+              <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mt-4 mb-2">📸 Creator / Influencer</h3>
+              <div onClick={() => loadTemplate('influencer_collab')} className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl cursor-pointer hover:bg-amber-500/20 transition-colors">
+                <p className="text-amber-400 font-bold text-xs">🤝 Creator Collab & PR</p>
+                <p className="text-[10px] text-gray-400">Auto-negotiate PR deals</p>
               </div>
             </div>
           </div>

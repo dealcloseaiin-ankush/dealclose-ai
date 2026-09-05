@@ -428,8 +428,35 @@ exports.handleDashboardAssistant = async (req, res) => {
         }
         else if (toolCall.function.name === "create_automation_flow") {
           let flowData = {};
+          let flowPlatform = args.platform || 'whatsapp';
           
-          if (args.businessType === 'real_estate') {
+          if (args.businessType === 'influencer_collab') {
+            flowPlatform = 'instagram';
+            flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 100, y: 350 } },
+                { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 400, y: 350 } },
+                { id: '5', type: 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 350 } },
+                { id: '6', type: 'message', data: { message: 'Thank you! ✅ I have saved your details. My team will review and share the Media Kit shortly!' }, position: { x: 250, y: 550 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' } ]
+            };
+          } else if (args.businessType === 'instagram_business' || args.platform === 'instagram') {
+            flowPlatform = 'instagram';
+            flowData = {
+              nodes: [
+                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, offer, discount, buy, catalog, link' }, position: { x: 400, y: 50 } },
+                { id: '2', type: 'menu', data: { message: 'Welcome to our Instagram page! 🎉 How can we help you today?', opt1: 'Get 15% OFF Coupon 🎁', opt2: 'Browse Catalog 🛍️', opt3: 'Customer Support 💬' }, position: { x: 400, y: 160 } },
+                { id: '3', type: 'message', data: { message: '🎉 Here is your special 15% discount coupon: *WELCOME15*! Use it during checkout.' }, position: { x: 100, y: 350 } },
+                { id: '4', type: 'message', data: { message: '🌐 Browse our complete collection and prices here: [Website Link]. Let us know what you like!' }, position: { x: 400, y: 350 } },
+                { id: '5', type: 'askQuestion', data: { question: 'Please share your query or order ID, and our team will resolve it quickly.', replyType: 'open' }, position: { x: 700, y: 350 } },
+                { id: '6', type: 'message', data: { message: 'Thank you! Our support agent will assist you shortly.' }, position: { x: 700, y: 550 } }
+              ],
+              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e5-6', source: '5', target: '6', sourceHandle: 'replied' } ]
+            };
+          } else if (args.businessType === 'real_estate') {
             flowData = {
               nodes: [
                 { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent' }, position: { x: 400, y: 50 } },
@@ -464,6 +491,7 @@ exports.handleDashboardAssistant = async (req, res) => {
           await Flow.create({
             userId: userId,
             workspaceId: 'main',
+            platform: flowPlatform,
             name: args.flowName,
             flowData: flowData
           });
@@ -574,22 +602,35 @@ exports.generateFlow = async (req, res) => {
     const systemPrompt = `You are the DealClose AI Flow Builder Assistant, a highly intelligent automation expert.
     The user will describe what automation flow they want to build in any language (like Hindi, Hinglish, or English).
     
-    DEALCLOSE AI FEATURES YOU KNOW ABOUT (from our Landing Page):
-    - WhatsApp & Instagram DM Automation (Auto-reply, Lead Capture, Abandoned Cart, Custom Menus)
+    DEALCLOSE AI FEATURES YOU KNOW ABOUT:
+    - WhatsApp & Instagram DM Automation (Auto-reply, Lead Capture, Abandoned Cart, Custom Menus, Post/Story Comment Triggers)
     - AI Voice Calling (Inbound/Outbound sales calls via Exotel)
     - CRM & Lead Management (Auto-save leads, Track deal stages)
     - ScanIQ (Meta/Google Ad Competitor Analysis)
-    - Real Estate Automation (Seamless integration with NewPropertyHub.in APIs to list, search, and book properties!)
+    - Real Estate Automation (Integration with NewPropertyHub.in APIs to list, search, and book properties!)
     
     USER'S BUSINESS DETAILS: 
     ${businessContext}
     
-    CONSULTATIVE APPROACH & COST SAVING (CRITICAL):
+    CRITICAL BUSINESS TYPE & PLATFORM AWARENESS:
+    1. STRICT DISTINCTION BETWEEN BUSINESS vs INFLUENCER:
+       - IF THE USER IS A BUSINESS (Real Estate, E-Commerce, Retail, Clinic, Coaching, Services, SaaS, Local Store, Agency, etc.):
+         * NEVER create "Influencer Collab / Brand Promotion / Fan" flows! Businesses do not look for collabs; they sell products/services to buyers.
+         * For Businesses (WhatsApp or Instagram): Generate high-converting BUSINESS flows like:
+           a) "Lead Capture & Qualification" (Ask Name, City, Product requirement)
+           b) "Direct Instagram Promo & Discount Offer" (Give 15% discount code, share product catalog link)
+           c) "Real Estate Property Finder & Site Visit Booking"
+           d) "E-Commerce Order Tracking & Catalog Menu"
+           e) "Customer Support & Inquiry Escalation"
+       - IF AND ONLY IF THE USER IS AN INFLUENCER / CONTENT CREATOR (or explicitly asks for "influencer collab / sponsor rates / PR"):
+         * Generate Creator Collab flows (Collab / PR inquiry, Brand budget, Media Kit sharing, Fan gratitude).
+    
+    CONSULTATIVE APPROACH & COST SAVING:
     1. YOU ALREADY KNOW THE BUSINESS DETAILS. Do NOT ask "Aapka business kya hai?". 
-    2. If the user says "hi", "help", or seems confused, IMMEDIATELY greet them using their business name (e.g., "Welcome to DealClose Flow Builder! Since you run [Business Name], I suggest these 2 flows...").
-    3. Give them 2-3 clear options to choose from (e.g., "1. Zero-Cost Lead Capture", "2. Support Menu"). Ask them to just reply with the number. DO NOT ask open-ended questions.
+    2. If the user says "hi", "help", or seems confused, IMMEDIATELY greet them using their business name (e.g., "Welcome to DealClose Flow Builder! Since you run [Business Name], I suggest these 2 high-converting business flows...").
+    3. Give them 2-3 clear options tailored to their actual business category. Ask them to just reply with the number.
     4. Once they choose an option or describe a flow, GENERATE THE FULL FLOW (nodes and edges) immediately. Do not stretch out the conversation.
-    5. ZERO-COST LEAD CAPTURE EXPLANATION: To save AI tokens, the backend automatically reads Flow answers. If you want to capture a name or city, simply use the exact words 'Name' or 'City' in the 'askQuestion' node's text. The system will auto-save it to the CRM natively. Explain this benefit (0 AI Cost) to the user if they ask.
+    5. ZERO-COST LEAD CAPTURE EXPLANATION: To save AI tokens, the backend automatically reads Flow answers. If you want to capture a name or city, simply use the exact words 'Name' or 'City' in the 'askQuestion' node's text. The system will auto-save it to the CRM natively.
     6. VERY IMPORTANT: Whenever you generate nodes and edges, add this exact instruction in your reply: "Mene aapke liye flow canvas par bana diya hai. Ise hamesha ke liye save karne ke liye please upar ek 'Naam' likhein aur 'Save Flow' button par click karein."
     
     You must return a JSON object with this exact structure:
@@ -600,10 +641,10 @@ exports.generateFlow = async (req, res) => {
     }
 
     Node Types & EXACT Data Schema YOU MUST USE:
-    - 'trigger': { "id": "1", "type": "trigger", "position": {"x":250,"y":50}, "data": { "triggerType": "keyword", "keyword": "hi" } }
+    - 'trigger': { "id": "1", "type": "trigger", "position": {"x":250,"y":50}, "data": { "triggerType": "keyword", "keyword": "hi, hello, price, offer, info" } }
     - 'message': { "id": "node_2", "type": "message", "position": {"x":250,"y":150}, "data": { "message": "Write the actual reply text here!" } }
     - 'askQuestion': { "id": "node_3", "type": "askQuestion", "position": {"x":250,"y":250}, "data": { "question": "Write the actual question here!", "replyType": "open" } }
-    - 'menu': { "id": "node_m", "type": "menu", "position": {"x":250,"y":250}, "data": { "message": "Choose option:", "opt1": "Collab", "opt2": "Ads", "opt3": "Fan" } }
+    - 'menu': { "id": "node_m", "type": "menu", "position": {"x":250,"y":250}, "data": { "message": "Choose option:", "opt1": "Browse Products 🛍️", "opt2": "Get 15% OFF Coupon 🎁", "opt3": "Customer Support 🎧" } }
     - 'delay': { "id": "node_4", "type": "delay", "position": {"x":250,"y":350}, "data": { "delay": "15", "unit": "Minutes" } }
     - 'condition': { "id": "node_5", "type": "condition", "position": {"x":250,"y":450}, "data": { "condition": "If User Replied" } }
     - 'tag_lead': { "id": "node_6", "type": "tag_lead", "position": {"x":250,"y":550}, "data": { "tag": "Hot Lead" } }

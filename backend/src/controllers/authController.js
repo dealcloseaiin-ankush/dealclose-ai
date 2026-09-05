@@ -99,61 +99,96 @@ const compareLoginPassword = async (inputPassword, storedPassword) => {
   return inputPassword === storedPassword;
 };
 
-// 🔥 HELPER: Magic Onboarding - Auto-create a default flow based on business type
+// 🔥 HELPER: Magic Onboarding - Auto-create default flows based on business type
 const autoCreateDefaultFlow = async (userId, businessDescription, businessName) => {
     try {
-        // Check if a default flow already exists to prevent duplicates
-        const existingFlow = await Flow.findOne({ userId: userId, name: { $regex: /Instagram Collab Flow|Lead Generation Auto|Real Estate Lead Capture/i } });
-        if (existingFlow) {
-            console.log(`[Magic Onboarding] Default flow already exists for user ${userId}. Skipping creation.`);
-            return;
-        }
-
-        const isInfluencer = /influencer|creator|collab|youtube|instagram|vlog|artist|model/i.test(businessDescription || '');
-        const isRealEstate = /property|real estate|flat|plot|realtor/i.test(businessDescription || '');
-
-        let flowName = "Business Lead Capture";
-        let flowData = {
-            nodes: [
-              { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, info, catalog, order, support' }, position: { x: 400, y: 50 } },
-              { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our business'}! 👋 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
-              { id: '3', type: 'menu', data: { message: 'Thanks {{name}}! What would you like to do today?', opt1: 'Explore Services/Products 📦', opt2: 'Customer Support 🎧', opt3: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
-              { id: '4', type: 'message', data: { message: 'Great! Here is our catalog/details: [Your Link Here]. Let us know what you need!' }, position: { x: 100, y: 500 } },
-              { id: '5', type: 'message', data: { message: 'Please drop your query here, and our support team will review it shortly.' }, position: { x: 400, y: 500 } },
-              { id: '6', type: 'message', data: { message: 'Our sales expert has been notified and will contact you shortly!' }, position: { x: 700, y: 500 } }
-            ],
-            edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'opt_0' }, { id: 'e3-5', source: '3', target: '5', sourceHandle: 'opt_1' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'opt_2' } ]
-        };
+        const isInfluencer = /influencer|creator|collab|vlogger|youtuber|artist|model/i.test(businessDescription || '');
+        const isRealEstate = /property|real estate|flat|plot|builder|broker|realtor/i.test(businessDescription || '');
 
         if (isInfluencer) {
-            flowName = "Instagram Collab Flow";
-            flowData = {
-                nodes: [
-                  { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, hi' }, position: { x: 400, y: 50 } },
-                  { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 400, y: 160 } },
-                  { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 100, y: 350 } },
-                  { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 400, y: 350 } },
-                  { id: '5', type: 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 350 } },
-                  { id: '6', type: 'message', data: { message: 'Thank you! ✅ I have saved your details. My team will review and share the Media Kit shortly!' }, position: { x: 250, y: 550 } }
-                ],
-                edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' } ]
-            };
+            // Check if Creator flow already exists
+            const existing = await Flow.findOne({ userId, platform: 'instagram', name: /collab|creator/i });
+            if (!existing) {
+                const flowData = {
+                    nodes: [
+                      { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'collab, sponsor, brand, pr, ad, promotion, fan, rate' }, position: { x: 400, y: 50 } },
+                      { id: '2', type: 'menu', data: { message: 'Hi! 👋 Thanks for reaching out. What are you looking for?', opt1: 'Collab / PR', opt2: 'Brand Promotion', opt3: 'Just a Fan ❤️' }, position: { x: 400, y: 160 } },
+                      { id: '3', type: 'askQuestion', data: { question: 'Awesome! Please share your Brand Name, Budget, and Campaign Details.', replyType: 'open' }, position: { x: 100, y: 350 } },
+                      { id: '4', type: 'askQuestion', data: { question: 'Great! What kind of promotion? (Reel/Story) Will you provide the script? And what is the budget?', replyType: 'open' }, position: { x: 400, y: 350 } },
+                      { id: '5', type: 'message', data: { message: 'Aww! Thank you so much for the love and support! Means the world to me. ❤️✨' }, position: { x: 700, y: 350 } },
+                      { id: '6', type: 'message', data: { message: 'Thank you! ✅ I have saved your details. My team will review and share the Media Kit shortly!' }, position: { x: 250, y: 550 } }
+                    ],
+                    edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' } ]
+                };
+                await Flow.create({ userId, workspaceId: 'main', platform: 'instagram', name: "Instagram Creator Collab Flow", flowData });
+                console.log(`✅ [Magic Onboarding] Created 'Instagram Creator Collab Flow' for influencer ${userId}.`);
+            }
         } else if (isRealEstate) {
-            flowName = "Real Estate Lead Capture";
-            flowData = {
-              nodes: [
-                { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent, flat, plot' }, position: { x: 400, y: 50 } },
-                { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our Real Estate agency'}! 🏢 Are you looking to Buy or Rent a property today?`, replyType: 'open' }, position: { x: 400, y: 160 } },
-                { id: '3', type: 'askQuestion', data: { question: 'Great! To help you better, could you please share your preferred City and Budget?', replyType: 'open' }, position: { x: 400, y: 310 } },
-                { id: '4', type: 'message', data: { message: 'Thanks, {{name}}! I have saved your details. Our property expert will contact you shortly with the best options! ⏳' }, position: { x: 400, y: 460 } }
-              ],
-              edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
-            };
+            // Real Estate: WhatsApp Flow + Instagram Property Tour Flow
+            const existingWA = await Flow.findOne({ userId, platform: 'whatsapp' });
+            if (!existingWA) {
+                const waFlowData = {
+                  nodes: [
+                    { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, property, buy, rent, flat, plot, site visit' }, position: { x: 400, y: 50 } },
+                    { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our Real Estate agency'}! 🏢 Are you looking to Buy or Rent a property?`, replyType: 'open' }, position: { x: 400, y: 160 } },
+                    { id: '3', type: 'askQuestion', data: { question: 'Great! To help you find the best property, please share your preferred City and Budget.', replyType: 'open' }, position: { x: 400, y: 310 } },
+                    { id: '4', type: 'message', data: { message: 'Thanks, {{name}}! I have saved your requirements. Our property specialist will contact you with top verified options! ⏳' }, position: { x: 400, y: 460 } }
+                  ],
+                  edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'replied' } ]
+                };
+                await Flow.create({ userId, workspaceId: 'main', platform: 'whatsapp', name: "Real Estate WhatsApp Lead Flow", flowData: waFlowData });
+            }
+
+            const existingIG = await Flow.findOne({ userId, platform: 'instagram' });
+            if (!existingIG) {
+                const igFlowData = {
+                  nodes: [
+                    { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, price, brochure, location, details, book' }, position: { x: 400, y: 50 } },
+                    { id: '2', type: 'menu', data: { message: `Welcome to ${businessName || 'our properties'}! 🏡 How can we assist you?`, opt1: 'Get Price & Brochure 📄', opt2: 'Book Free Site Visit 🚗', opt3: 'Speak to Advisor 📞' }, position: { x: 400, y: 160 } },
+                    { id: '3', type: 'askQuestion', data: { question: 'Please share your Name and Phone Number so we can send the project brochure & floor plan on WhatsApp.', replyType: 'open' }, position: { x: 100, y: 350 } },
+                    { id: '4', type: 'askQuestion', data: { question: 'Great! What day & time would you prefer for the site visit? Also share your Contact Number.', replyType: 'open' }, position: { x: 400, y: 350 } },
+                    { id: '5', type: 'message', data: { message: 'Our senior property consultant will DM / Call you right away!' }, position: { x: 700, y: 350 } },
+                    { id: '6', type: 'message', data: { message: 'Thank you! ✅ Details noted. We are preparing your tour pass & brochure now!' }, position: { x: 250, y: 550 } }
+                  ],
+                  edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'replied' }, { id: 'e4-6', source: '4', target: '6', sourceHandle: 'replied' } ]
+                };
+                await Flow.create({ userId, workspaceId: 'main', platform: 'instagram', name: "Instagram Property Inquiry Flow", flowData: igFlowData });
+            }
+        } else {
+            // General / E-Commerce / SaaS Business
+            const existingWA = await Flow.findOne({ userId, platform: 'whatsapp' });
+            if (!existingWA) {
+                const waFlowData = {
+                    nodes: [
+                      { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, info, catalog, order, support' }, position: { x: 400, y: 50 } },
+                      { id: '2', type: 'askQuestion', data: { question: `Welcome to ${businessName || 'our business'}! 👋 To serve you better, please reply with your Full Name and City.`, replyType: 'open' }, position: { x: 400, y: 160 } },
+                      { id: '3', type: 'menu', data: { message: 'Thanks {{name}}! What would you like to do today?', opt1: 'Explore Products 📦', opt2: 'Customer Support 🎧', opt3: 'Talk to Sales 📞' }, position: { x: 400, y: 310 } },
+                      { id: '4', type: 'message', data: { message: 'Great! Here is our catalog/website details. Let us know what you need!' }, position: { x: 100, y: 500 } },
+                      { id: '5', type: 'message', data: { message: 'Please drop your query here, and our support team will assist you.' }, position: { x: 400, y: 500 } },
+                      { id: '6', type: 'message', data: { message: 'Our sales expert has been notified and will contact you shortly!' }, position: { x: 700, y: 500 } }
+                    ],
+                    edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'replied' }, { id: 'e3-4', source: '3', target: '4', sourceHandle: 'opt_0' }, { id: 'e3-5', source: '3', target: '5', sourceHandle: 'opt_1' }, { id: 'e3-6', source: '3', target: '6', sourceHandle: 'opt_2' } ]
+                };
+                await Flow.create({ userId, workspaceId: 'main', platform: 'whatsapp', name: "WhatsApp Business Lead Flow", flowData: waFlowData });
+            }
+
+            const existingIG = await Flow.findOne({ userId, platform: 'instagram' });
+            if (!existingIG) {
+                const igFlowData = {
+                    nodes: [
+                      { id: '1', type: 'trigger', data: { triggerType: 'keyword', keyword: 'hi, hello, price, offer, discount, buy, catalog, link' }, position: { x: 400, y: 50 } },
+                      { id: '2', type: 'menu', data: { message: `Welcome to ${businessName || 'our store'}! 🎉 How can we help you today?`, opt1: 'Get Discount Coupon 🎁', opt2: 'Browse Catalog 🛍️', opt3: 'Customer Support 💬' }, position: { x: 400, y: 160 } },
+                      { id: '3', type: 'message', data: { message: '🎉 Here is your special 15% discount coupon: *WELCOME15*! Use it on our website during checkout.' }, position: { x: 100, y: 350 } },
+                      { id: '4', type: 'message', data: { message: '🌐 Browse our complete collection and prices here: [Your Store Link]. Let us know what you love!' }, position: { x: 400, y: 350 } },
+                      { id: '5', type: 'askQuestion', data: { question: 'Please share your query or order ID, and our team will resolve it quickly.', replyType: 'open' }, position: { x: 700, y: 350 } },
+                      { id: '6', type: 'message', data: { message: 'Thank you! Our support agent will assist you shortly.' }, position: { x: 700, y: 550 } }
+                    ],
+                    edges: [ { id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3', sourceHandle: 'opt_0' }, { id: 'e2-4', source: '2', target: '4', sourceHandle: 'opt_1' }, { id: 'e2-5', source: '2', target: '5', sourceHandle: 'opt_2' }, { id: 'e5-6', source: '5', target: '6', sourceHandle: 'replied' } ]
+                };
+                await Flow.create({ userId, workspaceId: 'main', platform: 'instagram', name: "Instagram Business Offer & Lead Flow", flowData: igFlowData });
+            }
         }
-
-        await Flow.create({ userId, workspaceId: 'main', name: flowName, flowData });
-        console.log(`✅ [Magic Onboarding] Automatically created '${flowName}' for user ${userId}.`);
-
+        console.log(`✅ [Magic Onboarding] Default flows set up for user ${userId}.`);
     } catch (error) {
         console.error(`❌ [Magic Onboarding] Failed to auto-create flow for user ${userId}:`, error.message);
     }
