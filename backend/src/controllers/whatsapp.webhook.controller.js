@@ -190,6 +190,17 @@ exports.handleWhatsApp = async (req, res) => {
         // 2. CHECK FOR INCOMING MESSAGES
         if (value.messages && value.messages.length > 0) {
           const msg = value.messages[0];
+          const msgId = msg.id;
+
+          // 🚀 MESSAGE DEDUPLICATION: Prevents duplicate bot replies & double reports when Meta retries
+          if (msgId) {
+            const isDuplicate = await Message.findOne({ wamid: msgId, userId: user._id });
+            if (isDuplicate) {
+              console.log(`⚠️ [Webhook Deduplication] Message ID ${msgId} already processed. Skipping duplicate execution.`);
+              continue;
+            }
+          }
+
           // 🚀 DEBUG LOG: Check what ID Meta is sending for Instagram
           if (changes.field === 'instagram') {
             console.log(`[DEBUG INSTAGRAM ID] Meta sent PSID: ${msg.from} for entry ID: ${entry.id}`);
@@ -275,7 +286,7 @@ exports.handleWhatsApp = async (req, res) => {
             const responseMessage = `🛍️ *Order Received!*\nThank you for placing an order from our catalog! Your Order ID is *#${newOrderId}*.\n\nCould you please reply with your complete *Delivery Address* and Pincode so we can dispatch it?`;
             
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-            await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Received Catalog Order] -> Replied asking for address.`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
             continue;
           }
 
@@ -288,7 +299,7 @@ exports.handleWhatsApp = async (req, res) => {
               const extractedData = await ocrService.extractTextFromImage(buffer, mimeType || 'image/jpeg', user._id);
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `*Here is what I read from your list:*\n\n${extractedData}\n\nWould you like me to create an order or quotation for these items?`);
-              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[AI Vision Extracted Data]", direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
             } catch (err) {
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "Sorry, I couldn't read the image properly right now. Could you please type it out?");
             }
@@ -439,6 +450,8 @@ exports.handleWhatsApp = async (req, res) => {
 
               if (isReportCommand) {
                 // 📊 Comprehensive CRM & Multi-Channel Aggregations
+                const todayIncomingPhones = await Message.distinct('customerPhone', { userId: user._id, timestamp: { $gte: todayStart }, direction: 'incoming' });
+
                 const [
                   totalLeads,
                   newLeadsToday,
@@ -453,29 +466,37 @@ exports.handleWhatsApp = async (req, res) => {
                   staffHandledMsgs,
                   incomingMsgsToday,
                   // WhatsApp Specific
-                  waNewLeads,
-                  waReturningLeads,
+                  waIncomingMsgs,
                   waAutoReplies,
                   waAiReplies,
                   waStaffReplies,
                   // Instagram Specific
-                  igNewLeads,
-                  igReturningLeads,
+                  igIncomingMsgs,
                   igAutoReplies,
                   igAiReplies
                 ] = await Promise.all([
                   Lead.countDocuments({ userId: user._id, status: { $ne: 'deleted' } }),
                   Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart }, status: { $ne: 'deleted' } }),
-                  Lead.countDocuments({ userId: user._id, createdAt: { $lt: todayStart }, lastInteractionAt: { $gte: todayStart }, status: { $ne: 'deleted' } }),
+                  Lead.countDocuments({ 
+                    userId: user._id, 
+                    createdAt: { $lt: todayStart }, 
+                    status: { $ne: 'deleted' },
+                    $or: [
+                      { lastInteractionAt: { $gte: todayStart } },
+                      { updatedAt: { $gte: todayStart } },
+                      { phoneNumber: { $in: todayIncomingPhones } }
+                    ]
+                  }),
                   Lead.find({ 
                     userId: user._id, 
                     status: { $ne: 'deleted' },
                     $or: [
                       { createdAt: { $gte: todayStart } }, 
                       { lastInteractionAt: { $gte: todayStart } }, 
-                      { updatedAt: { $gte: todayStart } }
+                      { updatedAt: { $gte: todayStart } },
+                      { phoneNumber: { $in: todayIncomingPhones } }
                     ] 
-                  }).sort({ lastInteractionAt: -1, updatedAt: -1 }).limit(5),
+                  }).sort({ lastInteractionAt: -1, updatedAt: -1 }).limit(10),
                   Lead.countDocuments({ userId: user._id, status: { $in: ['hot', 'negotiating', 'vip'] } }),
                   Lead.countDocuments({ userId: user._id, status: { $in: ['warm', 'interested', 'contacted'] } }),
                   Lead.find({ 
@@ -489,14 +510,12 @@ exports.handleWhatsApp = async (req, res) => {
                   Message.countDocuments({ userId: user._id, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['staff', 'owner_app'] } }),
                   Message.countDocuments({ userId: user._id, timestamp: { $gte: todayStart }, direction: 'incoming' }),
                   // WhatsApp Channel
-                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart }, phoneNumber: { $not: /^IG_/ }, status: { $ne: 'deleted' } }),
-                  Lead.countDocuments({ userId: user._id, createdAt: { $lt: todayStart }, lastInteractionAt: { $gte: todayStart }, phoneNumber: { $not: /^IG_/ }, status: { $ne: 'deleted' } }),
+                  Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'incoming' }),
                   Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['auto-reply', 'system'] } }),
                   Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: 'ai' }),
                   Message.countDocuments({ userId: user._id, channel: 'whatsapp', timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['staff', 'owner_app'] } }),
                   // Instagram Channel
-                  Lead.countDocuments({ userId: user._id, createdAt: { $gte: todayStart }, phoneNumber: /^IG_/, status: { $ne: 'deleted' } }),
-                  Lead.countDocuments({ userId: user._id, createdAt: { $lt: todayStart }, lastInteractionAt: { $gte: todayStart }, phoneNumber: /^IG_/, status: { $ne: 'deleted' } }),
+                  Message.countDocuments({ userId: user._id, channel: { $in: ['instagram_dm', 'instagram_comment'] }, timestamp: { $gte: todayStart }, direction: 'incoming' }),
                   Message.countDocuments({ userId: user._id, channel: { $in: ['instagram_dm', 'instagram_comment'] }, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: { $in: ['auto-reply', 'system'] } }),
                   Message.countDocuments({ userId: user._id, channel: { $in: ['instagram_dm', 'instagram_comment'] }, timestamp: { $gte: todayStart }, direction: 'outgoing', sentBy: 'ai' })
                 ]);
@@ -508,7 +527,10 @@ exports.handleWhatsApp = async (req, res) => {
                 if (activeLeadsList.length > 0) {
                   recentSnippet = activeLeadsList.map((l, i) => {
                     const chIcon = l.phoneNumber && l.phoneNumber.startsWith('IG_') ? '📸 IG' : '📱 WA';
-                    return `${i+1}. ${chIcon} *${l.name || 'Lead'}* (${l.phoneNumber}) - _${l.status || 'Active'}_`;
+                    const ws = user.workspaces?.find(w => w._id.toString() === (l.lastSelectedWorkspaceId || l.workspaceId));
+                    const wsLabel = ws ? ` [${ws.name}]` : ' [Main]';
+                    const cityLabel = l.city ? ` (${l.city})` : '';
+                    return `${i+1}. ${chIcon} *${l.name || 'Lead'}*${cityLabel} - ${l.phoneNumber}${wsLabel}\n   └ _Status: ${l.status || 'Active'}_`;
                   }).join('\n');
                 } else {
                   recentSnippet = '• No customer inquiries received yet today.';
@@ -518,22 +540,48 @@ exports.handleWhatsApp = async (req, res) => {
                 let workspaceBreakdownSection = '';
                 if (user.workspaces && user.workspaces.length > 0) {
                   const wsStats = await Promise.all(user.workspaces.map(async (ws) => {
-                    const wsLeads = await Lead.countDocuments({ 
-                      userId: user._id, 
-                      workspaceId: ws._id.toString(), 
+                    const wsIdStr = ws._id.toString();
+                    const wsLeadCount = await Lead.countDocuments({
+                      userId: user._id,
                       status: { $ne: 'deleted' },
-                      $or: [{ createdAt: { $gte: todayStart } }, { lastInteractionAt: { $gte: todayStart } }] 
+                      $or: [
+                        { lastSelectedWorkspaceId: wsIdStr },
+                        { workspaceId: wsIdStr }
+                      ]
                     });
-                    return `• 🏬 *${ws.name}:* ${wsLeads} active leads today`;
+                    const wsActiveLeads = await Lead.countDocuments({
+                      userId: user._id,
+                      status: { $ne: 'deleted' },
+                      $or: [
+                        { lastSelectedWorkspaceId: wsIdStr },
+                        { workspaceId: wsIdStr }
+                      ],
+                      $and: [
+                        {
+                          $or: [
+                            { createdAt: { $gte: todayStart } },
+                            { lastInteractionAt: { $gte: todayStart } },
+                            { updatedAt: { $gte: todayStart } },
+                            { phoneNumber: { $in: todayIncomingPhones } }
+                          ]
+                        }
+                      ]
+                    });
+                    const wsMsgCount = await Message.countDocuments({
+                      userId: user._id,
+                      workspaceId: wsIdStr,
+                      timestamp: { $gte: todayStart }
+                    });
+                    return `• 🏬 *${ws.name}:* ${wsActiveLeads} active today (Total: ${wsLeadCount} leads | ${wsMsgCount} msgs)`;
                   }));
                   workspaceBreakdownSection = `\n🏢 *BRANCHES / WORKSPACES:*\n${wsStats.join('\n')}\n`;
                 }
 
-                const ownerBriefing = `👑 *DealClose AI: Multi-Channel Live Reporting* 📊\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n📅 *Date:* ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}\n\n📈 *OVERALL TODAY'S SUMMARY:*\n• 🆕 *New Leads Today:* ${newLeadsToday}\n• 🔄 *Returning Active Customers:* ${returningLeadsToday}\n• 💬 *Total Active Inquiries:* ${totalActiveToday}\n• 👥 *Total CRM Database:* ${totalLeads}\n\n⚙️ *HANDLED BY SYSTEM TODAY:*\n• 🤖 Handled by Automation Flow: *${autoHandledMsgs}* msgs\n• 🧠 Handled by AI Assistant: *${aiHandledMsgs}* msgs\n• 👨‍💼 Handled by Staff/Human: *${staffHandledMsgs}* msgs\n• 📥 Total Inbound Queries: *${incomingMsgsToday}* msgs\n\n🔥 *PIPELINE HEALTH:*\n• Hot Leads: *${hotLeads}* 🔥\n• Warm Leads: *${warmLeads}* 🌟\n• Follow-ups Due: *${followUpsToday.length}* 📅\n━━━━━━━━━━━━━━━━━━━\n📡 *CHANNEL BREAKDOWN:*\n\n🟢 *WhatsApp Channel:*\n• Leads Today: *${waNewLeads + waReturningLeads}* (New: ${waNewLeads} | Returning: ${waReturningLeads})\n• Handled: Flow: ${waAutoReplies} | AI: ${waAiReplies} | Staff: ${waStaffReplies}\n\n🟣 *Instagram Funnel (DMs & Comments):*\n• Leads Today: *${igNewLeads + igReturningLeads}* (New: ${igNewLeads} | Returning: ${igReturningLeads})\n• Handled: Auto DM: ${igAutoReplies} | AI: ${igAiReplies}\n${workspaceBreakdownSection}━━━━━━━━━━━━━━━━━━━\n📋 *RECENT ACTIVE INQUIRIES:*\n${recentSnippet}\n\n💡 *Owner Shortcuts:*\n• Reply *"RULES"* - Check active automations\n• Reply *"HOT LEADS"* - Get buyer calling list\n• Reply *"PAUSE AI <Phone>"* - Stop AI for a lead\n• Ask any business question to chat with AI Manager\n━━━━━━━━━━━━━━━━━━━`;
+                const ownerBriefing = `👑 *DealClose AI: Multi-Channel Live Reporting* 📊\n━━━━━━━━━━━━━━━━━━━\n🏢 *Business:* ${user.businessName || 'DealClose AI'}\n📅 *Date:* ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}\n\n📈 *OVERALL TODAY'S SUMMARY:*\n• 🆕 *New Leads Today:* ${newLeadsToday}\n• 🔄 *Returning Active Customers:* ${returningLeadsToday}\n• 💬 *Total Active Inquiries:* ${totalActiveToday}\n• 👥 *Total CRM Database:* ${totalLeads}\n\n⚙️ *HANDLED BY SYSTEM TODAY:*\n• 🤖 Handled by Automation Flow: *${autoHandledMsgs}* msgs\n• 🧠 Handled by AI Assistant: *${aiHandledMsgs}* msgs\n• 👨‍💼 Handled by Staff/Human: *${staffHandledMsgs}* msgs\n• 📥 Total Inbound Queries: *${incomingMsgsToday}* msgs\n\n🔥 *PIPELINE HEALTH:*\n• Hot Leads: *${hotLeads}* 🔥\n• Warm Leads: *${warmLeads}* 🌟\n• Follow-ups Due: *${followUpsToday.length}* 📅\n━━━━━━━━━━━━━━━━━━━\n📡 *CHANNEL BREAKDOWN:*\n\n🟢 *WhatsApp Channel:*\n• Inbound Queries: *${waIncomingMsgs}*\n• Handled: Flow: ${waAutoReplies} | AI: ${waAiReplies} | Staff: ${waStaffReplies}\n\n🟣 *Instagram Funnel (DMs & Comments):*\n• Inbound Queries: *${igIncomingMsgs}*\n• Handled: Auto DM: ${igAutoReplies} | AI: ${igAiReplies}\n${workspaceBreakdownSection}━━━━━━━━━━━━━━━━━━━\n📋 *RECENT ACTIVE INQUIRIES:*\n${recentSnippet}\n\n💡 *Owner Shortcuts:*\n• Reply *"RULES"* - Check active automations\n• Reply *"HOT LEADS"* - Get buyer calling list\n• Reply *"PAUSE AI <Phone>"* - Stop AI for a lead\n• Ask any business question to chat with AI Manager\n━━━━━━━━━━━━━━━━━━━`;
 
                 console.log(`✅ [DEBUG] Multi-channel briefing sent to owner (${totalActiveToday} active leads).`);
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerBriefing);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerBriefing, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerBriefing, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue;
               }
 
@@ -579,7 +627,7 @@ exports.handleWhatsApp = async (req, res) => {
                 rulesMsg += `\n━━━━━━━━━━━━━━━━━━━\n💡 *Tip:* Ask me: _"Naya WhatsApp rule kaise banayein?"_ ya _"Instagram automation kaise set karein?"_ aur main aapki poori madad karunga!`;
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, rulesMsg);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: rulesMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: rulesMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue;
               }
 
@@ -603,7 +651,7 @@ exports.handleWhatsApp = async (req, res) => {
                 hotMsg += `━━━━━━━━━━━━━━━━━━━\n💡 Reply *"REPORT"* for full business statistics.`;
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, hotMsg);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: hotMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: hotMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue;
               }
 
@@ -620,7 +668,7 @@ exports.handleWhatsApp = async (req, res) => {
                     : `⚠️ Lead with phone containing *${targetPhone}* was not found in your CRM.`;
                   
                   await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyText);
-                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                   continue;
                 }
               }
@@ -637,7 +685,7 @@ exports.handleWhatsApp = async (req, res) => {
                     : `⚠️ Lead with phone containing *${targetPhone}* was not found in your CRM.`;
                   
                   await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyText);
-                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyText, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                   continue;
                 }
               }
@@ -649,7 +697,7 @@ exports.handleWhatsApp = async (req, res) => {
                 const ownerMenu = `👋 *Namaste ${user.fullName || user.businessName || 'Business Owner'}!* 💼\n\nMain aapka *${effectiveAiName} Operations Manager* hoon. Aap WhatsApp se hi apna business CRM, leads aur AI control kar sakte hain.\n\n📌 *Quick Commands:*\n• *REPORT* ya *LEADS* - Aaj ki Live WhatsApp & IG Report 📊\n• *HOT LEADS* - Top high-intent buyer leads list 🔥\n• *RULES* - Active WhatsApp & Instagram rules ⚙️\n• *TEST* - Customer Automation Flow test karne ke liye 🧪\n• *PAUSE AI <Phone>* - Kisi lead ke liye AI pause karein ⏸️\n• *RESUME AI <Phone>* - Lead ke liye AI resume karein ▶️\n\n💬 *AI Co-pilot se baat karein:*\nAap mujhse business growth ya automations par koi bhi sawal pooch sakte hain!`;
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, ownerMenu);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerMenu, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: ownerMenu, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue;
               }
 
@@ -676,7 +724,7 @@ Your Role:
                   const aiAdminResponse = await aiService.generateAIResponse(incomingText, adminContext);
                   console.log(`✅ [DEBUG] Owner custom query. Sending AI Admin reply.`);
                   await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, `🤖 *${effectiveAiName} Manager:*\n\n${aiAdminResponse}`);
-                  await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *${effectiveAiName} Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🤖 *${effectiveAiName} Manager:*\n\n${aiAdminResponse}`, direction: 'outgoing', status: 'sent', sentBy: 'ai', expiresAt: getMessageExpiry(user, 'whatsapp') });
                   continue;
                 } catch (aiErr) {
                   console.error('Owner AI error:', aiErr.message);
@@ -795,7 +843,7 @@ Your Role:
                 }
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, replyMsg);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: replyMsg, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
                 continue; // 🚀 Skip AI completely to save tokens!
               } else {
                 // Not a rating, just turn off the flag and process normally via AI
@@ -885,19 +933,25 @@ Your Role:
                            chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'other');
                          }
                        }
-                   } else if (questionNode.type === 'menu') {
-                       const incLower = incomingText.toLowerCase();
-                       if (questionNode.data.opt1 && incLower === questionNode.data.opt1.toLowerCase()) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_0');
-                       else if (questionNode.data.opt2 && incLower === questionNode.data.opt2.toLowerCase()) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_1');
-                       else if (questionNode.data.opt3 && incLower === questionNode.data.opt3.toLowerCase()) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_2');
-                       else {
-                           const num = parseInt(incomingText.trim());
-                           if (num === 1) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_0');
-                           else if (num === 2) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_1');
-                           else if (num === 3) chosenEdge = edges.find(e => e.source === questionNode.id && e.sourceHandle === 'opt_2');
-                       }
-                   }
+                    } else if (questionNode.type === 'menu') {
+                        const incLower = incomingText.toLowerCase().trim();
+                        const optMatches = (optText, input) => {
+                          if (!optText || !input) return false;
+                          const o = optText.toLowerCase().replace(/[^\w\s]/gi, '').trim();
+                          const inp = input.toLowerCase().replace(/[^\w\s]/gi, '').trim();
+                          return o === inp || inp.includes(o) || o.includes(inp) || o.split(/\s+/).some(w => w.length >= 3 && inp.includes(w));
+                        };
 
+                        if (optMatches(questionNode.data.opt1, incLower) || incLower === '1' || incLower.includes('buy') || incLower.includes('flow_opt_0') || incLower.includes('opt_0') || incLower.includes('opt_buy')) {
+                          chosenEdge = edges.find(e => e.source === questionNode.id && (e.sourceHandle === 'opt_0' || e.sourceHandle === 'opt1' || e.sourceHandle === 'opt_buy'));
+                        } else if (optMatches(questionNode.data.opt2, incLower) || incLower === '2' || incLower.includes('sell') || incLower.includes('list') || incLower.includes('flow_opt_1') || incLower.includes('opt_1') || incLower.includes('opt_sell')) {
+                          chosenEdge = edges.find(e => e.source === questionNode.id && (e.sourceHandle === 'opt_1' || e.sourceHandle === 'opt2' || e.sourceHandle === 'opt_sell'));
+                        } else if (optMatches(questionNode.data.opt3, incLower) || incLower === '3' || incLower.includes('visit') || incLower.includes('tour') || incLower.includes('flow_opt_2') || incLower.includes('opt_2') || incLower.includes('opt_visit')) {
+                          chosenEdge = edges.find(e => e.source === questionNode.id && (e.sourceHandle === 'opt_2' || e.sourceHandle === 'opt3' || e.sourceHandle === 'opt_visit'));
+                        } else {
+                          chosenEdge = edges.find(e => e.source === questionNode.id);
+                        }
+                    }
                    // Clear the waiting state since user has replied
                    await Lead.updateOne({ _id: currentLeadCheck._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
 
@@ -912,14 +966,14 @@ Your Role:
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
@@ -934,7 +988,7 @@ Your Role:
                          }));
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
-                        await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                        await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
@@ -1016,14 +1070,14 @@ Your Role:
                      if (nextNode.type === 'message') {
                        const msgText = formatFlowMsg(nextNode.data.message || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        let nextE = edges.find(e => e.source === nextNode.id);
                        currNodeId = nextE ? nextE.target : null;
                      } else if (nextNode.type === 'askQuestion') {
                        const msgText = formatFlowMsg(nextNode.data.question || nextNode.data.label);
                        await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, msgText); 
-                      await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                      await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: msgText, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                        
                        await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        currNodeId = null; 
@@ -1038,7 +1092,7 @@ Your Role:
                          }));
                          
                          await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, { type: "button", body: { text: msgText }, action: { buttons } });
-                        await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                        await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `[Sent Menu]: ${msgText}`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
                          await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { activeFlowState: { flowId: currentFlowId, nodeId: nextNode.id } } }, { strict: false });
                        }
                        currNodeId = null; 
@@ -1135,7 +1189,7 @@ Your Role:
                 action: { button: "Select Business", sections: [{ title: "Our Divisions", rows: menuRows }] }
               };
               await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
-              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
 
