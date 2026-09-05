@@ -15,6 +15,55 @@ const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 NEW: Auto
 const instagramService = require('../services/instagramService'); // 🚀 NEW: IG Publisher
 const { automationQueue } = require('../workers/automationWorker'); // 🚀 FIX: Import Queue to prevent ReferenceError crash
 
+// 🚀 CENTRAL WORKSPACE & SOCIAL PROFILE RESOLVER (Isolates Main vs Sub-Workspaces)
+const getWorkspaceDetails = (user, targetWorkspaceId) => {
+  const isMain = !targetWorkspaceId || targetWorkspaceId === 'main' || targetWorkspaceId === 'default';
+  if (!isMain && user.workspaces && user.workspaces.length > 0) {
+    const ws = user.workspaces.find(w => 
+      w._id?.toString() === String(targetWorkspaceId) || 
+      w.name?.toLowerCase().includes(String(targetWorkspaceId).toLowerCase())
+    );
+    if (ws) {
+      const isProp = ws.name && ws.name.toLowerCase().includes('property');
+      return {
+        id: ws._id.toString(),
+        name: ws.name || (isProp ? 'newpropertyhub.in' : 'Business Division'),
+        description: ws.description || ws.businessDescription || (isProp ? "India's smartest property listing platform for buyers, builders & brokers" : 'Products & Services'),
+        aiName: ws.aiName || user.aiName || 'DealClose AI',
+        website: ws.website || ws.externalApiUrl || (isProp ? 'https://newpropertyhub.in' : ''),
+        instagram: ws.instagram || (isProp ? 'https://instagram.com/newpropertyhub.in' : ''),
+        facebook: ws.facebook || (isProp ? 'https://facebook.com/newpropertyhub.in' : ''),
+        youtube: ws.youtube || '',
+        googleReview: ws.googleReview || ''
+      };
+    }
+  }
+  const mainLinks = user.digitalCardConfig || {};
+  return {
+    id: 'main',
+    name: user.businessName || 'DealClose AI',
+    description: user.businessDescription || 'Automations, CRM & AI Voice Calling',
+    aiName: user.aiName || 'DealClose AI',
+    website: (user.businessUrls && user.businessUrls[0]) || user.websiteUrl || 'https://dealcloseai.in',
+    instagram: mainLinks.instagram || 'https://instagram.com/dealcloseai.in',
+    facebook: mainLinks.facebook || 'https://facebook.com/dealcloseai.in',
+    youtube: mainLinks.youtube || 'https://youtube.com/@dealclose',
+    googleReview: mainLinks.googleReview || mainLinks.googleBusiness || ''
+  };
+};
+
+const formatSocialLinksText = (wsDetails) => {
+  if (!wsDetails) return '';
+  let socialLinks = [];
+  if (wsDetails.website) socialLinks.push(`🌐 Website: ${wsDetails.website}`);
+  if (wsDetails.instagram) socialLinks.push(`📸 Instagram: ${wsDetails.instagram}`);
+  if (wsDetails.facebook) socialLinks.push(`📘 Facebook: ${wsDetails.facebook}`);
+  if (wsDetails.youtube) socialLinks.push(`▶️ YouTube: ${wsDetails.youtube}`);
+  if (wsDetails.googleReview) socialLinks.push(`⭐ Rate Us: ${wsDetails.googleReview}`);
+  if (socialLinks.length === 0) return '';
+  return `\n\n*Connect with us:* \n${socialLinks.join('\n')}`;
+};
+
 // @desc    Verify Meta Webhook Setup (Required by Meta)
 // @route   GET /api/webhooks/whatsapp
 exports.verifyWhatsAppWebhook = async (req, res) => {
@@ -262,42 +311,22 @@ exports.handleWhatsApp = async (req, res) => {
             let responseMessage = "Got it! How can I help you today?";
             
             // 🚀 DYNAMIC WORKSPACE ROUTING
-            // Yahan hum hardcoded names ('menu_real_estate') ki jagah unique IDs match kar rahe hain
             if (selectedContext.startsWith('workspace_')) {
               const workspaceId = selectedContext.replace('workspace_', ''); 
               
-              // Save the selected business division in DB
+              // Save the selected business division in DB and unpause AI
               await Lead.findOneAndUpdate(
                 { phoneNumber: fromNumber, userId: user._id },
-                { $set: { lastSelectedWorkspaceId: workspaceId } }
+                { $set: { lastSelectedWorkspaceId: workspaceId, isAiPaused: false } },
+                { upsert: true }
               );
               
               const currentLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+              const wsDetails = getWorkspaceDetails(user, workspaceId);
               
-              let selectedWsName = user.businessName || "Main Business";
-              if (workspaceId !== 'default' && user.workspaces) {
-                const selectedWs = user.workspaces.find(w => w._id.toString() === workspaceId);
-                if (selectedWs) selectedWsName = selectedWs.name;
-              }
-              
-              // 🚀 CLEAN WELCOME MESSAGE (No awkward name interrogation)
+              // 🚀 CLEAN WELCOME MESSAGE WITH ACCURATE ISOLATED SOCIAL LINKS
               const displayName = (currentLead && currentLead.name && !currentLead.name.startsWith('User ')) ? ` ${currentLead.name.split(' ')[0]}` : '';
-              responseMessage = `Welcome${displayName ? ' back' : ''} to *${selectedWsName}*! 🏢\n\nHow can we assist you today? Feel free to ask about our catalog, products, prices, or any queries you have.`;
-              
-              // 🚀 SMART LINKS INJECTION
-              const links = user.digitalCardConfig || {};
-              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
-              
-              let socialLinks = [];
-              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
-              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
-              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
-              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
-              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
-              
-              if (socialLinks.length > 0) {
-                responseMessage += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
-              }
+              responseMessage = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today? Feel free to ask about our properties, catalog, prices, or any queries you have.${formatSocialLinksText(wsDetails)}`;
             }
 
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
@@ -659,6 +688,30 @@ Your Role:
               await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { isAiPaused: false, aiPausedUntil: null } });
             }
 
+            // 🚀 DIRECT NUMERIC / KEYWORD BUSINESS DIVISION SWITCHER (1, 2, DealClose, NewPropertyHub, Property)
+            const incomingClean = incomingTextLower.trim();
+            let directSwitchTarget = null;
+            if (['1', 'dealclose', 'dealcloseai', 'dealcloseai.in'].includes(incomingClean)) {
+              directSwitchTarget = 'main';
+            } else if (['2', 'newpropertyhub', 'newpropertyhub.in', 'property', 'properties', 'real estate'].includes(incomingClean) && user.workspaces && user.workspaces.length > 0) {
+              directSwitchTarget = user.workspaces[0]._id.toString();
+            }
+
+            if (directSwitchTarget && (!currentLeadCheck || !currentLeadCheck.activeFlowState || !currentLeadCheck.activeFlowState.flowId)) {
+              await Lead.findOneAndUpdate(
+                { phoneNumber: fromNumber, userId: user._id },
+                { $set: { lastSelectedWorkspaceId: directSwitchTarget, isAiPaused: false } },
+                { upsert: true }
+              );
+              const wsDetails = getWorkspaceDetails(user, directSwitchTarget);
+              const displayName = (currentLeadCheck && currentLeadCheck.name && !currentLeadCheck.name.startsWith('User ')) ? ` ${currentLeadCheck.name.split(' ')[0]}` : '';
+              const switchConfirmMsg = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today? Feel free to ask about our properties, catalog, pricing, or services.${formatSocialLinksText(wsDetails)}`;
+              
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, switchConfirmMsg);
+              await Message.create({ userId: user._id, workspaceId: directSwitchTarget, customerPhone: fromNumber, channel: 'whatsapp', messageText: switchConfirmMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              continue;
+            }
+
             // 🚀 ZERO-COST AI FEEDBACK CAPTURE (Catching 1-5 Ratings)
             if (currentLeadCheck && currentLeadCheck.awaitingFeedback) {
               const ratingMatch = incomingText.match(/^[1-5]$/);
@@ -675,7 +728,8 @@ Your Role:
                 let replyMsg = `Thank you for your feedback (${rating} ⭐)! We are constantly learning to serve you better. Have a great day!`;
                 
                 // 🚀 SMART UPSELL: If they gave 4 or 5 stars, ask for a Google Review!
-                const googleReviewLink = user.digitalCardConfig?.googleReview;
+                const activeWs = getWorkspaceDetails(user, currentLeadCheck.lastSelectedWorkspaceId);
+                const googleReviewLink = activeWs.googleReview || user.digitalCardConfig?.googleReview;
                 if (rating >= 4 && googleReviewLink) {
                    replyMsg = `Thank you for the amazing ${rating}⭐ rating! 🎉\n\nSince you had a great experience, it would mean the world to us if you could take 10 seconds to rate our business on Google:\n${googleReviewLink}\n\nHave a wonderful day! 🙏`;
                 }
@@ -701,18 +755,22 @@ Your Role:
               return text.replace(/\{\{name\}\}/gi, cName ? cName : 'there');
             };
             
-            // Workspace routing for Flows
+            // Workspace routing for Flows (STRICT WHATSAPP CHANNEL ISOLATION)
             const workspaceIdToUse = (currentLeadCheck && currentLeadCheck.lastSelectedWorkspaceId) ? currentLeadCheck.lastSelectedWorkspaceId : 'main';
             
+            const baseFlowFilter = {
+              userId: user._id,
+              platform: { $ne: 'instagram' },
+              name: { $not: /instagram collab|instagram flow/i },
+              isActive: { $ne: false }
+            };
+
             let userFlows = [];
             if (workspaceIdToUse && workspaceIdToUse !== 'main') {
-              userFlows = await Flow.find({ userId: user._id, $or: [{ workspaceId: workspaceIdToUse }, { platform: 'whatsapp' }] });
+              userFlows = await Flow.find({ ...baseFlowFilter, workspaceId: workspaceIdToUse });
             }
             if (!userFlows || userFlows.length === 0) {
-              userFlows = await Flow.find({ userId: user._id, $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
-            }
-            if (!userFlows || userFlows.length === 0) {
-              userFlows = await Flow.find({ userId: user._id });
+              userFlows = await Flow.find({ ...baseFlowFilter, $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
             }
 
             // STEP 1: Check if customer is currently inside an active "Ask Question" Flow block
@@ -974,10 +1032,10 @@ Your Role:
               let menuRows = [
                 { 
                   id: `workspace_default`, 
-                  title: (user.businessName || "Main Business").substring(0, 24), 
-                  description: (user.businessDescription || "Explore our automations and CRM").length > 69 
-                                ? (user.businessDescription || "Explore our automations and CRM").substring(0, 69) + '...'
-                                : (user.businessDescription || "Explore our automations and CRM")
+                  title: (user.businessName || "DealClose AI").substring(0, 24), 
+                  description: (user.businessDescription || "Explore automations and CRM").length > 69 
+                                ? (user.businessDescription || "Explore automations and CRM").substring(0, 69) + '...'
+                                : (user.businessDescription || "Explore automations and CRM")
                 }
               ];
               
@@ -987,9 +1045,9 @@ Your Role:
                   const wsRows = validWs.map(w => ({
                     id: `workspace_${w._id}`, 
                     title: w.name.substring(0, 24), 
-                    description: (w.description || "Properties & Site Visits").length > 69
-                                  ? (w.description || "Properties & Site Visits").substring(0, 69) + '...'
-                                  : (w.description || "Properties & Site Visits")
+                    description: (w.description || "Properties & Real Estate").length > 69
+                                  ? (w.description || "Properties & Real Estate").substring(0, 69) + '...'
+                                  : (w.description || "Properties & Real Estate")
                   }));
                   menuRows = [...menuRows, ...wsRows];
                 }
@@ -997,24 +1055,21 @@ Your Role:
               
               menuRows = menuRows.slice(0, 10);
 
-              let bodyText = `Welcome to *${user.fullName || user.businessName || 'Our Business'}*! 🏢\n\nPlease select the business division you want to connect with:\n\n1️⃣ *${user.businessName || 'DealClose AI'}* (Automations & CRM)\n2️⃣ *NewPropertyHub.in* (Properties & Real Estate)\n\n_Reply with 1, 2 or tap Select Business below:_`;
-              const links = user.digitalCardConfig || {};
-              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
+              const mainWs = getWorkspaceDetails(user, 'main');
+              let bodyText = `Welcome to *${user.fullName || user.businessName || 'Our Business'}*! 🏢\n\nPlease select the business division you want to connect with:\n\n`;
+              bodyText += `1️⃣ *${mainWs.name}*\n${mainWs.description}\n🌐 ${mainWs.website}\n\n`;
               
-              let socialLinks = [];
-              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
-              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
-              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
-              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
-              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
-              
-              if (socialLinks.length > 0) {
-                bodyText += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
+              if (user.workspaces && user.workspaces.length > 0) {
+                user.workspaces.forEach((w, idx) => {
+                  const subWs = getWorkspaceDetails(user, w._id.toString());
+                  bodyText += `${idx + 2}️⃣ *${subWs.name}*\n${subWs.description}\n🌐 ${subWs.website || 'https://newpropertyhub.in'}\n\n`;
+                });
               }
+              bodyText += `_Reply with 1, 2 or tap Select Business below:_`;
 
               const interactiveObj = {
                 type: "list",
-                header: { type: "text", text: `Welcome to ${user.fullName || 'Our Business'}` },
+                header: { type: "text", text: `Welcome to ${user.fullName || user.businessName || 'Our Business'}` },
                 body: { text: bodyText },
                 footer: { text: "Powered by DealClose AI" },
                 action: { button: "Select Business", sections: [{ title: "Our Divisions", rows: menuRows }] }
@@ -1028,28 +1083,18 @@ Your Role:
               const extractedName = incomingText.trim();
               const newName = `${extractedName} (ID: ${fromNumber.slice(-4)})`;
               await Lead.updateOne({ _id: currentLeadCheck._id }, { $set: { name: newName } });
+              const wsDetails = getWorkspaceDetails(user, currentLeadCheck.lastSelectedWorkspaceId);
               let responseMessage = `Thank you, ${extractedName.split(' ')[0]}! ✅ Your details are saved.\n\nHow can I assist you further today?`;
-              if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
-                 responseMessage = `Thanks ${extractedName.split(' ')[0]}! ✅\n\nI am DealClose AI. I can automate your WhatsApp, Instagram, and Voice Calls to save your time & money.\n\nWould you like to:\n1️⃣ Start a 14-Day Free Trial\n2️⃣ Know more about features\n3️⃣ See Pricing (Reply with number)`;
+              if (wsDetails.id === 'main' && user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
+                 responseMessage = `Thanks ${extractedName.split(' ')[0]}! ✅\n\nI am ${wsDetails.aiName}. I can automate your WhatsApp, Instagram, and Voice Calls to save your time & money.\n\nWould you like to:\n1️⃣ Start a 14-Day Free Trial\n2️⃣ Know more about features\n3️⃣ See Pricing (Reply with number)`;
+              } else if (wsDetails.id !== 'main') {
+                 responseMessage = `Thanks ${extractedName.split(' ')[0]}! ✅\n\nWelcome to *${wsDetails.name}*! How can we assist you with properties, projects, or listings today?`;
               }
               
-              // 🚀 SMART LINKS INJECTION (For Zero-Cost Welcome)
-              const links = user.digitalCardConfig || {};
-              const websiteUrl = (user.businessUrls && user.businessUrls.length > 0) ? user.businessUrls[0] : "";
-              
-              let socialLinks = [];
-              if (websiteUrl) socialLinks.push(`🌐 Website: ${websiteUrl}`);
-              if (links.instagram) socialLinks.push(`📸 Instagram: ${links.instagram}`);
-              if (links.facebook) socialLinks.push(`📘 Facebook: ${links.facebook}`);
-              if (links.youtube) socialLinks.push(`▶️ YouTube: ${links.youtube}`);
-              if (links.googleReview) socialLinks.push(`⭐ Rate Us: ${links.googleReview}`);
-              
-              if (socialLinks.length > 0) {
-                responseMessage += "\n\n*Connect with us:* \n" + socialLinks.join("\n");
-              }
+              responseMessage += formatSocialLinksText(wsDetails);
 
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-              await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              await Message.create({ userId: user._id, workspaceId: wsDetails.id, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'system', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
 
@@ -1065,13 +1110,16 @@ Your Role:
               const isAiEnabled = user.aiAgentEnabled !== false; // defaults to true
               const hasTrainingData = user.businessDescription && user.businessDescription.trim().length > 10;
               
-              // Auto-Review Links (Bina AI ke fallback message me links jodna)
-              const links = user.digitalCardConfig || {};
+              // Auto-Review Links (Bina AI ke fallback message me isolated links jodna)
+              const activeFallbackWs = getWorkspaceDetails(user, currentLeadCheck?.lastSelectedWorkspaceId);
               let autoLinks = "";
-              if (links.googleReview || links.instagram) {
+              if (activeFallbackWs.googleReview || activeFallbackWs.instagram || activeFallbackWs.website) {
                 autoLinks = "\n\n---\n*While you wait, connect with us:*";
-                if (links.googleReview) autoLinks += `\n⭐ Google Review: ${links.googleReview}`;
-                if (links.instagram) autoLinks += `\n📸 Instagram: ${links.instagram}`;
+                if (activeFallbackWs.website) autoLinks += `\n🌐 Website: ${activeFallbackWs.website}`;
+                if (activeFallbackWs.instagram) autoLinks += `\n📸 Instagram: ${activeFallbackWs.instagram}`;
+                if (activeFallbackWs.facebook) autoLinks += `\n📘 Facebook: ${activeFallbackWs.facebook}`;
+                if (activeFallbackWs.youtube) autoLinks += `\n▶️ YouTube: ${activeFallbackWs.youtube}`;
+                if (activeFallbackWs.googleReview) autoLinks += `\n⭐ Google Review: ${activeFallbackWs.googleReview}`;
               }
 
               if (!isAiEnabled || (user.aiCredits <= 0 && !isFreeTestUser)) {
@@ -1125,9 +1173,10 @@ Your Role:
                 const customerNameContext = isNameKnown ? lead.name : "Unknown";
                 const customerNotesContext = lead && lead.notes ? lead.notes : "No previous history.";
 
-                const selectedWs = (user.workspaces || []).find(w => w._id?.toString() === workspaceId || w.id === workspaceId);
-                const effectiveAiName = (selectedWs && selectedWs.aiName) || user.aiName || 'DealClose AI';
-                const businessDisplayName = selectedWs ? selectedWs.name : (user.businessName || user.fullName || 'our business');
+                const targetWsId = (lead && lead.lastSelectedWorkspaceId) ? lead.lastSelectedWorkspaceId : workspaceId;
+                const activeLeadWs = getWorkspaceDetails(user, targetWsId);
+                const effectiveAiName = activeLeadWs.aiName || 'DealClose AI';
+                const businessDisplayName = activeLeadWs.name || 'our business';
 
                 let aiContext = `You are "${effectiveAiName}", the official AI sales & customer support representative for "${businessDisplayName}".
 When introducing yourself or greeting customers, refer to yourself as "${effectiveAiName}".
@@ -1154,12 +1203,12 @@ If you don't know the answer, use the 'escalate_to_staff' tool.`;
                   aiContext += "\n\n⚠️ BUDGET LIMIT ACTIVE: Provide short answers (1-2 sentences max), but ALWAYS ensure the sentence finishes completely.";
                 }
                 
-                // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number)
-                if (user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
+                // 🚀 SAAS ADMIN OVERRIDE (For DealClose AI's own WhatsApp Number when main workspace is active)
+                if (activeLeadWs.id === 'main' && user.businessName && user.businessName.toLowerCase().includes('dealclose')) {
                     const customerNameContext = lead && !lead.name.startsWith('User ') ? lead.name : 'Unknown User';
                     const customerDetailsContext = lead && lead.notes ? lead.notes : 'Unknown';
 
-                    aiContext = `You are "DealClose AI", a world-class AI Sales & Marketing Automation expert.
+                    aiContext = `You are "${effectiveAiName}", a world-class AI Sales & Marketing Automation expert.
                     The user messaging you is a potential client for our SaaS platform.
                     
                     CUSTOMER DETAILS EXTRACTED SO FAR:
@@ -1167,7 +1216,7 @@ If you don't know the answer, use the 'escalate_to_staff' tool.`;
                     City/Business Info: ${customerDetailsContext}
                     
                     YOUR GOAL: 
-                    1. Greet the user WARMLY using their name (if known). If their business or city is known, mention specifically how DealClose AI can automate THEIR type of business (e.g., "Since you are in Real Estate in Delhi, we can set up Lead Capture flows...").
+                    1. Greet the user WARMLY using their name (if known). If their business or city is known, mention specifically how ${effectiveAiName} can automate THEIR type of business (e.g., "Since you are in Real Estate in Delhi, we can set up Lead Capture flows...").
                     2. If you don't know their business, politely ask what business they run so you can suggest the right automation.
                     3. Explain the simple onboarding: Once they create an account, they just need to connect their Meta WhatsApp API keys (Access Token, Phone ID, and WABA ID).
                     4. Highlight the 14-Day Free Trial! Tell them they get full app access for 14 days. They can log in to explore the dashboard, or just provide their Meta keys to start WhatsApp automation instantly.
@@ -1331,9 +1380,13 @@ If you don't know the answer, use the 'escalate_to_staff' tool.`;
                          await metaAdsService.sendConversionEvent(user.metaAdsConfig.pixelId, user.metaAdsConfig.accessToken, fromNumber, 'Purchase');
                       }
                     } else if (toolCall.function.name === "request_star_review") {
-                      const links = user.digitalCardConfig || {};
+                      const currentLeadWs = (lead && lead.lastSelectedWorkspaceId) ? lead.lastSelectedWorkspaceId : workspaceId;
+                      const activeReviewWs = getWorkspaceDetails(user, currentLeadWs);
                       const discount = user.discountConfig || {};
-                      let msg = `Thank you for your time! We'd love your support. 🙏\n\n⭐ *Please leave us a 5-Star Review:*\n${links.googleReview || 'Link not configured'}\n\n📸 *Follow us on Instagram:*\n${links.instagram || 'Link not configured'}\n▶️ *Subscribe on YouTube:*\n${links.youtube || 'Link not configured'}\n`;
+                      let msg = `Thank you for your time! We'd love your support. 🙏\n\n⭐ *Please leave us a 5-Star Review:*\n${activeReviewWs.googleReview || user.digitalCardConfig?.googleReview || 'Link not configured'}\n\n📸 *Follow us on Instagram:*\n${activeReviewWs.instagram || 'Link not configured'}\n`;
+                      if (activeReviewWs.youtube) {
+                        msg += `▶️ *Subscribe on YouTube:*\n${activeReviewWs.youtube}\n`;
+                      }
                       
                       if (discount.code && discount.percentage) {
                         msg += `\n🎁 *Special Offer for You!*\nShow the referral code *${discount.code}* on your next visit within ${discount.validityDays || 30} days to get *${discount.percentage}% OFF* your purchase!`;
