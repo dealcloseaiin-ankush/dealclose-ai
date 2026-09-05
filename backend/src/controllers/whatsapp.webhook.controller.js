@@ -292,6 +292,42 @@ exports.handleWhatsApp = async (req, res) => {
 
           if (msg.type === 'image') {
             const mediaId = msg.image.id;
+            const currentLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+            const activeWsId = currentLead?.lastSelectedWorkspaceId || workspaceId;
+            const wsDetails = getWorkspaceDetails(user, activeWsId);
+            const isRealEstate = (wsDetails.name && /property|real estate|estate|housing|plot/i.test(wsDetails.name)) || (wsDetails.type === 'real_estate') || (currentLead && currentLead.notes && /property|flat|bhk|plot|rent|villa/i.test(currentLead.notes));
+
+            // 🏠 REAL ESTATE PROPERTY PHOTOS HANDLER
+            if (isRealEstate) {
+              const existingNotes = currentLead?.notes || "";
+              const updatedNotes = `${existingNotes}\n[Property Photo Received]: Media ID ${mediaId} on ${new Date().toLocaleTimeString('en-IN')}`;
+              
+              await Lead.updateOne(
+                { _id: currentLead._id },
+                { 
+                  $set: { notes: updatedNotes, lastInteractionAt: new Date() },
+                  $push: { "customFields.propertyPhotos": mediaId }
+                },
+                { strict: false }
+              );
+
+              // If lead is in active flow waiting for photos (node_sell_ask_photos), advance to completion
+              if (currentLead.activeFlowState && currentLead.activeFlowState.nodeId === 'node_sell_ask_photos') {
+                const displayName = (currentLead && currentLead.name && !currentLead.name.startsWith('User ')) ? ` ${currentLead.name.split(' ')[0]}` : '';
+                await Lead.updateOne({ _id: currentLead._id }, { $unset: { activeFlowState: 1 } }, { strict: false });
+                const confirmMsg = `📸 *Property Photo Received & Saved!* ✅\n\n🎉 Badhai ho${displayName}! Aapki property NewPropertyHub verified listings me add ho gayi hai.\n\n✅ Humaare verified buyers aur tenants ko ye property dikhai degi. Jaise hi koi inquiry aayegi, hum aapko turant WhatsApp par notify karenge! 🏠`;
+                await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, confirmMsg);
+                await Message.create({ userId: user._id, workspaceId: activeWsId, customerPhone: fromNumber, channel: 'whatsapp', messageText: confirmMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                continue;
+              }
+
+              const photoAck = `📸 *Property Photo Received!* ✅\n\nMaine aapki photo property listing me attach kar di hai. Agar aap aur photos bhejna chahein to bhej sakte hain, ya *"DONE"* reply karein! 🏠`;
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, photoAck);
+              await Message.create({ userId: user._id, workspaceId: activeWsId, customerPhone: fromNumber, channel: 'whatsapp', messageText: photoAck, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              continue;
+            }
+
+            // Fallback for E-commerce / OCR Vision
             await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, "I received your image! Let me read the list using AI for you... ⏳");
 
             try {
@@ -1301,15 +1337,19 @@ ${ownerRules}
 
 CUSTOMER INFO:
 Name: ${customerNameContext}
+Phone: ${fromNumber}
+City: ${lead?.city || 'Unknown'}
 Customer History/Notes: ${customerNotesContext}
+Captured Property / Form Data: ${JSON.stringify(lead?.customFields ? Object.fromEntries(lead.customFields) : {})}
 
 CRITICAL BEHAVIOR RULES:
 1. Greet the customer warmly and introduce yourself as "${effectiveAiName}" from "${businessDisplayName}" if this is the start of the conversation.
-2. Review the Customer History/Notes. If they answered bot questions (like City, Buyer or Seller), use that context to personalize your reply.
+2. Review the Customer History/Notes and Captured Property / Form Data. Use all previously collected details (like Name, City, Property Type, BHK, Budget, Location) to personalize your reply without re-asking what the customer already told us.
 3. Be EXTREMELY concise, fast, and to the point. Do not write long paragraphs.
 4. Do NOT engage in irrelevant, personal, or non-business small talk.
 5. ALWAYS use the 'send_whatsapp_menu' tool for multiple-choice questions.
 6. LEAD CAPTURE: If the user provides new details, use the 'update_customer_profile' tool.
+7. REAL ESTATE & SITE VISITS: If the customer is looking to Buy or Rent, use 'search_real_estate_properties' to show top matching properties with prices, then offer to book a Site Visit via 'schedule_property_visit'. If the customer is listing/selling a property, guide them and ask any remaining missing specs/photos.
 If you don't know the answer, use the 'escalate_to_staff' tool.`;
                 
                 // Fair Usage Policy: If 80% of the 1000 credit pack is consumed (<= 200 left), force shorter replies
