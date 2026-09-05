@@ -5,6 +5,7 @@ import api from './services/api';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
+import { useInboxStore } from './store/inboxStore';
 
 // 🚀 PERFORMANCE & AUTO-RECOVERY: Automatically retry and reload when new deployment changes chunk hashes
 const lazyWithRetry = (componentImport) =>
@@ -137,55 +138,23 @@ const GlobalNotification = () => {
           if (m.id) seenMessageIdsRef.current.add(String(m.id));
         });
 
-        // If there are new incoming messages, notify ONLY ONCE per message
-        if (newIncoming.length > 0) {
-          const latest = newIncoming[newIncoming.length - 1];
-          try {
-            const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-            audio.play().catch(() => {});
-          } catch (e) {}
+        // Calculate unread count
+        const unreadIncoming = messages.filter(m => m.direction === 'incoming' && m.status !== 'read');
+        const unreadCount = unreadIncoming.length;
 
-          const sender = latest.customerName || latest.customerPhone || 'Customer';
-          const text = latest.messageText || latest.text || 'New incoming message';
-          
-          toast.custom((t) => (
-            <div
-              onClick={() => {
-                toast.dismiss(t.id);
-                if (window.location.pathname !== '/mobile' && window.location.pathname !== '/chats') {
-                  window.location.href = '/mobile';
-                }
-              }}
-              className="bg-[#0e0e14] border border-emerald-500/60 p-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 max-w-sm w-full cursor-pointer animate-fade-in backdrop-blur-md"
-            >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  💬
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-black text-white truncate">{sender}</div>
-                  <div className="text-[11px] text-gray-300 truncate">{text}</div>
-                </div>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toast.dismiss(t.id);
-                }}
-                className="text-gray-400 hover:text-white p-1 rounded-lg bg-gray-800/80 hover:bg-gray-700 text-xs shrink-0"
-              >
-                ✕
-              </button>
-            </div>
-          ), {
-            id: `msg-${latest._id || latest.id || Date.now()}`,
-            duration: 3500
+        // If there are new incoming messages, play sound and add to inboxStore without screen-blocking popups
+        if (newIncoming.length > 0) {
+          useInboxStore.getState().playNotificationSound();
+          newIncoming.forEach(msg => {
+            useInboxStore.getState().addNotification(msg);
           });
         }
+        
+        useInboxStore.getState().setUnreadCount(unreadCount);
 
-        // 🚀 GLOBAL BLUE DOT EVENT: Broadcasts unread status so Sidebar can catch it globally
-        const hasUnread = messages.some(m => m.direction === 'incoming' && m.status !== 'read');
-        window.dispatchEvent(new CustomEvent('update_unread_badge', { detail: { hasUnread } }));
+        // 🚀 GLOBAL BLUE DOT EVENT: Broadcasts unread status so Sidebar/Navbar can catch it globally
+        const hasUnread = unreadCount > 0;
+        window.dispatchEvent(new CustomEvent('update_unread_badge', { detail: { hasUnread, unreadCount } }));
       } catch(error) {
         if (error.response?.status === 401) {
           shouldPoll.current = false;

@@ -13,24 +13,9 @@ exports.getChats = async (req, res) => {
     const { search, platform, workspaceId: requestedWorkspaceId } = req.query;
     const normalizedWorkspaceId = requestedWorkspaceId === 'main_business' ? 'main' : requestedWorkspaceId;
 
-    const messageQuery = { userId, isDeleted: { $ne: true } };
-    if (normalizedWorkspaceId && normalizedWorkspaceId !== 'all') {
-      if (normalizedWorkspaceId === 'main') {
-        messageQuery.$or = [
-          { workspaceId: 'main' },
-          { workspaceId: { $exists: false } },
-          { workspaceId: null },
-          { workspaceId: 'default' }
-        ];
-      } else {
-        messageQuery.workspaceId = normalizedWorkspaceId;
-      }
-    }
-
-    const messages = await Message.find(messageQuery).lean().sort({ timestamp: 1 });
-
     const leads = await Lead.find({ userId }).lean();
     const leadDataMap = {};
+    const matchingLeadPhones = [];
     
     // 🚀 SMART NORMALIZER: Retroactively fix Old Names and extract City dynamically
     const normalizeData = (nameStr, cityStr) => {
@@ -60,18 +45,45 @@ exports.getChats = async (req, res) => {
 
     leads.forEach(lead => {
       const norm = normalizeData(lead.name, lead.city);
-      // 🚀 FIX: Exact mapping for both regular phones and IG IDs to show real names
       const identifier = String(lead.phoneNumber || lead.phone || '').trim();
+      const wsId = lead.lastSelectedWorkspaceId || lead.workspaceId || 'main';
       if (identifier) {
         leadDataMap[identifier] = {
           name: norm.name,
           city: norm.city,
-          workspaceId: lead.lastSelectedWorkspaceId || 'main',
+          workspaceId: wsId,
           isAiPaused: lead.isAiPaused || false,
           aiPausedUntil: lead.aiPausedUntil || null
         };
+        if (normalizedWorkspaceId && normalizedWorkspaceId !== 'all') {
+          if (normalizedWorkspaceId === 'main' && (wsId === 'main' || wsId === 'default' || !wsId)) {
+            matchingLeadPhones.push(identifier);
+          } else if (wsId === normalizedWorkspaceId) {
+            matchingLeadPhones.push(identifier);
+          }
+        }
       }
     });
+
+    const messageQuery = { userId, isDeleted: { $ne: true } };
+    if (normalizedWorkspaceId && normalizedWorkspaceId !== 'all') {
+      if (normalizedWorkspaceId === 'main') {
+        messageQuery.$or = [
+          { workspaceId: 'main' },
+          { workspaceId: { $exists: false } },
+          { workspaceId: null },
+          { workspaceId: 'default' },
+          ...(matchingLeadPhones.length > 0 ? [{ customerPhone: { $in: matchingLeadPhones } }] : [])
+        ];
+      } else {
+        messageQuery.$or = [
+          { workspaceId: normalizedWorkspaceId },
+          ...(matchingLeadPhones.length > 0 ? [{ customerPhone: { $in: matchingLeadPhones } }] : [])
+        ];
+      }
+    }
+
+    const messages = await Message.find(messageQuery).lean().sort({ timestamp: 1 });
 
     let enrichedMessages = messages.map(msg => {
       let platform = 'whatsapp';

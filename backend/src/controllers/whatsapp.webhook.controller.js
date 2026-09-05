@@ -300,38 +300,64 @@ exports.handleWhatsApp = async (req, res) => {
             let selectedContext = interactiveType === 'list_reply' ? msg.interactive.list_reply.id : msg.interactive.button_reply.id;
             let buttonTitle = interactiveType === 'list_reply' ? msg.interactive.list_reply.title : msg.interactive.button_reply.title;
             
-            // 🚀 SMART ROUTING: Agar Flow ya AI ka button click kiya hai, toh usko text banakar Flow Engine me bhej do!
-            if (selectedContext.startsWith('flow_opt_') || selectedContext.startsWith('ai_btn_')) {
-              msg.type = 'text';
-              msg.text = { body: buttonTitle };
-              console.log(`🔘 [Interactive Button] Converted button click '${buttonTitle}' to text for Flow/AI Engine.`);
-              // Yahan 'continue' nahi lagayenge, taaki code niche 'msg.type === text' wale block me ja sake!
-            } else {
-            
-            let responseMessage = "Got it! How can I help you today?";
-            
             // 🚀 DYNAMIC WORKSPACE ROUTING
             if (selectedContext.startsWith('workspace_')) {
-              const workspaceId = selectedContext.replace('workspace_', ''); 
+              const targetWsId = selectedContext.replace('workspace_', '') === 'default' ? 'main' : selectedContext.replace('workspace_', ''); 
               
               // Save the selected business division in DB and unpause AI
               await Lead.findOneAndUpdate(
                 { phoneNumber: fromNumber, userId: user._id },
-                { $set: { lastSelectedWorkspaceId: workspaceId, isAiPaused: false } },
+                { $set: { lastSelectedWorkspaceId: targetWsId, isAiPaused: false } },
                 { upsert: true }
               );
               
               const currentLead = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
-              const wsDetails = getWorkspaceDetails(user, workspaceId);
-              
-              // 🚀 CLEAN WELCOME MESSAGE WITH ACCURATE ISOLATED SOCIAL LINKS
+              const wsDetails = getWorkspaceDetails(user, targetWsId);
               const displayName = (currentLead && currentLead.name && !currentLead.name.startsWith('User ')) ? ` ${currentLead.name.split(' ')[0]}` : '';
-              responseMessage = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today? Feel free to ask about our properties, catalog, prices, or any queries you have.${formatSocialLinksText(wsDetails)}`;
-            }
+              const isRealEstate = (wsDetails.name && /property|real estate|estate|housing|plot/i.test(wsDetails.name)) || (wsDetails.type === 'real_estate');
 
-            await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-            await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
-            continue;
+              if (isRealEstate) {
+                try {
+                  const listPayload = {
+                    type: 'list',
+                    header: { type: 'text', text: `🏢 ${wsDetails.name}` },
+                    body: { text: `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*!\n\nIndia's smart property platform. How can we assist you today?${formatSocialLinksText(wsDetails)}` },
+                    footer: { text: 'Select an option below' },
+                    action: {
+                      button: 'Select Service 📋',
+                      sections: [
+                        {
+                          title: 'Property Options',
+                          rows: [
+                            { id: 'opt_buy_prop', title: '🔍 Buy Property', description: 'Flats, plots, villas & commercial' },
+                            { id: 'opt_sell_prop', title: '📝 List / Sell Property', description: 'Post your property for verified buyers' },
+                            { id: 'opt_rent_prop', title: '🔑 Rent Property', description: 'Find rentals or list tenant property' },
+                            { id: 'opt_site_visit', title: '🚗 Book Site Visit', description: 'Schedule physical or virtual tour' }
+                          ]
+                        }
+                      ]
+                    }
+                  };
+                  await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, listPayload);
+                  await Message.create({ userId: user._id, workspaceId: targetWsId, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🏢 Welcome to ${wsDetails.name}! [Interactive Menu: Buy / Sell / Rent / Site Visit]`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  continue;
+                } catch (interactiveErr) {
+                  console.warn(`⚠️ [Interactive Send Failed, falling back to text]:`, interactiveErr.message);
+                }
+              }
+
+              const responseMessage = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today?\n\n1️⃣ *Buy Property*\n2️⃣ *List / Sell Property*\n3️⃣ *Rent Property*\n4️⃣ *Book Site Visit*\n\nFeel free to ask about our properties, catalog, prices, or any queries you have.${formatSocialLinksText(wsDetails)}`;
+              await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
+              await Message.create({ userId: user._id, workspaceId: targetWsId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+              continue;
+            } else {
+              // 🚀 UNIVERSAL INTERACTIVE BUTTON NORMALIZER
+              // Convert ANY button/list reply to text so Flow Engine, AutoReplies, Keywords, and AI can process it!
+              msg.type = 'text';
+              msg.text = { body: buttonTitle || selectedContext };
+              msg.interactiveId = selectedContext;
+              console.log(`🔘 [Interactive Button] Converted button click '${buttonTitle}' (ID: ${selectedContext}) to text for Flow/AI Engine.`);
+              // Do NOT continue here, so execution falls through to 'msg.type === text' processing!
             }
           }
 
@@ -658,8 +684,11 @@ Your Role:
               }
             }
 
-            console.log(`💾 [DEBUG] Saving incoming message to database...`);
-            const incomingMsg = await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
+            const effectiveWorkspaceId = currentLeadCheck?.lastSelectedWorkspaceId || currentLeadCheck?.workspaceId || workspaceId;
+
+            console.log(`💾 [DEBUG] Saving incoming message to database (Workspace: ${effectiveWorkspaceId})...`);
+            const incomingMsg = await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
             console.log(`✅ [DEBUG] Message saved with ID: ${incomingMsg._id}`);
 
             // 🚀 Broadcast the incoming message to all connected chat dashboards
@@ -675,7 +704,6 @@ Your Role:
             const incomingTextLower = incomingText.toLowerCase();
 
             // 🚀 CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED) WITH AUTO-UNPAUSE ON TRIGGER
-            const currentLeadCheck = await Lead.findOne({ phoneNumber: fromNumber, userId: user._id });
             const isTriggerWord = ['hi', 'hello', 'hey', 'start', 'menu', 'reset', 'restart', '0', '1', '2', 'property', 'collab', 'offer', 'price'].includes(incomingTextLower) || (user.autoReplies && user.autoReplies.some(r => r.triggerWord && incomingTextLower.includes(r.triggerWord.toLowerCase())));
 
             if (isTriggerWord && currentLeadCheck && currentLeadCheck.isAiPaused) {
@@ -705,7 +733,39 @@ Your Role:
               );
               const wsDetails = getWorkspaceDetails(user, directSwitchTarget);
               const displayName = (currentLeadCheck && currentLeadCheck.name && !currentLeadCheck.name.startsWith('User ')) ? ` ${currentLeadCheck.name.split(' ')[0]}` : '';
-              const switchConfirmMsg = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today? Feel free to ask about our properties, catalog, pricing, or services.${formatSocialLinksText(wsDetails)}`;
+              const isRealEstate = (wsDetails.name && /property|real estate|estate|housing|plot/i.test(wsDetails.name)) || (wsDetails.type === 'real_estate');
+
+              if (isRealEstate) {
+                try {
+                  const listPayload = {
+                    type: 'list',
+                    header: { type: 'text', text: `🏢 ${wsDetails.name}` },
+                    body: { text: `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*!\n\nIndia's smart property platform. How can we assist you today?${formatSocialLinksText(wsDetails)}` },
+                    footer: { text: 'Select an option below' },
+                    action: {
+                      button: 'Select Service 📋',
+                      sections: [
+                        {
+                          title: 'Property Options',
+                          rows: [
+                            { id: 'opt_buy_prop', title: '🔍 Buy Property', description: 'Flats, plots, villas & commercial' },
+                            { id: 'opt_sell_prop', title: '📝 List / Sell Property', description: 'Post your property for verified buyers' },
+                            { id: 'opt_rent_prop', title: '🔑 Rent Property', description: 'Find rentals or list tenant property' },
+                            { id: 'opt_site_visit', title: '🚗 Book Site Visit', description: 'Schedule physical or virtual tour' }
+                          ]
+                        }
+                      ]
+                    }
+                  };
+                  await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, listPayload);
+                  await Message.create({ userId: user._id, workspaceId: directSwitchTarget, customerPhone: fromNumber, channel: 'whatsapp', messageText: `🏢 Welcome to ${wsDetails.name}! [Interactive Menu: Buy / Sell / Rent / Site Visit]`, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
+                  continue;
+                } catch (interactiveErr) {
+                  console.warn(`⚠️ [Interactive Direct Switch Failed]:`, interactiveErr.message);
+                }
+              }
+
+              const switchConfirmMsg = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today?\n\n1️⃣ *Buy Property*\n2️⃣ *List / Sell Property*\n3️⃣ *Rent Property*\n4️⃣ *Book Site Visit*\n\nFeel free to ask about our properties, catalog, pricing, or services.${formatSocialLinksText(wsDetails)}`;
               
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, switchConfirmMsg);
               await Message.create({ userId: user._id, workspaceId: directSwitchTarget, customerPhone: fromNumber, channel: 'whatsapp', messageText: switchConfirmMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
@@ -1572,7 +1632,7 @@ If you don't know the answer, use the 'escalate_to_staff' tool.`;
                 }
 
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
-                await Message.create({ userId: user._id, workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy, expiresAt: getMessageExpiry(user, 'whatsapp') });
+                await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy, expiresAt: getMessageExpiry(user, 'whatsapp') });
                 
                 // 🚀 SMART DELAYED FEEDBACK: Only trigger if AI actually replied!
                 if (repliedBy === 'ai') {
