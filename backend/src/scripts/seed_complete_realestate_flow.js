@@ -97,13 +97,13 @@ async function seedCompleteRealEstateFlow() {
           },
           position: { x: 550, y: 620 }
         },
-        // Step A4: Request Photos
+        // Step A4: Request Photos & GPS Location
         {
           id: 'node_sell_ask_photos',
           type: 'askQuestion',
           data: {
-            label: 'Ask Property Photos',
-            question: 'Details save ho gayi hain! 📝\n\n📸 Kripya property ki *1 ya 2 photos* WhatsApp par send karein (ya type *"SKIP"* karein) taaki hum verified tag ke sath listing live karein.',
+            label: 'Ask Property Photos & GPS Pin',
+            question: 'Details save ho gayi hain! 📝\n\n📸 Kripya property ki *kam se kam 1-2 photos* WhatsApp par send karein (jyada ho to bhi bhej sakte hain). Iske baad agar aapke paas property ki *WhatsApp GPS Location pin* hai to use bhi send kar sakte hain (ya type *"SKIP"* karein).',
             replyType: 'open',
             platform: 'whatsapp'
           },
@@ -119,6 +119,17 @@ async function seedCompleteRealEstateFlow() {
             platform: 'whatsapp'
           },
           position: { x: 550, y: 860 }
+        },
+        // Step A6: AI Followup Discussion
+        {
+          id: 'node_sell_ai_followup',
+          type: 'ai_agent',
+          data: {
+            label: 'AI Listing Enhancement Discussion',
+            message: 'Maine aapki property details NewPropertyHub par note kar li hain. Kya aap is property ke baare me koi khas baatein (jaise: Gated Society, Reserved Car Parking, North Facing, ya Urgent Sale) add karna chahte hain? 🤖',
+            platform: 'whatsapp'
+          },
+          position: { x: 550, y: 980 }
         },
 
         // ==========================================
@@ -158,7 +169,7 @@ async function seedCompleteRealEstateFlow() {
         { id: 'e_menu_buy', source: 'node_menu_intent', target: 'node_buy_ask_budget_loc', sourceHandle: 'opt_0' },
         { id: 'e_buy_to_ai', source: 'node_buy_ask_budget_loc', target: 'node_buy_ai_agent', sourceHandle: 'replied' },
 
-        // Opt 2 (Sell/List Out) -> Step A1 Category -> Step A2 Specs -> Step A3 Price -> Step A4 Photos -> Step A5 Done
+        // Opt 2 (Sell/List Out) -> Step A1 Category -> Step A2 Specs -> Step A3 Price -> Step A4 Photos -> Step A5 Done -> Step A6 AI Discussion
         { id: 'e_menu_sell', source: 'node_menu_intent', target: 'node_sell_category_menu', sourceHandle: 'opt_1' },
         { id: 'e_sell_cat_opt0', source: 'node_sell_category_menu', target: 'node_sell_ask_specs', sourceHandle: 'opt_0' },
         { id: 'e_sell_cat_opt1', source: 'node_sell_category_menu', target: 'node_sell_ask_specs', sourceHandle: 'opt_1' },
@@ -166,6 +177,7 @@ async function seedCompleteRealEstateFlow() {
         { id: 'e_sell_specs_price', source: 'node_sell_ask_specs', target: 'node_sell_ask_price', sourceHandle: 'replied' },
         { id: 'e_sell_price_photos', source: 'node_sell_ask_price', target: 'node_sell_ask_photos', sourceHandle: 'replied' },
         { id: 'e_sell_photos_done', source: 'node_sell_ask_photos', target: 'node_sell_complete_msg', sourceHandle: 'replied' },
+        { id: 'e_sell_done_ai', source: 'node_sell_complete_msg', target: 'node_sell_ai_followup' },
 
         // Opt 3 (Direct AI Advisor) -> AI Agent
         { id: 'e_menu_ai', source: 'node_menu_intent', target: 'node_buy_ai_agent', sourceHandle: 'opt_2' }
@@ -178,7 +190,7 @@ async function seedCompleteRealEstateFlow() {
         $set: {
           userId: user._id,
           name: 'NewPropertyHub Real Estate Complete Automation',
-          description: 'Step-by-step Real Estate funnel: Name/City -> Buy (AI property search & site visit) vs Sell/List (Type, Specs, Price, Photos progressive collection)',
+          description: 'Step-by-step Real Estate funnel: Name/City -> Buy (AI property search & site visit) vs Sell/List (Type, Specs, Price, Photos & GPS progressive collection + AI enhancement discussion)',
           workspaceId: wsId,
           platform: 'whatsapp',
           triggerKeywords: ['property', '2', 'newpropertyhub', 'buy', 'sell', 'rent', 'visit', 'flat', 'plot', 'list'],
@@ -188,7 +200,7 @@ async function seedCompleteRealEstateFlow() {
       },
       { upsert: true, returnDocument: 'after' }
     );
-    console.log(`✅ Seeded complete progressive real estate flow for ${user.email} (Workspace: ${wsId})`);
+    console.log(`✅ Seeded complete progressive real estate flow with AI follow-up for ${user.email} (Workspace: ${wsId})`);
   }
 
   await mongoose.disconnect();
