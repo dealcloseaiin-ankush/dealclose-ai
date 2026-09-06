@@ -87,10 +87,12 @@ exports.getChats = async (req, res) => {
 
     let enrichedMessages = messages.map(msg => {
       let platform = 'whatsapp';
-      if (msg.customerPhone && msg.customerPhone.startsWith('IG_')) {
-        platform = 'instagram_dm';
-      } else if (msg.tags && msg.tags.includes('ig_comment')) {
+      if (msg.channel === 'instagram_comment' || (msg.tags && msg.tags.includes('ig_comment'))) {
         platform = 'instagram_comment';
+      } else if (msg.channel === 'instagram_dm' || (msg.customerPhone && msg.customerPhone.startsWith('IG_'))) {
+        platform = 'instagram_dm';
+      } else if (msg.channel === 'whatsapp') {
+        platform = 'whatsapp';
       } else if (msg.customerPhone && isNaN(msg.customerPhone.replace('+', ''))) {
         platform = 'instagram_comment'; // Fallback for pure text usernames
       }
@@ -487,3 +489,54 @@ exports.toggleAiForChat = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Mark all incoming messages for a customer/chat as read (live sync mobile & desktop)
+// @route   POST /api/chats/mark-read
+exports.markAsRead = async (req, res) => {
+  try {
+    const { customerPhone } = req.body;
+    const phone = customerPhone || req.params.customerPhone;
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!phone) return res.status(400).json({ success: false, message: 'customerPhone is required' });
+
+    await Message.updateMany(
+      { userId, customerPhone: phone, direction: 'incoming', status: { $ne: 'read' } },
+      { $set: { status: 'read', readAt: new Date() } }
+    );
+
+    res.status(200).json({ success: true, message: 'Chat marked as read' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Mark ALL incoming unread messages as read for this user/workspace
+// @route   POST /api/chats/mark-all-read
+exports.markAllAsRead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { workspaceId } = req.body;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const query = { userId, direction: 'incoming', status: { $ne: 'read' } };
+    if (workspaceId && workspaceId !== 'all') {
+      if (workspaceId === 'main') {
+        query.$or = [
+          { workspaceId: 'main' },
+          { workspaceId: { $exists: false } },
+          { workspaceId: null },
+          { workspaceId: 'default' }
+        ];
+      } else {
+        query.workspaceId = workspaceId;
+      }
+    }
+
+    const result = await Message.updateMany(query, { $set: { status: 'read', readAt: new Date() } });
+    res.status(200).json({ success: true, count: result.modifiedCount, message: 'All messages marked as read' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

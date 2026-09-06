@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
+import { useInboxStore } from '../store/inboxStore';
 import { Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck, Trash2, MapPin, CornerDownLeft, X } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
@@ -205,6 +206,54 @@ export default function Chats() {
       setActiveCustomer(customerDetails[0].phone);
     }
   }, [customerDetails, activeCustomer]);
+
+  // 🔥 Auto mark active customer as read (syncs DB for desktop & mobile)
+  useEffect(() => {
+    if (activeCustomer) {
+      const hasUnread = allMessages.some(m => m.customerPhone === activeCustomer && m.direction === 'incoming' && m.status !== 'read');
+      if (hasUnread) {
+        api.post('/chats/mark-read', { customerPhone: activeCustomer }).catch(() => {});
+        setAllMessages(prev => {
+          const updated = prev.map(m => m.customerPhone === activeCustomer && m.direction === 'incoming' ? { ...m, status: 'read' } : m);
+          allMessagesRef.current = updated;
+          return updated;
+        });
+      }
+    }
+  }, [activeCustomer, allMessages]);
+
+  const handleSelectCustomer = async (phone) => {
+    setActiveCustomer(phone);
+    setIsSidebarOpen(false);
+    
+    // Optimistically update local message status to 'read'
+    setAllMessages(prev => {
+      const updated = prev.map(m => m.customerPhone === phone && m.direction === 'incoming' ? { ...m, status: 'read' } : m);
+      allMessagesRef.current = updated;
+      return updated;
+    });
+
+    try {
+      await api.post('/chats/mark-read', { customerPhone: phone });
+    } catch (e) {
+      console.debug('Failed to mark chat as read:', e.message);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      setAllMessages(prev => {
+        const updated = prev.map(m => ({ ...m, status: 'read' }));
+        allMessagesRef.current = updated;
+        return updated;
+      });
+      await api.post('/chats/mark-all-read', { workspaceId: activeWorkspace });
+      useInboxStore.getState().setUnreadCount(0);
+      toast.success('All chats marked as read!');
+    } catch (err) {
+      toast.error('Failed to mark all as read');
+    }
+  };
 
   // Chat sorting ascending (oldest to newest)
   const activeChatMessages = useMemo(() => {
@@ -548,7 +597,16 @@ export default function Chats() {
       <div className={`absolute md:relative z-40 w-4/5 md:w-1/3 h-full bg-[#111] border-r border-gray-800 md:rounded-l-2xl p-4 overflow-y-auto transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 custom-scrollbar`}>
         <div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-4 mt-2">
           <h2 className="text-xl font-bold">Active Chats</h2>
-          <button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-500 text-white text-sm px-3 py-1.5 rounded-lg font-bold transition-colors">+ New Chat</button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleMarkAllAsRead} 
+              title="Mark all chats in this workspace as read"
+              className="bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 border border-gray-700"
+            >
+              <CheckCheck size={14} className="text-emerald-400" /> Read All
+            </button>
+            <button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-500 text-white text-sm px-3 py-1.5 rounded-lg font-bold transition-colors">+ New Chat</button>
+          </div>
         </div>
         
         <select 
@@ -596,7 +654,7 @@ export default function Chats() {
           customerDetails.length > 0 ? customerDetails.map(customer => (
             <div 
               key={customer.phone}
-              onClick={() => { setActiveCustomer(customer.phone); setIsSidebarOpen(false); }}
+              onClick={() => handleSelectCustomer(customer.phone)}
               className={`p-4 cursor-pointer rounded-xl mb-3 transition-all border ${
                 activeCustomer === customer.phone 
                   ? (customer.lastMessage?.platform?.startsWith('instagram') ? 'bg-pink-600/10 border-pink-500' : 'bg-green-600/10 border-green-500') 

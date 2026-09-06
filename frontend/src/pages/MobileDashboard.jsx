@@ -1026,6 +1026,11 @@ export default function MobileDashboard() {
 
     setChats(chats.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c));
     setActiveChatThread({ ...chat, unreadCount: 0 });
+
+    // 🔥 Live Sync: Tell backend to update MongoDB so desktop unread badge clears too
+    if (chat?.customerPhone) {
+      api.post('/chats/mark-read', { customerPhone: chat.customerPhone }).catch(() => {});
+    }
   };
 
   const handleSendChatMessage = async (e) => {
