@@ -597,6 +597,7 @@ exports.markAllAsRead = async (req, res) => {
     }
 
     const result = await Message.updateMany(query, { $set: { status: 'read', readAt: new Date() } });
+    console.log(`[markAllAsRead] Marked ${result.modifiedCount} incoming messages as read for user ${userId} (workspace: ${workspaceId || 'all'})`);
     res.status(200).json({ success: true, count: result.modifiedCount, message: 'All messages marked as read' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

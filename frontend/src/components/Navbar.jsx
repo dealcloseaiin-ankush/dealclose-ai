@@ -76,7 +76,19 @@ export default function Navbar() {
 
   const handleOpenChat = (notif) => {
     setIsNotifOpen(false);
+    if (notif?.customerPhone) {
+      api.post('/chats/mark-read', { customerPhone: notif.customerPhone }).catch(() => {});
+    }
     navigate('/chats');
+  };
+
+  const handleClearAll = async () => {
+    clearNotifications();
+    try {
+      await api.post('/chats/mark-all-read');
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
   };
 
   return (
@@ -124,7 +136,7 @@ export default function Navbar() {
               <div className="flex items-center gap-1.5">
                 {recentNotifications.length > 0 && (
                   <button
-                    onClick={clearNotifications}
+                    onClick={handleClearAll}
                     className="text-[11px] text-gray-400 hover:text-purple-400 transition-colors font-medium px-2 py-1 rounded-lg hover:bg-gray-800"
                   >
                     Clear All

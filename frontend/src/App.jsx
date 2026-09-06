@@ -114,15 +114,30 @@ const GlobalNotification = () => {
         const { data } = await api.get('/chats');
         if (!shouldPoll.current) return;
         const messages = Array.isArray(data) ? data : data.data || [];
-        if (messages.length === 0) return;
+        if (messages.length === 0) {
+          useInboxStore.getState().setNotifications([], 0);
+          return;
+        }
 
-        // On first app load, seed existing message IDs into seenMessageIdsRef so they DON'T trigger old notifications
+        // Calculate unread incoming messages
+        const unreadIncoming = messages.filter(m => m.direction === 'incoming' && m.status !== 'read');
+        const unreadCount = unreadIncoming.length;
+
+        // Sort unread messages newest first for notifications dropdown
+        const sortedUnread = [...unreadIncoming].sort((a, b) => {
+          const dateA = new Date(a.timestamp || a.createdAt || 0).getTime();
+          const dateB = new Date(b.timestamp || b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
+
+        // On first app load, seed existing message IDs into seenMessageIdsRef and seed unread notifications
         if (isFirstCheckRef.current) {
           messages.forEach(m => {
             if (m._id) seenMessageIdsRef.current.add(String(m._id));
             if (m.id) seenMessageIdsRef.current.add(String(m.id));
           });
           isFirstCheckRef.current = false;
+          useInboxStore.getState().setNotifications(sortedUnread.slice(0, 30), unreadCount);
           return;
         }
 
@@ -138,19 +153,13 @@ const GlobalNotification = () => {
           if (m.id) seenMessageIdsRef.current.add(String(m.id));
         });
 
-        // Calculate unread count
-        const unreadIncoming = messages.filter(m => m.direction === 'incoming' && m.status !== 'read');
-        const unreadCount = unreadIncoming.length;
-
-        // If there are new incoming messages, play sound and add to inboxStore without screen-blocking popups
+        // If there are new incoming messages, play sound
         if (newIncoming.length > 0) {
           useInboxStore.getState().playNotificationSound();
-          newIncoming.forEach(msg => {
-            useInboxStore.getState().addNotification(msg);
-          });
         }
         
-        useInboxStore.getState().setUnreadCount(unreadCount);
+        // Sync notifications dropdown & unread count with backend truth
+        useInboxStore.getState().setNotifications(sortedUnread.slice(0, 30), unreadCount);
 
         // 🚀 GLOBAL BLUE DOT EVENT: Broadcasts unread status so Sidebar/Navbar can catch it globally
         const hasUnread = unreadCount > 0;

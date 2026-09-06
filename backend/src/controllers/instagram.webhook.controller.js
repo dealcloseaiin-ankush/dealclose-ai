@@ -1025,18 +1025,19 @@ with whatever information is available (leave budget field empty/null if not pro
              }
              
              await Message.create({
-               userId: user._id,
-               workspaceId: incomingWorkspaceId,
-               customerPhone: `IG_${igUserId}`, 
-               channel: 'instagram_comment',
-               messageText: `[💬 IG Comment - Phone Detected, awaiting confirmation]: ${commentText}`,
-               direction: 'incoming',
-               status: 'received',
-               sentBy: 'customer',
-               tags: ['ig_comment', 'phone_detected_unconfirmed'],
-               timestamp: new Date(),
-               expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming')
-             });
+                userId: user._id,
+                workspaceId: incomingWorkspaceId,
+                customerPhone: `IG_${igUserId}`, 
+                channel: 'instagram_comment',
+                messageText: `[💬 IG Comment - Phone Detected, awaiting confirmation]: ${commentText}`,
+                direction: 'incoming',
+                status: 'received',
+                sentBy: 'customer',
+                wamid: commentData.id,
+                tags: ['ig_comment', 'phone_detected_unconfirmed'],
+                timestamp: new Date(),
+                expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming')
+              });
              continue; // Skip flow routing for phone capture drops
           }
 
@@ -1201,7 +1202,7 @@ with whatever information is available (leave budget field empty/null if not pro
                 : finalReplyMsg;
              
              const postLabel = mediaId ? ` (Post/Reel #${mediaId})` : '';
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[💬 IG Comment${postLabel}]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', ...(mediaId ? [`post_${mediaId}`] : []), 'auto_replied'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming') });
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[💬 IG Comment${postLabel}]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', wamid: commentData.id, tags: ['ig_comment', ...(mediaId ? [`post_${mediaId}`] : []), 'auto_replied'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming') });
              await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_dm', messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply', ...(mediaId ? [`post_${mediaId}`] : [])], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
 
           } else {
@@ -1289,6 +1290,7 @@ with whatever information is available (leave budget field empty/null if not pro
                direction: 'incoming',
                status: 'received',
                sentBy: 'customer',
+               wamid: commentData.id,
                tags: ['ig_comment', ...(mediaId ? [`post_${mediaId}`] : []), 'needs_reply'],
                timestamp: new Date(),
                expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming')

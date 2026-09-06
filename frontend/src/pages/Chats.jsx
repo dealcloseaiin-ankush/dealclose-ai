@@ -429,8 +429,8 @@ export default function Chats() {
         allMessagesRef.current = updated;
         return updated;
       });
-      await api.post('/chats/mark-all-read', { workspaceId: activeWorkspace });
-      useInboxStore.getState().setUnreadCount(0);
+      useInboxStore.getState().clearNotifications();
+      await api.post('/chats/mark-all-read', { workspaceId: activeWorkspace || 'all' });
       toast.success('All chats marked as read!');
     } catch (err) {
       toast.error('Failed to mark all as read');
