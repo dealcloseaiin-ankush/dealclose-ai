@@ -6,7 +6,7 @@ import { useInboxStore } from '../store/inboxStore';
 import { 
   Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck, Trash2, MapPin, 
   CornerDownLeft, X, ExternalLink, User, Tag, Phone, Mail, FileText, Bot, 
-  PanelRightClose, PanelRightOpen, Sparkles, Send, Copy, CheckCircle2, Edit2, Save
+  PanelRightClose, PanelRightOpen, Sparkles, Send, Copy, CheckCircle2, Edit2, Save, RefreshCw
 } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
@@ -57,13 +57,39 @@ export default function Chats() {
   const prevMsgCountRef = useRef(0);
   const allMessagesRef = useRef([]);
 
-  // Fetch Instagram Posts for Post Card Resolution
+  // Fetch Instagram Posts for Post Card Resolution (from Graph API & Saved Automations)
   useEffect(() => {
     const fetchIgPosts = async () => {
       try {
-        const { data } = await api.get('/instagram/posts', { params: { limit: 50, workspaceId: activeWorkspace } });
-        const posts = Array.isArray(data) ? data : data?.data || [];
-        setIgPosts(posts);
+        const [postsRes, autoRes] = await Promise.all([
+          api.get('/instagram/posts', { params: { limit: 50, workspaceId: activeWorkspace } }).catch(() => ({ data: {} })),
+          api.get('/instagram/automations', { params: { workspaceId: activeWorkspace } }).catch(() => ({ data: {} }))
+        ]);
+
+        const fetchedPosts = postsRes.data?.posts || postsRes.data?.data || (Array.isArray(postsRes.data) ? postsRes.data : []);
+        const autoRules = autoRes.data?.automations || [];
+
+        const automationsAsPosts = autoRules
+          .filter(r => r.postId && (r.thumbnailUrl || r.mediaUrl))
+          .map(r => ({
+            id: String(r.postId),
+            caption: r.replyMessage || 'Instagram Reel / Post',
+            thumbnail_url: r.thumbnailUrl || r.mediaUrl,
+            media_url: r.mediaUrl || r.thumbnailUrl,
+            permalink: r.permalink || `https://www.instagram.com/p/${r.postId}`,
+            media_type: 'REEL',
+            like_count: 0,
+            comments_count: 0
+          }));
+
+        const combined = [...fetchedPosts];
+        automationsAsPosts.forEach(autoPost => {
+          if (!combined.some(p => String(p.id) === String(autoPost.id))) {
+            combined.push(autoPost);
+          }
+        });
+
+        setIgPosts(combined);
       } catch (err) {
         console.debug("Instagram posts fetch optional error:", err.message);
       }
@@ -259,7 +285,7 @@ export default function Chats() {
   }, [activeCustomer, allMessages]);
 
   const activeCustomerData = customerDetails?.find(c => c.phone === activeCustomer) || null;
-  const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
+  const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram') || activeCustomer?.startsWith('IG_');
 
   // Initialize editable fields when active customer changes
   useEffect(() => {
@@ -286,7 +312,7 @@ export default function Chats() {
       .forEach(msg => {
         const postTag = msg.tags?.find(t => t.startsWith('post_'));
         const tagId = postTag ? postTag.replace('post_', '') : null;
-        const match = msg.messageText?.match(/Post\/Reel\s*#?([0-9a-zA-Z_]+)/i);
+        const match = msg.messageText?.match(/Post\/Reel\s*#?([0-9a-zA-Z_]+)/i) || msg.messageText?.match(/Post\s*#?([0-9a-zA-Z_]+)/i);
         const extractedId = tagId || (match && match[1] !== 'Reel' ? match[1] : null);
 
         if (extractedId) {
@@ -309,19 +335,20 @@ export default function Chats() {
         }
       });
 
-    // If no specific post ID tag was found but it's an Instagram comment thread, fallback to latest post
+    // If no specific post ID tag was found but it's an Instagram comment thread, fallback to posts list
     if (map.size === 0 && (activeCustomerData?.lastMessage?.platform === 'instagram_comment' || isActiveIg) && igPosts.length > 0) {
-      const firstPost = igPosts[0];
-      map.set(firstPost.id, {
-        id: firstPost.id,
-        caption: firstPost.caption || 'Recent Instagram Post / Reel',
-        thumbnail_url: firstPost.thumbnail_url || firstPost.media_url || null,
-        permalink: firstPost.permalink || `https://www.instagram.com/p/${firstPost.id}`,
-        media_type: firstPost.media_type || 'REEL',
-        like_count: firstPost.like_count || 0,
-        comments_count: firstPost.comments_count || 0,
-        timestamp: firstPost.timestamp,
-        count: 1
+      igPosts.slice(0, 3).forEach(p => {
+        map.set(String(p.id), {
+          id: String(p.id),
+          caption: p.caption || 'Recent Instagram Post / Reel',
+          thumbnail_url: p.thumbnail_url || p.media_url || null,
+          permalink: p.permalink || `https://www.instagram.com/p/${p.id}`,
+          media_type: p.media_type || 'REEL',
+          like_count: p.like_count || 0,
+          comments_count: p.comments_count || 0,
+          timestamp: p.timestamp,
+          count: 1
+        });
       });
     }
 
@@ -470,7 +497,7 @@ export default function Chats() {
         messageText: replyText,
         repliedToMessageId: replyingTo?._id,
         replyMode: isActiveIg ? replyMode : undefined,
-        commentId: replyingTo?._id || undefined,
+        commentId: replyingTo?.wamid || undefined,
         mediaId: postFilter !== 'all' ? postFilter : (currentBannerPost?.id || undefined)
       };
       const res = await api.post('/chats/send', payload);
@@ -482,7 +509,7 @@ export default function Chats() {
           return updated;
         });
       }
-      if (isPublicComment) {
+      if (isPublicComment && res.data?.message?.status !== 'failed') {
         toast.success("Public comment reply posted on Instagram!");
       }
     } catch (error) {
@@ -598,7 +625,7 @@ export default function Chats() {
   };
 
   const deleteMessage = async (messageId) => {
-    if (!window.confirm("This will only hide the message from your dashboard, not from the customer's WhatsApp. Are you sure?")) return;
+    if (!window.confirm("Are you sure you want to delete this message from your dashboard?")) return;
 
     setAllMessages(prev => {
       const updated = prev.filter(m => m._id !== messageId);
@@ -616,7 +643,7 @@ export default function Chats() {
   };
 
   const deleteConversation = async (customerPhone) => {
-    if (!window.confirm(`Are you sure you want to delete the entire chat history with ${customerPhone}? This will hide it from your dashboard.`)) return;
+    if (!window.confirm(`Are you sure you want to delete the entire chat history with ${customerPhone}? This will clear it from your dashboard.`)) return;
 
     setAllMessages(prev => {
       const updated = prev.filter(m => m.customerPhone !== customerPhone);
@@ -1020,12 +1047,14 @@ export default function Chats() {
                   <Copy size={13} />
                 </button>
 
-                {/* Delete Conversation Button */}
-                {user?.role === 'owner' && (
-                  <button onClick={() => deleteConversation(activeCustomer)} className="text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 p-2 rounded-lg transition-colors font-bold flex items-center gap-1 border border-rose-800/40" title="Delete Conversation">
-                    <Trash2 size={13} />
-                  </button>
-                )}
+                {/* 🗑️ Delete Conversation Button (Always visible to staff/owner) */}
+                <button 
+                  onClick={() => deleteConversation(activeCustomer)} 
+                  className="text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 p-2 rounded-lg transition-colors font-bold flex items-center gap-1 border border-rose-800/40" 
+                  title="Clear / Delete entire chat history with this user"
+                >
+                  <Trash2 size={13} />
+                </button>
 
                 {/* 1-CLICK TOGGLE RIGHT CRM CONTEXT SIDEBAR */}
                 <button 
@@ -1142,6 +1171,7 @@ export default function Chats() {
                 const msgDateStr = new Date(msg.timestamp || msg.createdAt || 0).toDateString();
                 const prevMsgDateStr = index > 0 ? new Date(activeChatMessages[index - 1].timestamp || activeChatMessages[index - 1].createdAt || 0).toDateString() : null;
                 const showDateBadge = msgDateStr !== prevMsgDateStr;
+                const isFailed = msg.status === 'failed';
 
                 return (
                   <div key={msg._id} className="flex flex-col w-full">
@@ -1155,7 +1185,7 @@ export default function Chats() {
                     <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`group p-3.5 max-w-md rounded-2xl relative shadow-md ${
                         msg.direction === 'outgoing' 
-                          ? (msg.channel === 'instagram_comment' ? 'bg-pink-700 text-white rounded-br-sm' : 'bg-green-600 text-white rounded-br-sm') 
+                          ? (isFailed ? 'bg-rose-950/80 border border-rose-600/60 text-white rounded-br-sm' : (msg.channel === 'instagram_comment' ? 'bg-pink-700 text-white rounded-br-sm' : 'bg-green-600 text-white rounded-br-sm')) 
                           : 'bg-[#151515] border border-gray-800 text-gray-200 rounded-bl-sm'
                       }`}>
                         {/* Channel Badge (Post Comment vs DM) */}
@@ -1170,16 +1200,28 @@ export default function Chats() {
                           </div>
                         )}
 
-                        {/* Reply and Delete buttons on hover */}
-                        <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/50 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${
+                        {/* Reply and Delete buttons on hover / touch */}
+                        <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
                           msg.direction === 'outgoing' ? '-left-20' : '-right-20'
                         }`}
                         > 
                           <button onClick={() => setReplyingTo(msg)} className="text-gray-300 hover:text-white p-1.5 rounded hover:bg-gray-700" title="Reply"><CornerDownLeft size={14}/></button>
-                          {user?.role === 'owner' && (
-                            <button onClick={() => deleteMessage(msg._id)} className="text-gray-300 hover:text-rose-400 p-1.5 rounded hover:bg-gray-700" title="Delete"><Trash2 size={14}/></button>
-                          )}
+                          <button onClick={() => deleteMessage(msg._id)} className="text-gray-300 hover:text-rose-400 p-1.5 rounded hover:bg-gray-700" title="Delete Message"><Trash2 size={14}/></button>
                         </div>
+
+                        {/* Prominent 1-Click Delete button for failed messages */}
+                        {isFailed && (
+                          <div className="flex items-center justify-between gap-2 mb-2 p-1.5 bg-rose-900/40 border border-rose-500/40 rounded-lg text-xs text-rose-200">
+                            <span className="font-semibold flex items-center gap-1">⚠️ Delivery Failed</span>
+                            <button 
+                              onClick={() => deleteMessage(msg._id)} 
+                              className="px-2 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded flex items-center gap-1 transition-colors"
+                              title="Delete this failed message"
+                            >
+                              <Trash2 size={11} /> Delete
+                            </button>
+                          </div>
+                        )}
 
                         <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.isDeleted ? <span className="italic text-gray-400">This message was deleted</span> : (msg.messageText || "📎 [Attachment / Shared Post]")}</p>
                         
@@ -1199,9 +1241,9 @@ export default function Chats() {
             </div>
             
             {/* 24-Hour Closed Warning */}
-            {activeCustomerData && !activeCustomerData.windowOpen && (
+            {activeCustomerData && !activeCustomerData.windowOpen && !isActiveIg && (
                <div className="px-4 py-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-xs font-semibold text-center">
-                 ⚠️ 24-Hour window closed. Normal messages might fail. <button onClick={openTemplateModal} className="font-bold underline hover:text-rose-200">Use a Template</button> to re-initiate.
+                 ⚠️ 24-Hour WhatsApp window closed. Normal messages might fail. <button onClick={openTemplateModal} className="font-bold underline hover:text-rose-200">Use a Template</button> to re-initiate.
                </div>
             )}
 

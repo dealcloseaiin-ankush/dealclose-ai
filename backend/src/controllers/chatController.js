@@ -262,8 +262,24 @@ exports.sendManualMessage = async (req, res) => {
       if (isPublicCommentMode) {
         // 💬 PUBLIC COMMENT REPLY VIA GRAPH API
         try {
-          const targetCommentId = commentId || (lastMessage?.channel === 'instagram_comment' ? lastMessage._id : recipientId);
-          console.log(`💬 Posting Public Reply to Comment ID: ${targetCommentId}`);
+          // Find the real Meta comment ID (stored in wamid on incoming instagram_comment messages)
+          let targetCommentId = commentId;
+          if (!targetCommentId) {
+            const lastCommentMsg = await Message.findOne({
+              customerPhone,
+              userId,
+              channel: 'instagram_comment',
+              direction: 'incoming',
+              wamid: { $exists: true, $ne: null }
+            }).sort({ timestamp: -1 }).lean();
+            targetCommentId = lastCommentMsg?.wamid;
+          }
+
+          if (!targetCommentId) {
+            throw new Error("No valid Instagram Comment ID found for this customer. Please reply using 'Send Private DM' instead.");
+          }
+
+          console.log(`💬 Posting Public Reply to Meta Comment ID: ${targetCommentId}`);
 
           const commentReplyUrl = isNative
             ? `https://graph.instagram.com/v21.0/${targetCommentId}/replies`
@@ -445,24 +461,19 @@ exports.sendManualMessage = async (req, res) => {
 exports.deleteMessage = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const userRole = req.user?.role;
     const { messageId } = req.params;
-
-    if (userRole !== 'owner') {
-      return res.status(403).json({ success: false, message: 'Only account owner can delete messages.' });
-    }
 
     const message = await Message.findOne({ _id: messageId, userId });
     if (!message) {
       return res.status(404).json({ success: false, message: 'Message not found or you do not have permission to delete it.' });
     }
 
-    // Soft delete logic
+    // Soft delete logic - mark deleted so it disappears from chat feed
     message.isDeleted = true;
     message.deletedBy = userId;
     message.deletedAt = new Date();
     message.deleteScope = 'message';
-    message.messageText = 'This message was deleted.'; // Placeholder text
+    message.messageText = 'This message was deleted.';
     await message.save();
 
     res.status(200).json({ success: true, message: 'Message deleted successfully.' });
@@ -476,12 +487,7 @@ exports.deleteMessage = async (req, res) => {
 exports.deleteConversation = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const userRole = req.user?.role;
     const { customerPhone } = req.params;
-
-    if (userRole !== 'owner') {
-      return res.status(403).json({ success: false, message: 'Only account owner can delete conversations.' });
-    }
 
     await Message.updateMany(
       { userId, customerPhone },
