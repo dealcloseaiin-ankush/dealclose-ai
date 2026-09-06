@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import useWorkspaceStore from '../store/workspaceStore';
 
 // Native-style Facebook Logo Icon
 const FacebookIcon = ({ size = 20, className = '' }) => (
@@ -957,6 +958,14 @@ export default function MobileDashboard() {
 
   useEffect(() => {
     fetchLiveBackendData(activeWorkspaceId);
+
+    // 🔥 Live Sync: Periodically poll chats every 4 seconds so actions on Desktop
+    // (messages sent, read status, new leads) immediately reflect on Mobile
+    const interval = setInterval(() => {
+      fetchChatsForWorkspace(activeWorkspaceId);
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, [user, activeWorkspaceId]);
 
   // Unread Calculations: Exactly like WhatsApp, count distinct contacts/chats who have unread messages
@@ -974,6 +983,7 @@ export default function MobileDashboard() {
       return;
     }
     setActiveWorkspaceId(selectedId);
+    useWorkspaceStore.getState().setActiveWorkspaceId(selectedId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('dealclose_active_workspace', selectedId);
       localStorage.setItem('active_workspace_id', selectedId);
@@ -1086,11 +1096,22 @@ export default function MobileDashboard() {
     setActiveChatThread({ ...activeChatThread, messages: updatedMessages, lastMessage: textDesc, time: 'Today, Just now' });
   };
 
-  const handleTransferContactStage = (stage) => {
+  const handleTransferContactStage = async (stage) => {
     if (!selectedContactForTransfer) return;
-    setContacts(contacts.map(c => c.id === selectedContactForTransfer.id ? { ...c, stage } : c));
-    setChats(chats.map(c => c.customerPhone === selectedContactForTransfer.phone ? { ...c, stage } : c));
-    alert(`Lead "${selectedContactForTransfer.name}" transferred to stage: ${stage} 🚀`);
+    const contact = selectedContactForTransfer;
+    setContacts(contacts.map(c => c.id === contact.id ? { ...c, stage } : c));
+    setChats(chats.map(c => c.customerPhone === contact.phone ? { ...c, stage } : c));
+    
+    // 🔥 Live Sync: Update Lead status in MongoDB so Desktop CRM updates in real-time
+    try {
+      await api.patch(`/leads/${contact.id}/stage`, { stage }).catch(() => {
+        return api.put(`/leads/${contact.id}`, { status: stage, stage });
+      });
+    } catch(e) {
+      console.debug('Lead stage sync:', e.message);
+    }
+
+    alert(`Lead "${contact.name}" transferred to stage: ${stage} 🚀`);
     setSelectedContactForTransfer(null);
   };
 
