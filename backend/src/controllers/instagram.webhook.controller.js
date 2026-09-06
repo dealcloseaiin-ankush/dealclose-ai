@@ -1176,8 +1176,9 @@ with whatever information is available (leave budget field empty/null if not pro
                 ? `${matchedRule.replyMessage}\n\n🔗 Link: ${matchedRule.fileUrl}` 
                 : finalReplyMsg;
              
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[💬 IG Comment]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', 'auto_replied'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming') });
-             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_dm', messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
+             const postLabel = mediaId ? ` (Post/Reel #${mediaId})` : '';
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_comment', messageText: `[💬 IG Comment${postLabel}]: ${commentText}`, direction: 'incoming', status: 'received', sentBy: 'customer', tags: ['ig_comment', ...(mediaId ? [`post_${mediaId}`] : []), 'auto_replied'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming') });
+             await Message.create({ userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`, channel: 'instagram_dm', messageText: finalLoggedMsg, direction: 'outgoing', status: dmSentSuccessfully ? 'sent' : 'failed', sentBy: 'auto-reply', tags: ['ig_private_reply', ...(mediaId ? [`post_${mediaId}`] : [])], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_dm', 'auto-reply') });
 
           } else {
              const accountAiEnabled = incomingWorkspaceId !== 'main'
@@ -1246,24 +1247,25 @@ with whatever information is available (leave budget field empty/null if not pro
                  await Message.create({ // Log the public AI reply
                    userId: user._id, workspaceId: incomingWorkspaceId, customerPhone: `IG_${igUserId}`,
                    channel: 'instagram_comment',
-                   messageText: `[Public AI Reply]: ${aiReply}`,
+                   messageText: `[Public AI Reply on Post #${mediaId || 'Reel'}]: ${aiReply}`,
                    direction: 'outgoing', status: 'sent', sentBy: 'ai',
-                   tags: ['ig_comment_reply'], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'ai')
+                   tags: ['ig_comment_reply', ...(mediaId ? [`post_${mediaId}`] : [])], timestamp: new Date(), expiresAt: getMessageExpiry(user, 'instagram_comment', 'ai')
                  });
              } catch (aiCommentErr) {
                  console.error("❌ [Instagram AI Comment Reply Error]:", aiCommentErr.message);
              }
              
+             const postLabelUnhandled = mediaId ? ` (Post/Reel #${mediaId})` : '';
              await Message.create({
                userId: user._id,
                workspaceId: incomingWorkspaceId,
                customerPhone: `IG_${igUserId}`,
                channel: 'instagram_comment',
-               messageText: `[💬 IG Comment - Unhandled]: ${commentText}`,
+               messageText: `[💬 IG Comment${postLabelUnhandled} - Unhandled]: ${commentText}`,
                direction: 'incoming',
                status: 'received',
                sentBy: 'customer',
-               tags: ['ig_comment', 'needs_reply'],
+               tags: ['ig_comment', ...(mediaId ? [`post_${mediaId}`] : []), 'needs_reply'],
                timestamp: new Date(),
                expiresAt: getMessageExpiry(user, 'instagram_comment', 'incoming')
              });

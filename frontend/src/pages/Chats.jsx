@@ -34,6 +34,9 @@ export default function Chats() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const prevActiveCustomerRef = useRef(null);
+  const prevMsgCountRef = useRef(0);
 
   // 🚀 FIX: Real useRef (persists across renders, doesn't retrigger effects)
   const allMessagesRef = useRef([]);
@@ -255,17 +258,47 @@ export default function Chats() {
     }
   };
 
-  // Chat sorting ascending (oldest to newest)
+  // Chat sorting ascending (oldest to newest) with active platform filter support
   const activeChatMessages = useMemo(() => {
     return filteredMessages
-      .filter(m => m.customerPhone === activeCustomer)
+      .filter(m => {
+        if (m.customerPhone !== activeCustomer) return false;
+        if (platformFilter === 'whatsapp') return m.platform === 'whatsapp';
+        if (platformFilter === 'instagram_dm') return m.platform === 'instagram_dm';
+        if (platformFilter === 'instagram_comment') return m.platform === 'instagram_comment';
+        return true;
+      })
       .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
-  }, [filteredMessages, activeCustomer]);
+  }, [filteredMessages, activeCustomer, platformFilter]);
 
-  // Auto scroll on new message
+  // Smart Auto-Scroll: only scroll when switching customer or when user is already near bottom on new incoming/outgoing message
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChatMessages]);
+    const isNewCustomer = prevActiveCustomerRef.current !== activeCustomer;
+    prevActiveCustomerRef.current = activeCustomer;
+
+    const msgCount = activeChatMessages.length;
+    const hasNewMsg = msgCount > prevMsgCountRef.current;
+    prevMsgCountRef.current = msgCount;
+
+    if (isNewCustomer) {
+      // Immediate scroll down when user selects a different chat
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 50);
+    } else if (hasNewMsg) {
+      // If messages increased, check if user was already near bottom before scrolling
+      const container = scrollContainerRef.current;
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 250;
+        if (isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+    // If background poll happens without new messages, DO NOT force scroll down!
+  }, [activeChatMessages, activeCustomer]);
 
   // Start a manual chat by entering a new number
   const handleStartChatSubmit = (e) => {
@@ -757,7 +790,7 @@ export default function Chats() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
               {activeChatMessages.map((msg, index) => {
                 const msgDateStr = new Date(msg.timestamp || msg.createdAt || 0).toDateString();
                 const prevMsgDateStr = index > 0 ? new Date(activeChatMessages[index - 1].timestamp || activeChatMessages[index - 1].createdAt || 0).toDateString() : null;
@@ -774,6 +807,18 @@ export default function Chats() {
                     )}
                     <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`group p-4 max-w-sm rounded-2xl relative ${msg.direction === 'outgoing' ? 'bg-green-600 text-white rounded-br-sm' : 'bg-[#1a1a1a] border border-gray-800 text-gray-200 rounded-bl-sm'}`}>
+                        {/* 🚀 Channel Badge (Post Comment vs DM) */}
+                        {msg.platform === 'instagram_comment' && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-md mb-1.5 w-fit">
+                            <MessageCircle size={11} /> Post Comment
+                          </div>
+                        )}
+                        {msg.platform === 'instagram_dm' && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md mb-1.5 w-fit">
+                            <Camera size={11} /> {msg.tags?.includes('ig_private_reply') ? 'Auto Private Reply' : 'Instagram DM'}
+                          </div>
+                        )}
+
                         {/* 🚀 FIX: Reply and Delete buttons on hover */}
                         <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/20 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${
                           msg.direction === 'outgoing' ? '-left-20' : '-right-20'
