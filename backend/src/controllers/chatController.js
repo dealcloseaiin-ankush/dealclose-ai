@@ -603,7 +603,7 @@ exports.updateLeadContext = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const { customerPhone } = req.params;
-    const { name, email, status, dealValue, notes, customFields, city } = req.body;
+    const { name, email, status, dealValue, notes, customFields, city, phoneNumber } = req.body;
     if (!userId || !customerPhone) return res.status(400).json({ message: 'Missing required parameters' });
 
     let cleanPhone = customerPhone.replace(/\D/g, '');
@@ -623,6 +623,7 @@ exports.updateLeadContext = async (req, res) => {
       if (dealValue !== undefined) lead.dealValue = dealValue;
       if (notes !== undefined) lead.notes = notes;
       if (city !== undefined) lead.city = city;
+      if (phoneNumber) lead.phoneNumber = phoneNumber;
       if (customFields) {
         lead.customFields = { ...(lead.customFields || {}), ...customFields };
       }

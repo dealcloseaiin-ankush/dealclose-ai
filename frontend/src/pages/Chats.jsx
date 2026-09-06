@@ -6,7 +6,7 @@ import { useInboxStore } from '../store/inboxStore';
 import { 
   Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck, Trash2, MapPin, 
   CornerDownLeft, X, ExternalLink, User, Tag, Phone, Mail, FileText, Bot, 
-  PanelRightClose, PanelRightOpen, Sparkles, Send, Copy, CheckCircle2, ChevronRight
+  PanelRightClose, PanelRightOpen, Sparkles, Send, Copy, CheckCircle2, Edit2, Save
 } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
@@ -15,22 +15,27 @@ export default function Chats() {
   const [activeCustomer, setActiveCustomer] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Left chat list sidebar
-  const [isContextSidebarOpen, setIsContextSidebarOpen] = useState(true); // 🚀 NEW: Right CRM Context Sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isContextSidebarOpen, setIsContextSidebarOpen] = useState(true);
   
   const { user } = useAuth() || {};
   const [workspaces, setWorkspaces] = useState([{ _id: 'main', name: user?.businessName || 'Main Business' }, ...(user?.workspaces || [])]);
   const [activeWorkspace, setActiveWorkspace] = useState('main');
   const [platformFilter, setPlatformFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all'); // Date range filter
+  const [dateFilter, setDateFilter] = useState('all');
   
-  // Instagram Reply Mode & Multi-Post Filter
+  // Instagram Posts List for Thumbnail & Post Context Resolution
+  const [igPosts, setIgPosts] = useState([]);
   const [replyMode, setReplyMode] = useState('private_dm'); // 'public_comment' or 'private_dm'
-  const [postFilter, setPostFilter] = useState('all'); // 'all' or specific mediaId
+  const [postFilter, setPostFilter] = useState('all');
   
-  // CRM Lead Context State
-  const [isUpdatingLead, setIsUpdatingLead] = useState(false);
+  // CRM Lead Profile & Context Editing
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [leadName, setLeadName] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+  const [leadCity, setLeadCity] = useState('');
   const [leadNotes, setLeadNotes] = useState('');
+  const [isUpdatingLead, setIsUpdatingLead] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
@@ -38,22 +43,33 @@ export default function Chats() {
   const [newChatSource, setNewChatSource] = useState('Manual Entry');
   const [sendAutoOffer, setSendAutoOffer] = useState(false);
   
-  // Template Modal State
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateVars, setTemplateVars] = useState({});
   
-  // State for replying to a specific message
   const [replyingTo, setReplyingTo] = useState(null);
-
   const [searchTerm, setSearchTerm] = useState('');
+  
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const prevActiveCustomerRef = useRef(null);
   const prevMsgCountRef = useRef(0);
-
   const allMessagesRef = useRef([]);
+
+  // Fetch Instagram Posts for Post Card Resolution
+  useEffect(() => {
+    const fetchIgPosts = async () => {
+      try {
+        const { data } = await api.get('/instagram/posts', { params: { limit: 50, workspaceId: activeWorkspace } });
+        const posts = Array.isArray(data) ? data : data?.data || [];
+        setIgPosts(posts);
+      } catch (err) {
+        console.debug("Instagram posts fetch optional error:", err.message);
+      }
+    };
+    fetchIgPosts();
+  }, [activeWorkspace]);
 
   useEffect(() => {
     let isFirstLoad = true;
@@ -108,7 +124,7 @@ export default function Chats() {
     };
     
     fetchChats();
-    const intervalId = setInterval(fetchChats, 4000); // Auto-refresh silently every 4 seconds
+    const intervalId = setInterval(fetchChats, 4000);
     
     return () => {
       isMounted = false;
@@ -116,7 +132,6 @@ export default function Chats() {
     };
   }, [activeWorkspace, platformFilter]);
 
-  // Filter messages by selected Workspace
   const filteredMessages = useMemo(() => {
     const filtered = allMessages.filter(msg => {
       if (msg.isDeleted) return false;
@@ -127,7 +142,6 @@ export default function Chats() {
     return filtered;
   }, [allMessages, activeWorkspace]);
 
-  // Advanced logic to calculate 24-Hour Window, Needs Reply status, Name/City, and CRM Context
   const customerDetails = useMemo(() => {
     const map = new Map();
 
@@ -156,6 +170,12 @@ export default function Chats() {
       const data = map.get(phone);
       if (msg.leadContext) {
         data.leadContext = msg.leadContext;
+        if (msg.leadContext.name && (!data.name || data.name === 'Unknown' || data.name.startsWith('@'))) {
+          data.name = msg.leadContext.name;
+        }
+        if (msg.leadContext.city && !data.city) {
+          data.city = msg.leadContext.city;
+        }
       }
       if (msg.isAiPaused !== undefined) {
         data.isAiPaused = msg.isAiPaused;
@@ -218,14 +238,12 @@ export default function Chats() {
     return finalDetails.filter(c => c.lastMessage.workspaceId === activeWorkspace || (activeWorkspace === 'main' && (c.lastMessage.workspaceId === 'main' || !c.lastMessage.workspaceId || c.lastMessage.workspaceId === 'default')));
   }, [allMessages, platformFilter, searchTerm, activeWorkspace, dateFilter]);
 
-  // Auto-select first chat
   useEffect(() => {
     if (!activeCustomer && customerDetails.length > 0) {
       setActiveCustomer(customerDetails[0].phone);
     }
   }, [customerDetails, activeCustomer]);
 
-  // Auto mark active customer as read
   useEffect(() => {
     if (activeCustomer) {
       const hasUnread = allMessages.some(m => m.customerPhone === activeCustomer && m.direction === 'incoming' && m.status !== 'read');
@@ -243,13 +261,15 @@ export default function Chats() {
   const activeCustomerData = customerDetails?.find(c => c.phone === activeCustomer) || null;
   const isActiveIg = activeCustomerData?.lastMessage?.platform?.startsWith('instagram');
 
-  // Sync lead notes when activeCustomer changes
+  // Initialize editable fields when active customer changes
   useEffect(() => {
-    if (activeCustomerData?.leadContext?.notes) {
-      setLeadNotes(activeCustomerData.leadContext.notes);
-    } else {
-      setLeadNotes('');
+    if (activeCustomerData) {
+      setLeadName(activeCustomerData.name && !activeCustomerData.name.startsWith('IG_') && !activeCustomerData.name.startsWith('@') ? activeCustomerData.name : (activeCustomerData.leadContext?.name || ''));
+      setLeadPhone(activeCustomerData.leadContext?.phoneNumber || (activeCustomer?.startsWith('IG_') ? '' : activeCustomer) || '');
+      setLeadCity(activeCustomerData.city || activeCustomerData.leadContext?.city || '');
+      setLeadNotes(activeCustomerData.leadContext?.notes || '');
     }
+    setIsEditingProfile(false);
     setPostFilter('all');
     if (activeCustomerData?.lastMessage?.platform === 'instagram_comment') {
       setReplyMode('public_comment');
@@ -258,7 +278,7 @@ export default function Chats() {
     }
   }, [activeCustomer]);
 
-  // Extract all distinct posts related to this customer's interactions
+  // Extract all distinct posts related to this customer's interactions and attach real IG media metadata
   const activeCustomerPosts = useMemo(() => {
     const map = new Map();
     filteredMessages
@@ -270,11 +290,17 @@ export default function Chats() {
         const extractedId = tagId || (match && match[1] !== 'Reel' ? match[1] : null);
 
         if (extractedId) {
+          const resolvedIgPost = igPosts.find(p => String(p.id) === String(extractedId));
           if (!map.has(extractedId)) {
             map.set(extractedId, {
               id: extractedId,
-              caption: msg.messageText?.replace(/^[💬[^]]+]:\s*/, '')?.slice(0, 60) || 'Instagram Post / Reel',
-              timestamp: msg.timestamp || msg.createdAt,
+              caption: resolvedIgPost?.caption || msg.messageText?.replace(/^[💬[^]]+]:\s*/, '')?.slice(0, 80) || 'Instagram Post / Reel',
+              thumbnail_url: resolvedIgPost?.thumbnail_url || resolvedIgPost?.media_url || null,
+              permalink: resolvedIgPost?.permalink || `https://www.instagram.com/p/${extractedId}`,
+              media_type: resolvedIgPost?.media_type || 'REEL',
+              like_count: resolvedIgPost?.like_count || 0,
+              comments_count: resolvedIgPost?.comments_count || 0,
+              timestamp: resolvedIgPost?.timestamp || msg.timestamp || msg.createdAt,
               count: 1
             });
           } else {
@@ -282,10 +308,34 @@ export default function Chats() {
           }
         }
       });
-    return Array.from(map.values());
-  }, [filteredMessages, activeCustomer]);
 
-  // Chat sorting ascending with post filtering
+    // If no specific post ID tag was found but it's an Instagram comment thread, fallback to latest post
+    if (map.size === 0 && (activeCustomerData?.lastMessage?.platform === 'instagram_comment' || isActiveIg) && igPosts.length > 0) {
+      const firstPost = igPosts[0];
+      map.set(firstPost.id, {
+        id: firstPost.id,
+        caption: firstPost.caption || 'Recent Instagram Post / Reel',
+        thumbnail_url: firstPost.thumbnail_url || firstPost.media_url || null,
+        permalink: firstPost.permalink || `https://www.instagram.com/p/${firstPost.id}`,
+        media_type: firstPost.media_type || 'REEL',
+        like_count: firstPost.like_count || 0,
+        comments_count: firstPost.comments_count || 0,
+        timestamp: firstPost.timestamp,
+        count: 1
+      });
+    }
+
+    return Array.from(map.values());
+  }, [filteredMessages, activeCustomer, igPosts, isActiveIg]);
+
+  // Active Post for the banner
+  const currentBannerPost = useMemo(() => {
+    if (postFilter !== 'all') {
+      return activeCustomerPosts.find(p => p.id === postFilter) || activeCustomerPosts[0] || null;
+    }
+    return activeCustomerPosts[0] || null;
+  }, [activeCustomerPosts, postFilter]);
+
   const activeChatMessages = useMemo(() => {
     return filteredMessages
       .filter(m => {
@@ -303,7 +353,6 @@ export default function Chats() {
       .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
   }, [filteredMessages, activeCustomer, platformFilter, postFilter]);
 
-  // Smart Auto-Scroll
   useEffect(() => {
     const isNewCustomer = prevActiveCustomerRef.current !== activeCustomer;
     prevActiveCustomerRef.current = activeCustomer;
@@ -422,7 +471,7 @@ export default function Chats() {
         repliedToMessageId: replyingTo?._id,
         replyMode: isActiveIg ? replyMode : undefined,
         commentId: replyingTo?._id || undefined,
-        mediaId: postFilter !== 'all' ? postFilter : undefined
+        mediaId: postFilter !== 'all' ? postFilter : (currentBannerPost?.id || undefined)
       };
       const res = await api.post('/chats/send', payload);
       
@@ -444,6 +493,42 @@ export default function Chats() {
         allMessagesRef.current = updated;
         return updated;
       });
+    }
+  };
+
+  // Save full Customer Profile (Name, Phone, City) from Sidebar
+  const handleSaveProfile = async () => {
+    if (!activeCustomer) return;
+    setIsUpdatingLead(true);
+    try {
+      await api.patch(`/chats/${activeCustomer}/lead-context`, { 
+        name: leadName.trim(), 
+        phoneNumber: leadPhone.trim(),
+        city: leadCity.trim() 
+      });
+      toast.success("Customer profile updated successfully!");
+      setIsEditingProfile(false);
+      
+      // Update local state
+      setAllMessages(prev => {
+        const updated = prev.map(m => m.customerPhone === activeCustomer ? {
+          ...m,
+          customerName: leadName.trim() || m.customerName,
+          customerCity: leadCity.trim() || m.customerCity,
+          leadContext: { 
+            ...(m.leadContext || {}), 
+            name: leadName.trim() || m.leadContext?.name, 
+            phoneNumber: leadPhone.trim() || m.leadContext?.phoneNumber,
+            city: leadCity.trim() || m.leadContext?.city 
+          }
+        } : m);
+        allMessagesRef.current = updated;
+        return updated;
+      });
+    } catch (err) {
+      toast.error("Failed to update profile");
+    } finally {
+      setIsUpdatingLead(false);
     }
   };
 
@@ -912,7 +997,7 @@ export default function Chats() {
               
               {/* Right Action Icons & Context Sidebar Toggle */}
               <div className="flex items-center gap-2 shrink-0">
-                {/* 🤖 AI Status Quick Toggle Pill */}
+                {/* AI Status Quick Toggle Pill */}
                 <button 
                   onClick={handleToggleAi}
                   title={isAiPaused ? "AI is Paused. Click to resume." : "AI is Active. Click to pause."}
@@ -942,7 +1027,7 @@ export default function Chats() {
                   </button>
                 )}
 
-                {/* 👤 1-CLICK TOGGLE RIGHT CRM CONTEXT SIDEBAR */}
+                {/* 1-CLICK TOGGLE RIGHT CRM CONTEXT SIDEBAR */}
                 <button 
                   onClick={() => setIsContextSidebarOpen(prev => !prev)}
                   className={`text-xs px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all border ${
@@ -959,33 +1044,68 @@ export default function Chats() {
             </div>
 
             {/* ========================================================================= */}
-            {/* 📸 STICKY INSTAGRAM POST THUMBNAIL & MULTI-POST CONTEXT BANNER            */}
+            {/* 📸 RICH INSTAGRAM POST CARD & MULTI-POST SWITCHER BANNER                  */}
             {/* ========================================================================= */}
-            {(activeCustomerPosts.length > 0 || isActiveIg) && (
-              <div className="bg-gradient-to-r from-pink-950/30 via-[#16121e] to-[#121212] border-b border-pink-500/20 p-2.5 px-4 shrink-0 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-md">
-                      <Camera size={14} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-pink-300 flex items-center gap-1.5">
-                        <span>Instagram Post Context</span>
-                        {activeCustomerPosts.length > 1 && (
-                          <span className="text-[10px] bg-pink-500/20 text-pink-400 px-1.5 py-0.2 rounded-full font-bold border border-pink-500/30">
-                            {activeCustomerPosts.length} Posts Active
+            {(activeCustomerPosts.length > 0 || isActiveIg) && currentBannerPost && (
+              <div className="bg-gradient-to-r from-[#1a121e] via-[#14121a] to-[#0e0e0e] border-b border-pink-500/30 p-3 px-4 shrink-0 shadow-md">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  
+                  {/* Left: Thumbnail & Caption & Link */}
+                  <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+                    {/* Post Thumbnail Preview */}
+                    <a 
+                      href={currentBannerPost.permalink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block w-14 h-14 bg-gray-900 rounded-xl flex-shrink-0 relative overflow-hidden border border-pink-500/30 group shadow-lg"
+                      title="Click to view original Post/Reel on Instagram"
+                    >
+                      {currentBannerPost.thumbnail_url ? (
+                        <img 
+                          src={currentBannerPost.thumbnail_url} 
+                          alt="Instagram Post Thumbnail" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-gray-900 text-pink-400">
+                          <Camera size={20} />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] font-bold text-white uppercase">
+                        IG ↗
+                      </div>
+                    </a>
+
+                    {/* Post Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[9px] bg-pink-500/20 text-pink-300 font-bold px-2 py-0.5 rounded border border-pink-500/30 uppercase tracking-wider">
+                          {currentBannerPost.media_type || 'POST/REEL'}
+                        </span>
+                        <a 
+                          href={currentBannerPost.permalink} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-[11px] font-bold text-pink-400 hover:text-pink-300 flex items-center gap-1"
+                        >
+                          #{currentBannerPost.id} <ExternalLink size={11} />
+                        </a>
+                        {currentBannerPost.timestamp && (
+                          <span className="text-[10px] text-gray-500">
+                            • {new Date(currentBannerPost.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-400 truncate max-w-md">
-                        {postFilter !== 'all' ? `Viewing comments for Post #${postFilter}` : 'Customer has commented on your published content'}
+                      <p className="text-xs text-gray-300 font-medium line-clamp-1 leading-snug">
+                        {currentBannerPost.caption || 'Customer commented on this Instagram content'}
                       </p>
                     </div>
                   </div>
 
-                  {/* Multi-Post Switcher Pills */}
-                  {activeCustomerPosts.length > 0 && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+                  {/* Right: Multi-Post Switcher Pills */}
+                  {activeCustomerPosts.length > 1 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar shrink-0 pt-1 sm:pt-0">
+                      <span className="text-[10px] text-gray-500 font-bold">Posts:</span>
                       <button 
                         onClick={() => setPostFilter('all')} 
                         className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all shrink-0 ${
@@ -994,33 +1114,24 @@ export default function Chats() {
                             : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
                         }`}
                       >
-                        📂 All Posts ({activeCustomerPosts.length})
+                        All ({activeCustomerPosts.length})
                       </button>
                       {activeCustomerPosts.map(p => (
-                        <div key={p.id} className="flex items-center gap-1 shrink-0">
-                          <button 
-                            onClick={() => setPostFilter(p.id)} 
-                            className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all flex items-center gap-1 ${
-                              postFilter === p.id 
-                                ? 'bg-pink-600 text-white shadow-sm' 
-                                : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
-                            }`}
-                          >
-                            🎬 #{p.id.slice(-6)} ({p.count})
-                          </button>
-                          <a 
-                            href={`https://www.instagram.com/p/${p.id}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-gray-400 hover:text-pink-400 p-1"
-                            title="Open on Instagram"
-                          >
-                            <ExternalLink size={12} />
-                          </a>
-                        </div>
+                        <button 
+                          key={p.id}
+                          onClick={() => setPostFilter(p.id)} 
+                          className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all flex items-center gap-1 shrink-0 ${
+                            postFilter === p.id 
+                              ? 'bg-pink-600 text-white shadow-sm' 
+                              : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
+                          }`}
+                        >
+                          🎬 #{p.id.slice(-5)} ({p.count})
+                        </button>
                       ))}
                     </div>
                   )}
+
                 </div>
               </div>
             )}
@@ -1110,7 +1221,7 @@ export default function Chats() {
                 </div>
               )}
               
-              {/* 🔀 DEDICATED PUBLIC COMMENT VS PRIVATE DM SWITCHER (Instagram Only) */}
+              {/* DEDICATED PUBLIC COMMENT VS PRIVATE DM SWITCHER (Instagram Only) */}
               {isActiveIg && (
                 <div className="flex items-center gap-2 pb-1">
                   <span className="text-[11px] font-bold text-gray-400">Reply As:</span>
@@ -1209,28 +1320,80 @@ export default function Chats() {
             </button>
           </div>
 
-          {/* Contact Profile Summary */}
-          <div className="bg-[#0e0e0e] border border-gray-800 rounded-xl p-3.5 space-y-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-blue-400 text-sm shrink-0">
-                {activeCustomerData?.name ? activeCustomerData.name.slice(0, 2).toUpperCase() : 'U'}
+          {/* Contact Profile Summary & Inline Editing */}
+          <div className="bg-[#0e0e0e] border border-gray-800 rounded-xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-blue-400 text-sm shrink-0">
+                  {leadName ? leadName.slice(0, 2).toUpperCase() : (activeCustomerData?.name ? activeCustomerData.name.slice(0, 2).toUpperCase() : 'U')}
+                </div>
+                <div className="overflow-hidden">
+                  <h4 className="font-bold text-sm text-white truncate">{leadName || activeCustomerData?.name || 'Unknown Contact'}</h4>
+                  <p className="text-xs text-gray-400 truncate">{leadPhone || activeCustomer}</p>
+                </div>
               </div>
-              <div className="overflow-hidden">
-                <h4 className="font-bold text-sm text-white truncate">{activeCustomerData?.name || 'Unknown Contact'}</h4>
-                <p className="text-xs text-gray-400 truncate">{activeCustomer}</p>
-              </div>
+              <button 
+                onClick={() => setIsEditingProfile(prev => !prev)}
+                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 p-1.5 rounded-lg transition-colors border border-gray-700"
+                title={isEditingProfile ? "Cancel Editing" : "Edit Name & Phone"}
+              >
+                {isEditingProfile ? <X size={13} /> : <Edit2 size={13} />}
+              </button>
             </div>
 
-            <div className="pt-2 border-t border-gray-800/80 grid grid-cols-2 gap-2 text-[11px]">
-              <div>
-                <span className="text-gray-500 block">Channel:</span>
-                <span className="font-semibold text-gray-300">{isActiveIg ? 'Instagram' : 'WhatsApp'}</span>
+            {/* Editable Profile Inputs (if toggled on or if Name is missing) */}
+            {isEditingProfile ? (
+              <div className="space-y-2 pt-2 border-t border-gray-800">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 block mb-1">Customer Full Name</label>
+                  <input 
+                    type="text" 
+                    value={leadName} 
+                    onChange={e => setLeadName(e.target.value)} 
+                    placeholder="Enter customer name..."
+                    className="w-full bg-[#161616] border border-gray-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 block mb-1">WhatsApp / Phone Number</label>
+                  <input 
+                    type="text" 
+                    value={leadPhone} 
+                    onChange={e => setLeadPhone(e.target.value)} 
+                    placeholder="+919876543210"
+                    className="w-full bg-[#161616] border border-gray-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 block mb-1">City / Location</label>
+                  <input 
+                    type="text" 
+                    value={leadCity} 
+                    onChange={e => setLeadCity(e.target.value)} 
+                    placeholder="e.g. Lucknow / Delhi"
+                    className="w-full bg-[#161616] border border-gray-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <button 
+                  onClick={handleSaveProfile}
+                  disabled={isUpdatingLead}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <Save size={13} /> Save Profile Details
+                </button>
               </div>
-              <div>
-                <span className="text-gray-500 block">City:</span>
-                <span className="font-semibold text-gray-300">{activeCustomerData?.city || 'N/A'}</span>
+            ) : (
+              <div className="pt-2 border-t border-gray-800/80 grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <span className="text-gray-500 block">Channel:</span>
+                  <span className="font-semibold text-gray-300">{isActiveIg ? 'Instagram' : 'WhatsApp'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">City:</span>
+                  <span className="font-semibold text-gray-300">{leadCity || activeCustomerData?.city || 'N/A'}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* CRM Pipeline Stage Dropdown */}
@@ -1273,7 +1436,7 @@ export default function Chats() {
 
               <div className="flex justify-between items-center py-1 border-b border-gray-800">
                 <span className="text-gray-400">Location / Society:</span>
-                <span className="font-semibold text-gray-200">{customFields.society || customFields.location || activeCustomerData?.city || 'N/A'}</span>
+                <span className="font-semibold text-gray-200">{customFields.society || customFields.location || leadCity || activeCustomerData?.city || 'N/A'}</span>
               </div>
 
               {/* GPS Coordinates & Google Maps Link */}
