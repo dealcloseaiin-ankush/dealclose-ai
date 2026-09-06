@@ -563,41 +563,35 @@ exports.markAsRead = async (req, res) => {
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     if (!phone) return res.status(400).json({ success: false, message: 'customerPhone is required' });
 
-    await Message.updateMany(
-      { userId, customerPhone: phone, direction: 'incoming', status: { $ne: 'read' } },
+    const cleanPhone = String(phone).replace(/\D/g, '');
+    const phoneVariants = [phone];
+    if (cleanPhone) {
+      phoneVariants.push(cleanPhone, `+${cleanPhone}`, `91${cleanPhone.slice(-10)}`, `+91${cleanPhone.slice(-10)}`);
+    }
+
+    const result = await Message.updateMany(
+      { userId, customerPhone: { $in: phoneVariants }, direction: 'incoming', status: { $ne: 'read' } },
       { $set: { status: 'read', readAt: new Date() } }
     );
 
-    res.status(200).json({ success: true, message: 'Chat marked as read' });
+    res.status(200).json({ success: true, count: result.modifiedCount, message: 'Chat marked as read' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Mark ALL incoming unread messages as read for this user/workspace
+// @desc    Mark ALL incoming unread messages as read for this user
 // @route   POST /api/chats/mark-all-read
 exports.markAllAsRead = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const { workspaceId } = req.body;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const query = { userId, direction: 'incoming', status: { $ne: 'read' } };
-    if (workspaceId && workspaceId !== 'all') {
-      if (workspaceId === 'main') {
-        query.$or = [
-          { workspaceId: 'main' },
-          { workspaceId: { $exists: false } },
-          { workspaceId: null },
-          { workspaceId: 'default' }
-        ];
-      } else {
-        query.workspaceId = workspaceId;
-      }
-    }
-
-    const result = await Message.updateMany(query, { $set: { status: 'read', readAt: new Date() } });
-    console.log(`[markAllAsRead] Marked ${result.modifiedCount} incoming messages as read for user ${userId} (workspace: ${workspaceId || 'all'})`);
+    const result = await Message.updateMany(
+      { userId, direction: 'incoming', status: { $ne: 'read' } },
+      { $set: { status: 'read', readAt: new Date() } }
+    );
+    console.log(`[markAllAsRead] Marked ${result.modifiedCount} incoming messages as read for user ${userId}`);
     res.status(200).json({ success: true, count: result.modifiedCount, message: 'All messages marked as read' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
