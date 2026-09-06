@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getChats, sendManualMessage, updateChatStatus, deleteMessage, deleteConversation, toggleAiForChat, markAsRead, markAllAsRead } = require('../controllers/chatController');
+const { getChats, sendManualMessage, updateChatStatus, deleteMessage, deleteConversation, toggleAiForChat, markAsRead, markAllAsRead, updateLeadContext } = require('../controllers/chatController');
 const { protect } = require('../middleware/authMiddleware'); 
 
 router.use(protect); // Yeh line ab is file ke saare routes ko secure kar degi!
@@ -11,6 +11,7 @@ router.post('/toggle-ai', toggleAiForChat); // Route to toggle AI for a chat
 router.post('/mark-read', markAsRead); // Route to mark a customer's chat as read
 router.post('/mark-all-read', markAllAsRead); // Route to mark all chats as read
 
+router.patch('/:customerPhone/lead-context', updateLeadContext); // 🚀 Update lead info, CRM stage, notes from Chat Context Sidebar
 router.delete('/conversation/:customerPhone', deleteConversation); // 🚀 NEW: Route to delete a whole conversation
 
 router.delete('/:messageId', deleteMessage); // Route to delete a single message

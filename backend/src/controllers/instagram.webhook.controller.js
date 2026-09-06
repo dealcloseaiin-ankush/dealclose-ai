@@ -1,6 +1,7 @@
 const aiService = require('../services/aiService');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
+const Lead = require('../models/leadModel');
 const Flow = require('../models/flowModel'); 
 const metaService = require('../services/metaAdsService');
 const metaAdsService = require('../services/metaAdsService');
@@ -374,18 +375,39 @@ exports.handleInstagramWebhook = async (req, res) => {
                   expiresAt: getMessageExpiry(user, 'instagram_dm', 'incoming')
                 });
               }
-              let currentLeadCheck = await Lead.findOne({ phoneNumber: `IG_${senderId}`, userId: user._id });
-              if (!currentLeadCheck) {
-                currentLeadCheck = await Lead.create({
-                  userId: user._id,
-                  workspaceId: incomingWorkspaceId, // ✅ FIX: Save workspaceId on lead creation
-                  phoneNumber: `IG_${senderId}`,
-                  name: realName,
-                  source: 'Instagram DM',
-                  status: 'new',
-                  createdBy: user._id,
-                  timeline: [{ eventType: 'Lead Created', description: 'Lead auto-captured from Instagram DM', timestamp: new Date() }]
-                });
+              // Check if lead already exists by IG ID or extracted phone
+              let currentLeadCheck = await Lead.findOne({ 
+                userId: user._id, 
+                $or: [{ phoneNumber: `IG_${senderId}` }, { 'customFields.igSenderId': senderId }] 
+              });
+
+              // 🎯 CLEAN CRM RULE: Only create/promote to CRM Lead if customer shared a valid phone number!
+              const phoneRegex = /(?:\+?\d{1,3}[- ]?)?\d{10}/;
+              const phoneMatch = incomingText && !isEcho ? incomingText.match(phoneRegex) : null;
+
+              if (phoneMatch) {
+                const extractedPhone = phoneMatch[0].replace(/\D/g, '');
+                if (extractedPhone.length >= 10) {
+                  if (currentLeadCheck) {
+                    currentLeadCheck.phoneNumber = extractedPhone;
+                    currentLeadCheck.source = 'Instagram DM (Phone Verified)';
+                    currentLeadCheck.timeline = currentLeadCheck.timeline || [];
+                    currentLeadCheck.timeline.push({ eventType: 'Phone Shared', description: `Phone number ${extractedPhone} captured from Instagram DM`, timestamp: new Date() });
+                    await currentLeadCheck.save();
+                  } else {
+                    currentLeadCheck = await Lead.create({
+                      userId: user._id,
+                      workspaceId: incomingWorkspaceId,
+                      phoneNumber: extractedPhone,
+                      name: realName,
+                      source: 'Instagram DM (Phone Verified)',
+                      status: 'new',
+                      customFields: { igSenderId: senderId, igUsername: realName },
+                      createdBy: user._id,
+                      timeline: [{ eventType: 'Lead Created', description: `Lead auto-captured with Phone (${extractedPhone}) from Instagram DM`, timestamp: new Date() }]
+                    });
+                  }
+                }
               }
               
               if (isEcho) {
@@ -402,10 +424,12 @@ exports.handleInstagramWebhook = async (req, res) => {
                    expiresAt: getMessageExpiry(user, 'instagram_dm', 'outgoing')
                  });
 
-                 await Lead.findOneAndUpdate(
-                   { phoneNumber: `IG_${senderId}`, userId: user._id },
-                   { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }
-                 );
+                 if (currentLeadCheck) {
+                   await Lead.updateOne(
+                     { _id: currentLeadCheck._id },
+                     { $set: { isAiPaused: true, aiPausedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) } }
+                   );
+                 }
                  console.log(`⏸️ [IG Webhook] Owner replied from IG App. AI Paused.`);
                  continue; 
               }

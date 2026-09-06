@@ -3,6 +3,7 @@ const User = require('../models/userModel');
 const Lead = require('../models/leadModel');
 const whatsappService = require('../services/whatsappService');
 const metaAdsService = require('../services/metaAdsService');
+const axios = require('axios');
 
 // @desc    Get all chat history for a user (Grouped by customer)
 exports.getChats = async (req, res) => {
@@ -48,13 +49,36 @@ exports.getChats = async (req, res) => {
       const identifier = String(lead.phoneNumber || lead.phone || '').trim();
       const wsId = lead.lastSelectedWorkspaceId || lead.workspaceId || 'main';
       if (identifier) {
-        leadDataMap[identifier] = {
+        const leadObj = {
+          _id: lead._id,
           name: norm.name,
           city: norm.city,
+          email: lead.email || '',
+          phoneNumber: lead.phoneNumber || identifier,
+          status: lead.status || 'new',
+          dealValue: lead.dealValue || 0,
+          notes: lead.notes || '',
+          source: lead.source || '',
           workspaceId: wsId,
           isAiPaused: lead.isAiPaused || false,
-          aiPausedUntil: lead.aiPausedUntil || null
+          aiPausedUntil: lead.aiPausedUntil || null,
+          customFields: lead.customFields || {},
+          activeFlowState: lead.activeFlowState || null,
+          callingBucket: lead.callingBucket || 'fresh_pool',
+          followUpDate: lead.followUpDate || null
         };
+        leadDataMap[identifier] = leadObj;
+        const cleanDigits = identifier.replace(/\D/g, '');
+        if (cleanDigits && cleanDigits.length >= 10) {
+          leadDataMap[cleanDigits] = leadObj;
+          leadDataMap[`+${cleanDigits}`] = leadObj;
+          leadDataMap[`91${cleanDigits.slice(-10)}`] = leadObj;
+          leadDataMap[`+91${cleanDigits.slice(-10)}`] = leadObj;
+        }
+        if (lead.customFields && lead.customFields.igSenderId) {
+          leadDataMap[`IG_${lead.customFields.igSenderId}`] = leadObj;
+        }
+
         if (normalizedWorkspaceId && normalizedWorkspaceId !== 'all') {
           if (normalizedWorkspaceId === 'main' && (wsId === 'main' || wsId === 'default' || !wsId)) {
             matchingLeadPhones.push(identifier);
@@ -97,19 +121,18 @@ exports.getChats = async (req, res) => {
         platform = 'instagram_comment'; // Fallback for pure text usernames
       }
 
+      const cleanPhone = String(msg.customerPhone || '').replace(/\D/g, '');
+      const leadInfo = leadDataMap[msg.customerPhone] || (cleanPhone ? leadDataMap[cleanPhone] : null) || null;
+
       return {
         ...msg,
         platform, // Added Platform Tag for Frontend Filters
-        customerName: leadDataMap[msg.customerPhone]?.name || (platform !== 'whatsapp' ? String(msg.customerPhone).replace('IG_', '@') : 'Unknown'),
-        customerCity: leadDataMap[msg.customerPhone]?.city || '',
-        workspaceId: msg.workspaceId || leadDataMap[msg.customerPhone]?.workspaceId || 'main',
-        isAiPaused: leadDataMap[msg.customerPhone]?.isAiPaused || false,
-        aiPausedUntil: leadDataMap[msg.customerPhone]?.aiPausedUntil || null,
-        // 🚀 NEW: Pass detailed timestamps for delivery status tooltips
-        // ✅ CRITICAL FIX v2: The frontend crashes with a `RangeError` if `deliveredAt` or `readAt`
-        // are `null`. By using `|| undefined`, we ensure that if these fields are falsy (null, undefined),
-        // they are passed as `undefined`. The frontend can safely handle `new Date(undefined)`
-        // which results in an "Invalid Date", preventing the crash that `new Date(null)` would cause.
+        customerName: leadInfo?.name || (platform !== 'whatsapp' ? String(msg.customerPhone).replace('IG_', '@') : 'Unknown'),
+        customerCity: leadInfo?.city || '',
+        workspaceId: msg.workspaceId || leadInfo?.workspaceId || 'main',
+        isAiPaused: leadInfo?.isAiPaused || false,
+        aiPausedUntil: leadInfo?.aiPausedUntil || null,
+        leadContext: leadInfo, // 🚀 Rich Lead Context attached!
         sentAt: msg.timestamp || msg.createdAt || new Date(),
         deliveredAt: msg.deliveredAt || undefined,
         readAt: msg.readAt || undefined
@@ -152,9 +175,9 @@ exports.sendManualMessage = async (req, res) => {
   const userId = req.user?._id || req.user?.id;
   console.log(`\n➡️ [DEBUG Chat Flow] 1. Request Received. User ID from token: ${userId}`);
   try {
-    const { customerPhone, messageText } = req.body;
+    const { customerPhone, messageText, replyMode, commentId, mediaId } = req.body;
 
-    console.log(`➡️ [DEBUG Chat Flow] 2. Payload details - Phone: ${customerPhone}, Message: "${messageText}"`);
+    console.log(`➡️ [DEBUG Chat Flow] 2. Payload details - Phone: ${customerPhone}, Mode: ${replyMode || 'standard'}, Message: "${messageText}"`);
 
     // SAFETY CHECK: Ensure phone number and message are not empty
     if (!customerPhone || !messageText) {
@@ -167,9 +190,9 @@ exports.sendManualMessage = async (req, res) => {
       return res.status(401).json({ message: 'Session expired. Please login again.' });
     }
 
-    // 🚀 NEW: HANDLE INSTAGRAM DIRECT MESSAGES (Manual Reply from UI)
+    // 🚀 NEW: HANDLE INSTAGRAM (Public Comment Reply vs Private DM)
     if (customerPhone.startsWith('IG_') || isNaN(customerPhone.replace('+', ''))) {
-      console.log(`➡️ [DEBUG Chat Flow] Handling Manual Reply for Instagram: ${customerPhone}`);
+      console.log(`➡️ [DEBUG Chat Flow] Handling Manual Reply for Instagram: ${customerPhone} (Mode: ${replyMode || 'private_dm'})`);
       
       // .lean() is REQUIRED to read fields bypassing Mongoose strict schema
       const user = await User.findById(userId).lean();
@@ -182,18 +205,25 @@ exports.sendManualMessage = async (req, res) => {
       
       // 🛡️ BULLETPROOF TOKEN EXTRACTION (Prevents 'Cannot read properties of undefined' crashes)
       let igToken = null;
-      // 🐛 FIX: Added optional chaining `?.` to prevent `TypeError: Cannot read properties of null (reading 'find')`
+      let igPageId = null;
       if (user && wsIdIg !== 'main') {
          const ws = user.workspaces?.find(w => w && w._id && w._id.toString() === wsIdIg);
-          const workspaceInstagram = ws?.instagramConfig || ws?.instagramConfig;
-          if (workspaceInstagram?.accessToken) igToken = workspaceInstagram.accessToken;
+         const workspaceInstagram = ws?.instagramConfig || ws?.igConfig;
+         if (workspaceInstagram?.accessToken) {
+           igToken = workspaceInstagram.accessToken;
+           igPageId = workspaceInstagram.facebookPageId || null;
+         }
       }
-      if (!igToken && user && (user.instagramConfig || user.instagramConfig)?.accessToken) {
-         igToken = (user.instagramConfig || user.instagramConfig).accessToken;
+      if (!igToken && user && (user.instagramConfig || user.igConfig)?.accessToken) {
+         igToken = (user.instagramConfig || user.igConfig).accessToken;
+         igPageId = (user.instagramConfig || user.igConfig).facebookPageId || null;
       }
       if (!igToken && user && user.workspaces) {
-          const wsWithToken = user.workspaces.find(w => (w?.instagramConfig || w?.instagramConfig)?.accessToken);
-          if (wsWithToken) igToken = (wsWithToken.instagramConfig || wsWithToken.instagramConfig).accessToken;
+          const wsWithToken = user.workspaces.find(w => (w?.instagramConfig || w?.igConfig)?.accessToken);
+          if (wsWithToken) {
+            igToken = (wsWithToken.instagramConfig || wsWithToken.igConfig).accessToken;
+            igPageId = (wsWithToken.instagramConfig || wsWithToken.igConfig).facebookPageId || null;
+          }
       }
 
       if (!user || !igToken) {
@@ -201,52 +231,79 @@ exports.sendManualMessage = async (req, res) => {
         return res.status(400).json({ message: 'Instagram connection missing. Please link Instagram in Settings.' });
       }
 
+      const isPublicCommentMode = replyMode === 'public_comment';
+      const targetChannel = isPublicCommentMode ? 'instagram_comment' : 'instagram_dm';
+
       const newMsg = await Message.create({
         userId,
         workspaceId: wsIdIg,
         customerPhone: customerPhone,
+        channel: targetChannel,
         messageText,
         direction: 'outgoing',
         status: 'sent',
         sentBy: 'staff',
+        tags: isPublicCommentMode ? ['public_comment_reply', ...(mediaId ? [`post_${mediaId}`] : [])] : ['staff_dm', ...(mediaId ? [`post_${mediaId}`] : [])],
         timestamp: new Date()
       });
 
-      // 🚀 NEW: PAUSE AI FOR THIS INSTAGRAM CUSTOMER (HUMAN TAKEOVER)
+      // 🚀 PAUSE AI FOR THIS CUSTOMER (HUMAN TAKEOVER)
       const pauseUntilIg = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
       await Lead.findOneAndUpdate(
         { phoneNumber: customerPhone, userId: userId },
-        { $set: { isAiPaused: true, aiPausedUntil: pauseUntilIg } },
-        { upsert: true }
+        { $set: { isAiPaused: true, aiPausedUntil: pauseUntilIg } }
       );
       console.log(`⏸️ [DEBUG Chat Flow] AI Paused for IG customer ${customerPhone} for 24 hours.`);
 
-      // Dispatch IG message via Meta Graph API
-      try {
-        let recipientId = customerPhone.replace('IG_', '');
-        const loginType = (user.instagramConfig || user.igConfig)?.loginType || 'facebook_business';
-          
+      let recipientId = customerPhone.replace('IG_', '');
+      const loginType = (user.instagramConfig || user.igConfig)?.loginType || 'facebook_business';
+      const isNative = loginType === 'instagram_basic_display' || loginType === 'instagram_business_login';
+
+      if (isPublicCommentMode) {
+        // 💬 PUBLIC COMMENT REPLY VIA GRAPH API
+        try {
+          const targetCommentId = commentId || (lastMessage?.channel === 'instagram_comment' ? lastMessage._id : recipientId);
+          console.log(`💬 Posting Public Reply to Comment ID: ${targetCommentId}`);
+
+          const commentReplyUrl = isNative
+            ? `https://graph.instagram.com/v21.0/${targetCommentId}/replies`
+            : `https://graph.facebook.com/v19.0/${targetCommentId}/replies`;
+
+          const response = await axios.post(commentReplyUrl, {
+            message: messageText
+          }, { params: { access_token: igToken } });
+
+          console.log(`✅ PUBLIC COMMENT REPLY POSTED!`, response.data);
+          newMsg.wamid = response.data?.id;
+          await newMsg.save();
+        } catch (publicErr) {
+          console.error(`❌ META REJECTED PUBLIC COMMENT REPLY:`, publicErr.response?.data || publicErr.message);
+          newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Post Public Reply: ${publicErr.response?.data?.error?.message || publicErr.message}]`;
+          newMsg.status = 'failed';
+          await newMsg.save();
+        }
+      } else {
+        // ✉️ PRIVATE DIRECT MESSAGE (DM)
+        try {
           console.log(`\n================== [MANUAL REPLY MEGA DEBUG] ==================`);
-          console.log(`Sending manual reply to IG ID: ${recipientId}`);
+          console.log(`Sending manual DM to IG ID: ${recipientId}`);
           console.log(`Using loginType: ${loginType}`);
           
-          // ✅ FIX: Use the centralized, loginType-aware service instead of a raw axios call.
-          // This was the source of the "Invalid OAuth access token" error for native IG connections.
           const response = await metaAdsService.sendInstagramDM(igToken, recipientId, messageText, loginType);
           
           console.log(`✅ META RETURNED SUCCESS (200 OK)! Response:`, JSON.stringify(response.data));
-          console.log(`⚠️ IF THIS IS INVISIBLE IN IG APP, CHECK MESSAGE REQUESTS FOLDER OR META APP MODE.`);
           console.log(`===============================================================\n`);
           newMsg.wamid = response.data?.message_id;
           await newMsg.save();
-      } catch (igError) {
-        console.error(`❌ META REJECTED MANUAL REPLY:`, igError.response?.data || igError.message);
-        newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
-        newMsg.status = 'failed'; // Update status to failed
-        await newMsg.save();
+        } catch (igError) {
+          console.error(`❌ META REJECTED MANUAL REPLY:`, igError.response?.data || igError.message);
+          newMsg.messageText = `${messageText}\n\n[⚠️ Failed to Send IG DM: ${igError.response?.data?.error?.message || igError.message}]`;
+          newMsg.status = 'failed';
+          await newMsg.save();
+        }
       }
 
-      // 🚀 NEW: Broadcast the new message to all connected chat dashboards
+      // Broadcast the new message to all connected chat dashboards
       const wssChat = req.app.get('wssChat');
       if (wssChat) {
         wssChat.clients.forEach(client => {
@@ -539,4 +596,58 @@ exports.markAllAsRead = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Update customer lead details from Chat Context Sidebar
+// @route   PATCH /api/chats/:customerPhone/lead-context
+exports.updateLeadContext = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { customerPhone } = req.params;
+    const { name, email, status, dealValue, notes, customFields, city } = req.body;
+    if (!userId || !customerPhone) return res.status(400).json({ message: 'Missing required parameters' });
+
+    let cleanPhone = customerPhone.replace(/\D/g, '');
+    let lead = await Lead.findOne({
+      userId,
+      $or: [
+        { phoneNumber: customerPhone },
+        ...(cleanPhone.length >= 10 ? [{ phoneNumber: { $regex: new RegExp(cleanPhone.slice(-10) + '$') } }] : []),
+        { 'customFields.igSenderId': customerPhone.replace('IG_', '') }
+      ]
+    });
+
+    if (lead) {
+      if (name) lead.name = name;
+      if (email !== undefined) lead.email = email;
+      if (status) lead.status = status;
+      if (dealValue !== undefined) lead.dealValue = dealValue;
+      if (notes !== undefined) lead.notes = notes;
+      if (city !== undefined) lead.city = city;
+      if (customFields) {
+        lead.customFields = { ...(lead.customFields || {}), ...customFields };
+      }
+      await lead.save();
+      return res.status(200).json({ success: true, lead, message: 'Lead updated successfully' });
+    } else {
+      // Create new verified lead
+      lead = await Lead.create({
+        userId,
+        name: name || customerPhone,
+        phoneNumber: customerPhone.startsWith('IG_') ? (cleanPhone.length >= 10 ? cleanPhone : customerPhone) : customerPhone,
+        email: email || '',
+        status: status || 'new',
+        dealValue: dealValue || 0,
+        notes: notes || '',
+        city: city || '',
+        customFields: { ...(customFields || {}), ...(customerPhone.startsWith('IG_') ? { igSenderId: customerPhone.replace('IG_', '') } : {}) },
+        source: customerPhone.startsWith('IG_') ? 'Instagram' : 'WhatsApp',
+        createdBy: userId
+      });
+      return res.status(201).json({ success: true, lead, message: 'Lead created successfully' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
