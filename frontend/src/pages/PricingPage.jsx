@@ -219,7 +219,7 @@ export default function PricingPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             
             {/* 1. Instagram Basic (No AI) - ₹99/mo */}
             <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-pink-500/40 transition-all space-y-4">
@@ -254,15 +254,11 @@ export default function PricingPage() {
             </div>
 
             {/* 2. Instagram Creator & AI Growth Pro - ₹199/mo */}
-            <div className="bg-gradient-to-b from-purple-950/40 to-[#0e0e14] border-2 border-purple-500/80 rounded-3xl p-6 flex flex-col justify-between shadow-xl shadow-purple-500/10 space-y-4 relative">
-              <div className="absolute -top-3 right-6 px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
-                AI Deep Analytics 🔥
-              </div>
-              
+            <div className="bg-[#0e0e14] border border-purple-500/60 rounded-3xl p-6 flex flex-col justify-between hover:border-purple-400 transition-all space-y-4 relative">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider bg-purple-950/60 border border-purple-500/40 px-2.5 py-0.5 rounded-full">
-                    ✨ Instagram Creator Pro
+                    ✨ Creator Pro
                   </span>
                   <span className="text-[10px] text-amber-400 font-bold">10 AI Posts / mo</span>
                 </div>
@@ -274,47 +270,83 @@ export default function PricingPage() {
                 
                 <div className="space-y-2 text-xs text-gray-300 border-t border-gray-800 pt-3">
                   <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Everything in Instagram Basic +</div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>Monthly 10 Deep AI Post Analyses</strong></div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> AI compares Top Reach vs Low View Reels</div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Viral Hook, Caption & Hashtag Suggestions</div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Direct DM Lead Capture to CRM</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>10 Deep AI Post Analyses/mo</strong></div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> AI Viral Hook & Caption Suggestions</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Compare Top Reach vs Low View Reels</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 10x Token Billed Protection & Alert</div>
                 </div>
               </div>
 
               <Link
                 to="/register"
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-95 text-white font-black text-xs text-center transition-all shadow-md shadow-purple-600/30"
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs text-center shadow-lg shadow-purple-600/30 transition-all"
               >
-                Get Creator Pro (₹199) ⚡
+                Get Creator Pro (₹199) ➔
               </Link>
             </div>
 
-            {/* 3. Google 5-Star Review & Smart Card - ₹149/mo */}
-            <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-amber-500/40 transition-all space-y-4">
+            {/* 3. Instagram Commerce & Reels Catalog Pro - ₹349/mo */}
+            <div className="bg-gradient-to-b from-amber-950/30 to-[#0e0e14] border-2 border-amber-500/80 rounded-3xl p-6 flex flex-col justify-between shadow-xl shadow-amber-500/10 space-y-4 relative">
+              <div className="absolute -top-3 right-6 px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-md font-bold">
+                E-Commerce Ready 🔥
+              </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
-                    ⭐ Google Reviews + NFC Card
+                  <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider bg-amber-950/60 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
+                    🛍️ Reels Catalog Pro
                   </span>
-                  <span className="text-[10px] text-gray-400">Local Stores</span>
+                  <span className="text-[10px] text-emerald-400 font-bold">Unlimited Catalog</span>
+                </div>
+                <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 font-mono flex items-baseline gap-1 mb-1">
+                  <span>₹349</span>
+                  <span className="text-xs text-gray-400 font-sans font-normal">/ month</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Tag 4+ products per Reel, send instant DM product carousels & collect UPI/WhatsApp orders.</p>
+                
+                <div className="space-y-2 text-xs text-gray-300 border-t border-gray-800 pt-3">
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Everything in ₹199 Creator Pro +</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>Unlimited Catalog & CSV Bulk Upload</strong></div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>Reel-to-Catalog 4-Product Tagging</strong></div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>1-Click Direct UPI & WhatsApp Checkout</strong></div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>Order Dispatch & Live Tracking Link</strong></div>
+                </div>
+              </div>
+
+              <Link
+                to="/register"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs text-center shadow-lg shadow-amber-500/20 transition-all"
+              >
+                Get Reels Catalog Pro (₹349) ➔
+              </Link>
+            </div>
+
+            {/* 4. Google 5-Star Review Booster + NFC Digital Card - ₹149/mo */}
+            <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-emerald-500/40 transition-all space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                    🌟 Google Reviews & NFC
+                  </span>
+                  <span className="text-[10px] text-gray-400">Zero Meta API</span>
                 </div>
                 <div className="text-2xl font-black text-white font-mono flex items-baseline gap-1 mb-1">
                   <span>₹149</span>
                   <span className="text-xs text-gray-400 font-sans font-normal">/ month</span>
                 </div>
-                <p className="text-xs text-gray-400 mb-4">For salons, clinics, restaurants & local stores to get 100+ 5-star Google reviews.</p>
+                <p className="text-xs text-gray-400 mb-4">For shops & clinics wanting 1-Tap Google 5-Star Reviews & NFC Digital Cards.</p>
                 
                 <div className="space-y-2 text-xs text-gray-300 border-t border-gray-800 pt-3">
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 1-Tap 5-Star Google Review Booster Link & QR</div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Smart Digital Business Card (<code className="text-[10px] text-amber-300">/card/:id</code>)</div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Direct WhatsApp Order & Location Link</div>
-                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 100% Standalone (Zero Meta Setup Needed)</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>1-Tap Direct 5-Star Google Review</strong> QR</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>NFC Ready Digital Business Card</strong></div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> WhatsApp Direct Order & Directions</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Printable Smart QR Standee Download</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 100% Free from Meta/WhatsApp Fees</div>
                 </div>
               </div>
 
               <Link
                 to="/register"
-                className="w-full py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 text-amber-300 font-black text-xs text-center transition-all"
+                className="w-full py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 font-black text-xs text-center transition-all"
               >
                 Get Review Booster (₹149) ➔
               </Link>

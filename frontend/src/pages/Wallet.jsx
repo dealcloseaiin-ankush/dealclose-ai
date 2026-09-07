@@ -147,9 +147,9 @@ export default function Wallet() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Instagram Basic Plan */}
-          <div className="bg-gradient-to-br from-[#1a0a14] to-[#111] border border-pink-500/30 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-[#111] border border-gray-800 hover:border-pink-500/40 transition-all rounded-2xl p-6 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-start mb-3">
                 <div>
@@ -160,30 +160,28 @@ export default function Wallet() {
                 </div>
                 <span className="text-lg font-black text-white font-mono">₹99 <span className="text-xs font-normal text-gray-400">/mo</span></span>
               </div>
-              <p className="text-xs text-gray-400 mb-4">Unlimited keyword Comment-to-DM for reels and posts.</p>
+              <p className="text-xs text-gray-400 mb-4">Unlimited keyword Comment-to-DM without AI cost.</p>
               <ul className="text-xs space-y-1.5 mb-6 text-gray-300">
                 <li className="flex items-center gap-2">✓ Unlimited Reel Comment-to-DM</li>
-                <li className="flex items-center gap-2">✓ Post & Story DM Auto-responder</li>
-                <li className="flex items-center gap-2 text-gray-500">✕ No AI Tokens / No AI Post Analytics</li>
+                <li className="flex items-center gap-2">✓ Story & Post Auto-DM Replies</li>
+                <li className="flex items-center gap-2">✓ 1 Instagram Business Account</li>
+                <li className="flex items-center gap-2 text-gray-500">✕ No AI Tokens / No Post AI</li>
               </ul>
             </div>
-            <button className="w-full py-2.5 bg-pink-950/80 hover:bg-pink-900 border border-pink-500/50 text-pink-200 rounded-xl text-xs font-black transition-colors">
+            <button className="w-full py-2.5 bg-pink-950/80 hover:bg-pink-900 border border-pink-500/40 text-pink-300 rounded-xl text-xs font-black transition-colors">
               Activate Instagram Basic (₹99)
             </button>
           </div>
 
-          {/* Instagram Creator & AI Analytics Pro Plan */}
-          <div className="bg-gradient-to-br from-[#1c0e2a] via-[#111] to-[#0c0c14] border-2 border-purple-500/60 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl shadow-purple-950/40">
-            <div className="absolute top-0 right-0 bg-gradient-to-l from-purple-600 to-pink-600 text-white font-black text-[9px] px-3 py-1 rounded-bl-xl uppercase tracking-wider">
-              10 AI Posts / mo 🔥
-            </div>
+          {/* Instagram Creator Pro Plan */}
+          <div className="bg-[#111] border border-purple-500/60 hover:border-purple-400 transition-all rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden">
             <div>
-              <div className="flex justify-between items-start mb-3 pt-1">
+              <div className="flex justify-between items-start mb-3">
                 <div>
-                  <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider bg-purple-950/60 px-2.5 py-0.5 rounded-full border border-purple-500/30">
-                    AI Deep Analytics
+                  <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider bg-purple-950/60 px-2.5 py-0.5 rounded-full border border-purple-500/40">
+                    AI Reach Growth
                   </span>
-                  <h3 className="text-lg font-bold text-white mt-1">✨ Instagram Creator Pro</h3>
+                  <h3 className="text-lg font-bold text-white mt-1">✨ Creator Pro</h3>
                 </div>
                 <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono">₹199 <span className="text-xs font-normal text-gray-400">/mo</span></span>
               </div>
@@ -192,25 +190,53 @@ export default function Wallet() {
                 <li className="flex items-center gap-2">✓ Unlimited Comment-to-DM</li>
                 <li className="flex items-center gap-2">✓ <strong>Monthly 10 Deep AI Post Analyses</strong></li>
                 <li className="flex items-center gap-2">✓ Viral Hook & Caption Suggestions</li>
-                <li className="flex items-center gap-2">✓ Direct DM Lead Capture to CRM</li>
+                <li className="flex items-center gap-2">✓ 10x Token Billed Protection</li>
               </ul>
             </div>
-            <button className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-purple-600/30">
+            <button className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-purple-600/30">
               Activate Creator Pro (₹199)
             </button>
           </div>
 
-          {/* Google 5-Star Review & Smart Card Plan */}
-          <div className="bg-gradient-to-br from-[#1a1408] to-[#111] border border-amber-500/30 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between">
+          {/* Instagram Reels Catalog Pro Plan */}
+          <div className="bg-gradient-to-br from-[#1a1408] to-[#111] border-2 border-amber-500/80 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl shadow-amber-500/10">
+            <div className="absolute top-2 right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-[9px] px-2 py-0.5 rounded-md uppercase">
+              E-Commerce 🔥
+            </div>
             <div>
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                    Catalog & Orders
+                  </span>
+                  <h3 className="text-lg font-bold text-white mt-1">🛍️ Reels Catalog Pro</h3>
+                </div>
+              </div>
+              <div className="text-xl font-black text-amber-300 font-mono mb-2">₹349 <span className="text-xs font-normal text-gray-400">/mo</span></div>
+              <p className="text-xs text-gray-400 mb-4">Tag 4+ products per Reel, send DM carousels & collect UPI/WhatsApp orders.</p>
+              <ul className="text-xs space-y-1.5 mb-6 text-gray-300">
+                <li className="flex items-center gap-2">✓ Unlimited Catalog & CSV Upload</li>
+                <li className="flex items-center gap-2">✓ <strong>Reel-to-Catalog 4-Product Tagging</strong></li>
+                <li className="flex items-center gap-2">✓ <strong>1-Click Direct UPI & WhatsApp Order</strong></li>
+                <li className="flex items-center gap-2">✓ Order Dispatch & Tracking Module</li>
+              </ul>
+            </div>
+            <button className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black rounded-xl text-xs font-black transition-all shadow-md shadow-amber-500/20">
+              Activate Catalog Pro (₹349)
+            </button>
+          </div>
+
+          {/* Google 5-Star Review & Smart Card Plan */}
+          <div className="bg-[#111] border border-gray-800 hover:border-emerald-500/40 transition-all rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                     Local Business
                   </span>
-                  <h3 className="text-lg font-bold text-white mt-1">⭐ Google Review + NFC</h3>
+                  <h3 className="text-lg font-bold text-white mt-1">🌟 Google Review + NFC</h3>
                 </div>
-                <span className="text-lg font-black text-amber-300 font-mono">₹149 <span className="text-xs font-normal text-gray-400">/mo</span></span>
+                <span className="text-lg font-black text-emerald-300 font-mono">₹149 <span className="text-xs font-normal text-gray-400">/mo</span></span>
               </div>
               <p className="text-xs text-gray-400 mb-4">1-Tap Google Review Booster + Smart Digital NFC Business Card.</p>
               <ul className="text-xs space-y-1.5 mb-6 text-gray-300">
@@ -220,7 +246,7 @@ export default function Wallet() {
                 <li className="flex items-center gap-2">✓ Zero Meta Connection Needed</li>
               </ul>
             </div>
-            <button className="w-full py-2.5 bg-amber-950/80 hover:bg-amber-900 border border-amber-500/50 text-amber-200 rounded-xl text-xs font-black transition-colors">
+            <button className="w-full py-2.5 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-black transition-colors">
               Activate Review Booster (₹149)
             </button>
           </div>
