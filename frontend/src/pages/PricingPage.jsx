@@ -205,6 +205,124 @@ export default function PricingPage() {
           </div>
         </div>
 
+        {/* 🚀 STANDALONE TARGETED MICRO-PLANS (Instagram Only & Google Review Only) */}
+        <div className="mb-14 text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+            <div>
+              <span className="text-[11px] font-black text-pink-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles size={13} /> Standalone Single-Channel Plans
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white">Don't need WhatsApp API? Pick only what you need:</h3>
+            </div>
+            <span className="text-xs text-gray-400 bg-gray-900 border border-gray-800 px-3 py-1 rounded-xl self-start sm:self-auto">
+              Zero WhatsApp Setup Required ⚡
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            
+            {/* 1. Instagram Basic (No AI) - ₹99/mo */}
+            <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-pink-500/40 transition-all space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-pink-400 uppercase tracking-wider bg-pink-950/60 border border-pink-500/30 px-2.5 py-0.5 rounded-full">
+                    📸 Instagram Basic
+                  </span>
+                  <span className="text-[10px] text-gray-400">Pure Rule-Based</span>
+                </div>
+                <div className="text-2xl font-black text-white font-mono flex items-baseline gap-1 mb-1">
+                  <span>₹99</span>
+                  <span className="text-xs text-gray-400 font-sans font-normal">/ month</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">For creators & boutiques wanting only keyword Comment-to-DM without AI.</p>
+                
+                <div className="space-y-2 text-xs text-gray-300 border-t border-gray-800 pt-3">
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Unlimited Reel Comment-to-DM (e.g. "PRICE")</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Story & Post Auto-DM Link Sharing</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 1 Instagram Business Account</div>
+                  <div className="flex items-center gap-2 text-gray-500"><span className="text-gray-600">✕</span> No AI Tokens / No AI Post Analytics</div>
+                  <div className="flex items-center gap-2 text-gray-500"><span className="text-gray-600">✕</span> No WhatsApp API included</div>
+                </div>
+              </div>
+
+              <Link
+                to="/register"
+                className="w-full py-2.5 rounded-xl bg-pink-950/60 hover:bg-pink-900/80 border border-pink-500/40 text-pink-300 font-black text-xs text-center transition-all"
+              >
+                Get Instagram Basic (₹99) ➔
+              </Link>
+            </div>
+
+            {/* 2. Instagram Creator & AI Growth Pro - ₹199/mo */}
+            <div className="bg-gradient-to-b from-purple-950/40 to-[#0e0e14] border-2 border-purple-500/80 rounded-3xl p-6 flex flex-col justify-between shadow-xl shadow-purple-500/10 space-y-4 relative">
+              <div className="absolute -top-3 right-6 px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
+                AI Deep Analytics 🔥
+              </div>
+              
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider bg-purple-950/60 border border-purple-500/40 px-2.5 py-0.5 rounded-full">
+                    ✨ Instagram Creator Pro
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-bold">10 AI Posts / mo</span>
+                </div>
+                <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono flex items-baseline gap-1 mb-1">
+                  <span>₹199</span>
+                  <span className="text-xs text-gray-400 font-sans font-normal">/ month</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Unlimited Comment-to-DM + AI compares top vs low posts for viral growth.</p>
+                
+                <div className="space-y-2 text-xs text-gray-300 border-t border-gray-800 pt-3">
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Everything in Instagram Basic +</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> <strong>Monthly 10 Deep AI Post Analyses</strong></div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> AI compares Top Reach vs Low View Reels</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Viral Hook, Caption & Hashtag Suggestions</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Direct DM Lead Capture to CRM</div>
+                </div>
+              </div>
+
+              <Link
+                to="/register"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-95 text-white font-black text-xs text-center transition-all shadow-md shadow-purple-600/30"
+              >
+                Get Creator Pro (₹199) ⚡
+              </Link>
+            </div>
+
+            {/* 3. Google 5-Star Review & Smart Card - ₹149/mo */}
+            <div className="bg-[#0e0e14] border border-gray-800 rounded-3xl p-6 flex flex-col justify-between hover:border-amber-500/40 transition-all space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                    ⭐ Google Reviews + NFC Card
+                  </span>
+                  <span className="text-[10px] text-gray-400">Local Stores</span>
+                </div>
+                <div className="text-2xl font-black text-white font-mono flex items-baseline gap-1 mb-1">
+                  <span>₹149</span>
+                  <span className="text-xs text-gray-400 font-sans font-normal">/ month</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">For salons, clinics, restaurants & local stores to get 100+ 5-star Google reviews.</p>
+                
+                <div className="space-y-2 text-xs text-gray-300 border-t border-gray-800 pt-3">
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 1-Tap 5-Star Google Review Booster Link & QR</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Smart Digital Business Card (<code className="text-[10px] text-amber-300">/card/:id</code>)</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> Direct WhatsApp Order & Location Link</div>
+                  <div className="flex items-center gap-2"><Check size={13} className="text-emerald-400 shrink-0" /> 100% Standalone (Zero Meta Setup Needed)</div>
+                </div>
+              </div>
+
+              <Link
+                to="/register"
+                className="w-full py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 text-amber-300 font-black text-xs text-center transition-all"
+              >
+                Get Review Booster (₹149) ➔
+              </Link>
+            </div>
+
+          </div>
+        </div>
+
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left mb-16 max-w-4xl mx-auto">
           

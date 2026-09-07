@@ -140,35 +140,89 @@ export default function Wallet() {
 
       {/* Subscription Plans Status */}
       <div className="mb-12">
-        <h2 className="text-2xl font-bold text-white mb-6">Your Software Subscriptions</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Your Software Subscriptions</h2>
+            <p className="text-xs text-gray-400">Choose modular single-channel or all-in-one automation plans.</p>
+          </div>
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
-          {/* WhatsApp Plan */}
-          <div className="bg-gradient-to-br from-[#0a1a10] to-[#111] border border-green-500/30 rounded-2xl p-6 relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-white">WhatsApp Automations</h3>
-              <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold">1 Month Free Trial</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Instagram Basic Plan */}
+          <div className="bg-gradient-to-br from-[#1a0a14] to-[#111] border border-pink-500/30 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <span className="text-[10px] font-black text-pink-400 uppercase tracking-wider bg-pink-950/60 px-2.5 py-0.5 rounded-full border border-pink-500/30">
+                    Rule-Based
+                  </span>
+                  <h3 className="text-lg font-bold text-white mt-1">📸 Instagram Basic</h3>
+                </div>
+                <span className="text-lg font-black text-white font-mono">₹99 <span className="text-xs font-normal text-gray-400">/mo</span></span>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">Unlimited keyword Comment-to-DM for reels and posts.</p>
+              <ul className="text-xs space-y-1.5 mb-6 text-gray-300">
+                <li className="flex items-center gap-2">✓ Unlimited Reel Comment-to-DM</li>
+                <li className="flex items-center gap-2">✓ Post & Story DM Auto-responder</li>
+                <li className="flex items-center gap-2 text-gray-500">✕ No AI Tokens / No AI Post Analytics</li>
+              </ul>
             </div>
-            <p className="text-sm text-gray-400 mb-4">Expires in 28 days. After trial, choose your plan:</p>
-            <ul className="text-sm space-y-2 mb-6">
-              <li className="flex justify-between text-gray-300"><span>Basic Automation (Base)</span> <span>₹199 / mo</span></li>
-              <li className="flex justify-between text-green-300 font-bold border-t border-gray-800 pt-2 mt-2"><span>1st Month AI Offer</span> <span className="line-through text-gray-500 mr-2">₹299</span><span>₹99 / mo</span></li>
-            </ul>
-            <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-bold transition-colors">Select Plan</button>
+            <button className="w-full py-2.5 bg-pink-950/80 hover:bg-pink-900 border border-pink-500/50 text-pink-200 rounded-xl text-xs font-black transition-colors">
+              Activate Instagram Basic (₹99)
+            </button>
           </div>
 
-          {/* Instagram Plan */}
-          <div className="bg-gradient-to-br from-[#1a0a10] to-[#111] border border-pink-500/30 rounded-2xl p-6 relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-white">Instagram AI Funnel</h3>
-              <span className="bg-pink-500/20 text-pink-400 px-3 py-1 rounded-full text-xs font-bold">1 Month Free Trial</span>
+          {/* Instagram Creator & AI Analytics Pro Plan */}
+          <div className="bg-gradient-to-br from-[#1c0e2a] via-[#111] to-[#0c0c14] border-2 border-purple-500/60 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl shadow-purple-950/40">
+            <div className="absolute top-0 right-0 bg-gradient-to-l from-purple-600 to-pink-600 text-white font-black text-[9px] px-3 py-1 rounded-bl-xl uppercase tracking-wider">
+              10 AI Posts / mo 🔥
             </div>
-            <p className="text-sm text-gray-400 mb-4">Expires in 28 days. Includes Profile Growth Audits.</p>
-            <ul className="text-sm space-y-2 mb-6">
-              <li className="flex justify-between text-gray-300"><span>Basic Auto-DM (Base)</span> <span>₹199 / mo</span></li>
-              <li className="flex justify-between text-pink-300 font-bold border-t border-gray-800 pt-2 mt-2"><span>1st Month AI Offer</span> <span className="line-through text-gray-500 mr-2">₹299</span><span>₹99 / mo</span></li>
-            </ul>
-            <button className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-bold transition-colors">Select Plan</button>
+            <div>
+              <div className="flex justify-between items-start mb-3 pt-1">
+                <div>
+                  <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider bg-purple-950/60 px-2.5 py-0.5 rounded-full border border-purple-500/30">
+                    AI Deep Analytics
+                  </span>
+                  <h3 className="text-lg font-bold text-white mt-1">✨ Instagram Creator Pro</h3>
+                </div>
+                <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 font-mono">₹199 <span className="text-xs font-normal text-gray-400">/mo</span></span>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">Comment-to-DM + AI compares top vs low-view posts for viral reach.</p>
+              <ul className="text-xs space-y-1.5 mb-6 text-gray-300">
+                <li className="flex items-center gap-2">✓ Unlimited Comment-to-DM</li>
+                <li className="flex items-center gap-2">✓ <strong>Monthly 10 Deep AI Post Analyses</strong></li>
+                <li className="flex items-center gap-2">✓ Viral Hook & Caption Suggestions</li>
+                <li className="flex items-center gap-2">✓ Direct DM Lead Capture to CRM</li>
+              </ul>
+            </div>
+            <button className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-purple-600/30">
+              Activate Creator Pro (₹199)
+            </button>
+          </div>
+
+          {/* Google 5-Star Review & Smart Card Plan */}
+          <div className="bg-gradient-to-br from-[#1a1408] to-[#111] border border-amber-500/30 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                    Local Business
+                  </span>
+                  <h3 className="text-lg font-bold text-white mt-1">⭐ Google Review + NFC</h3>
+                </div>
+                <span className="text-lg font-black text-amber-300 font-mono">₹149 <span className="text-xs font-normal text-gray-400">/mo</span></span>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">1-Tap Google Review Booster + Smart Digital NFC Business Card.</p>
+              <ul className="text-xs space-y-1.5 mb-6 text-gray-300">
+                <li className="flex items-center gap-2">✓ 1-Tap 5-Star Google Review Booster QR</li>
+                <li className="flex items-center gap-2">✓ Smart Digital Business Card (/card/:id)</li>
+                <li className="flex items-center gap-2">✓ Direct WhatsApp Order & Location Link</li>
+                <li className="flex items-center gap-2">✓ Zero Meta Connection Needed</li>
+              </ul>
+            </div>
+            <button className="w-full py-2.5 bg-amber-950/80 hover:bg-amber-900 border border-amber-500/50 text-amber-200 rounded-xl text-xs font-black transition-colors">
+              Activate Review Booster (₹149)
+            </button>
           </div>
         </div>
       </div>
