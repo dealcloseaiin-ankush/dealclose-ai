@@ -56,73 +56,100 @@ const BillingPage = () => {
       </h1>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl shadow-xl">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-500/10 p-3 rounded-xl"><Cpu className="h-6 w-6 text-blue-400" /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <div className="bg-[#111] border border-gray-800 p-5 rounded-2xl shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-500/10 p-2.5 rounded-xl"><Cpu className="h-5 w-5 text-blue-400" /></div>
             <div>
-              <p className="text-sm font-semibold text-gray-400">Total AI Tokens Used</p>
-              <p className="text-2xl font-bold text-white">{summary.totalTokens.toLocaleString()}</p>
+              <p className="text-xs font-semibold text-gray-400">Total Tokens Used</p>
+              <p className="text-xl font-bold text-white font-mono">{(summary.totalTokens || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
-        <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl shadow-xl">
-          <div className="flex items-center gap-4">
-            <div className="bg-green-500/10 p-3 rounded-xl"><DollarSign className="h-6 w-6 text-green-400" /></div>
+
+        <div className="bg-[#111] border border-emerald-500/30 p-5 rounded-2xl shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500/10 p-2.5 rounded-xl"><CheckCircle className="h-5 w-5 text-emerald-400" /></div>
             <div>
-              <p className="text-sm font-semibold text-gray-400">Total AI Cost</p>
-              <p className="text-2xl font-bold text-white">{formatCost(summary.totalUserCost)}</p>
+              <p className="text-xs font-semibold text-gray-400">Free Tokens Remaining</p>
+              <p className="text-xl font-bold text-emerald-400 font-mono">{(summary.freeAiTokensRemaining || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
-        {/* Placeholder for Daily Limit */}
-        <div className="bg-[#111] border border-dashed border-gray-700 p-6 rounded-2xl shadow-xl">
-          <div className="flex items-center gap-4">
-            <div className="bg-yellow-500/10 p-3 rounded-xl"><Sliders className="h-6 w-6 text-yellow-400" /></div>
+
+        <div className="bg-[#111] border border-purple-500/30 p-5 rounded-2xl shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-500/10 p-2.5 rounded-xl"><DollarSign className="h-5 w-5 text-purple-400" /></div>
             <div>
-              <p className="text-sm font-semibold text-gray-400">Daily Spending Limit</p>
-              <p className="text-2xl font-bold text-gray-500">Not Set</p>
+              <p className="text-xs font-semibold text-gray-400">Total AI Billed (10x)</p>
+              <p className="text-xl font-bold text-purple-300 font-mono">{formatCost(summary.totalUserCost || 0)}</p>
             </div>
           </div>
-          <button className="text-xs mt-2 text-yellow-400 font-bold hover:underline">Set Limit (Coming Soon)</button>
+        </div>
+
+        <div className="bg-[#111] border border-gray-800 p-5 rounded-2xl shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-500/10 p-2.5 rounded-xl"><Sliders className="h-5 w-5 text-amber-400" /></div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400">Wallet Balance</p>
+              <p className="text-xl font-bold text-amber-400 font-mono">₹{(summary.walletBalance || 0).toFixed(2)}</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Warning Banner */}
       <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl mb-8 flex items-center gap-3">
-        <AlertTriangle className="h-5 w-5 text-rose-400" />
-        <p className="text-sm text-rose-300">
-          This page shows your <strong>AI usage cost</strong> (for features like Smart Replies, AI Voice Calls). It does <strong className="font-bold">NOT</strong> include WhatsApp conversation charges, which are billed directly by Meta.
+        <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0" />
+        <p className="text-xs text-rose-300">
+          This dashboard shows your real-time <strong>AI Model token consumption</strong> (Smart WhatsApp/IG Replies, Auto-Marketer, CRM Actions). Initial 50,000 tokens are 100% free; post-free quota is billed automatically from wallet with official 10x API pricing.
         </p>
       </div>
 
       {/* Detailed Logs Table */}
       <div className="bg-[#111] border border-gray-800 rounded-2xl shadow-xl overflow-hidden">
-        <h2 className="text-lg font-bold text-white p-5 border-b border-gray-800">Recent AI Activity Log</h2>
+        <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+          <h2 className="text-base font-bold text-white">Live AI Token & Billing Activity</h2>
+          <span className="text-xs text-gray-400 font-mono">Last 100 API Calls</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-[#1a1a1a] text-xs uppercase text-gray-400 tracking-wider">
               <tr>
-                <th className="px-6 py-3 font-semibold">Date & Time</th>
-                <th className="px-6 py-3 font-semibold">Feature Used</th>
-                <th className="px-6 py-3 font-semibold">AI Model</th>
-                <th className="px-6 py-3 font-semibold text-right">Tokens</th>
-                <th className="px-6 py-3 font-semibold text-right">Cost (INR)</th>
+                <th className="px-5 py-3 font-semibold text-left">Date & Time</th>
+                <th className="px-5 py-3 font-semibold text-left">Feature / Action</th>
+                <th className="px-5 py-3 font-semibold text-left">AI Model</th>
+                <th className="px-5 py-3 font-semibold text-right">Prompt / Reply Tokens</th>
+                <th className="px-5 py-3 font-semibold text-right">Total Tokens</th>
+                <th className="px-5 py-3 font-semibold text-right">Status / Charge</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800 text-sm">
+            <tbody className="divide-y divide-gray-800 text-xs">
               {logs.map(log => (
                 <tr key={log._id} className="hover:bg-gray-900/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-400">{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-white">{log.feature}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-mono">{log.model}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-purple-400 font-semibold">{log.totalTokens}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right font-semibold text-green-400">{formatCost(log.userCost)}</td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-gray-400 font-mono">{new Date(log.createdAt).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 whitespace-nowrap font-medium text-white">{log.feature}</td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-gray-400 font-mono">{log.model}</td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-right text-gray-400 font-mono">
+                    {log.promptTokens || 0} in / {log.completionTokens || 0} out
+                  </td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-right text-purple-400 font-bold font-mono">{log.totalTokens}</td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-right font-semibold">
+                    {log.chargedTo === 'free_quota' || log.userCost === 0 ? (
+                      <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[11px] border border-emerald-500/20">
+                        🎁 Free Quota
+                      </span>
+                    ) : (
+                      <span className="text-purple-300 font-mono">
+                        {formatCost(log.userCost)}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="text-center py-10 text-gray-500">No AI activity recorded yet.</td>
+                  <td colSpan="6" className="text-center py-10 text-gray-500 text-xs">No AI activity recorded yet. Incoming chats will appear here live.</td>
                 </tr>
               )}
             </tbody>

@@ -90,6 +90,8 @@ const userSchema = new Schema({
   walletBalance: { type: Number, default: 0 },
   totalAiCost: { type: Number, default: 0 },
   aiCredits: { type: Number, default: 100 }, // Starting with 100 Free AI Replies
+  freeAiTokens: { type: Number, default: 50000 }, // 50,000 Free AI Tokens upon registration
+  totalAiTokensUsed: { type: Number, default: 0 }, // Total AI tokens consumed lifetime
   referralCode: { type: String, unique: true, sparse: true }, // E.g., 'SCALIO-AB12'
   referredBy: { type: String }, // Code of the user who referred them
   discountAvailable: { type: Boolean, default: false }, // 20% off on next billing

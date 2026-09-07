@@ -5,6 +5,7 @@ const aiUsageLogSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+    index: true,
   },
   feature: {
     type: String,
@@ -18,11 +19,20 @@ const aiUsageLogSchema = new mongoose.Schema({
   completionTokens: { type: Number, default: 0 },
   totalTokens: { type: Number, required: true, default: 0 },
   isEstimated: { type: Boolean, default: false },
-  internalCost: { type: Number, default: 0 }, // Your internal cost in USD
-  userCost: { type: Number, default: 0 },     // Cost charged to the user in USD
+  internalCost: { type: Number, default: 0 },    // Internal API cost in INR
+  userCost: { type: Number, default: 0 },        // Cost billed to user in INR (10x markup)
+  internalCostUsd: { type: Number, default: 0 }, // API cost in USD
+  userCostUsd: { type: Number, default: 0 },     // Billed cost in USD
+  chargedTo: { 
+    type: String, 
+    enum: ['free_quota', 'wallet', 'billable', 'unassigned'], 
+    default: 'billable' 
+  },
 }, {
   timestamps: true,
 });
+
+aiUsageLogSchema.index({ userId: 1, createdAt: -1 });
 
 const AiUsageLog = mongoose.models.AiUsageLog || mongoose.model('AiUsageLog', aiUsageLogSchema);
 

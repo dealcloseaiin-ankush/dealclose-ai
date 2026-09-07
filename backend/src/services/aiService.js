@@ -11,10 +11,10 @@ const openai = new OpenAI({
 
 // 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_7_FLASH: 'gemini-3.7-flash',          // Priority 1: High-Speed Agentic & Reasoning
-  GEMINI_3_5_FLASH_LITE: 'gemini-3.5-flash-lite',// Priority 2: Ultra Low-Cost High-Volume Chat
-  GEMINI_2_FLASH: 'gemini-2.0-flash',            // Priority 3: Stable Fallback Model
-  OPENAI_MINI: 'gpt-4o-mini',                    // Priority 4: OpenAI Tools & Fallback Model
+  GEMINI_2_FLASH_LITE: 'gemini-2.0-flash-lite',  // Priority 1: Ultra-Cost-Effective High-Volume Chat ($0.075/1M)
+  GEMINI_2_FLASH: 'gemini-2.0-flash',            // Priority 2: Standard Fast Flash ($0.10/1M)
+  GEMINI_1_5_FLASH: 'gemini-1.5-flash',          // Priority 3: Stable Fallback Model ($0.075/1M)
+  OPENAI_MINI: 'gpt-4o-mini',                    // Priority 4: OpenAI Tools & Fallback Model ($0.15/1M)
 };
 
 /**
@@ -29,9 +29,10 @@ const MODELS = {
  * @param {string} [systemContext="You are a helpful AI assistant."] The system message to set the AI's behavior.
  * @param {string} [platform="whatsapp"] The platform where the reply will be sent (whatsapp or instagram).
  * @param {string} [userId] The ID of the user to associate the usage with.
+ * @param {string} [feature="chat-reply"] Descriptive feature name for usage billing.
  * @returns {Promise<string>} The AI-generated response text.
  */
-exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp") => {
+exports.generateAIResponse = async (prompt, systemContext = "You are a helpful AI assistant.", platform = "whatsapp", userId = null, feature = "chat-reply") => {
   try {
     let finalContext = systemContext || "You are a helpful AI assistant.";
     // 🎯 DEALCLOSE AI ULTRA SALES-CLOSING & HINGLISH TONE POLISH
@@ -53,25 +54,42 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     let rawResponse = "";
     let aiSuccess = false;
 
-    // 🚀 DYNAMIC GEMINI MULTI-MODEL FALLBACK (3.5 Lite -> 3.5 Flash -> 3.1 Lite)
+    // 🚀 DYNAMIC GEMINI MULTI-MODEL FALLBACK (2.0 Flash Lite -> 2.0 Flash -> 1.5 Flash)
     if (genAI) {
       const geminiOrder = [
-        MODELS.GEMINI_3_7_FLASH,
-        MODELS.GEMINI_3_5_FLASH_LITE,
+        MODELS.GEMINI_2_FLASH_LITE,
         MODELS.GEMINI_2_FLASH,
+        MODELS.GEMINI_1_5_FLASH,
       ];
 
       for (const modelName of geminiOrder) {
         if (aiSuccess) break;
         try {
           console.log(`[AI Service] 🤖 Requesting model: ${modelName}`);
-          const model = genAI.getGenerativeModel({ model: modelName });
+          const model = genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: {
+              maxOutputTokens: 350,
+              temperature: 0.4,
+            }
+          });
           const result = await model.generateContent([finalContext, prompt]);
           const response = await result.response;
 
           console.log(`✅ [AI Service] Responded using model: ${modelName}`);
           rawResponse = response.text();
           aiSuccess = true;
+
+          // 🚀 REAL-TIME TOKEN EXTRACTION & 10X BILLING LOGGING
+          if (userId) {
+            aiUsageTracker.trackUsage({
+              userId,
+              feature: `${feature}-${platform}`,
+              provider: 'gemini',
+              model: modelName,
+              usage: response.usageMetadata
+            });
+          }
         } catch (geminiError) {
           console.warn(`⚠️ [AI Service] ${modelName} failed/busy: ${geminiError.message}. Trying next fallback...`);
         }
@@ -88,11 +106,23 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
                 { role: "user", content: prompt }
             ], 
             model: MODELS.OPENAI_MINI,
+            max_tokens: 350,
+            temperature: 0.4,
         });
 
         console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
         rawResponse = completion.choices[0].message.content;
         aiSuccess = true;
+
+        if (userId) {
+          aiUsageTracker.trackUsage({
+            userId,
+            feature: `${feature}-${platform}`,
+            provider: 'openai',
+            model: MODELS.OPENAI_MINI,
+            usage: completion.usage
+          });
+        }
       } catch (openaiError) {
         console.error(`❌ [AI Service] OpenAI fallback also failed: ${openaiError.message}`);
         throw openaiError;
@@ -122,16 +152,22 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext, userI
 
     if (apiKey && genAI) {
       const geminiOrder = [
-        MODELS.GEMINI_3_5_LITE,
-        MODELS.GEMINI_3_5_FLASH,
-        MODELS.GEMINI_3_1_LITE,
+        MODELS.GEMINI_2_FLASH_LITE,
+        MODELS.GEMINI_2_FLASH,
+        MODELS.GEMINI_1_5_FLASH,
       ];
 
       for (const modelName of geminiOrder) {
         if (aiSuccess) break;
         try {
           console.log(`[Dashboard Assistant] 🤖 Requesting model: ${modelName}`);
-          const model = genAI.getGenerativeModel({ model: modelName });
+          const model = genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: {
+              maxOutputTokens: 500,
+              temperature: 0.4,
+            }
+          });
           const result = await model.generateContent([systemContext, prompt]);
           const response = await result.response;
 

@@ -1,4 +1,5 @@
 const AiUsageLog = require('../models/aiUsageLogModel');
+const User = require('../models/userModel');
 
 // @desc    Get AI usage logs and billing summary for the logged-in user
 // @route   GET /api/billing/summary
@@ -8,6 +9,8 @@ exports.getBillingSummary = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
+
+    const user = await User.findById(userId).select('freeAiTokens totalAiTokensUsed totalAiCost walletBalance aiCredits fullName businessName').lean();
 
     // Fetch recent 100 logs for detailed view
     const recentLogs = await AiUsageLog.find({ userId })
@@ -23,13 +26,22 @@ exports.getBillingSummary = async (req, res) => {
           _id: null,
           totalTokens: { $sum: '$totalTokens' },
           totalUserCost: { $sum: '$userCost' },
+          totalInternalCost: { $sum: '$internalCost' },
         },
       },
     ]);
 
+    const aggregateSummary = summary[0] || { totalTokens: 0, totalUserCost: 0, totalInternalCost: 0 };
+
     res.status(200).json({
       success: true,
-      summary: summary[0] || { totalTokens: 0, totalUserCost: 0 },
+      summary: {
+        totalTokens: user?.totalAiTokensUsed || aggregateSummary.totalTokens,
+        totalUserCost: user?.totalAiCost || aggregateSummary.totalUserCost,
+        freeAiTokensRemaining: user?.freeAiTokens !== undefined ? user.freeAiTokens : 50000,
+        walletBalance: user?.walletBalance || 0,
+        aiCredits: user?.aiCredits || 0,
+      },
       logs: recentLogs,
     });
   } catch (error) {

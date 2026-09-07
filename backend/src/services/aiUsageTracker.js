@@ -1,20 +1,22 @@
 const AiUsageLog = require('../models/aiUsageLogModel');
+const User = require('../models/userModel');
 const { calculateCosts } = require('../utils/costCalculator');
 
 /**
- * Tracks AI API usage by parsing response metadata and logging it to the database.
- * This centralized function ensures all AI calls are monitored from a single point.
+ * Tracks AI API usage by parsing actual provider response metadata,
+ * calculates exact API cost & 10x customer billable cost,
+ * and updates user free tokens quota or wallet balance.
  *
- * @param {object} params - The parameters for tracking.
+ * @param {object} params
  * @param {string} params.userId - The ID of the user who triggered the AI call.
- * @param {string} params.feature - A descriptive name for the feature using the AI (e.g., 'whatsapp-reply', 'dashboard-assistant').
- * @param {string} params.provider - The AI provider ('gemini' or 'openai').
- * @param {string} params.model - The specific model name used (e.g., 'gemini-1.5-flash', 'gpt-4o-mini').
- * @param {object} params.usage - The usage object from the AI API response (e.g., response.usageMetadata for Gemini, response.usage for OpenAI).
+ * @param {string} params.feature - Descriptive feature name (e.g., 'whatsapp-reply', 'instagram-reply', 'dashboard-assistant').
+ * @param {string} params.provider - 'gemini' | 'openai'
+ * @param {string} params.model - Specific model name (e.g., 'gemini-2.0-flash-lite', 'gpt-4o-mini').
+ * @param {object} params.usage - The usage object from API response.
  */
 exports.trackUsage = async ({ userId, feature, provider, model, usage }) => {
   if (!userId || !feature || !provider || !model) {
-    console.error('[AI Usage Tracker] Missing required parameters for tracking.');
+    console.warn('[AI Usage Tracker] Missing required parameters for tracking.');
     return;
   }
 
@@ -24,35 +26,67 @@ exports.trackUsage = async ({ userId, feature, provider, model, usage }) => {
     totalTokens: 0,
     internalCost: 0,
     userCost: 0,
-    isEstimated: true, // Default to estimated
+    internalCostUsd: 0,
+    userCostUsd: 0,
+    chargedTo: 'billable',
+    isEstimated: false,
   };
 
   try {
     if (provider === 'gemini' && usage) {
-      usageData.promptTokens = usage.promptTokenCount || 0;
-      usageData.completionTokens = usage.candidatesTokenCount || 0;
-      usageData.totalTokens = usage.totalTokenCount || (usageData.promptTokens + usageData.completionTokens);
-      usageData.isEstimated = !usage.totalTokenCount;
+      usageData.promptTokens = Number(usage.promptTokenCount || 0);
+      usageData.completionTokens = Number(usage.candidatesTokenCount || 0);
+      usageData.totalTokens = Number(usage.totalTokenCount || (usageData.promptTokens + usageData.completionTokens));
+      usageData.isEstimated = !usage.totalTokenCount && !usage.promptTokenCount;
     } else if (provider === 'openai' && usage) {
-      usageData.promptTokens = usage.prompt_tokens || 0;
-      usageData.completionTokens = usage.completion_tokens || 0;
-      usageData.totalTokens = usage.total_tokens || (usageData.promptTokens + usageData.completionTokens);
+      usageData.promptTokens = Number(usage.prompt_tokens || 0);
+      usageData.completionTokens = Number(usage.completion_tokens || 0);
+      usageData.totalTokens = Number(usage.total_tokens || (usageData.promptTokens + usageData.completionTokens));
       usageData.isEstimated = !usage.total_tokens;
     } else {
-      // Fallback for unknown structure or missing usage data
-      usageData.totalTokens = 100; // Log a default estimated value
-      console.warn(`[AI Usage Tracker] Usage metadata not found for ${provider}. Logging estimated usage.`);
+      // Fallback estimate for 1 short message (~120 tokens)
+      usageData.promptTokens = 90;
+      usageData.completionTokens = 30;
+      usageData.totalTokens = 120;
+      usageData.isEstimated = true;
     }
 
-    // Calculate costs based on token usage
-    const { internalCost, userCost } = calculateCosts({
+    // Calculate costs based on real token usage (in INR and USD with 10x customer markup)
+    const costResult = calculateCosts({
       provider,
       model,
       promptTokens: usageData.promptTokens,
       completionTokens: usageData.completionTokens,
     });
-    usageData.internalCost = internalCost;
-    usageData.userCost = userCost;
+
+    usageData.internalCost = costResult.internalCostInr;
+    usageData.userCost = costResult.userCostInr;
+    usageData.internalCostUsd = costResult.internalCostUsd;
+    usageData.userCostUsd = costResult.userCostUsd;
+
+    // Deduct from User free token quota or wallet
+    const user = await User.findById(userId);
+    if (user) {
+      const freeTokensRemaining = user.freeAiTokens !== undefined ? user.freeAiTokens : 50000;
+      
+      if (freeTokensRemaining > 0) {
+        // User has free tokens remaining!
+        const deducted = Math.min(freeTokensRemaining, usageData.totalTokens);
+        user.freeAiTokens = Math.max(0, freeTokensRemaining - deducted);
+        usageData.chargedTo = 'free_quota';
+        usageData.userCost = 0; // Free for user
+      } else {
+        // Free quota exhausted -> 10x billable charge applied to user
+        usageData.chargedTo = 'billable';
+        user.totalAiCost = (user.totalAiCost || 0) + usageData.userCost;
+        if (user.walletBalance > 0) {
+          user.walletBalance = Math.max(0, user.walletBalance - usageData.userCost);
+        }
+      }
+
+      user.totalAiTokensUsed = (user.totalAiTokensUsed || 0) + usageData.totalTokens;
+      await user.save();
+    }
 
     await AiUsageLog.create({
       userId,
@@ -61,6 +95,8 @@ exports.trackUsage = async ({ userId, feature, provider, model, usage }) => {
       model,
       ...usageData,
     });
+
+    console.log(`[AI Usage Tracker] Logged: ${feature} (${model}) - Tokens: ${usageData.totalTokens} (In: ${usageData.promptTokens}, Out: ${usageData.completionTokens}) | Internal Cost: ₹${usageData.internalCost.toFixed(4)} | Charged: ₹${usageData.userCost.toFixed(4)} [${usageData.chargedTo}]`);
 
   } catch (error) {
     console.error('❌ [AI Usage Tracker] Failed to log AI usage:', error.message);

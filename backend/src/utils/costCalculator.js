@@ -1,52 +1,62 @@
-// All prices are in USD per 1 Million tokens.
+// Official API rates in USD per 1 Million tokens (1M tokens)
 const MODEL_PRICING = {
   gemini: {
-    'gemini-3.5-flash-lite': { input: 0.10, output: 0.40 }, // Latest ultra-cost-effective 3.5 lite
-    'gemini-3.5-flash': { input: 0.15, output: 0.60 },      // Latest 3.5 flash
-    'gemini-3.1-flash-lite': { input: 0.10, output: 0.40 }, // 3.1 flash lite
-    'gemini-2.5-flash-lite': { input: 0.10, output: 0.40 }, // 2.5 flash lite
-    'gemini-1.5-flash': { input: 0.075, output: 0.30 },     // 1.5 flash
+    'gemini-2.0-flash-lite': { input: 0.075, output: 0.30 }, // Ultra-cost-effective ($0.075/1M in, $0.30/1M out)
+    'gemini-2.0-flash': { input: 0.10, output: 0.40 },      // Standard Flash ($0.10/1M in, $0.40/1M out)
+    'gemini-1.5-flash': { input: 0.075, output: 0.30 },     // 1.5 Flash ($0.075/1M in, $0.30/1M out)
+    'gemini-1.5-flash-8b': { input: 0.0375, output: 0.15 }, // Mini 8B Flash ($0.0375/1M in, $0.15/1M out)
+    'gemini-2.5-flash-lite': { input: 0.10, output: 0.40 }, 
   },
   openai: {
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },          // OpenAI cheapest flagship mini
+    'gpt-4o-mini': { input: 0.15, output: 0.60 },          // OpenAI mini ($0.15/1M in, $0.60/1M out)
     'gpt-3.5-turbo': { input: 0.50, output: 1.50 },        // Legacy turbo
   },
 };
 
-const INTERNAL_COST_MULTIPLIER = 1.5; // Includes GST and adjustments
-const USER_COST_MULTIPLIER = 8;       // User-facing price markup (5-8x)
+const USD_TO_INR = 87;                // Current USD to INR conversion rate
+const INTERNAL_COST_MULTIPLIER = 1.0; // Raw Google / OpenAI cost
+const USER_COST_MULTIPLIER = 10.0;    // 10x markup charged to user/customer
 
 /**
- * Calculates the internal and user-facing cost for an AI API call.
- * @param {object} params - The parameters for cost calculation.
- * @param {string} params.provider - The AI provider ('gemini' or 'openai').
- * @param {string} params.model - The specific model name.
- * @param {number} params.promptTokens - Number of tokens in the prompt.
- * @param {number} params.completionTokens - Number of tokens in the completion.
- * @returns {{internalCost: number, userCost: number}} - The calculated costs in USD.
+ * Calculates the internal API cost and 10x user-facing billable cost for an AI API call.
+ * @param {object} params
+ * @param {string} params.provider - 'gemini' | 'openai'
+ * @param {string} params.model - Model name
+ * @param {number} params.promptTokens - Number of input prompt tokens
+ * @param {number} params.completionTokens - Number of output completion tokens
+ * @returns {{internalCost: number, userCost: number, internalCostInr: number, userCostInr: number}}
  */
-exports.calculateCosts = ({ provider, model, promptTokens, completionTokens }) => {
-  const prices = MODEL_PRICING[provider]?.[model];
-
+exports.calculateCosts = ({ provider, model, promptTokens = 0, completionTokens = 0 }) => {
+  const normalizedModel = String(model || '').toLowerCase();
+  const providerKey = String(provider || 'gemini').toLowerCase();
+  
+  let prices = MODEL_PRICING[providerKey]?.[normalizedModel];
   if (!prices) {
-    console.warn(`[Cost Calculator] Pricing not found for model ${provider}/${model}. Returning zero cost.`);
-    return { internalCost: 0, userCost: 0 };
+    // Default fallback pricing (gemini-2.0-flash-lite)
+    prices = { input: 0.075, output: 0.30 };
   }
 
-  const inputCost = (promptTokens / 1_000_000) * prices.input;
-  const outputCost = (completionTokens / 1_000_000) * prices.output;
+  const pTokens = Math.max(0, Number(promptTokens) || 0);
+  const cTokens = Math.max(0, Number(completionTokens) || 0);
 
-  const baseCost = inputCost + outputCost;
+  const inputCostUsd = (pTokens / 1_000_000) * prices.input;
+  const outputCostUsd = (cTokens / 1_000_000) * prices.output;
+  const baseCostUsd = inputCostUsd + outputCostUsd;
 
-  // Calculate internal cost (your cost + GST/adjustments)
-  const internalCost = baseCost * INTERNAL_COST_MULTIPLIER;
+  // Internal API Cost in USD & INR
+  const internalCostUsd = baseCostUsd * INTERNAL_COST_MULTIPLIER;
+  const internalCostInr = internalCostUsd * USD_TO_INR;
 
-  // Calculate user-facing cost (what you charge the customer)
-  const userCost = internalCost * USER_COST_MULTIPLIER;
+  // 10x Customer Billable Cost in INR & USD
+  const userCostInr = internalCostInr * USER_COST_MULTIPLIER;
+  const userCostUsd = internalCostUsd * USER_COST_MULTIPLIER;
 
   return {
-    // Returning costs in USD, you can convert to INR on the frontend if needed.
-    internalCost,
-    userCost,
+    internalCost: internalCostInr, // Primary cost in INR
+    userCost: userCostInr,         // Primary user cost in INR (10x)
+    internalCostInr,
+    userCostInr,
+    internalCostUsd,
+    userCostUsd,
   };
 };

@@ -243,6 +243,8 @@ export default function SuperAdmin() {
                 <th className="p-4">Business / Owner</th>
                 <th className="p-4">Phone / WhatsApp</th>
                 <th className="p-4">Email</th>
+                <th className="p-4">AI Tokens Used</th>
+                <th className="p-4">AI Billed (10x)</th>
                 <th className="p-4">Plan Status</th>
                 <th className="p-4">Workspaces</th>
                 <th className="p-4">Joined Date</th>
@@ -257,6 +259,13 @@ export default function SuperAdmin() {
                   </td>
                   <td className="p-4 font-mono text-gray-300">{u.ownerPhone || 'N/A'}</td>
                   <td className="p-4 text-gray-400">{u.email}</td>
+                  <td className="p-4 font-mono text-purple-400 font-bold">
+                    {(u.totalAiTokensUsed || 0).toLocaleString()}
+                    <span className="block text-[10px] text-gray-500 font-normal">{(u.freeAiTokens !== undefined ? u.freeAiTokens : 50000).toLocaleString()} free left</span>
+                  </td>
+                  <td className="p-4 font-mono text-emerald-400 font-bold">
+                    ₹{(u.totalAiCost || 0).toFixed(2)}
+                  </td>
                   <td className="p-4">
                     {u.isPremium || u.role === 'superadmin' ? (
                       <span className="bg-amber-950/60 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">

@@ -17,7 +17,7 @@ exports.getSystemStats = async (req, res) => {
 
     const totalUsers = await User.countDocuments();
     const users = await User.find()
-      .select('fullName email businessName ownerPhone role isPremium subscription workspaces createdAt')
+      .select('fullName email businessName ownerPhone role isPremium subscription workspaces createdAt totalAiTokensUsed freeAiTokens totalAiCost walletBalance')
       .sort({ createdAt: -1 })
       .lean();
 
