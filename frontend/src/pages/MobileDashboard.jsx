@@ -726,12 +726,18 @@ export default function MobileDashboard() {
     const defaultFbLink = ws.facebookLink || (isMain ? (liveUser?.digitalCardConfig?.facebook || 'https://facebook.com/dealclose') : `https://facebook.com/${cleanName}`);
     const defaultUpi = ws.upiId || (isMain ? (liveUser?.digitalCardConfig?.upiId || 'dealclose@upi') : `${cleanName}@upi`);
 
+    const instaDp = ws.instagramConfig?.profilePictureUrl || liveUser?.instagramConfig?.profilePictureUrl || '';
+    const instaUsername = ws.instagramConfig?.username || liveUser?.instagramConfig?.username || '';
+    const resolvedLogo = ws.logoUrl || ws.logo || liveUser?.brandKit?.logoUrl || liveUser?.logoUrl || liveUser?.logo || instaDp || '/logo.png';
+
     setProfileData({
       businessName: ws.name,
       aiName: ws.aiName || (isMain ? liveUser?.aiName : '') || liveUser?.aiName || 'DealClose AI',
       ownerPhone: ws.whatsappConfig?.displayPhoneNumber || liveUser?.phone || liveUser?.ownerPhone || '+91 98765 43210',
       managerPhone: '+91 98260 99887',
-      logoUrl: liveUser?.logo || '/logo.png',
+      logoUrl: resolvedLogo,
+      instagramDp: instaDp,
+      instagramUsername: instaUsername,
       address: isProperty ? 'Prime Property Zone, Ring Road' : 'Shop #14, City Center Mall, Main Road',
       instagramLink: defaultInstaLink,
       youtubeLink: defaultYoutubeLink,
@@ -1685,31 +1691,72 @@ export default function MobileDashboard() {
               <ArrowLeft size={16} />
             </button>
           ) : (
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 flex items-center justify-center font-black text-white text-xs shadow-md overflow-hidden shrink-0 p-0.5">
-              <img src={profileData.logoUrl || "/logo.png"} alt="Business Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class=\"text-xs font-black text-purple-300\">⚡</span>'; }} />
+            <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-black text-white text-xs shadow-md overflow-hidden shrink-0 p-0.5 ${
+              (chatChannel === 'instagram' && activeTab === 'chats') || activeTab === 'posts' || menuSubScreen === 'ig_comment_dm'
+                ? 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] border-pink-500/50'
+                : 'bg-gradient-to-tr from-purple-900 to-indigo-900 border-purple-500/40'
+            }`}>
+              {(chatChannel === 'instagram' && activeTab === 'chats') || activeTab === 'posts' || menuSubScreen === 'ig_comment_dm' ? (
+                profileData.instagramDp ? (
+                  <img 
+                    src={profileData.instagramDp} 
+                    alt="Instagram Profile" 
+                    className="w-full h-full object-cover rounded-lg" 
+                    onError={(e) => { 
+                      e.target.style.display = 'none'; 
+                      if (e.target.parentNode) {
+                        e.target.parentNode.innerHTML = '<div class="w-full h-full flex items-center justify-center text-white"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg></div>'; 
+                      }
+                    }} 
+                  />
+                ) : (
+                  <InstagramIcon size={18} className="text-white" />
+                )
+              ) : (
+                <img 
+                  src={profileData.logoUrl || "/logo.png"} 
+                  alt="Business Logo" 
+                  className="w-full h-full object-contain rounded-lg" 
+                  onError={(e) => { 
+                    e.target.style.display='none'; 
+                    if (e.target.parentNode) {
+                      e.target.parentNode.innerHTML='<span class="text-xs font-black text-purple-300">⚡</span>'; 
+                    }
+                  }} 
+                />
+              )}
             </div>
           )}
 
           <div>
-            <h1 className="font-extrabold text-xs text-white tracking-tight leading-tight">
-              {activeChatThread 
-                ? activeChatThread.customerName 
-                : (activeTab === 'chats' ? 'Conversations' : 
-                   activeTab === 'dashboard' ? 'Business Dashboard' :
-                   activeTab === 'catalog' ? 'Product Catalog' :
-                   activeTab === 'posts' ? 'Social Post Scheduler' : 
-                   (menuSubScreen === 'contacts_crm' ? 'Contacts & CRM' :
-                    menuSubScreen === 'stage_funnel' ? 'Funnel & Stage Sequences' :
-                    menuSubScreen === 'ai_assistant' ? 'AI Smart Assistant' :
-                    menuSubScreen === 'auto_reply' ? 'WhatsApp Auto-Replies' :
-                    menuSubScreen === 'ig_comment_dm' ? 'Instagram Comment-DM' :
-                    menuSubScreen === 'flow_automation' ? 'Flow & Auto-Pilot' :
-                    menuSubScreen === 'meta_templates' ? 'Meta WhatsApp Templates' :
-                    menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
-                    menuSubScreen === 'blog_seo' ? 'Google SEO & Blogs' :
-                    menuSubScreen === 'custom_webhooks' ? '🔗 Custom Webhooks & API' :
-                    menuSubScreen === 'settings_ai_training' ? 'Settings, Profile & API' : 
-                    menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu'))}
+            <h1 className="font-extrabold text-xs text-white tracking-tight leading-tight flex items-center gap-1.5">
+              {activeChatThread ? (
+                <>
+                  {activeChatThread.channel === 'instagram' && (
+                    <span className="p-0.5 bg-gradient-to-tr from-purple-600 to-pink-600 rounded-md text-white shrink-0">
+                      <InstagramIcon size={12} />
+                    </span>
+                  )}
+                  <span className="truncate">{activeChatThread.customerName}</span>
+                </>
+              ) : (
+                activeTab === 'chats' ? (chatChannel === 'instagram' ? 'Instagram DMs' : 'Conversations') : 
+                activeTab === 'dashboard' ? 'Business Dashboard' :
+                activeTab === 'catalog' ? 'Product Catalog' :
+                activeTab === 'posts' ? 'Social Post Scheduler' : 
+                (menuSubScreen === 'contacts_crm' ? 'Contacts & CRM' :
+                 menuSubScreen === 'stage_funnel' ? 'Funnel & Stage Sequences' :
+                 menuSubScreen === 'ai_assistant' ? 'AI Smart Assistant' :
+                 menuSubScreen === 'auto_reply' ? 'WhatsApp Auto-Replies' :
+                 menuSubScreen === 'ig_comment_dm' ? 'Instagram Comment-DM' :
+                 menuSubScreen === 'flow_automation' ? 'Flow & Auto-Pilot' :
+                 menuSubScreen === 'meta_templates' ? 'Meta WhatsApp Templates' :
+                 menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
+                 menuSubScreen === 'blog_seo' ? 'Google SEO & Blogs' :
+                 menuSubScreen === 'custom_webhooks' ? '🔗 Custom Webhooks & API' :
+                 menuSubScreen === 'settings_ai_training' ? 'Settings, Profile & API' : 
+                 menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu')
+              )}
             </h1>
             
             {/* 🏢 Store / Channel Switcher Dropdown */}
@@ -1882,16 +1929,27 @@ export default function MobileDashboard() {
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs border shrink-0 ${
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs border shrink-0 relative ${
                         chat.channel === 'whatsapp' 
                           ? 'bg-[#075E54]/40 text-emerald-300 border-emerald-500/30' 
-                          : 'bg-purple-950/40 text-pink-300 border-pink-500/30'
+                          : 'bg-gradient-to-tr from-purple-950/80 to-pink-950/80 text-pink-300 border-pink-500/40'
                       }`}>
-                        {chat.customerName.slice(0, 2).toUpperCase()}
+                        {chat.channel === 'instagram' ? (
+                          <>
+                            <span>{chat.customerName.replace('@', '').slice(0, 2).toUpperCase()}</span>
+                            <span className="absolute -bottom-0.5 -right-0.5 p-0.5 bg-gradient-to-tr from-purple-600 via-pink-600 to-orange-500 rounded-full text-white shadow-sm border border-black">
+                              <InstagramIcon size={9} />
+                            </span>
+                          </>
+                        ) : (
+                          chat.customerName.slice(0, 2).toUpperCase()
+                        )}
                       </div>
                       <div className="min-w-0">
                         <div className={`text-xs flex items-center gap-1.5 truncate ${chat.unreadCount > 0 ? 'font-black text-white' : 'font-semibold text-gray-300'}`}>
-                          <span className="truncate">{chat.customerName}</span>
+                          <span className="truncate">
+                            {chat.channel === 'instagram' && !chat.customerName.startsWith('@') ? `@${chat.customerName}` : chat.customerName}
+                          </span>
                           <span className="text-[9px] text-emerald-400 font-mono font-normal bg-emerald-950/60 px-1.5 rounded shrink-0">
                             {chat.stage}
                           </span>
