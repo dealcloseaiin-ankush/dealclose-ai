@@ -15,7 +15,7 @@ import 'reactflow/dist/style.css';
 import { 
   MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, 
   FolderOpen, ChevronLeft, Menu, ListPlus, Camera, Edit, Trash2,
-  Plus, ZoomIn, ZoomOut, Maximize2, Sparkles, ArrowLeft
+  Plus, ZoomIn, ZoomOut, Maximize2, Sparkles, ArrowLeft, Copy, Check, ExternalLink, FileCode
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -31,6 +31,28 @@ const initialNodes = [
 ];
 
 const getId = () => `dndnode_${crypto.randomUUID()}`;
+
+// 🚀 PRESETS FOR EXTERNAL AI PROMPT INJECTION (ChatGPT / Gemini)
+export const INDUSTRY_PRESETS = [
+  { id: 'clothing', label: '👗 Fashion & Clothing Boutique', defaultProducts: 'Sarees, Designer Kurtis, Western Tops, Jeans, Lehengas, Ethnic Wear' },
+  { id: 'real_estate', label: '🏢 Real Estate & Properties', defaultProducts: '2BHK / 3BHK Luxury Flats, Commercial Shops, Residential Plots, Villas' },
+  { id: 'ecommerce', label: '🛍️ E-Commerce & Retail Store', defaultProducts: 'Trending Gadgets, Home Essentials, Footwear, Accessories' },
+  { id: 'healthcare', label: '🩺 Doctor, Clinic & Healthcare', defaultProducts: 'General Doctor Consultation, Dental Care, Lab Tests, Skin & Hair Clinic' },
+  { id: 'restaurant', label: '🍽️ Restaurant, Cafe & Bakery', defaultProducts: 'Pizza, Burgers, North Indian Thali, Fresh Bakery, Table Booking' },
+  { id: 'fitness', label: '🏋️ Gym, Yoga & Fitness Center', defaultProducts: 'Monthly Membership, Personal Training, Weight Loss Plans' },
+  { id: 'education', label: '🎓 Coaching, Tuition & Courses', defaultProducts: 'IIT/NEET Prep, Spoken English, Digital Marketing Course, Admissions' },
+  { id: 'salon', label: '💇 Salon, Spa & Beauty Parlour', defaultProducts: 'Haircut, Hair Spa, Facial, Bridal Makeup, Waxing' },
+  { id: 'services', label: '💼 Agency, B2B & Consulting', defaultProducts: 'Digital Marketing, Web Development, CA/Tax Accounting Services' },
+  { id: 'creator', label: '📸 Content Creator & Influencer', defaultProducts: 'Reel Shoutout, Story Promotion, Brand Collab, PR Review' },
+];
+
+export const GOAL_PRESETS = [
+  { id: 'lead_capture', label: '💬 Fast Lead Capture & City Inquiry', desc: 'Ask customer Name, City, Phone number, and specific product requirement.' },
+  { id: 'catalog_order', label: '🛍️ Catalog Browsing & COD Checkout', desc: 'Show product categories, share price list/catalog link, collect size and delivery address.' },
+  { id: 'site_visit', label: '🏠 Property Inquiries & Site Visit Booking', desc: 'Ask budget (Under 50L / 1Cr), preferred location, and book a Sunday site visit.' },
+  { id: 'discount_promo', label: '🎁 Instant 15% Discount Code & Menu', desc: 'Give welcome coupon code, show popular bestsellers, and transfer hot leads to staff.' },
+  { id: 'support_menu', label: '🎧 Interactive Support & FAQs Menu', desc: '3-button menu for Order Status, Return/Exchange, and Talk to Human.' },
+];
 
 // 🚀 NEW: LocalStorage Logic for Chat History (12 hours limit & Max 5 recent chats)
 const CHAT_STORAGE_KEY = 'dealclose_ai_chat_history';
@@ -77,6 +99,16 @@ function FlowBuilder() {
   // 🚀 NEW: Flow List Modal States
   const [isFlowListOpen, setIsFlowListOpen] = useState(false);
   const [savedFlows, setSavedFlows] = useState([]);
+
+  // 🚀 NEW: External AI Script Importer / ChatGPT Flow Architect States
+  const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
+  const [scriptModalTab, setScriptModalTab] = useState('prompt'); // 'prompt' | 'paste' | 'chat'
+  const [scriptIndustry, setScriptIndustry] = useState('clothing');
+  const [scriptGoal, setScriptGoal] = useState('lead_capture');
+  const [scriptBizName, setScriptBizName] = useState('');
+  const [scriptProducts, setScriptProducts] = useState('');
+  const [pastedJson, setPastedJson] = useState('');
+  const [isCopyingPrompt, setIsCopyingPrompt] = useState(false);
 
   // 🚀 NEW: AI Flow Builder Assistant States
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
@@ -139,6 +171,17 @@ function FlowBuilder() {
       if (userData) {
         const bName = (userData.businessName && userData.businessName !== 'Main Business') ? userData.businessName : 'DealClose AI (Main)';
         setMainBusinessName(bName);
+        setScriptBizName(bName);
+        if (userData.brandKit?.category) {
+          const matched = INDUSTRY_PRESETS.find(i => (userData.brandKit.category || '').toLowerCase().includes(i.id));
+          if (matched) {
+            setScriptIndustry(matched.id);
+            setScriptProducts(matched.defaultProducts);
+          }
+        }
+        if (userData.brandKit?.products && Array.isArray(userData.brandKit.products) && userData.brandKit.products.length > 0) {
+          setScriptProducts(userData.brandKit.products.join(', '));
+        }
       }
     }).catch(console.error);
 
@@ -324,6 +367,189 @@ function FlowBuilder() {
     setIsMobileDrawerOpen(false);
     toast.success(`Added ${label.replace(/[^a-zA-Z ]/g, '')} block! ⚡`);
   }, [platform, setNodes, nodes]); 
+
+  // 🚀 MASTER PROMPT GENERATOR FOR EXTERNAL AI (ChatGPT / Gemini / Claude)
+  const generatedMasterPrompt = useMemo(() => {
+    const biz = scriptBizName.trim() || mainBusinessName || 'My Business';
+    const industryObj = INDUSTRY_PRESETS.find(i => i.id === scriptIndustry) || INDUSTRY_PRESETS[0];
+    const goalObj = GOAL_PRESETS.find(g => g.id === scriptGoal) || GOAL_PRESETS[0];
+    const products = scriptProducts.trim() || industryObj.defaultProducts;
+    const channel = platform === 'instagram' ? 'Instagram DM' : 'WhatsApp';
+
+    return `You are an Elite Conversational AI Automation Flow Architect.
+Design a high-converting, friendly chatbot automation flow for my business:
+
+🏢 BUSINESS PROFILE:
+- Business Name: "${biz}"
+- Industry / Category: "${industryObj.label}"
+- Products / Services: "${products}"
+- Target Platform: "${channel}"
+- Main Conversion Goal: "${goalObj.label}" (${goalObj.desc})
+
+📋 COMPATIBLE NODE TYPES & RULES:
+1. "trigger": Keyword trigger (e.g. {"type": "trigger", "data": {"triggerType": "keyword", "keyword": "hi, hello, price, info, order"}})
+2. "menu": Interactive 2-3 button options menu (e.g. {"type": "menu", "data": {"message": "Welcome to ${biz}! 👋 How can we help?", "opt1": "View Catalog 📦", "opt2": "Track Order 🚚", "opt3": "Talk to Sales 📞"}}). SourceHandle MUST be "opt_0", "opt_1", "opt_2".
+3. "askQuestion": Collect lead info like Name, City, Budget, Size (e.g. {"type": "askQuestion", "data": {"question": "Please share your City & Delivery Pincode:", "replyType": "open"}}). SourceHandle MUST be "replied".
+4. "message": Final confirmation, coupon code or catalog link (e.g. {"type": "message", "data": {"message": "Thank you! Our team has received your details and will DM you shortly."}}).
+5. "delay": Wait timer before follow-up (e.g. {"type": "delay", "data": {"delay": "15", "unit": "Minutes"}}).
+
+⚡ OUTPUT REQUIREMENT:
+Return ONLY the JSON structure below wrapped in \`\`\`json ... \`\`\` codeblock so I can import it directly into DealClose Flow Builder:
+{
+  "flowName": "${biz} - ${goalObj.label}",
+  "nodes": [
+    { "id": "1", "type": "trigger", "data": { "triggerType": "keyword", "keyword": "hi, hello, catalog, price" } },
+    { "id": "2", "type": "menu", "data": { "message": "Hi! Welcome to ${biz} 👋 How can we help you today?", "opt1": "View Catalog 📦", "opt2": "Order Status 🚚", "opt3": "Talk to Human 📞" } },
+    { "id": "3", "type": "message", "data": { "message": "Here is our latest collection: [Store Link]. Let us know what you like!" } },
+    { "id": "4", "type": "askQuestion", "data": { "question": "Please share your Order ID or registered mobile number:", "replyType": "open" } },
+    { "id": "5", "type": "message", "data": { "message": "A support executive will contact you right away! 📞" } },
+    { "id": "6", "type": "message", "data": { "message": "Thanks! Tracking your shipment now..." } }
+  ],
+  "edges": [
+    { "id": "e1-2", "source": "1", "target": "2" },
+    { "id": "e2-3", "source": "2", "target": "3", "sourceHandle": "opt_0" },
+    { "id": "e2-4", "source": "2", "target": "4", "sourceHandle": "opt_1" },
+    { "id": "e2-5", "source": "2", "target": "5", "sourceHandle": "opt_2" },
+    { "id": "e4-6", "source": "4", "target": "6", "sourceHandle": "replied" }
+  ]
+}
+
+Please generate the customized flow for "${biz}" now.`;
+  }, [scriptBizName, mainBusinessName, scriptIndustry, scriptGoal, scriptProducts, platform]);
+
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(generatedMasterPrompt);
+    setIsCopyingPrompt(true);
+    toast.success("Master Prompt Copied! 📋 Paste it into ChatGPT or Gemini.");
+    setTimeout(() => setIsCopyingPrompt(false), 2500);
+  };
+
+  // 🚀 1-CLICK SCRIPT PARSER & CANVAS BUILDER
+  const handleBuildFromPastedScript = () => {
+    if (!pastedJson.trim()) {
+      toast.error("Please paste the flow JSON / script generated by ChatGPT or Gemini first.");
+      return;
+    }
+
+    try {
+      let rawText = pastedJson.trim();
+      if (rawText.includes('```')) {
+        const matches = rawText.match(/```(?:json)?([\s\S]*?)```/);
+        if (matches && matches[1]) {
+          rawText = matches[1].trim();
+        }
+      }
+
+      const firstBrace = rawText.indexOf('{');
+      const lastBrace = rawText.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        rawText = rawText.substring(firstBrace, lastBrace + 1);
+      }
+
+      const parsed = JSON.parse(rawText);
+
+      let parsedNodes = [];
+      let parsedEdges = [];
+      let parsedName = '';
+
+      if (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+        parsedName = parsed.flowName || parsed.name || flowName;
+        let yOffset = 50;
+        parsedNodes = parsed.nodes.map((n, idx) => {
+          const type = n.type || 'message';
+          const pos = (n.position && n.position.x !== undefined && n.position.y !== undefined) 
+            ? n.position 
+            : { x: 250, y: yOffset };
+          yOffset += 240;
+          return {
+            id: String(n.id || `node_${idx + 1}`),
+            type: type === 'ask_question' ? 'askQuestion' : type,
+            position: pos,
+            data: {
+              ...(n.data || {}),
+              platform: platform || 'whatsapp'
+            }
+          };
+        });
+
+        parsedEdges = (parsed.edges || []).map((e, idx) => ({
+          id: e.id || `edge_${idx + 1}`,
+          source: String(e.source),
+          target: String(e.target),
+          sourceHandle: e.sourceHandle || undefined
+        }));
+      } else if (Array.isArray(parsed.steps) || Array.isArray(parsed.flow)) {
+        const steps = parsed.steps || parsed.flow;
+        parsedName = parsed.flowName || 'Imported Flow';
+        let yOffset = 50;
+        parsedNodes.push({
+          id: '1',
+          type: 'trigger',
+          position: { x: 250, y: yOffset },
+          data: { triggerType: 'keyword', keyword: parsed.trigger || 'hi, hello', platform }
+        });
+        yOffset += 220;
+
+        steps.forEach((st, idx) => {
+          const nodeId = String(idx + 2);
+          let nType = 'message';
+          let nData = { platform };
+          if (st.type === 'menu' || st.options) {
+            nType = 'menu';
+            nData.message = st.message || st.text || 'Choose an option:';
+            if (Array.isArray(st.options)) {
+              if (st.options[0]) nData.opt1 = st.options[0];
+              if (st.options[1]) nData.opt2 = st.options[1];
+              if (st.options[2]) nData.opt3 = st.options[2];
+            }
+          } else if (st.type === 'askQuestion' || st.question) {
+            nType = 'askQuestion';
+            nData.question = st.question || st.message;
+            nData.replyType = 'open';
+          } else if (st.type === 'delay' || st.delay) {
+            nType = 'delay';
+            nData.delay = String(st.delay || '15');
+            nData.unit = st.unit || 'Minutes';
+          } else {
+            nType = 'message';
+            nData.message = st.message || st.text || String(st);
+          }
+
+          parsedNodes.push({
+            id: nodeId,
+            type: nType,
+            position: { x: 250, y: yOffset },
+            data: nData
+          });
+
+          parsedEdges.push({
+            id: `e_${idx + 1}_${nodeId}`,
+            source: String(idx + 1),
+            target: nodeId
+          });
+
+          yOffset += 240;
+        });
+      } else {
+        throw new Error("JSON must contain 'nodes' & 'edges' or a 'steps' array.");
+      }
+
+      if (parsedNodes.length === 0) {
+        throw new Error("No valid flow blocks found in the JSON.");
+      }
+
+      if (parsedName) setFlowName(parsedName);
+      setNodes(parsedNodes);
+      setEdges(parsedEdges);
+      setIsScriptModalOpen(false);
+      setPastedJson('');
+      toast.success(`🎉 Successfully created ${parsedNodes.length} blocks on Flow Canvas!`);
+      setTimeout(() => fitView({ padding: 0.25, duration: 400 }), 100);
+    } catch (err) {
+      console.error("Failed to parse flow script:", err);
+      toast.error(`Import Error: ${err.message || "Invalid JSON script format."}`);
+    }
+  };
 
   // 🚀 NEW: Handle AI Prompt to Auto-Generate Flow
   const handleAiSubmit = async (e) => {
@@ -665,6 +891,228 @@ function FlowBuilder() {
       </div>
     )}
 
+    {/* 🚀 EXTERNAL AI FLOW SCRIPT GENERATOR & 1-CLICK IMPORTER MODAL */}
+    {isScriptModalOpen && (
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 animate-fade-in">
+        <div className="bg-[#111116] border border-gray-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+          
+          {/* Modal Header */}
+          <div className="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-purple-900/40 border-b border-gray-800 p-4 md:p-5 flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white shrink-0">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2">
+                  AI Flow Script Architect ⚡
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 hidden sm:inline">
+                    ChatGPT & Gemini Compatible
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400">Generate personalized prompts, discuss with external AI, and import the flow canvas in 1-click!</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsScriptModalOpen(false)}
+              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/80 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Modal Tabs */}
+          <div className="flex border-b border-gray-800 bg-[#0d0d12] shrink-0">
+            <button
+              onClick={() => setScriptModalTab('prompt')}
+              className={`flex-1 py-3 px-3 text-xs md:text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-all ${
+                scriptModalTab === 'prompt'
+                  ? 'border-blue-500 text-blue-400 bg-blue-500/10'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <Copy size={15} />
+              <span>1. Master Prompt</span>
+            </button>
+            <button
+              onClick={() => setScriptModalTab('paste')}
+              className={`flex-1 py-3 px-3 text-xs md:text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-all ${
+                scriptModalTab === 'paste'
+                  ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <FileCode size={15} />
+              <span>2. Paste & Build Canvas</span>
+            </button>
+          </div>
+
+          {/* Modal Tab Content */}
+          <div className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4">
+            
+            {/* TAB 1: MASTER PROMPT GENERATOR */}
+            {scriptModalTab === 'prompt' && (
+              <div className="space-y-4 animate-fade-in">
+                
+                {/* Auto-injected Business Details Selector */}
+                <div className="bg-[#171720] border border-gray-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+                      🏢 Customize Prompt for Your Business:
+                    </h3>
+                    <span className="text-[11px] text-gray-400">
+                      Channel: <strong className={platform === 'instagram' ? 'text-pink-400' : 'text-green-400'}>{platform === 'instagram' ? 'Instagram' : 'WhatsApp'}</strong>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 block mb-1">Business Name</label>
+                      <input
+                        type="text"
+                        value={scriptBizName}
+                        onChange={(e) => setScriptBizName(e.target.value)}
+                        placeholder="e.g. Royal Fashion Boutique"
+                        className="w-full bg-black/60 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 block mb-1">Industry / Category</label>
+                      <select
+                        value={scriptIndustry}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setScriptIndustry(val);
+                          const preset = INDUSTRY_PRESETS.find(i => i.id === val);
+                          if (preset && (!scriptProducts || INDUSTRY_PRESETS.some(p => p.defaultProducts === scriptProducts))) {
+                            setScriptProducts(preset.defaultProducts);
+                          }
+                        }}
+                        className="w-full bg-black/60 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        {INDUSTRY_PRESETS.map((ind) => (
+                          <option key={ind.id} value={ind.id}>{ind.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="text-[11px] font-bold text-gray-400 block mb-1">Products / Services Offered</label>
+                      <input
+                        type="text"
+                        value={scriptProducts}
+                        onChange={(e) => setScriptProducts(e.target.value)}
+                        placeholder="e.g. Sarees, Kurtis, Lehengas, Western Wear"
+                        className="w-full bg-black/60 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="text-[11px] font-bold text-gray-400 block mb-1">Automation Flow Goal</label>
+                      <select
+                        value={scriptGoal}
+                        onChange={(e) => setScriptGoal(e.target.value)}
+                        className="w-full bg-black/60 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        {GOAL_PRESETS.map((g) => (
+                          <option key={g.id} value={g.id}>{g.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Master Prompt Output Box */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-300">Generated Master AI Prompt:</label>
+                    <button
+                      onClick={handleCopyPrompt}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition-all active:scale-95 shadow-md shadow-blue-600/30"
+                    >
+                      {isCopyingPrompt ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
+                      <span>{isCopyingPrompt ? 'Copied to Clipboard! ✨' : 'Copy Master Prompt 📋'}</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-[#0b0b0f] border border-gray-800 rounded-2xl p-3 font-mono text-[11px] text-gray-300 max-h-52 overflow-y-auto whitespace-pre-wrap select-all">
+                    {generatedMasterPrompt}
+                  </div>
+                </div>
+
+                {/* Quick Launch Buttons for External AI Tools */}
+                <div className="bg-[#14141c] border border-gray-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-300 font-semibold">
+                    <span>Open External AI:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="https://chatgpt.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      <span>ChatGPT</span>
+                      <ExternalLink size={12} />
+                    </a>
+                    <a
+                      href="https://gemini.google.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      <span>Gemini AI</span>
+                      <ExternalLink size={12} />
+                    </a>
+                    <button
+                      onClick={() => setScriptModalTab('paste')}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-colors"
+                    >
+                      <span>Next: Paste Script ➔</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 2: PASTE SCRIPT & 1-CLICK BUILD */}
+            {scriptModalTab === 'paste' && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <label className="text-xs font-bold text-gray-300 block mb-1.5">
+                    Paste ChatGPT / Gemini Response or Flow JSON:
+                  </label>
+                  <textarea
+                    value={pastedJson}
+                    onChange={(e) => setPastedJson(e.target.value)}
+                    rows={9}
+                    placeholder={`Paste output from ChatGPT or Gemini here...\n\nExample:\n{\n  "flowName": "Clothing Store Flow",\n  "nodes": [...],\n  "edges": [...]\n}`}
+                    className="w-full bg-[#0b0b0f] border border-gray-700 rounded-2xl p-3.5 font-mono text-xs text-white outline-none focus:border-emerald-500 leading-relaxed"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                  <div className="text-[11px] text-gray-400">
+                    💡 <em>Tip: You can paste the whole AI response or just the JSON block. Our parser handles everything automatically!</em>
+                  </div>
+                  <button
+                    onClick={handleBuildFromPastedScript}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs md:text-sm rounded-2xl shadow-xl shadow-emerald-600/30 active:scale-95 transition-all shrink-0"
+                  >
+                    <Sparkles size={16} />
+                    <span>Build Flow Canvas in 1-Click 🚀</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      </div>
+    )}
+
     {/* 🚀 MOBILE SLIDE-UP BOTTOM DRAWER FOR ADDING NODES */}
     {isMobileDrawerOpen && (
       <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center md:hidden animate-fade-in" onClick={() => setIsMobileDrawerOpen(false)}>
@@ -679,6 +1127,23 @@ function FlowBuilder() {
               <X size={20} />
             </button>
           </div>
+
+          {/* 🚀 Mobile AI Script Generator Button */}
+          <button 
+            onClick={() => { setIsMobileDrawerOpen(false); setIsScriptModalOpen(true); }}
+            className="w-full bg-gradient-to-r from-purple-900/50 via-indigo-900/50 to-blue-900/50 border border-purple-500/50 p-3 rounded-2xl flex items-center justify-between text-left active:scale-95 transition-all shadow-md shadow-purple-900/20"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <div className="font-bold text-xs text-white">External AI Flow Architect ✨</div>
+                <div className="text-[10px] text-purple-200/80">Copy prompt for ChatGPT & paste JSON to build</div>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold bg-purple-600 text-white px-2 py-1 rounded-lg">Open ➔</span>
+          </button>
 
           <div className="grid grid-cols-2 gap-2.5">
             <button 
@@ -813,7 +1278,7 @@ function FlowBuilder() {
 
         {/* ROW 2: Action Buttons (Flows, Templates, AI, Save) */}
         <div className="flex items-center justify-between gap-1.5 w-full pt-1 border-t border-gray-800/60">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button 
               onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} 
               className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
@@ -823,10 +1288,19 @@ function FlowBuilder() {
             </button>
 
             <button 
+              onClick={() => setIsScriptModalOpen(true)} 
+              className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-purple-600/20 active:scale-95"
+              title="Generate Prompt for ChatGPT/Gemini & Import Script"
+            >
+              <Sparkles size={13} />
+              <span>AI Flow Script ✨</span>
+            </button>
+
+            <button 
               onClick={() => setIsAiChatOpen(prev => !prev)} 
               className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
             >
-              <Sparkles size={13} />
+              <Bot size={13} />
               <span>AI Copilot</span>
             </button>
 
@@ -865,6 +1339,20 @@ function FlowBuilder() {
               <button onClick={() => setIsPaletteOpen(false)} className="text-gray-400 hover:text-white bg-gray-800/50 p-1.5 rounded-lg">
                 <ChevronLeft size={16} />
               </button>
+            </div>
+
+            {/* 🚀 EXTERNAL AI GENERATOR & IMPORTER CARD */}
+            <div 
+              onClick={() => setIsScriptModalOpen(true)}
+              className="bg-gradient-to-r from-purple-900/40 via-indigo-900/40 to-blue-900/40 border border-purple-500/50 hover:border-purple-400 p-3 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] shadow-lg shadow-purple-900/20 group"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles size={16} className="text-purple-400 animate-pulse" />
+                <span className="font-black text-xs text-white">External AI Architect ⚡</span>
+              </div>
+              <p className="text-[10px] text-purple-200/80 leading-relaxed">
+                Copy custom prompt for ChatGPT / Gemini and import flow script in 1-click!
+              </p>
             </div>
             
             <div onClick={() => onNodeClickAdd('💬 Send Message')} className="bg-[#1a1a1a] border border-gray-700 p-3 rounded-xl cursor-pointer hover:border-blue-500 transition-colors flex items-center gap-3" onDragStart={(e) => e.dataTransfer.setData('application/label', '💬 Send Message')} draggable>
