@@ -92,6 +92,7 @@ export default function MobileDashboard() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showWaConnectModal, setShowWaConnectModal] = useState(false);
   const [showIgConnectModal, setShowIgConnectModal] = useState(false);
+  const [showCreateBlogModal, setShowCreateBlogModal] = useState(false);
   const [instagramPicker, setInstagramPicker] = useState(null);
   const [isSavingInstagramSelection, setIsSavingInstagramSelection] = useState(false);
 
@@ -1025,7 +1026,7 @@ export default function MobileDashboard() {
   const handleGuestInstantLogin = async () => {
     setIsLoggingIn(true);
     setLoginEmail('ankush.bani@gmail.com');
-    setPassword('ak@7828289433');
+    setLoginPassword('ak@7828289433');
     try {
       await login('ankush.bani@gmail.com', 'ak@7828289433');
       setShowLoginModal(false);
@@ -1407,6 +1408,16 @@ export default function MobileDashboard() {
     try {
       await api.patch(`/whatsapp/flows/${id}/toggle`).catch(() => {});
     } catch (e) {}
+  };
+
+  const handleDeleteFlow = async (flowId, flowName) => {
+    if (!window.confirm(`Delete flow "${flowName}"?`)) return;
+    try {
+      await api.delete(`/whatsapp/flows/${flowId}`).catch(() => {});
+      setFlowRules(prev => prev.filter(f => f.id !== flowId));
+    } catch(err) {
+      setFlowRules(prev => prev.filter(f => f.id !== flowId));
+    }
   };
 
   const handleInspectFlow = async (fl) => {
@@ -2472,7 +2483,7 @@ export default function MobileDashboard() {
                     caption: `🔥 Special Promotion at ${profileData.businessName}! Flat 20% Discount. Reply or DM "OFFER" to claim.`,
                     scheduledTime: 'Today 6:00 PM'
                   };
-                  setPrebuildTemplates([newBatchItem, ...prebuildTemplates]);
+                  setCustomAiPostBatches([newBatchItem, ...customAiPostBatches]);
                   alert('New AI Post Batch Generated for your store! 🤖✨');
                 }}
                 className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-black rounded-xl flex items-center gap-1 shadow-md"
@@ -4708,13 +4719,13 @@ export default function MobileDashboard() {
                   <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
                     <span className="text-[9px] text-gray-400 uppercase font-bold">Total Views</span>
                     <div className="text-lg font-black text-emerald-400 mt-0.5">
-                      {linkAnalyticsStats.totalViews || liveUser?.digitalCardConfig?.totalViews || 0}
+                      {linkAnalyticsStats.totalViews || rawDbUser?.digitalCardConfig?.totalViews || 0}
                     </div>
                   </div>
                   <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
                     <span className="text-[9px] text-gray-400 uppercase font-bold">Total Clicks</span>
                     <div className="text-lg font-black text-blue-400 mt-0.5">
-                      {linkAnalyticsStats.totalClicks || liveUser?.digitalCardConfig?.totalClicks || 0}
+                      {linkAnalyticsStats.totalClicks || rawDbUser?.digitalCardConfig?.totalClicks || 0}
                     </div>
                   </div>
                   <div className="p-2.5 bg-black/60 border border-gray-800 rounded-2xl">
@@ -5200,14 +5211,14 @@ export default function MobileDashboard() {
               </div>
             </div>
 
-            {isInstagramLinked ? (
+            {isIgConnected ? (
               <div className="space-y-3 p-3 bg-pink-950/20 border border-pink-500/30 rounded-2xl">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
                   <span className="text-xs font-bold text-emerald-400">Instagram Connected</span>
                 </div>
                 <p className="text-[11px] text-gray-300">
-                  Connected Page/Account: <span className="font-semibold text-pink-300">{instagramPageName || profileData.businessName}</span>
+                  Connected Page/Account: <span className="font-semibold text-pink-300">{profileData.instagramUsername || profileData.businessName}</span>
                 </p>
                 <button
                   type="button"
