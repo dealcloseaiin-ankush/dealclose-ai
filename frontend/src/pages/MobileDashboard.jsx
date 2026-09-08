@@ -14,6 +14,7 @@ import {
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import useWorkspaceStore from '../store/workspaceStore';
+import MetaConnectButton from '../components/MetaConnectButton';
 
 // Native-style Facebook Logo Icon
 const FacebookIcon = ({ size = 20, className = '' }) => (
@@ -91,6 +92,8 @@ export default function MobileDashboard() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showWaConnectModal, setShowWaConnectModal] = useState(false);
   const [showIgConnectModal, setShowIgConnectModal] = useState(false);
+  const [instagramPicker, setInstagramPicker] = useState(null);
+  const [isSavingInstagramSelection, setIsSavingInstagramSelection] = useState(false);
 
   // Google Business Places Search Modal State
   const [showGoogleSearchModal, setShowGoogleSearchModal] = useState(false);
@@ -1738,6 +1741,57 @@ export default function MobileDashboard() {
     }
   };
 
+  const openInstagramPicker = (data, workspaceId = activeWorkspaceId) => {
+    if (!data?.availableAccounts?.length) {
+      fetchLiveBackendData(workspaceId);
+      setShowIgConnectModal(false);
+      return;
+    }
+    setShowIgConnectModal(false);
+    setInstagramPicker({ workspaceId, accounts: data.availableAccounts });
+  };
+
+  const saveInstagramSelection = async (account) => {
+    setIsSavingInstagramSelection(true);
+    try {
+      const { data } = await api.post('/users/settings/instagram-connect-selected', {
+        selectedAccountId: account.accountId,
+        selectedPageId: account.pageId,
+        workspaceId: instagramPicker?.workspaceId || activeWorkspaceId
+      });
+      
+      setInstagramPicker(null);
+      await fetchLiveBackendData(activeWorkspaceId);
+      
+      if (data.webhookWarning) {
+        alert(`Instagram connected, but webhook setup needs Meta permissions: ${data.webhookWarning}`);
+      } else {
+        alert(`🎉 Instagram @${account.pageName} successfully connected to ${profileData.businessName}! 🚀`);
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || 'Could not save the selected Instagram account.');
+    } finally {
+      setIsSavingInstagramSelection(false);
+    }
+  };
+
+  const disconnectInstagram = async () => {
+    if (!window.confirm(`🚨 Are you sure you want to disconnect Instagram from "${profileData.businessName}"?`)) return;
+    try {
+      const payload = activeWorkspaceId && activeWorkspaceId !== 'main' ? { workspaceId: activeWorkspaceId } : {};
+      const res = await api.post('/settings/instagram-disconnect', payload);
+      if (res.data.success) {
+        alert('Instagram disconnected successfully.');
+        await fetchLiveBackendData(activeWorkspaceId);
+        setShowIgConnectModal(false);
+      } else {
+        alert(res.data.message || 'Could not disconnect Instagram.');
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || 'Instagram disconnect failed.');
+    }
+  };
+
   const handleAiSubmit = async (e) => {
     e.preventDefault();
     if (!aiInput.trim()) return;
@@ -1806,10 +1860,7 @@ export default function MobileDashboard() {
                     alt="Instagram Profile" 
                     className="w-full h-full object-cover rounded-lg" 
                     onError={(e) => { 
-                      e.target.style.display = 'none'; 
-                      if (e.target.parentNode) {
-                        e.target.parentNode.innerHTML = '<div class="w-full h-full flex items-center justify-center text-white"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg></div>'; 
-                      }
+                      e.currentTarget.style.display = 'none'; 
                     }} 
                   />
                 ) : (
@@ -1821,10 +1872,7 @@ export default function MobileDashboard() {
                   alt="Business Logo" 
                   className="w-full h-full object-contain rounded-lg" 
                   onError={(e) => { 
-                    e.target.style.display='none'; 
-                    if (e.target.parentNode) {
-                      e.target.parentNode.innerHTML='<span class="text-xs font-black text-purple-300">⚡</span>'; 
-                    }
+                    e.currentTarget.src = '/logo.png'; 
                   }} 
                 />
               )}
@@ -4362,7 +4410,7 @@ export default function MobileDashboard() {
             </button>
             
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-950 to-emerald-950 border border-emerald-500/40 flex items-center justify-center mx-auto overflow-hidden p-1 shadow-md">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-xl" onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span class="text-xl font-bold">⚡</span>'; }} />
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-xl" onError={(e) => { e.currentTarget.style.display='none'; }} />
             </div>
 
             <div className="text-center">
@@ -5138,29 +5186,102 @@ export default function MobileDashboard() {
       {/* Modal 3.6: Instagram Link Modal */}
       {showIgConnectModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
-            <button onClick={() => setShowIgConnectModal(false)} className="absolute top-4 right-4 text-gray-400">
+          <div className="bg-[#0e0e14] border border-pink-500/50 rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl">
+            <button onClick={() => setShowIgConnectModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
               <X size={16} />
             </button>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center">
                 <InstagramIcon size={16} />
               </div>
-              <h3 className="text-sm font-black text-white">Link Instagram Account</h3>
+              <div>
+                <h3 className="text-sm font-black text-white">Link Instagram Account</h3>
+                <p className="text-[10px] text-gray-400">For: <strong>{profileData.businessName}</strong></p>
+              </div>
             </div>
-            <p className="text-[10px] text-gray-400">Connect with Meta Facebook Login for Business or Instagram Professional Account:</p>
-            <div className="space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  window.open('/settings', '_blank');
-                  setShowIgConnectModal(false);
-                }}
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+
+            {isInstagramLinked ? (
+              <div className="space-y-3 p-3 bg-pink-950/20 border border-pink-500/30 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                  <span className="text-xs font-bold text-emerald-400">Instagram Connected</span>
+                </div>
+                <p className="text-[11px] text-gray-300">
+                  Connected Page/Account: <span className="font-semibold text-pink-300">{instagramPageName || profileData.businessName}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={disconnectInstagram}
+                  className="w-full py-2 bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded-xl border border-rose-500/30 text-xs font-bold transition-all"
+                >
+                  Disconnect Instagram
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <MetaConnectButton 
+                    variant="facebook" 
+                    buttonText="Connect via Facebook" 
+                    platform="instagram" 
+                    workspaceId={activeWorkspaceId} 
+                    onSuccess={(data) => openInstagramPicker(data, activeWorkspaceId)} 
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Recommended: Links FB Page + Instagram Professional Account with full DM & Comment automation.</p>
+                </div>
+
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-gray-800"></div>
+                  <span className="flex-shrink mx-2 text-[9px] text-gray-500 uppercase tracking-wider">or direct</span>
+                  <div className="flex-grow border-t border-gray-800"></div>
+                </div>
+
+                <div>
+                  <MetaConnectButton 
+                    variant="instagram" 
+                    buttonText="Connect with Instagram Login" 
+                    platform="instagram" 
+                    workspaceId={activeWorkspaceId} 
+                    onSuccess={(data) => openInstagramPicker(data, activeWorkspaceId)} 
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">For Standalone Instagram Business/Creator account.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3.7: Instagram Account Picker Modal */}
+      {instagramPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-pink-500/50 bg-[#0e0e14] p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-pink-400">Choose Instagram Account</h3>
+              <button 
+                type="button" 
+                disabled={isSavingInstagramSelection} 
+                onClick={() => setInstagramPicker(null)} 
+                className="text-gray-400 hover:text-white text-xs font-bold"
               >
-                <InstagramIcon size={14} />
-                <span>Open Meta Instagram Login ↗</span>
+                ✕
               </button>
+            </div>
+            <p className="text-[11px] text-gray-400">Select the account to link with <strong>{profileData.businessName}</strong>:</p>
+            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+              {instagramPicker.accounts.map((account) => (
+                <button
+                  key={`${account.pageId}-${account.accountId}`}
+                  type="button"
+                  disabled={isSavingInstagramSelection}
+                  onClick={() => saveInstagramSelection(account)}
+                  className="w-full rounded-2xl border border-gray-800 bg-black/60 p-3 text-left transition-all hover:border-pink-500 hover:bg-pink-950/20 disabled:opacity-50"
+                >
+                  <span className="block text-xs font-bold text-white">{account.pageName}</span>
+                  <span className="mt-0.5 block text-[10px] text-gray-400">Page ID: {account.pageId}</span>
+                  <span className="block text-[10px] text-pink-400">Instagram ID: {account.accountId}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
