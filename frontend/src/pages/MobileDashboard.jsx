@@ -1694,7 +1694,7 @@ export default function MobileDashboard() {
     setIsSearchingGoogle(true);
     try {
       const res = await api.get('/settings/google-places/search', { params: { query: q } });
-      const results = res.data?.results || [];
+      const results = res.data?.data || res.data?.results || [];
       setGoogleSearchResults(results);
       if (results.length === 0) {
         alert(`Google par "${q}" ke naam se koi business nahi mila. Kripya pura naam ya shahar ka naam saath me likhein (jaise: Ganesh Traders Sarangarh)`);
@@ -1707,14 +1707,17 @@ export default function MobileDashboard() {
   };
 
   const handleSelectGooglePlace = async (place) => {
-    const reviewUrl = place.review_url || place.google_maps_url || `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+    const placeId = place.placeId || place.place_id || '';
+    const rating = place.rating || 0;
+    const reviewsCount = place.userRatingCount || place.user_ratings_total || 0;
+    const reviewUrl = place.review_url || (placeId ? `https://search.google.com/local/writereview?placeid=${placeId}` : (place.googleMapsUri || place.google_maps_url || ''));
     
     setProfileData(prev => ({
       ...prev,
       googleBusinessLink: reviewUrl,
-      googlePlaceId: place.place_id,
-      googleRating: place.rating,
-      googleReviewCount: place.user_ratings_total
+      googlePlaceId: placeId,
+      googleRating: rating,
+      googleReviewCount: reviewsCount
     }));
 
     try {
@@ -1722,13 +1725,13 @@ export default function MobileDashboard() {
         digitalCardConfig: {
           ...(rawDbUser?.digitalCardConfig || {}),
           googleBusiness: reviewUrl,
-          googlePlaceId: place.place_id,
-          googleRating: place.rating,
-          googleReviewCount: place.user_ratings_total
+          googlePlaceId: placeId,
+          googleRating: rating,
+          googleReviewCount: reviewsCount
         }
       });
       setShowGoogleSearchModal(false);
-      alert(`🎉 Google Business Profile Linked Successfully!\n\n🏢 Business: ${place.name}\n⭐ Current Rating: ${place.rating || 'N/A'}★ (${place.user_ratings_total || 0} reviews)\n📍 Address: ${place.address || 'Synced'}\n\nAb 5-Star Review Booster is business ke liye auto-sync ho chuka hai! 🚀`);
+      alert(`🎉 Google Business Profile Linked Successfully!\n\n🏢 Business: ${place.name}\n⭐ Rating: ${rating || 'N/A'}★ (${reviewsCount} reviews)\n📍 Address: ${place.address || 'Synced'}\n\nAb 5-Star Review Booster is business ke liye auto-sync ho chuka hai! 🚀`);
     } catch (err) {
       setShowGoogleSearchModal(false);
       alert(`Google Business Review Link set ho gaya: ${reviewUrl}`);
@@ -1859,12 +1862,12 @@ export default function MobileDashboard() {
               )}
             </h1>
             
-            {/* 🏢 Store / Channel Switcher Dropdown */}
-            <div className="flex items-center gap-1 mt-0.5">
+            {/* 🏢 Store / Channel Switcher Dropdown & Quick Manage Button */}
+            <div className="flex items-center gap-1.5 mt-0.5">
               <select
                 value={activeWorkspaceId}
                 onChange={(e) => handleWorkspaceChange(e.target.value)}
-                className="bg-black/60 border border-gray-800 rounded-lg px-1.5 py-0.5 text-[10px] text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[170px] truncate"
+                className="bg-black/60 border border-gray-800 rounded-lg px-1.5 py-0.5 text-[10px] text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[140px] truncate"
               >
                 {workspaces.map(ws => (
                   <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
@@ -1872,9 +1875,19 @@ export default function MobileDashboard() {
                   </option>
                 ))}
                 <option value="add_new" className="bg-[#0e0e14] text-purple-300 font-bold">
-                  ➕ Add New Business / Store...
+                  ➕ Add New Firm...
                 </option>
               </select>
+
+              <button
+                type="button"
+                onClick={() => setShowAddWorkspaceModal(true)}
+                className="px-1.5 py-0.5 rounded-lg bg-purple-950/60 border border-purple-500/40 text-purple-300 hover:text-white text-[9px] font-bold flex items-center gap-0.5 shrink-0 shadow-sm"
+                title="Manage & Delete Businesses"
+              >
+                <Building size={10} />
+                <span>Firms ({workspaces.length})</span>
+              </button>
             </div>
           </div>
         </div>

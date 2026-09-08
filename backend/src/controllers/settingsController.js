@@ -313,7 +313,7 @@ exports.searchGooglePlaces = async (req, res) => {
     }
     const googlePlacesService = require('../services/googlePlacesService');
     const results = await googlePlacesService.searchGoogleBusiness(query);
-    res.status(200).json({ success: true, count: results.length, data: results });
+    res.status(200).json({ success: true, count: results.length, data: results, results });
   } catch (error) {
     console.error('Google Places Search Error:', error);
     res.status(500).json({ success: false, message: error.message });
