@@ -199,11 +199,19 @@ export default function Settings() {
   };
 
   const addWorkspace = () => {
-    if (config.workspaces && config.workspaces.length >= 5) {
+    if (config.workspaces && config.workspaces.length >= 10) {
       return alert("Business limit reached! Please upgrade your plan to add more branches.");
     }
-    setConfig({ ...config, workspaces: [...(config.workspaces || []), { name: 'New Branch', description: '', email: '', whatsappConfig: {}, instagramConfig: {} }] });
-    setActiveWorkspace(`ws_${(config.workspaces || []).length}`);
+    const currentList = config.workspaces || [];
+    let count = currentList.length + 1;
+    let newName = `Branch ${count}`;
+    while (currentList.some(w => (w.name || '').trim().toLowerCase() === newName.toLowerCase()) || (config.businessName || '').trim().toLowerCase() === newName.toLowerCase()) {
+      count++;
+      newName = `Branch ${count}`;
+    }
+
+    setConfig({ ...config, workspaces: [...currentList, { name: newName, description: '', email: '', whatsappConfig: {}, instagramConfig: {} }] });
+    setActiveWorkspace(`ws_${currentList.length}`);
   };
 
   const removeWorkspace = (index) => {
@@ -243,6 +251,22 @@ export default function Settings() {
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     try {
+      // 🔒 Duplicate Name Check
+      const seenNames = new Set();
+      const mainBiz = (config.businessName || '').trim().toLowerCase();
+      if (mainBiz) seenNames.add(mainBiz);
+
+      for (const ws of (config.workspaces || [])) {
+        const cleanName = (ws.name || '').trim().toLowerCase();
+        if (cleanName) {
+          if (seenNames.has(cleanName)) {
+            alert(`⚠️ Duplicate business name "${ws.name}" mila! Har business/firm ka naam alag (unique) hona chahiye.`);
+            return;
+          }
+          seenNames.add(cleanName);
+        }
+      }
+
       let finalLogoUrl = config.brandKit.logoUrl;
       if (logoFile) {
         setIsUploadingLogo(true);

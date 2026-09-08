@@ -1609,20 +1609,32 @@ export default function MobileDashboard() {
   };
 
   const handleAddWorkspace = async (e) => {
-    e.preventDefault();
-    if (!newWorkspaceName.trim()) return;
+    if (e) e.preventDefault();
+    const cleanName = newWorkspaceName.trim();
+    if (!cleanName) return;
+
+    // 🔒 Prevent duplicate firm/business names
+    const existingWorkspaces = rawDbUser?.workspaces || [];
+    const mainBusinessName = (profileData?.businessName || 'Main Business').trim().toLowerCase();
+    const isDuplicate = cleanName.toLowerCase() === mainBusinessName || 
+      existingWorkspaces.some(w => (w.name || '').trim().toLowerCase() === cleanName.toLowerCase());
+
+    if (isDuplicate) {
+      alert(`⚠️ "${cleanName}" naam ka Business / Firm pehle se exist karta hai!\n\nKripya koi alag (unique) naam daalein.`);
+      return;
+    }
+
     const newWsObj = {
-      name: newWorkspaceName.trim(),
+      name: cleanName,
       description: 'Branch / Sub-store',
-      externalApiUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in`,
-      externalApiPostUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/post`,
-      externalApiSearchUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/search`,
-      externalApiVisitUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/visit`,
-      externalApiBlogUrl: `https://${newWorkspaceName.trim().toLowerCase().replace(/\s+/g, '')}.in/api/blog`
+      externalApiUrl: `https://${cleanName.toLowerCase().replace(/\s+/g, '')}.in`,
+      externalApiPostUrl: `https://${cleanName.toLowerCase().replace(/\s+/g, '')}.in/api/post`,
+      externalApiSearchUrl: `https://${cleanName.toLowerCase().replace(/\s+/g, '')}.in/api/search`,
+      externalApiVisitUrl: `https://${cleanName.toLowerCase().replace(/\s+/g, '')}.in/api/visit`,
+      externalApiBlogUrl: `https://${cleanName.toLowerCase().replace(/\s+/g, '')}.in/api/blog`
     };
 
     try {
-      const existingWorkspaces = rawDbUser?.workspaces || [];
       const updatedWsList = [...existingWorkspaces, newWsObj];
       await api.put('/users/profile', { workspaces: updatedWsList });
       await fetchLiveBackendData();
@@ -1630,8 +1642,44 @@ export default function MobileDashboard() {
       setShowAddWorkspaceModal(false);
       alert(`New Business Store "${newWsObj.name}" created and switched! 🏢✅`);
     } catch (err) {
-      alert(`Store "${newWorkspaceName}" created! 🏢`);
+      alert(err.response?.data?.message || `Store "${cleanName}" created! 🏢`);
       setShowAddWorkspaceModal(false);
+    }
+  };
+
+  const handleDeleteWorkspace = async (wsItem) => {
+    const wsId = wsItem.id || wsItem._id?.toString();
+    const wsName = wsItem.name || 'This Firm';
+
+    if (wsId === 'main' || wsName === profileData.businessName) {
+      alert('⚠️ Main Primary Business ko delete nahi kiya ja sakta.');
+      return;
+    }
+
+    if (!window.confirm(`Kya aap sach me "${wsName}" firm/store ko permanently delete karna chahte hain?`)) {
+      return;
+    }
+
+    try {
+      const existingWorkspaces = rawDbUser?.workspaces || [];
+      const updatedWsList = existingWorkspaces.filter(w => {
+        const itemIdentifier = (w._id?.toString() || w.id || '').trim();
+        const itemName = (w.name || '').trim().toLowerCase();
+        if (wsId && itemIdentifier && itemIdentifier === wsId) return false;
+        if (itemName === wsName.trim().toLowerCase()) return false;
+        return true;
+      });
+
+      await api.put('/users/profile', { workspaces: updatedWsList });
+
+      if (activeWorkspaceId === wsId || activeWorkspaceId === wsName) {
+        handleWorkspaceChange('main');
+      }
+
+      await fetchLiveBackendData('main');
+      alert(`Business "${wsName}" successfully delete ho gaya! 🗑️✅`);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Firm delete karne me error aaya. Kripya punah prayas karein.');
     }
   };
 
@@ -4708,28 +4756,116 @@ export default function MobileDashboard() {
         </div>
       )}
 
-      {/* Modal 3: Add New Business Channel / Workspace */}
+      {/* Modal 3: Business & Workspace / Firm Switcher & Manager */}
       {showAddWorkspaceModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-xs w-full space-y-3 relative shadow-2xl">
-            <button onClick={() => setShowAddWorkspaceModal(false)} className="absolute top-4 right-4 text-gray-400">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-purple-500/50 rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <button 
+              onClick={() => setShowAddWorkspaceModal(false)} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-full bg-white/5"
+            >
               <X size={16} />
             </button>
-            <h3 className="text-sm font-bold text-white">Add New Business / Store</h3>
-            <p className="text-[10px] text-gray-400">e.g. NewPropertyHub, Branch 2, Luxury Boutique</p>
-            <form onSubmit={handleAddWorkspace} className="space-y-2 text-xs">
-              <input
-                type="text"
-                placeholder="Business Name (e.g. NewPropertyHub)"
-                value={newWorkspaceName}
-                onChange={(e) => setNewWorkspaceName(e.target.value)}
-                className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white focus:outline-none"
-                required
-              />
-              <button type="submit" className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs mt-2 shadow-lg">
-                Add & Switch Store 🏢
-              </button>
-            </form>
+            
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Building size={16} className="text-purple-400" /> Manage Businesses & Firms
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">Switch between firms or delete duplicate/unwanted branches.</p>
+            </div>
+
+            {/* List of Existing Businesses / Firms */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                Your Businesses ({workspaces.length})
+              </label>
+              <div className="space-y-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-0.5">
+                {workspaces.map((ws) => {
+                  const isMain = ws.id === 'main';
+                  const isSelected = activeWorkspaceId === ws.id || String(ws._id) === activeWorkspaceId;
+                  
+                  return (
+                    <div 
+                      key={ws.id || ws._id || ws.name}
+                      className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all ${
+                        isSelected 
+                          ? 'bg-purple-950/40 border-purple-500/60 shadow-sm' 
+                          : 'bg-black/50 border-gray-800/80 hover:border-gray-700'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleWorkspaceChange(ws.id);
+                          setShowAddWorkspaceModal(false);
+                        }}
+                        className="flex-1 flex items-center gap-2 text-left min-w-0"
+                      >
+                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs shrink-0 ${
+                          isSelected ? 'bg-purple-500 text-white font-bold' : 'bg-white/5 text-gray-400'
+                        }`}>
+                          🏢
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-white truncate">{ws.name}</span>
+                            {isMain && (
+                              <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-semibold border border-emerald-500/30">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9px] text-gray-500 truncate">
+                            {isMain ? 'Main Business Account' : (ws.description || 'Branch / Sub-store')}
+                          </p>
+                        </div>
+                      </button>
+
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {isSelected && (
+                          <span className="text-[10px] text-purple-400 font-bold px-1.5 py-0.5 bg-purple-500/20 rounded-md">
+                            Active
+                          </span>
+                        )}
+                        {!isMain && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWorkspace(ws)}
+                            className="p-1.5 rounded-xl bg-red-950/40 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                            title="Delete this firm"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Add New Firm Form */}
+            <div className="pt-2 border-t border-gray-800">
+              <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-1.5">
+                + Add New Firm / Branch
+              </label>
+              <form onSubmit={handleAddWorkspace} className="space-y-2 text-xs">
+                <input
+                  type="text"
+                  placeholder="Firm Name (e.g. Luxury Boutique)"
+                  value={newWorkspaceName}
+                  onChange={(e) => setNewWorkspaceName(e.target.value)}
+                  className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                  required
+                />
+                <button 
+                  type="submit" 
+                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-purple-900/30 transition-all"
+                >
+                  <Plus size={14} /> Add Firm & Switch
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

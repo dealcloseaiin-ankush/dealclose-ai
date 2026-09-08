@@ -1319,13 +1319,23 @@ exports.updateProfile = async (req, res) => {
     }
 
     if (workspaces !== undefined) {
-      updateData.workspaces = (workspaces || []).map(ws => {
-        if (ws.instagramConfig && ws.instagramConfig.accessToken === '') {
-          const { instagramConfig, ...cleanWs } = ws;
-          return cleanWs;
+      const seenNames = new Set();
+      const dedupedWorkspaces = [];
+      for (const ws of (workspaces || [])) {
+        const cleanName = (ws.name || '').trim();
+        if (!cleanName) continue;
+        const lowerName = cleanName.toLowerCase();
+        if (!seenNames.has(lowerName)) {
+          seenNames.add(lowerName);
+          if (ws.instagramConfig && ws.instagramConfig.accessToken === '') {
+            const { instagramConfig, ...cleanWs } = ws;
+            dedupedWorkspaces.push({ ...cleanWs, name: cleanName });
+          } else {
+            dedupedWorkspaces.push({ ...ws, name: cleanName });
+          }
         }
-        return ws;
-      });
+      }
+      updateData.workspaces = dedupedWorkspaces;
     }
 
     if (instagramConfig !== undefined) {
