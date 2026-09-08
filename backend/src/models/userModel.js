@@ -133,11 +133,30 @@ const userSchema = new Schema({
     name: { type: String }, 
     description: { type: String }, // E.g., "Real Estate", "Electronics" for Cross-Selling
     email: { type: String }, // Branch Email ID
+    phone: { type: String },
+    ownerPhone: { type: String },
+    officePhone: { type: String },
+    ivrForwardingPhone: { type: String },
+    logoUrl: { type: String },
+    logo: { type: String },
+    googleBusinessLink: { type: String },
+    instagramLink: { type: String },
+    youtubeLink: { type: String },
+    facebookLink: { type: String },
+    upiId: { type: String },
+    externalApiUrl: { type: String },
+    externalApiToken: { type: String },
+    externalApiSearchUrl: { type: String },
+    externalApiPostUrl: { type: String },
+    externalApiVisitUrl: { type: String },
+    externalApiBlogUrl: { type: String },
+    customWebhooks: { type: String },
     // --- Separate Connections for each Workspace ---
     whatsappConfig: {
       accessToken: { type: String },
       phoneNumberId: { type: String },
-      wabaId: { type: String }
+      wabaId: { type: String },
+      displayPhoneNumber: { type: String }
     },
     instagramConfig: instagramConfigSchema, // ✅ USE: Using the new comprehensive schema
     // --- Separate AI Brain for each Workspace ---

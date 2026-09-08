@@ -159,8 +159,11 @@ export default function MobileDashboard() {
   const [profileData, setProfileData] = useState({
     businessName: 'DealClose AI',
     aiName: 'DealClose AI',
-    ownerPhone: '+91 98765 43210',
-    managerPhone: '+91 98260 99887',
+    ownerPhone: '',
+    whatsappNumber: '',
+    officePhone: '',
+    ivrForwardingPhone: '',
+    managerPhone: '',
     logoUrl: '/logo.png',
     address: 'Shop #14, City Center Mall, Main Road',
     instagramLink: 'https://instagram.com/dealclose_official',
@@ -179,11 +182,11 @@ export default function MobileDashboard() {
   });
 
   // Channel Connection States (3 Detailed Boxes for WhatsApp Cloud API)
-  const [waApiKey, setWaApiKey] = useState('EAAOx8Z... (Meta Cloud API Linked)');
-  const [waPhoneNumberId, setWaPhoneNumberId] = useState('109823485748392');
-  const [waWabaId, setWaWabaId] = useState('102938475610293');
-  const [waDisplayPhone, setWaDisplayPhone] = useState('+91 98765 43210');
-  const [isWaConnected, setIsWaConnected] = useState(true);
+  const [waApiKey, setWaApiKey] = useState('');
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
+  const [waWabaId, setWaWabaId] = useState('');
+  const [waDisplayPhone, setWaDisplayPhone] = useState('');
+  const [isWaConnected, setIsWaConnected] = useState(false);
 
   const [igAccessToken, setIgAccessToken] = useState('');
   const [igAccountId, setIgAccountId] = useState('');
@@ -739,11 +742,26 @@ export default function MobileDashboard() {
     const instaUsername = ws.instagramConfig?.username || liveUser?.instagramConfig?.username || '';
     const resolvedLogo = ws.logoUrl || ws.logo || liveUser?.brandKit?.logoUrl || liveUser?.logoUrl || liveUser?.logo || instaDp || '/logo.png';
 
+    const savedOwnerPhone = isMain 
+      ? (liveUser?.ownerPhone || liveUser?.phone || liveUser?.brandKit?.phone || '') 
+      : (ws.ownerPhone || ws.phone || ws.whatsappConfig?.displayPhoneNumber || '');
+
+    const savedWaNumber = isMain
+      ? (liveUser?.whatsappConfig?.displayPhoneNumber || liveUser?.ownerPhone || liveUser?.phone || '')
+      : (ws.whatsappConfig?.displayPhoneNumber || ws.phone || ws.ownerPhone || '');
+
+    const savedOfficePhone = isMain
+      ? (liveUser?.officePhone || liveUser?.ivrForwardingPhone || '')
+      : (ws.officePhone || ws.ivrForwardingPhone || '');
+
     setProfileData({
       businessName: ws.name,
       aiName: ws.aiName || (isMain ? liveUser?.aiName : '') || liveUser?.aiName || 'DealClose AI',
-      ownerPhone: ws.whatsappConfig?.displayPhoneNumber || liveUser?.phone || liveUser?.ownerPhone || '+91 98765 43210',
-      managerPhone: '+91 98260 99887',
+      ownerPhone: savedOwnerPhone,
+      whatsappNumber: savedWaNumber,
+      officePhone: savedOfficePhone,
+      ivrForwardingPhone: savedOfficePhone,
+      managerPhone: savedOfficePhone,
       logoUrl: resolvedLogo,
       instagramDp: instaDp,
       instagramUsername: instaUsername,
@@ -764,12 +782,19 @@ export default function MobileDashboard() {
     });
 
     // WhatsApp 3 Boxes for this specific store
-    if (ws.whatsappConfig) {
-      setWaApiKey(ws.whatsappConfig.accessToken || 'EAAOx8Z... (Meta Cloud API Linked)');
-      setWaPhoneNumberId(ws.whatsappConfig.phoneNumberId || '109823485748392');
-      setWaWabaId(ws.whatsappConfig.wabaId || '102938475610293');
-      setWaDisplayPhone(ws.whatsappConfig.displayPhoneNumber || ws.whatsappConfig.phoneNumber || '+91 98765 43210');
-      setIsWaConnected(!!(ws.whatsappConfig.accessToken || ws.whatsappConfig.phoneNumberId));
+    const currentWaConfig = ws.whatsappConfig || (isMain ? liveUser?.whatsappConfig : null);
+    if (currentWaConfig) {
+      setWaApiKey(currentWaConfig.accessToken || '');
+      setWaPhoneNumberId(currentWaConfig.phoneNumberId || '');
+      setWaWabaId(currentWaConfig.wabaId || '');
+      setWaDisplayPhone(currentWaConfig.displayPhoneNumber || currentWaConfig.phoneNumber || savedWaNumber || '');
+      setIsWaConnected(!!(currentWaConfig.accessToken || currentWaConfig.phoneNumberId));
+    } else {
+      setWaApiKey('');
+      setWaPhoneNumberId('');
+      setWaWabaId('');
+      setWaDisplayPhone(savedWaNumber || '');
+      setIsWaConnected(false);
     }
 
     // Instagram for this specific store
@@ -777,6 +802,10 @@ export default function MobileDashboard() {
       setIgAccessToken(ws.instagramConfig.accessToken || '');
       setIgAccountId(ws.instagramConfig.instagramBusinessAccountId || '');
       setIsIgConnected(!!ws.instagramConfig.accessToken);
+    } else {
+      setIgAccessToken('');
+      setIgAccountId('');
+      setIsIgConnected(false);
     }
 
     // AI Knowledge Base
@@ -1251,10 +1280,17 @@ export default function MobileDashboard() {
           brandKit: {
             ...(rawDbUser?.brandKit || {}),
             logoUrl: profileData.logoUrl,
-            businessName: profileData.businessName
+            businessName: profileData.businessName,
+            phone: profileData.ownerPhone
           },
           phone: profileData.ownerPhone,
           ownerPhone: profileData.ownerPhone,
+          officePhone: profileData.officePhone,
+          ivrForwardingPhone: profileData.officePhone,
+          whatsappConfig: {
+            ...(rawDbUser?.whatsappConfig || {}),
+            displayPhoneNumber: profileData.whatsappNumber || profileData.ownerPhone
+          },
           digitalCardConfig: {
             instagram: profileData.instagramLink,
             youtube: profileData.youtubeLink,
@@ -1279,12 +1315,26 @@ export default function MobileDashboard() {
               name: profileData.businessName,
               aiName: profileData.aiName,
               logoUrl: profileData.logoUrl,
+              phone: profileData.ownerPhone,
+              ownerPhone: profileData.ownerPhone,
+              officePhone: profileData.officePhone,
+              ivrForwardingPhone: profileData.officePhone,
+              whatsappConfig: {
+                ...(w.whatsappConfig || {}),
+                displayPhoneNumber: profileData.whatsappNumber || profileData.ownerPhone
+              },
+              instagramLink: profileData.instagramLink,
+              youtubeLink: profileData.youtubeLink,
+              facebookLink: profileData.facebookLink,
+              googleBusinessLink: profileData.googleBusinessLink,
+              upiId: profileData.upiId,
               externalApiUrl: profileData.externalApiUrl,
               externalApiPostUrl: profileData.externalApiPostUrl,
               externalApiSearchUrl: profileData.externalApiSearchUrl,
               externalApiVisitUrl: profileData.externalApiVisitUrl,
               externalApiBlogUrl: profileData.externalApiBlogUrl,
-              externalApiToken: profileData.externalApiToken
+              externalApiToken: profileData.externalApiToken,
+              customWebhooks: profileData.customWebhooks
             };
           }
           return w;
@@ -1295,7 +1345,8 @@ export default function MobileDashboard() {
         });
       }
 
-      alert(`Profile & Webhooks for "${profileData.businessName}" Saved to Database! ✅`);
+      await fetchLiveBackendData(activeWorkspaceId);
+      alert(`Profile & Phone Numbers for "${profileData.businessName}" Saved to Database! ✅`);
     } catch (err) {
       alert(`Settings for "${profileData.businessName}" Saved Successfully! ✅`);
     }
@@ -1303,16 +1354,37 @@ export default function MobileDashboard() {
 
   const handleSaveWhatsAppConfig = async () => {
     try {
-      await api.put('/users/profile', {
-        whatsappConfig: {
-          accessToken: waApiKey,
-          phoneNumberId: waPhoneNumberId,
-          wabaId: waWabaId,
-          displayPhoneNumber: waDisplayPhone
-        }
-      });
+      if (activeWorkspaceId === 'main') {
+        await api.put('/users/profile', {
+          whatsappConfig: {
+            ...(rawDbUser?.whatsappConfig || {}),
+            accessToken: waApiKey,
+            phoneNumberId: waPhoneNumberId,
+            wabaId: waWabaId,
+            displayPhoneNumber: waDisplayPhone
+          }
+        });
+      } else {
+        const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
+          if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+            return {
+              ...w,
+              whatsappConfig: {
+                ...(w.whatsappConfig || {}),
+                accessToken: waApiKey,
+                phoneNumberId: waPhoneNumberId,
+                wabaId: waWabaId,
+                displayPhoneNumber: waDisplayPhone
+              }
+            };
+          }
+          return w;
+        });
+        await api.put('/users/profile', { workspaces: updatedWorkspaces });
+      }
       setIsWaConnected(true);
       setShowWaConnectModal(false);
+      await fetchLiveBackendData(activeWorkspaceId);
       alert('WhatsApp Cloud API (3 Details) Verified & Linked! 🟢✅');
     } catch (err) {
       alert('WhatsApp Config Saved! 🟢');
@@ -1327,11 +1399,23 @@ export default function MobileDashboard() {
         await api.put('/users/profile', {
           whatsappConfig: { accessToken: '', phoneNumberId: '', wabaId: '', displayPhoneNumber: '' }
         });
+      } else {
+        const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
+          if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+            return {
+              ...w,
+              whatsappConfig: { accessToken: '', phoneNumberId: '', wabaId: '', displayPhoneNumber: '' }
+            };
+          }
+          return w;
+        });
+        await api.put('/users/profile', { workspaces: updatedWorkspaces });
       }
       setIsWaConnected(false);
       setWaApiKey('');
       setWaPhoneNumberId('');
       setWaWabaId('');
+      await fetchLiveBackendData(activeWorkspaceId);
       alert('WhatsApp disconnected successfully.');
     } catch (err) {
       setIsWaConnected(false);
