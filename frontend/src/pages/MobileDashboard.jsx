@@ -473,6 +473,17 @@ export default function MobileDashboard() {
             category: 'Main Business',
             whatsappConfig: liveUser.whatsappConfig || {},
             instagramConfig: liveUser.instagramConfig || {},
+            ownerPhone: liveUser.ownerPhone || liveUser.phone || liveUser.brandKit?.phone || '',
+            officePhone: liveUser.officePhone || '',
+            ivrForwardingPhone: liveUser.ivrForwardingPhone || '',
+            managerPhone: liveUser.managerPhone || '',
+            phone: liveUser.phone || liveUser.ownerPhone || '',
+            logoUrl: liveUser.brandKit?.logoUrl || liveUser.logoUrl || liveUser.logo || '',
+            googleBusinessLink: liveUser.digitalCardConfig?.googleBusiness || '',
+            instagramLink: liveUser.digitalCardConfig?.instagram || '',
+            youtubeLink: liveUser.digitalCardConfig?.youtube || '',
+            facebookLink: liveUser.digitalCardConfig?.facebook || '',
+            upiId: liveUser.digitalCardConfig?.upiId || '',
             externalApiUrl: liveUser.externalApiUrl || 'https://dealcloseai.in',
             externalApiToken: liveUser.externalApiToken || '',
             externalApiPostUrl: liveUser.externalApiPostUrl || 'https://dealcloseai.in/api/post',
@@ -493,11 +504,23 @@ export default function MobileDashboard() {
               const defaultDomain = isPropertyHub ? 'newpropertyhub.in' : `${ws.name.toLowerCase().replace(/\s+/g, '')}.in`;
 
               wsList.push({
+                ...ws,
                 id: wsId,
                 name: ws.name,
                 category: ws.description || 'Branch / Sub-store',
                 whatsappConfig: ws.whatsappConfig || {},
                 instagramConfig: ws.instagramConfig || {},
+                ownerPhone: ws.ownerPhone || ws.phone || '',
+                officePhone: ws.officePhone || '',
+                ivrForwardingPhone: ws.ivrForwardingPhone || '',
+                managerPhone: ws.managerPhone || '',
+                phone: ws.phone || ws.ownerPhone || '',
+                logoUrl: ws.logoUrl || ws.logo || '',
+                googleBusinessLink: ws.googleBusinessLink || '',
+                instagramLink: ws.instagramLink || '',
+                youtubeLink: ws.youtubeLink || '',
+                facebookLink: ws.facebookLink || '',
+                upiId: ws.upiId || '',
                 externalApiUrl: ws.externalApiUrl || `https://${defaultDomain}`,
                 externalApiToken: ws.externalApiToken || '',
                 externalApiPostUrl: ws.externalApiPostUrl || `https://${defaultDomain}/api/post`,
@@ -747,15 +770,19 @@ export default function MobileDashboard() {
 
     const savedOwnerPhone = isMain 
       ? (liveUser?.ownerPhone || liveUser?.phone || liveUser?.brandKit?.phone || '') 
-      : (ws.ownerPhone || ws.phone || ws.whatsappConfig?.displayPhoneNumber || '');
+      : (ws.ownerPhone || ws.phone || '');
 
     const savedWaNumber = isMain
-      ? (liveUser?.whatsappConfig?.displayPhoneNumber || liveUser?.ownerPhone || liveUser?.phone || '')
-      : (ws.whatsappConfig?.displayPhoneNumber || ws.phone || ws.ownerPhone || '');
+      ? (liveUser?.whatsappConfig?.displayPhoneNumber || '')
+      : (ws.whatsappConfig?.displayPhoneNumber || '');
 
     const savedOfficePhone = isMain
       ? (liveUser?.officePhone || liveUser?.ivrForwardingPhone || '')
       : (ws.officePhone || ws.ivrForwardingPhone || '');
+
+    const savedManagerPhone = isMain
+      ? (liveUser?.managerPhone || '')
+      : (ws.managerPhone || '');
 
     setProfileData({
       businessName: ws.name,
@@ -764,7 +791,7 @@ export default function MobileDashboard() {
       whatsappNumber: savedWaNumber,
       officePhone: savedOfficePhone,
       ivrForwardingPhone: savedOfficePhone,
-      managerPhone: savedOfficePhone,
+      managerPhone: savedManagerPhone,
       logoUrl: resolvedLogo,
       instagramDp: instaDp,
       instagramUsername: instaUsername,
@@ -1290,11 +1317,12 @@ export default function MobileDashboard() {
           },
           phone: profileData.ownerPhone,
           ownerPhone: profileData.ownerPhone,
+          managerPhone: profileData.managerPhone,
           officePhone: profileData.officePhone,
           ivrForwardingPhone: profileData.officePhone,
           whatsappConfig: {
             ...(rawDbUser?.whatsappConfig || {}),
-            displayPhoneNumber: profileData.whatsappNumber || profileData.ownerPhone
+            displayPhoneNumber: profileData.whatsappNumber
           },
           digitalCardConfig: {
             instagram: profileData.instagramLink,
@@ -1322,11 +1350,12 @@ export default function MobileDashboard() {
               logoUrl: profileData.logoUrl,
               phone: profileData.ownerPhone,
               ownerPhone: profileData.ownerPhone,
+              managerPhone: profileData.managerPhone,
               officePhone: profileData.officePhone,
               ivrForwardingPhone: profileData.officePhone,
               whatsappConfig: {
                 ...(w.whatsappConfig || {}),
-                displayPhoneNumber: profileData.whatsappNumber || profileData.ownerPhone
+                displayPhoneNumber: profileData.whatsappNumber
               },
               instagramLink: profileData.instagramLink,
               youtubeLink: profileData.youtubeLink,
@@ -1389,6 +1418,7 @@ export default function MobileDashboard() {
       }
       setIsWaConnected(true);
       setShowWaConnectModal(false);
+      setProfileData(prev => ({ ...prev, whatsappNumber: waDisplayPhone }));
       await fetchLiveBackendData(activeWorkspaceId);
       alert('WhatsApp Cloud API (3 Details) Verified & Linked! 🟢✅');
     } catch (err) {
@@ -4150,11 +4180,11 @@ export default function MobileDashboard() {
                     <div className="text-[9px] text-gray-400">AI will introduce itself with this name to customers & owner.</div>
                   </div>
 
-                  {/* 3 Dedicated Phone Channels */}
+                  {/* 4 Dedicated Phone Channels */}
                   <div className="space-y-2 pt-1 border-t border-gray-800">
                     <div className="text-[11px] font-bold text-gray-300 flex items-center justify-between">
                       <span>Phone Numbers & Call Forwarding</span>
-                      <span className="text-[9px] text-purple-400 font-normal">3 Roles Defined</span>
+                      <span className="text-[9px] text-purple-400 font-normal">4 Dedicated Numbers</span>
                     </div>
 
                     <div className="grid grid-cols-1 gap-2">
@@ -4173,15 +4203,26 @@ export default function MobileDashboard() {
                         <label className="text-[9px] font-black text-emerald-400 block mb-0.5">💬 2. Official WhatsApp Cloud API Number (Bot & Templates)</label>
                         <input
                           type="text"
-                          value={profileData.whatsappNumber || profileData.managerPhone || ''}
-                          onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value, managerPhone: e.target.value })}
+                          value={profileData.whatsappNumber || ''}
+                          onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value })}
                           placeholder="+91 98765 11223"
                           className="w-full bg-black border border-gray-800 rounded-lg p-1.5 text-emerald-300 font-mono text-[11px] focus:outline-none focus:border-emerald-500"
                         />
                       </div>
 
                       <div className="bg-black/50 border border-gray-800/80 p-2 rounded-xl">
-                        <label className="text-[9px] font-black text-amber-300 block mb-0.5">📞 3. Office Support Helpline & Forwarding (Human Staff)</label>
+                        <label className="text-[9px] font-black text-blue-400 block mb-0.5">👔 3. Manager / Alternate Contact Mobile Number</label>
+                        <input
+                          type="text"
+                          value={profileData.managerPhone || ''}
+                          onChange={(e) => setProfileData({ ...profileData, managerPhone: e.target.value })}
+                          placeholder="+91 98765 55443"
+                          className="w-full bg-black border border-gray-800 rounded-lg p-1.5 text-blue-200 font-mono text-[11px] focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="bg-black/50 border border-gray-800/80 p-2 rounded-xl">
+                        <label className="text-[9px] font-black text-amber-300 block mb-0.5">📞 4. Office Support Helpline & Forwarding (Human Staff)</label>
                         <input
                           type="text"
                           value={profileData.officePhone || profileData.ivrForwardingPhone || ''}

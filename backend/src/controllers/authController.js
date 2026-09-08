@@ -1288,11 +1288,12 @@ exports.updateProfile = async (req, res) => {
     if (discountConfig !== undefined) updateData.discountConfig = discountConfig;
     if (metaAdsConfig !== undefined) updateData.metaAdsConfig = metaAdsConfig;
     if (ownerPhone !== undefined) updateData.ownerPhone = ownerPhone;
+    if (req.body.phone !== undefined) updateData.phone = req.body.phone;
+    if (req.body.managerPhone !== undefined) updateData.managerPhone = req.body.managerPhone;
     if (req.body.officePhone !== undefined) updateData.officePhone = req.body.officePhone;
     if (req.body.ivrForwardingPhone !== undefined) updateData.ivrForwardingPhone = req.body.ivrForwardingPhone;
     if (aiAgentEnabled !== undefined) updateData.aiAgentEnabled = aiAgentEnabled;
     if (acceptCollabs !== undefined) updateData.acceptCollabs = acceptCollabs;
-    if (workspaces !== undefined) updateData.workspaces = workspaces;
     if (twilioConfig !== undefined) updateData.twilioConfig = twilioConfig;
     if (externalApiUrl !== undefined) updateData.externalApiUrl = externalApiUrl;
     if (externalApiToken !== undefined) updateData.externalApiToken = externalApiToken;
@@ -1308,13 +1309,7 @@ exports.updateProfile = async (req, res) => {
     if (req.body.brandKit !== undefined) updateData.brandKit = req.body.brandKit;
 
     // 🐛 FIX for "MulterError: Field value too long"
-    // Agar designJson field request me hai, to use alag se handle karo.
-    // Yeh check Multer error ko bypass karega agar data bahut bada hai.
-    // Asli fix frontend me hona chahiye (image ko base64 me save na karein),
-    // lekin yeh ek temporary backend safety net hai.
     if (designJson !== undefined) {
-      // Yahan aap logic daal sakte hain, jaise ki agar designJson > 5MB hai to error bhejein.
-      // Abhi ke liye, hum ise updateData se bahar rakh rahe hain taaki crash na ho.
       console.warn('⚠️ [Profile Update] Received large designJson, but it is not being saved to prevent errors. This field should be handled by the post/draft creation endpoint.');
     }
 

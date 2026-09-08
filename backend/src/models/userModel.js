@@ -97,7 +97,9 @@ const userSchema = new Schema({
   discountAvailable: { type: Boolean, default: false }, // 20% off on next billing
   apiKey: { type: String, unique: true, sparse: true },
   websiteUrl: { type: String },
+  phone: { type: String }, // General phone / primary number
   ownerPhone: { type: String }, // Shop owner's personal WhatsApp number
+  managerPhone: { type: String }, // Branch / Store Manager number
   officePhone: { type: String }, // Official customer calling & helpline number attended by staff
   ivrForwardingPhone: { type: String }, // Number to forward customer calls when human assistance is needed
   isOwnerPhoneVerified: { type: Boolean, default: false },
@@ -135,6 +137,7 @@ const userSchema = new Schema({
     email: { type: String }, // Branch Email ID
     phone: { type: String },
     ownerPhone: { type: String },
+    managerPhone: { type: String },
     officePhone: { type: String },
     ivrForwardingPhone: { type: String },
     logoUrl: { type: String },
@@ -156,7 +159,8 @@ const userSchema = new Schema({
       accessToken: { type: String },
       phoneNumberId: { type: String },
       wabaId: { type: String },
-      displayPhoneNumber: { type: String }
+      displayPhoneNumber: { type: String },
+      ownerBusinessId: { type: String }
     },
     instagramConfig: instagramConfigSchema, // ✅ USE: Using the new comprehensive schema
     // --- Separate AI Brain for each Workspace ---
@@ -211,7 +215,9 @@ const userSchema = new Schema({
     accessToken: { type: String },
     phoneNumberId: { type: String },
     webhookVerifyToken: { type: String },
-    wabaId: { type: String } // Required by Meta for Template Approvals
+    wabaId: { type: String }, // Required by Meta for Template Approvals
+    displayPhoneNumber: { type: String },
+    ownerBusinessId: { type: String }
   },
   instagramConfig: instagramConfigSchema, // ✅ USE: Using the new comprehensive schema
   // Server-side, 10-minute state for the account picker. It is never sent in profile responses.
