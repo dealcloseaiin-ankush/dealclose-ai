@@ -454,6 +454,8 @@ export default function MobileDashboard() {
   // 2.5 LIVE BACKEND DATA SYNC (MongoDB + Meta Graph API)
   // ─────────────────────────────────────────────────────────────
   const fetchLiveBackendData = async (targetWsId = activeWorkspaceId) => {
+    const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
+    if (!hasToken) return;
     try {
       const currentWsId = targetWsId || (typeof window !== 'undefined' && (localStorage.getItem('dealclose_active_workspace') || localStorage.getItem('active_workspace_id'))) || 'main';
 
@@ -945,6 +947,8 @@ export default function MobileDashboard() {
 
   // Fetch Filtered Chats by Workspace with Relative Date Labels & Read State Persistence
   const fetchChatsForWorkspace = async (wsId) => {
+    const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
+    if (!hasToken) return;
     try {
       const url = wsId && wsId !== 'all' ? `/chats?workspaceId=${wsId}` : '/chats';
       const { data: rawMessages } = await api.get(url).catch(() => ({ data: [] }));
