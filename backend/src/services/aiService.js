@@ -158,9 +158,10 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext, userI
 
     if (apiKey && genAI) {
       const geminiOrder = [
-        MODELS.GEMINI_2_FLASH_LITE,
-        MODELS.GEMINI_2_FLASH,
-        MODELS.GEMINI_1_5_FLASH,
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-3.5-flash-lite'
       ];
 
       for (const modelName of geminiOrder) {
