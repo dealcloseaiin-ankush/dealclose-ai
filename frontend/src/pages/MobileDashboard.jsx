@@ -105,6 +105,7 @@ export default function MobileDashboard() {
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('ankush.bani@gmail.com');
   const [loginPassword, setLoginPassword] = useState('ak@7828289433');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Read Chat IDs Set (Persists so unread badges don't re-appear)
@@ -4545,13 +4546,22 @@ export default function MobileDashboard() {
 
               <div>
                 <label className="text-[10px] font-bold text-gray-400">Password:</label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full bg-black border border-gray-800 rounded-xl p-2 pr-9 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    {showLoginPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
 
               <button
