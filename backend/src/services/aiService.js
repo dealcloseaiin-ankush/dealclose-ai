@@ -11,10 +11,12 @@ const openai = new OpenAI({
 
 // 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_2_FLASH_LITE: 'gemini-2.0-flash-lite',  // Priority 1: Ultra-Cost-Effective High-Volume Chat ($0.075/1M)
-  GEMINI_2_FLASH: 'gemini-2.0-flash',            // Priority 2: Standard Fast Flash ($0.10/1M)
-  GEMINI_1_5_FLASH: 'gemini-1.5-flash',          // Priority 3: Stable Fallback Model ($0.075/1M)
-  OPENAI_MINI: 'gpt-4o-mini',                    // Priority 4: OpenAI Tools & Fallback Model ($0.15/1M)
+  GEMINI_2_5_FLASH: 'gemini-2.5-flash',
+  GEMINI_2_5_FLASH_LITE: 'gemini-2.5-flash-lite',
+  GEMINI_2_FLASH: 'gemini-2.0-flash',
+  GEMINI_2_FLASH_LITE: 'gemini-2.0-flash-lite',
+  GEMINI_1_5_FLASH: 'gemini-1.5-flash',
+  OPENAI_MINI: 'gpt-4o-mini',
 };
 
 /**
@@ -54,12 +56,16 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     let rawResponse = "";
     let aiSuccess = false;
 
-    // 🚀 DYNAMIC GEMINI MULTI-MODEL FALLBACK (2.0 Flash Lite -> 2.0 Flash -> 1.5 Flash)
+    // 🚀 DYNAMIC GEMINI MULTI-MODEL FALLBACK (2.5 Flash -> 2.5 Flash Lite -> 2.0 Flash -> 1.5 Flash)
     if (genAI) {
       const geminiOrder = [
-        MODELS.GEMINI_2_FLASH_LITE,
-        MODELS.GEMINI_2_FLASH,
-        MODELS.GEMINI_1_5_FLASH,
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-8b',
+        'gemini-1.5-pro'
       ];
 
       for (const modelName of geminiOrder) {

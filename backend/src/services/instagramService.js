@@ -223,7 +223,7 @@ exports.getBusinessInsights = async (igAccountId, accessToken, loginType = 'face
     : 'https://graph.facebook.com/v19.0';
 
   try {
-    const dailyMetrics = 'reach,impressions,profile_views,website_clicks,accounts_engaged';
+    const dailyMetrics = 'reach,profile_views,website_clicks,accounts_engaged,total_interactions';
     const insightsUrl = `${baseUrl}/${igAccountId}/insights`;
     const [dailyResponse, lifetimeResponse] = await Promise.all([
       axios.get(insightsUrl, {

@@ -302,3 +302,38 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error fetching profile' });
   }
 };
+
+// @desc    Live Google Places Business Search / Autocomplete
+// @route   GET /api/settings/google-places/search?query=...
+exports.searchGooglePlaces = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'Search query is required' });
+    }
+    const googlePlacesService = require('../services/googlePlacesService');
+    const results = await googlePlacesService.searchGoogleBusiness(query);
+    res.status(200).json({ success: true, count: results.length, data: results });
+  } catch (error) {
+    console.error('Google Places Search Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Sync Google Rating & Reviews Count for Digital Card (Weekly/Manual)
+// @route   POST /api/settings/google-places/sync-rating
+exports.syncGoogleRating = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const workspaceId = req.body?.workspaceId || req.query?.workspaceId || 'main';
+    const googlePlacesService = require('../services/googlePlacesService');
+    const updated = await googlePlacesService.syncUserGoogleRating(userId, workspaceId);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'No Google Business Profile matched for sync.' });
+    }
+    res.status(200).json({ success: true, message: 'Rating synced successfully', data: updated });
+  } catch (error) {
+    console.error('Sync Google Rating Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

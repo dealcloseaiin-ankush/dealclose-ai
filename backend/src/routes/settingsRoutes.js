@@ -23,4 +23,8 @@ router.post('/whatsapp-disconnect', protect, settingsController.whatsappDisconne
 router.get('/google/auth-url', protect, googleSheetsController.getAuthUrl);
 router.post('/google/connect', protect, googleSheetsController.connectGoogleAccount);
 
+// --- Google Places & Review Booster Integration ---
+router.get('/google-places/search', protect, settingsController.searchGooglePlaces);
+router.post('/google-places/sync-rating', protect, settingsController.syncGoogleRating);
+
 module.exports = router;

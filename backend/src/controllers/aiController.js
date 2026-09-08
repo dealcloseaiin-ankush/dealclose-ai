@@ -11,11 +11,10 @@ const { automationQueue } = require('../workers/automationWorker');
 
 // 🌊 LATEST ULTRA COST-EFFECTIVE & HIGH-AVAILABILITY PRODUCTION CONFIGURATION
 const MODELS = {
-  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Latest & Cheapest Gemini 3.5 Model
-  GEMINI_3_5_FLASH: 'gemini-3.5-flash',      // Priority 2: Latest Gemini 3.5 Standard Flash
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 3: Cost-Optimized 3.1 Flash Lite
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 4: Stable 2.5 Fallback
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 5: OpenAI Cheapest Model Fallback
+  GEMINI_2_FLASH_LITE: 'gemini-2.0-flash-lite',  // Priority 1: Latest & Cheapest Gemini 2.0 Lite ($0.075/1M)
+  GEMINI_2_FLASH: 'gemini-2.0-flash',            // Priority 2: Standard Gemini 2.0 Flash ($0.10/1M)
+  GEMINI_1_5_FLASH: 'gemini-1.5-flash',          // Priority 3: Cost-Optimized 1.5 Flash ($0.075/1M)
+  OPENAI_MINI: 'gpt-4o-mini',                    // Priority 4: OpenAI Cheapest Model Fallback ($0.15/1M)
 };
 
 // @desc    Get unanswered queries for AI training
@@ -671,23 +670,38 @@ exports.generateFlow = async (req, res) => {
 
       // Gemini Multi-Model Fallback Chain
       const geminiOrder = [
-        MODELS.GEMINI_3_5_LITE,
-        MODELS.GEMINI_3_5_FLASH,
-        MODELS.GEMINI_3_1_LITE,
-        MODELS.GEMINI_2_5_LITE,
+        MODELS.GEMINI_2_FLASH_LITE,
+        MODELS.GEMINI_2_FLASH,
+        MODELS.GEMINI_1_5_FLASH,
       ];
 
       for (const modelName of geminiOrder) {
         if (flowGenSuccess) break;
         try {
           console.log(`[Flow Gen] 🤖 Requesting canvas model: ${modelName}`);
-          const model = genAI.getGenerativeModel({ model: modelName });
+          const model = genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: {
+              temperature: 0.3,
+            }
+          });
           const result = await model.generateContent([systemPrompt, prompt]);
           console.log(`✅ [Flow Gen] Responded using model: ${modelName}`);
           rawResponse = result.response.text();
           flowGenSuccess = true;
+
+          if (userId) {
+            const aiUsageTracker = require('../services/aiUsageTracker');
+            aiUsageTracker.trackUsage({
+              userId,
+              feature: 'flow-builder-generator',
+              provider: 'gemini',
+              model: modelName,
+              usage: result.response.usageMetadata
+            });
+          }
         } catch (geminiErr) {
-          console.warn(`⚠️ [Flow Gen] ${modelName} failed, trying next fallback...`);
+          console.warn(`⚠️ [Flow Gen] ${modelName} failed, trying next fallback: ${geminiErr.message}`);
         }
       }
     }
@@ -702,10 +716,22 @@ exports.generateFlow = async (req, res) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt }
         ],
+        temperature: 0.3,
       });
       console.log(`✅ [Flow Gen] Responded using model: ${MODELS.OPENAI_MINI}`);
       rawResponse = chatCompletion.choices[0].message.content;
       flowGenSuccess = true;
+
+      if (userId) {
+        const aiUsageTracker = require('../services/aiUsageTracker');
+        aiUsageTracker.trackUsage({
+          userId,
+          feature: 'flow-builder-generator',
+          provider: 'openai',
+          model: MODELS.OPENAI_MINI,
+          usage: chatCompletion.usage
+        });
+      }
     }
 
     if (!flowGenSuccess) throw new Error("All pipeline generation models failed.");
