@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { 
   Sparkles, ArrowRight, Check, CheckCircle2, ShieldCheck, Flame, Search, 
-  HelpCircle, Zap, Phone, ShoppingBag, Gem, Hammer, Smartphone, ShoppingCart, 
+  HelpCircle, Zap, Phone, ShoppingBag, Gem, Hammer, Smartphone, Monitor, ShoppingCart, 
   Building2, Scissors, Utensils, GraduationCap, X, ChevronRight, MessageSquare
 } from 'lucide-react';
 
