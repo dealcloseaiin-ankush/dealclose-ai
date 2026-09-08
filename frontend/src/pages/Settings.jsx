@@ -75,6 +75,34 @@ export default function Settings() {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupMessage, setBackupMessage] = useState('');
 
+  // 🔍 Google Places 1-Tap Search State
+  const [googleSearchQuery, setGoogleSearchQuery] = useState('');
+  const [googleSearchResults, setGoogleSearchResults] = useState([]);
+  const [isSearchingGoogle, setIsSearchingGoogle] = useState(false);
+  const [showGoogleDropdown, setShowGoogleDropdown] = useState(false);
+
+  const handleSearchGooglePlaces = async (searchQ) => {
+    const q = (searchQ || googleSearchQuery || config.businessName || '').trim();
+    if (!q) return;
+    setIsSearchingGoogle(true);
+    setShowGoogleDropdown(true);
+    try {
+      const res = await api.get('/settings/google-places/search', { params: { query: q } });
+      setGoogleSearchResults(res.data?.results || []);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Google Places search failed.');
+    } finally {
+      setIsSearchingGoogle(false);
+    }
+  };
+
+  const handleSelectGooglePlace = (place) => {
+    const reviewUrl = place.review_url || place.google_maps_url || `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+    setConfig(prev => ({ ...prev, googleReviewLink: reviewUrl }));
+    setShowGoogleDropdown(false);
+    alert(`🎉 Google Business Linked: ${place.name} (⭐ ${place.rating || 'N/A'}★ - ${place.user_ratings_total || 0} reviews)`);
+  };
+
   // --- Functions ---
   const addCustomWebhook = () => {
     if (config.customWebhooks && config.customWebhooks.length >= 10) return alert("Maximum 10 custom actions allowed.");
@@ -636,7 +664,57 @@ export default function Settings() {
                               <input type="text" value={getUsername(config.facebookLink, 'https://facebook.com/')} onChange={(e) => handleSocialLinkChange('facebookLink', 'https://facebook.com/', e)} placeholder="page_name" className="w-full bg-transparent p-2 text-white text-sm outline-none" />
                             </div>
                           </div>
-                          <input type="text" name="googleReviewLink" value={config.googleReviewLink} onChange={handleChange} placeholder="⭐ Google Review / Maps Link" className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none" />
+                          <div className="relative">
+                            <div className="flex gap-2">
+                              <input 
+                                type="text" 
+                                name="googleReviewLink" 
+                                value={config.googleReviewLink} 
+                                onChange={handleChange} 
+                                placeholder="⭐ Google Review / Maps Link" 
+                                className="flex-1 bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-purple-500 outline-none" 
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSearchGooglePlaces()}
+                                className="px-3 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0"
+                              >
+                                {isSearchingGoogle ? 'Searching...' : '🔍 1-Tap Find'}
+                              </button>
+                            </div>
+
+                            {/* Live Search Results Dropdown */}
+                            {showGoogleDropdown && (
+                              <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-[#16161e] border border-amber-500/40 rounded-xl p-3 shadow-2xl space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                <div className="flex justify-between items-center text-xs text-gray-400 border-b border-gray-800 pb-1.5">
+                                  <span className="font-bold text-amber-400">Google Places Results ({googleSearchResults.length})</span>
+                                  <button type="button" onClick={() => setShowGoogleDropdown(false)} className="text-gray-400 hover:text-white">✕</button>
+                                </div>
+                                {isSearchingGoogle && (
+                                  <p className="text-xs text-center text-amber-300 py-3">Connecting to Google Places...</p>
+                                )}
+                                {!isSearchingGoogle && googleSearchResults.length === 0 && (
+                                  <p className="text-xs text-center text-gray-500 py-2">No business found. Please check business name or include city.</p>
+                                )}
+                                {!isSearchingGoogle && googleSearchResults.map((place, idx) => (
+                                  <div key={place.place_id || idx} className="p-2.5 bg-black/60 border border-gray-800 hover:border-amber-500/60 rounded-lg flex items-center justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-xs font-bold text-white truncate">{place.name}</div>
+                                      <div className="text-[11px] text-gray-400 truncate">{place.address}</div>
+                                      <div className="text-[10px] text-amber-400 font-semibold">⭐ {place.rating || 'New'} ({place.user_ratings_total || 0} reviews)</div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectGooglePlace(place)}
+                                      className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-lg shrink-0 shadow"
+                                    >
+                                      Select & Link 🚀
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 

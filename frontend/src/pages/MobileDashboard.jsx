@@ -89,9 +89,14 @@ export default function MobileDashboard() {
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showAddWorkspaceModal, setShowAddWorkspaceModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showCreateBlogModal, setShowCreateBlogModal] = useState(false);
   const [showWaConnectModal, setShowWaConnectModal] = useState(false);
   const [showIgConnectModal, setShowIgConnectModal] = useState(false);
+
+  // Google Business Places Search Modal State
+  const [showGoogleSearchModal, setShowGoogleSearchModal] = useState(false);
+  const [googleSearchQuery, setGoogleSearchQuery] = useState('');
+  const [googleSearchResults, setGoogleSearchResults] = useState([]);
+  const [isSearchingGoogle, setIsSearchingGoogle] = useState(false);
 
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('ankush.bani@gmail.com');
@@ -1680,6 +1685,53 @@ export default function MobileDashboard() {
       alert(`Business "${wsName}" successfully delete ho gaya! 🗑️✅`);
     } catch (err) {
       alert(err.response?.data?.message || 'Firm delete karne me error aaya. Kripya punah prayas karein.');
+    }
+  };
+
+  const handleSearchGooglePlaces = async (customQuery) => {
+    const q = (customQuery || googleSearchQuery || profileData.businessName || '').trim();
+    if (!q) return;
+    setIsSearchingGoogle(true);
+    try {
+      const res = await api.get('/settings/google-places/search', { params: { query: q } });
+      const results = res.data?.results || [];
+      setGoogleSearchResults(results);
+      if (results.length === 0) {
+        alert(`Google par "${q}" ke naam se koi business nahi mila. Kripya pura naam ya shahar ka naam saath me likhein (jaise: Ganesh Traders Sarangarh)`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Google Places search failed. Please try again.');
+    } finally {
+      setIsSearchingGoogle(false);
+    }
+  };
+
+  const handleSelectGooglePlace = async (place) => {
+    const reviewUrl = place.review_url || place.google_maps_url || `https://search.google.com/local/writereview?placeid=${place.place_id}`;
+    
+    setProfileData(prev => ({
+      ...prev,
+      googleBusinessLink: reviewUrl,
+      googlePlaceId: place.place_id,
+      googleRating: place.rating,
+      googleReviewCount: place.user_ratings_total
+    }));
+
+    try {
+      await api.put('/users/profile', {
+        digitalCardConfig: {
+          ...(rawDbUser?.digitalCardConfig || {}),
+          googleBusiness: reviewUrl,
+          googlePlaceId: place.place_id,
+          googleRating: place.rating,
+          googleReviewCount: place.user_ratings_total
+        }
+      });
+      setShowGoogleSearchModal(false);
+      alert(`🎉 Google Business Profile Linked Successfully!\n\n🏢 Business: ${place.name}\n⭐ Current Rating: ${place.rating || 'N/A'}★ (${place.user_ratings_total || 0} reviews)\n📍 Address: ${place.address || 'Synced'}\n\nAb 5-Star Review Booster is business ke liye auto-sync ho chuka hai! 🚀`);
+    } catch (err) {
+      setShowGoogleSearchModal(false);
+      alert(`Google Business Review Link set ho gaya: ${reviewUrl}`);
     }
   };
 
@@ -3990,13 +4042,34 @@ export default function MobileDashboard() {
                       onChange={(e) => setProfileData({ ...profileData, instagramLink: e.target.value })}
                       className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-gray-300 font-mono"
                     />
-                    <input
-                      type="text"
-                      placeholder="Google Review URL (To Improve Rating ⭐)"
-                      value={profileData.googleBusinessLink}
-                      onChange={(e) => setProfileData({ ...profileData, googleBusinessLink: e.target.value })}
-                      className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-amber-300 font-mono"
-                    />
+                    {/* Google Business Review Link with 1-Tap Search */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
+                          ⭐ Google 5-Star Review Booster:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGoogleSearchQuery(profileData.businessName || '');
+                            setShowGoogleSearchModal(true);
+                            if (profileData.businessName) {
+                              handleSearchGooglePlaces(profileData.businessName);
+                            }
+                          }}
+                          className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black rounded-lg text-[9px] font-bold flex items-center gap-1 transition-all shadow-sm"
+                        >
+                          <Search size={10} /> 1-Tap Search Profile 🔍
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Google Review URL (e.g. https://g.page/r/...)"
+                        value={profileData.googleBusinessLink}
+                        onChange={(e) => setProfileData({ ...profileData, googleBusinessLink: e.target.value })}
+                        className="w-full bg-black border border-gray-800 rounded-xl p-1.5 text-[11px] text-amber-300 font-mono focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
                     <input
                       type="text"
                       placeholder="YouTube Channel URL"
@@ -4865,6 +4938,109 @@ export default function MobileDashboard() {
                   <Plus size={14} /> Add Firm & Switch
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3.2: Google Business 1-Tap Search & Auto-Link */}
+      {showGoogleSearchModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e0e14] border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full space-y-3 relative shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
+            <button 
+              onClick={() => setShowGoogleSearchModal(false)} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-full bg-white/5"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm">
+                ⭐
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-white">Find Your Google Business Profile</h3>
+                <p className="text-[10px] text-gray-400">Search by firm name & city to auto-link with 1 tap</p>
+              </div>
+            </div>
+
+            {/* Search Input Box */}
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearchGooglePlaces(googleSearchQuery);
+              }} 
+              className="flex gap-1.5"
+            >
+              <input
+                type="text"
+                placeholder="e.g. Ganesh Traders Sarangarh"
+                value={googleSearchQuery}
+                onChange={(e) => setGoogleSearchQuery(e.target.value)}
+                className="flex-1 bg-black border border-gray-800 rounded-xl px-2.5 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500"
+                required
+              />
+              <button
+                type="submit"
+                disabled={isSearchingGoogle}
+                className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl text-xs flex items-center gap-1 shrink-0 transition-all disabled:opacity-50"
+              >
+                {isSearchingGoogle ? (
+                  <RefreshCw size={12} className="animate-spin" />
+                ) : (
+                  <Search size={12} />
+                )}
+                <span>Search</span>
+              </button>
+            </form>
+
+            {/* Results List */}
+            <div className="space-y-2 pt-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                {isSearchingGoogle ? 'Searching Google Maps...' : `Search Results (${googleSearchResults.length})`}
+              </label>
+
+              {isSearchingGoogle && (
+                <div className="p-6 text-center text-xs text-amber-400 flex flex-col items-center gap-2">
+                  <RefreshCw size={20} className="animate-spin" />
+                  <span>Connecting to Google Places API...</span>
+                </div>
+              )}
+
+              {!isSearchingGoogle && googleSearchResults.length === 0 && (
+                <div className="p-4 text-center bg-gray-900/30 border border-dashed border-gray-800 rounded-2xl text-[11px] text-gray-400">
+                  <p>Type your business name & city above, then tap <strong>Search</strong>.</p>
+                </div>
+              )}
+
+              {!isSearchingGoogle && googleSearchResults.map((place, idx) => (
+                <div 
+                  key={place.place_id || idx}
+                  className="bg-black/60 border border-gray-800/80 hover:border-amber-500/50 p-3 rounded-2xl space-y-2 transition-all text-left"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-bold text-white truncate">{place.name}</h4>
+                      <p className="text-[10px] text-gray-400 line-clamp-2 mt-0.5">{place.address}</p>
+                    </div>
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-md text-[10px] font-bold shrink-0">
+                      <span>⭐</span>
+                      <span>{place.rating || 'New'}</span>
+                      {place.user_ratings_total ? (
+                        <span className="text-[9px] text-gray-400">({place.user_ratings_total})</span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectGooglePlace(place)}
+                    className="w-full py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-[11px] rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all"
+                  >
+                    <Check size={13} /> Select & Auto-Link Profile 🚀
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
