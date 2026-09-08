@@ -29,22 +29,42 @@ class GlobalErrorBoundary extends React.Component {
           <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '6px', maxWidth: '350px' }}>
             A temporary screen refresh is needed. Tap below to reload seamlessly.
           </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginTop: '20px' }}>
             <button
               onClick={() => {
                 window.location.reload();
               }}
-              style={{ padding: '10px 20px', background: '#10b981', color: '#000', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
+              style={{ padding: '10px 18px', background: '#10b981', color: '#000', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
             >
               🔄 Reload Screen
             </button>
             <button
               onClick={() => {
+                try {
+                  localStorage.removeItem('dealclose_active_workspace');
+                  localStorage.removeItem('dealclose_mobile_active_tab');
+                  sessionStorage.clear();
+                } catch(e) {}
                 window.location.href = '/mobile';
               }}
-              style={{ padding: '10px 20px', background: '#374151', color: '#fff', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
+              style={{ padding: '10px 18px', background: '#374151', color: '#fff', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
             >
               📱 Mobile Home
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  if ('caches' in window) {
+                    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+                  }
+                } catch(e) {}
+                window.location.href = '/mobile';
+              }}
+              style={{ padding: '10px 18px', background: '#e11d48', color: '#fff', fontWeight: 'bold', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '12px' }}
+            >
+              ⚡ Reset App Cache
             </button>
           </div>
         </div>

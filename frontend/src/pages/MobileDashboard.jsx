@@ -2097,19 +2097,19 @@ export default function MobileDashboard() {
                       }`}>
                         {chat.channel === 'instagram' ? (
                           <>
-                            <span>{chat.customerName.replace('@', '').slice(0, 2).toUpperCase()}</span>
+                            <span>{(chat.customerName || 'Customer').replace('@', '').slice(0, 2).toUpperCase()}</span>
                             <span className="absolute -bottom-0.5 -right-0.5 p-0.5 bg-gradient-to-tr from-purple-600 via-pink-600 to-orange-500 rounded-full text-white shadow-sm border border-black">
                               <InstagramIcon size={9} />
                             </span>
                           </>
                         ) : (
-                          chat.customerName.slice(0, 2).toUpperCase()
+                          (chat.customerName || 'Customer').slice(0, 2).toUpperCase()
                         )}
                       </div>
                       <div className="min-w-0">
                         <div className={`text-xs flex items-center gap-1.5 truncate ${chat.unreadCount > 0 ? 'font-black text-white' : 'font-semibold text-gray-300'}`}>
                           <span className="truncate">
-                            {chat.channel === 'instagram' && !chat.customerName.startsWith('@') ? `@${chat.customerName}` : chat.customerName}
+                            {chat.channel === 'instagram' && !String(chat.customerName || '').startsWith('@') ? `@${chat.customerName || 'Customer'}` : (chat.customerName || 'Customer')}
                           </span>
                           <span className="text-[9px] text-emerald-400 font-mono font-normal bg-emerald-950/60 px-1.5 rounded shrink-0">
                             {chat.stage}
