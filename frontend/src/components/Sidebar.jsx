@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
 import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import useWorkspaceStore
 import { useInboxStore } from '../store/inboxStore';
-import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home } from 'lucide-react';
+import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home, Sparkles } from 'lucide-react';
 import { FaInstagram, FaFacebookF } from 'react-icons/fa'; // For Instagram/Facebook specific icons
 
 export default function Sidebar() {
@@ -34,6 +34,7 @@ export default function Sidebar() {
         { name: 'Inbox (Chats)', path: '/chats', icon: <MessageSquare size={18} />, badge: unreadCount },
         { name: 'Contacts', path: '/contacts', icon: <Users size={18} /> },
         { name: 'Catalog', path: '/catalog', icon: <ShoppingBag size={18} /> },
+        { name: 'Product Studio', path: '/product-studio', icon: <Sparkles size={18} className="text-amber-400" /> },
         { name: 'CRM', path: '/crm', icon: <Briefcase size={18} /> },
         { name: 'Campaigns', path: '/campaigns', icon: <Megaphone size={18} /> },
         { name: 'Templates', path: '/templates', icon: <FileText size={18} /> }

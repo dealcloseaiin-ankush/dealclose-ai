@@ -73,6 +73,7 @@ const PricingPage = lazyWithRetry(() => import('./pages/PricingPage'));
 const ComparePage = lazyWithRetry(() => import('./pages/ComparePage'));
 const IndustryPage = lazyWithRetry(() => import('./pages/IndustryPage'));
 const MobileDashboard = lazyWithRetry(() => import('./pages/MobileDashboard'));
+const ProductStudio = lazyWithRetry(() => import('./pages/ProductStudio'));
 
 // Smart Redirects for Logged In Users
 const PublicRoute = ({ children }) => {
@@ -315,6 +316,7 @@ export default function App() {
               <Route path="auto-marketer" element={<AutoMarketerDashboard />} />
               <Route path="publisher" element={<Publisher />} />
               <Route path="/admin/templates" element={<AdminTemplates />} />
+              <Route path="product-studio" element={<ProductStudio />} />
               <Route path="meta-ads" element={<MetaAdsManager />} />
               <Route path="billing" element={<BillingPage />} />
             </Route>

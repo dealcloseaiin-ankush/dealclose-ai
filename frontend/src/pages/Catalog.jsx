@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -251,6 +252,9 @@ export default function Catalog() {
               </select>
             </div>
             <div className="flex flex-wrap gap-3 mt-4 md:mt-0">
+              <Link to="/product-studio" className="bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 text-sm">
+                ✨ AI Product Studio & BG Changer
+              </Link>
               <label className="bg-[#111] hover:bg-gray-800 border border-blue-500/30 text-blue-400 px-4 py-2.5 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-2 text-sm shadow-lg">
                 🖼️ Bulk Auto-Create (Images)
                 <input type="file" multiple accept="image/*" className="hidden" onChange={handleBulkImageUpload} />
@@ -362,9 +366,16 @@ export default function Catalog() {
                   <td className="p-5 font-bold text-white">{item.name}</td>
                   <td className="p-5 text-green-400 font-semibold">{item.price}</td>
                   <td className="p-5 text-gray-400 text-sm whitespace-normal">{item.description}</td>
-                  <td className="p-5 text-right">
-                    <button onClick={() => openEditModal(item)} className="text-blue-400 hover:text-blue-300 font-bold text-sm bg-blue-500/10 px-3 py-1 rounded mr-2 transition-colors">Edit</button>
-                    <button onClick={() => handleDeleteItem(item._id || item.id)} className="text-red-400 hover:text-red-300 font-bold text-sm bg-red-500/10 px-3 py-1 rounded transition-colors">Delete</button>
+                  <td className="p-5 text-right whitespace-nowrap">
+                    <Link 
+                      to="/product-studio" 
+                      state={{ image: item.imageUrl, name: item.name, price: item.price }} 
+                      className="text-amber-400 hover:text-amber-300 font-bold text-sm bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg mr-2 transition-colors inline-flex items-center gap-1 border border-amber-500/20"
+                    >
+                      ✨ Studio
+                    </Link>
+                    <button onClick={() => openEditModal(item)} className="text-blue-400 hover:text-blue-300 font-bold text-sm bg-blue-500/10 px-3 py-1.5 rounded-lg mr-2 transition-colors">Edit</button>
+                    <button onClick={() => handleDeleteItem(item._id || item.id)} className="text-red-400 hover:text-red-300 font-bold text-sm bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors">Delete</button>
                   </td>
                 </tr>
               ))}

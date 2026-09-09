@@ -2516,6 +2516,23 @@ export default function MobileDashboard() {
               </button>
             </div>
 
+            {/* AI Product Studio Quick Banner */}
+            <a 
+              href="/product-studio"
+              className="bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-pink-500/20 border border-amber-500/40 p-3 rounded-2xl flex items-center justify-between shadow-md hover:border-amber-400 transition-all text-left block"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <div className="text-white font-black text-xs">✨ AI Product Studio & BG Changer</div>
+                  <div className="text-[10px] text-amber-300/80">Select backgrounds from bottom carousel & export HD posters</div>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-amber-400 shrink-0" />
+            </a>
+
             <div className="space-y-2">
               {catalogItems.length === 0 ? (
                 <div className="bg-[#0e0e14] border border-gray-800 p-6 rounded-2xl text-center space-y-2.5 shadow-sm">
@@ -2549,6 +2566,13 @@ export default function MobileDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <a 
+                        href={`/product-studio?name=${encodeURIComponent(item.name || '')}&price=${encodeURIComponent(item.price || '')}&image=${encodeURIComponent(item.image || '')}`}
+                        className="p-2 text-amber-400 hover:text-amber-300 bg-amber-950/30 hover:bg-amber-950/60 border border-amber-500/20 rounded-xl transition-all"
+                        title="Studio Background Changer"
+                      >
+                        <Sparkles size={14} />
+                      </a>
                       <button 
                         onClick={() => handleEditProduct(item)}
                         className="p-2 text-gray-400 hover:text-purple-300 bg-purple-950/30 hover:bg-purple-950/60 border border-purple-500/20 rounded-xl transition-all"
@@ -2831,6 +2855,25 @@ export default function MobileDashboard() {
 
                 <div className="grid grid-cols-2 gap-2.5 text-xs font-bold">
                   
+                  {/* Tool 0: ✨ AI Product Studio & Background Changer */}
+                  <a 
+                    href="/product-studio"
+                    className="bg-gradient-to-br from-amber-950/40 to-[#0e0e14] border border-amber-500/40 p-3.5 rounded-2xl text-left space-y-2 hover:border-amber-400 transition-all shadow-md col-span-2 block"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
+                        <Sparkles size={16} />
+                      </div>
+                      <span className="text-[10px] font-mono bg-amber-950 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/40">
+                        ● 1-Tap BG Changer & Studio
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-white font-black">✨ AI Product Studio & BG Changer</div>
+                      <div className="text-[10px] text-amber-300 font-normal">Select luxury/studio backgrounds from bottom carousel, add prices & export posters</div>
+                    </div>
+                  </a>
+
                   {/* Tool 1: 🔗 Custom Webhooks & API Integrations */}
                   <button 
                     onClick={() => setMenuSubScreen('custom_webhooks')}
