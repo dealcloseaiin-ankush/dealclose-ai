@@ -3040,19 +3040,19 @@ export default function MobileDashboard() {
 
                 </div>
 
-                {/* Smart QR Counter Hub Card */}
+                {/* Link Page & Smart QR Card */}
                 <div className="bg-[#0e0e14] border border-gray-800 rounded-2xl p-4 flex items-center justify-between mt-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                      <QrCode size={20} />
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center">
+                      <Link2 size={20} />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">Smart QR Counter Hub</div>
-                      <div className="text-[10px] text-gray-400">Bundled WA, IG, YT, Review & UPI</div>
+                      <div className="text-xs font-bold text-white">🔗 Link Page & Bio Links</div>
+                      <div className="text-[10px] text-gray-400">Like Linktree • Custom links, QR & Leads</div>
                     </div>
                   </div>
-                  <button onClick={() => setShowSmartQrModal(true)} className="px-3 py-1.5 bg-amber-500 text-black font-black text-[11px] rounded-xl shadow-md">
-                    Open QR ⚡
+                  <button onClick={() => setShowSmartQrModal(true)} className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-emerald-500 text-black font-black text-[11px] rounded-xl shadow-md">
+                    Open Link Page ⚡
                   </button>
                 </div>
 
@@ -4680,7 +4680,7 @@ export default function MobileDashboard() {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-black text-white truncate">{profileData.businessName}</h3>
-                <p className="text-[10px] text-gray-400">Bio Link Hub & Smart Multi-Link Manager</p>
+                <p className="text-[10px] text-teal-400 font-bold">🔗 Link Page (Bio Link Hub & QR)</p>
               </div>
             </div>
 

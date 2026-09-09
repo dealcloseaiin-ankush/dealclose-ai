@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
 import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import useWorkspaceStore
 import { useInboxStore } from '../store/inboxStore';
-import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home, Sparkles } from 'lucide-react';
+import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home, Sparkles, Link2 } from 'lucide-react';
 import { FaInstagram, FaFacebookF } from 'react-icons/fa'; // For Instagram/Facebook specific icons
 
 export default function Sidebar() {
@@ -66,6 +66,7 @@ export default function Sidebar() {
     {
       title: 'TOOLS',
       items: [
+        { name: 'Link Page', path: '/card/me', icon: <Link2 size={18} className="text-emerald-400" /> },
         { name: 'Staff & Team', path: '/staff', icon: <UserCog size={18} /> },
         { name: 'Forms', path: '/forms', icon: <Clipboard size={18} /> },
         { name: 'Wallet', path: '/wallet', icon: <Wallet size={18} />, requireOwner: true },

@@ -6,6 +6,7 @@ import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { useInboxStore } from './store/inboxStore';
+import { isRealMobileDevice } from './utils/deviceDetect';
 
 // 🚀 PERFORMANCE & AUTO-RECOVERY: Automatically retry and reload when new deployment changes chunk hashes
 const lazyWithRetry = (componentImport) =>
@@ -80,7 +81,7 @@ const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
   if (user) {
-    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || localStorage.getItem('dealclose_mobile_view') === 'true');
+    const isMobile = isRealMobileDevice();
     return <Navigate to={isMobile ? "/mobile" : "/dashboard"} replace />;
   }
   return children;
@@ -90,7 +91,7 @@ const RootRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div></div>;
   if (user) {
-    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || localStorage.getItem('dealclose_mobile_view') === 'true');
+    const isMobile = isRealMobileDevice();
     return <Navigate to={isMobile ? "/mobile" : "/dashboard"} replace />;
   }
   return children;
@@ -273,8 +274,10 @@ export default function App() {
           {/* ScanIQ Public Shareable Results Page */}
           <Route path="/scan/:scanId" element={<ResultsPage />} />
           
-          {/* Public Digital Business Card (QR Code Destination) */}
+          {/* Public Link Page & Digital Card (QR Code Destination) */}
           <Route path="/card/:userId" element={<DigitalCard />} />
+          <Route path="/link-page/:userId" element={<DigitalCard />} />
+          <Route path="/link-page" element={<DigitalCard />} />
           
           {/* Onboarding Page (Replaces Setup) */}
           <Route path="/onboarding" element={<Onboarding />} />

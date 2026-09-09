@@ -30,7 +30,7 @@ export default function Catalog() {
   const [pendingQuotes, setPendingQuotes] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', price: '', description: '' });
+  const [formData, setFormData] = useState({ name: '', price: '', description: '', gstType: 'With GST (Incl.)', notes: '' });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -168,7 +168,13 @@ export default function Catalog() {
   // Open Modal for Editing an existing item
   const openEditModal = (item) => {
     setEditingItemId(item._id || item.id);
-    setFormData({ name: item.name, price: item.price, description: item.description });
+    setFormData({ 
+      name: item.name || '', 
+      price: item.price || '', 
+      description: item.description || '', 
+      gstType: item.gstType || 'With GST (Incl.)', 
+      notes: item.notes || '' 
+    });
     setImagePreview(item.imageUrl || '');
     setImageFile(null); // Reset file input
     setIsModalOpen(true);
@@ -223,7 +229,7 @@ export default function Catalog() {
       setImageFile(null);
       setImagePreview('');
       setIsModalOpen(false);
-      setFormData({ name: '', price: '', description: '' });
+      setFormData({ name: '', price: '', description: '', gstType: 'With GST (Incl.)', notes: '' });
       console.log("✅ [DEBUG] Item saved.");
     } catch (error) {
       console.error("❌ [DEBUG] Failed to save item:", error);
@@ -265,7 +271,7 @@ export default function Catalog() {
               </label>
               <button onClick={() => {
                 setEditingItemId(null);
-                setFormData({ name: '', price: '', description: '' });
+                setFormData({ name: '', price: '', description: '', gstType: 'With GST (Incl.)', notes: '' });
                 setImagePreview('');
                 setImageFile(null);
                 setIsModalOpen(true);
@@ -312,18 +318,46 @@ export default function Catalog() {
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">{itemNameLabel}</label>
-                <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder={isRealEstate ? "e.g. 3BHK Sea View Flat" : "e.g., Running Shoes"} />
+                <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none text-sm" placeholder={isRealEstate ? "e.g. 3BHK Sea View Flat" : "e.g., Running Shoes"} />
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">{priceLabel}</label>
-                <input type="text" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder={isRealEstate ? "e.g., ₹25,000/mo or ₹1.5 Cr" : "e.g., ₹1,499"} />
+                <input type="text" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none text-sm" placeholder={isRealEstate ? "e.g., ₹25,000/mo or ₹1.5 Cr" : "e.g., ₹1,499"} />
               </div>
+              
+              {/* GST Status Tags */}
               <div>
-                <label className="block text-sm text-gray-400 mb-1">{descLabel} (For AI to read)</label>
-                <textarea required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none" placeholder={isRealEstate ? "Amenities, floor, location..." : "Details about this product..."}></textarea>
+                <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase tracking-wider">GST Tax Status</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['With GST (Incl.)', 'Without GST (+Excl.)', 'No GST / N/A'].map(gst => (
+                    <button
+                      key={gst}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, gstType: gst })}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                        formData.gstType === gst
+                          ? 'bg-purple-600/30 border-purple-500 text-purple-300 shadow-md shadow-purple-500/20'
+                          : 'bg-[#0a0a0a] border-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {gst}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="pt-4">
-                <button type="submit" disabled={submitting} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50">
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">{descLabel} (For AI to read & pitch)</label>
+                <textarea required rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none text-sm" placeholder={isRealEstate ? "Amenities, floor, location..." : "Features, sizes, colors, material..."}></textarea>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Additional Notes / Specifications (Optional)</label>
+                <input type="text" value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-700 rounded-lg p-2.5 text-white focus:border-purple-500 outline-none text-xs" placeholder="e.g. Delivery in 2-3 days, 1-Year Brand Warranty, 100% Cotton" />
+              </div>
+
+              <div className="pt-3">
+                <button type="submit" disabled={submitting} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50 text-sm">
                   {submitting ? 'Saving...' : (editingItemId ? 'Update Item' : 'Save to Catalog')}
                 </button>
               </div>
@@ -364,8 +398,24 @@ export default function Catalog() {
                     )}
                   </td>
                   <td className="p-5 font-bold text-white">{item.name}</td>
-                  <td className="p-5 text-green-400 font-semibold">{item.price}</td>
-                  <td className="p-5 text-gray-400 text-sm whitespace-normal">{item.description}</td>
+                  <td className="p-5">
+                    <div className="text-green-400 font-semibold">{item.price}</div>
+                    {item.gstType && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block mt-0.5 ${
+                        item.gstType.includes('With') ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-300'
+                      }`}>
+                        {item.gstType}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-5 text-gray-400 text-sm whitespace-normal">
+                    <div>{item.description}</div>
+                    {item.notes && (
+                      <div className="text-xs text-purple-300/80 mt-1 font-mono">
+                        📝 {item.notes}
+                      </div>
+                    )}
+                  </td>
                   <td className="p-5 text-right whitespace-nowrap">
                     <Link 
                       to="/product-studio" 

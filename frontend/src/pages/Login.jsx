@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Button from '../components/Button';
 import { supabase } from '../lib/supabase'; // Centralized Supabase client
+import { isRealMobileDevice } from '../utils/deviceDetect';
 
 export default function Login() {
   const [email, setEmail] = useState('ankush.bani@gmail.com');
@@ -19,7 +20,7 @@ export default function Login() {
     const params = new URLSearchParams(window.location.search);
     const redirectParam = params.get('redirect');
     if (redirectParam) return redirectParam;
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    if (isRealMobileDevice()) {
       return '/mobile';
     }
     return '/dashboard';
