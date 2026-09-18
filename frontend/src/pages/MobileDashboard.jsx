@@ -12,6 +12,7 @@ import {
   Heart, MessageCircle as CommentIcon, ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import useWorkspaceStore from '../store/workspaceStore';
 import MetaConnectButton from '../components/MetaConnectButton';
@@ -130,6 +131,15 @@ export default function MobileDashboard() {
 
   // Show / Hide External API Token
   const [showExternalToken, setShowExternalToken] = useState(false);
+
+  // 🛡️ AI Channel Permissions & Kill Switches (Granular Manual Restrictions)
+  const [channelToggles, setChannelToggles] = useState({
+    comment: false, // strictly false by default!
+    instagram_dm: true,
+    whatsapp: true,
+    master: true
+  });
+  const [isUpdatingToggle, setIsUpdatingToggle] = useState(false);
 
   // Workspaces Array & Selection (PERSISTED ON REFRESH)
   const [rawDbUser, setRawDbUser] = useState(null);
@@ -546,6 +556,18 @@ export default function MobileDashboard() {
       if (dashRes?.stats) {
         setLiveStats(dashRes.stats);
       }
+
+      // 2.1 Fetch Live AI Channel Toggles (Kill Switches)
+      api.get(`/ai/training-data?workspaceId=${currentWsId}`).then(res => {
+        if (res.data) {
+          setChannelToggles({
+            comment: res.data.commentAiReplyEnabled === true, // strictly false by default
+            instagram_dm: res.data.instagramDmAiEnabled !== false,
+            whatsapp: res.data.whatsappAiReplyEnabled !== false,
+            master: res.data.aiAgentEnabled !== false
+          });
+        }
+      }).catch(() => {});
 
       // 3. Fetch Live Contacts + Leads for Active Workspace
       const [leadsRes, contactsRes] = await Promise.all([
@@ -1097,6 +1119,37 @@ export default function MobileDashboard() {
       setShowLoginModal(false);
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  // 🛡️ 1-Click Toggle for AI Channels (Comments, IG DMs, WhatsApp, Master)
+  const handleToggleAiChannel = async (channel) => {
+    const currentVal = channelToggles[channel];
+    const nextVal = !currentVal;
+
+    // Optimistic UI update
+    setChannelToggles(prev => ({ ...prev, [channel]: nextVal }));
+    setIsUpdatingToggle(true);
+
+    try {
+      const res = await api.post('/ai/toggle-channel', {
+        channel,
+        enabled: nextVal,
+        workspaceId: activeWorkspaceId
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message || 'AI Channel Setting Updated');
+        if (res.data.toggles) {
+          setChannelToggles(res.data.toggles);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update toggle setting:', error);
+      toast.error('Failed to update AI channel setting.');
+      // Rollback on error
+      setChannelToggles(prev => ({ ...prev, [channel]: !nextVal }));
+    } finally {
+      setIsUpdatingToggle(false);
     }
   };
 
@@ -3010,17 +3063,24 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
-                  {/* Tool 8: 🧠 AI Smart Assistant */}
+                  {/* Tool 8: 🧠 AI Smart Assistant & Kill Switches */}
                   <button 
                     onClick={() => setMenuSubScreen('ai_assistant')}
-                    className="bg-[#0e0e14] border border-teal-500/30 p-3.5 rounded-2xl text-left space-y-2 hover:border-teal-400 transition-all shadow-sm"
+                    className="bg-[#0e0e14] border border-teal-500/30 p-3.5 rounded-2xl text-left space-y-2 hover:border-teal-400 transition-all shadow-sm relative overflow-hidden"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-300 flex items-center justify-center">
-                      <Sparkles size={16} />
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-300 flex items-center justify-center">
+                        <Sparkles size={16} />
+                      </div>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${
+                        channelToggles.comment ? 'bg-amber-950/80 text-amber-300 border border-amber-500/40' : 'bg-purple-950/80 text-purple-300 border border-purple-500/40'
+                      }`}>
+                        {channelToggles.comment ? 'Cmt: ON' : 'Cmt: OFF'}
+                      </span>
                     </div>
                     <div>
-                      <div className="text-white">AI Assistant</div>
-                      <div className="text-[10px] text-teal-400 font-normal">Train store bot & chat</div>
+                      <div className="text-white font-bold">AI Assistant</div>
+                      <div className="text-[10px] text-teal-400 font-normal">Kill Switches & Chat</div>
                     </div>
                   </button>
 
@@ -3911,6 +3971,124 @@ export default function MobileDashboard() {
                   </button>
                 </div>
 
+                {/* 🛡️ AI Channel Kill Switches (Mobile Dedicated Controls) */}
+                <div className="bg-[#111116] border border-gray-800 rounded-2xl p-3 shadow-md space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck size={15} className="text-purple-400" />
+                      <span className="text-[11px] font-bold text-white">AI Channels & Kill Switches</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-black/60 px-2 py-0.5 rounded-lg border border-gray-800">
+                      <span className="text-[9px] text-gray-400 font-medium">Master:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAiChannel('master')}
+                        disabled={isUpdatingToggle}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-black flex items-center gap-1 transition-all ${
+                          channelToggles.master
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                        }`}
+                      >
+                        <Power size={9} />
+                        {channelToggles.master ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {/* Instagram Comments */}
+                    <div className={`p-2 rounded-xl border flex flex-col justify-between transition-all ${
+                      channelToggles.comment ? 'bg-purple-950/20 border-purple-500/40' : 'bg-black/60 border-gray-800/80'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <CommentIcon size={12} className="text-pink-400" />
+                        <span className={`text-[7px] font-black px-1 py-0.5 rounded uppercase ${
+                          channelToggles.comment ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                        }`}>
+                          {channelToggles.comment ? 'ACTIVE' : 'BLOCKED'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-bold text-white truncate">Comments</div>
+                      <div className="text-[8px] text-gray-400 mb-2 truncate">
+                        {channelToggles.comment ? 'AI Replies' : 'Strictly Off'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAiChannel('comment')}
+                        disabled={isUpdatingToggle}
+                        className={`w-full py-1 rounded-lg text-[9px] font-black transition-all ${
+                          channelToggles.comment
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                            : 'bg-purple-600 text-white shadow hover:bg-purple-500'
+                        }`}
+                      >
+                        {channelToggles.comment ? 'Turn OFF' : 'Turn ON'}
+                      </button>
+                    </div>
+
+                    {/* Instagram DMs */}
+                    <div className={`p-2 rounded-xl border flex flex-col justify-between transition-all ${
+                      channelToggles.instagram_dm ? 'bg-blue-950/20 border-blue-500/40' : 'bg-black/60 border-gray-800/80'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <InstagramIcon size={12} className="text-purple-400" />
+                        <span className={`text-[7px] font-black px-1 py-0.5 rounded uppercase ${
+                          channelToggles.instagram_dm ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                        }`}>
+                          {channelToggles.instagram_dm ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-bold text-white truncate">Instagram DM</div>
+                      <div className="text-[8px] text-gray-400 mb-2 truncate">
+                        {channelToggles.instagram_dm ? 'AI Replies' : 'Kill Switch'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAiChannel('instagram_dm')}
+                        disabled={isUpdatingToggle}
+                        className={`w-full py-1 rounded-lg text-[9px] font-black transition-all ${
+                          channelToggles.instagram_dm
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                            : 'bg-blue-600 text-white shadow hover:bg-blue-500'
+                        }`}
+                      >
+                        {channelToggles.instagram_dm ? 'Turn OFF' : 'Turn ON'}
+                      </button>
+                    </div>
+
+                    {/* WhatsApp */}
+                    <div className={`p-2 rounded-xl border flex flex-col justify-between transition-all ${
+                      channelToggles.whatsapp ? 'bg-emerald-950/20 border-emerald-500/40' : 'bg-black/60 border-gray-800/80'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <MessageCircle size={12} className="text-emerald-400" />
+                        <span className={`text-[7px] font-black px-1 py-0.5 rounded uppercase ${
+                          channelToggles.whatsapp ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                        }`}>
+                          {channelToggles.whatsapp ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-bold text-white truncate">WhatsApp</div>
+                      <div className="text-[8px] text-gray-400 mb-2 truncate">
+                        {channelToggles.whatsapp ? 'AI Replies' : 'Kill Switch'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAiChannel('whatsapp')}
+                        disabled={isUpdatingToggle}
+                        className={`w-full py-1 rounded-lg text-[9px] font-black transition-all ${
+                          channelToggles.whatsapp
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                            : 'bg-emerald-600 text-white shadow hover:bg-emerald-500'
+                        }`}
+                      >
+                        {channelToggles.whatsapp ? 'Turn OFF' : 'Turn ON'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs custom-scrollbar">
                   {aiChatMessages.map((msg, i) => (
                     <div
@@ -4221,6 +4399,115 @@ export default function MobileDashboard() {
                       className="w-full bg-black border border-purple-900/50 rounded-lg p-1.5 text-purple-200 text-xs font-semibold focus:outline-none focus:border-purple-500"
                     />
                     <div className="text-[9px] text-gray-400">AI will introduce itself with this name to customers & owner.</div>
+                  </div>
+
+                  {/* 🛡️ AI Channel Kill Switches (Settings & Profile View) */}
+                  <div className="bg-[#111116] border border-gray-800 rounded-xl p-2.5 shadow-md space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck size={14} className="text-purple-400" />
+                        <span className="text-[10px] font-bold text-white">AI Permissions & Kill Switches</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-black/60 px-1.5 py-0.5 rounded border border-gray-800">
+                        <span className="text-[9px] text-gray-400 font-medium">Master:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAiChannel('master')}
+                          disabled={isUpdatingToggle}
+                          className={`px-1.5 py-0.5 rounded text-[8px] font-black flex items-center gap-0.5 transition-all ${
+                            channelToggles.master
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                          }`}
+                        >
+                          <Power size={8} />
+                          {channelToggles.master ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {/* Comments */}
+                      <div className={`p-1.5 rounded-lg border flex flex-col justify-between transition-all ${
+                        channelToggles.comment ? 'bg-purple-950/20 border-purple-500/40' : 'bg-black/50 border-gray-800/80'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <CommentIcon size={11} className="text-pink-400" />
+                          <span className={`text-[7px] font-black px-1 rounded uppercase ${
+                            channelToggles.comment ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                          }`}>
+                            {channelToggles.comment ? 'ACTIVE' : 'BLOCKED'}
+                          </span>
+                        </div>
+                        <div className="text-[9px] font-bold text-white truncate">Comments</div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAiChannel('comment')}
+                          disabled={isUpdatingToggle}
+                          className={`w-full mt-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
+                            channelToggles.comment
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                              : 'bg-purple-600 text-white shadow hover:bg-purple-500'
+                          }`}
+                        >
+                          {channelToggles.comment ? 'Turn OFF' : 'Turn ON'}
+                        </button>
+                      </div>
+
+                      {/* Instagram DMs */}
+                      <div className={`p-1.5 rounded-lg border flex flex-col justify-between transition-all ${
+                        channelToggles.instagram_dm ? 'bg-blue-950/20 border-blue-500/40' : 'bg-black/50 border-gray-800/80'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <InstagramIcon size={11} className="text-purple-400" />
+                          <span className={`text-[7px] font-black px-1 rounded uppercase ${
+                            channelToggles.instagram_dm ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                          }`}>
+                            {channelToggles.instagram_dm ? 'ON' : 'OFF'}
+                          </span>
+                        </div>
+                        <div className="text-[9px] font-bold text-white truncate">Instagram DM</div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAiChannel('instagram_dm')}
+                          disabled={isUpdatingToggle}
+                          className={`w-full mt-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
+                            channelToggles.instagram_dm
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                              : 'bg-blue-600 text-white shadow hover:bg-blue-500'
+                          }`}
+                        >
+                          {channelToggles.instagram_dm ? 'Turn OFF' : 'Turn ON'}
+                        </button>
+                      </div>
+
+                      {/* WhatsApp */}
+                      <div className={`p-1.5 rounded-lg border flex flex-col justify-between transition-all ${
+                        channelToggles.whatsapp ? 'bg-emerald-950/20 border-emerald-500/40' : 'bg-black/50 border-gray-800/80'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <MessageCircle size={11} className="text-emerald-400" />
+                          <span className={`text-[7px] font-black px-1 rounded uppercase ${
+                            channelToggles.whatsapp ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                          }`}>
+                            {channelToggles.whatsapp ? 'ON' : 'OFF'}
+                          </span>
+                        </div>
+                        <div className="text-[9px] font-bold text-white truncate">WhatsApp</div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAiChannel('whatsapp')}
+                          disabled={isUpdatingToggle}
+                          className={`w-full mt-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
+                            channelToggles.whatsapp
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                              : 'bg-emerald-600 text-white shadow hover:bg-emerald-500'
+                          }`}
+                        >
+                          {channelToggles.whatsapp ? 'Turn OFF' : 'Turn ON'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {/* 4 Dedicated Phone Channels */}
