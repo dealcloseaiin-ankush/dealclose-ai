@@ -304,40 +304,57 @@ export default function Chats() {
     }
   }, [activeCustomer]);
 
+  // Helper to extract post/reel ID from message tags or text
+  const extractPostIdFromMessage = (msg) => {
+    if (!msg) return null;
+    if (Array.isArray(msg.tags)) {
+      const postTag = msg.tags.find(t => typeof t === 'string' && t.startsWith('post_'));
+      if (postTag) return postTag.replace('post_', '');
+      const directIgTag = msg.tags.find(t => typeof t === 'string' && t.startsWith('ig_post_'));
+      if (directIgTag) return directIgTag.replace('ig_post_', '');
+    }
+    if (typeof msg.messageText === 'string') {
+      const match = msg.messageText.match(/Post\/Reel\s*#?([0-9a-zA-Z_]+)/i) || 
+                    msg.messageText.match(/Post\s*#?([0-9a-zA-Z_]+)/i) ||
+                    msg.messageText.match(/Reel\s*#?([0-9a-zA-Z_]+)/i);
+      if (match && match[1] && match[1].toLowerCase() !== 'reel' && match[1].toLowerCase() !== 'post') {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
   // Extract all distinct posts related to this customer's interactions and attach real IG media metadata
   const activeCustomerPosts = useMemo(() => {
     const map = new Map();
-    filteredMessages
-      .filter(m => m.customerPhone === activeCustomer)
-      .forEach(msg => {
-        const postTag = msg.tags?.find(t => t.startsWith('post_'));
-        const tagId = postTag ? postTag.replace('post_', '') : null;
-        const match = msg.messageText?.match(/Post\/Reel\s*#?([0-9a-zA-Z_]+)/i) || msg.messageText?.match(/Post\s*#?([0-9a-zA-Z_]+)/i);
-        const extractedId = tagId || (match && match[1] !== 'Reel' ? match[1] : null);
+    const customerMsgs = filteredMessages.filter(m => m.customerPhone === activeCustomer);
 
-        if (extractedId) {
-          const resolvedIgPost = igPosts.find(p => String(p.id) === String(extractedId));
-          if (!map.has(extractedId)) {
-            map.set(extractedId, {
-              id: extractedId,
-              caption: resolvedIgPost?.caption || msg.messageText?.replace(/^[💬[^]]+]:\s*/, '')?.slice(0, 80) || 'Instagram Post / Reel',
-              thumbnail_url: resolvedIgPost?.thumbnail_url || resolvedIgPost?.media_url || null,
-              permalink: resolvedIgPost?.permalink || `https://www.instagram.com/p/${extractedId}`,
-              media_type: resolvedIgPost?.media_type || 'REEL',
-              like_count: resolvedIgPost?.like_count || 0,
-              comments_count: resolvedIgPost?.comments_count || 0,
-              timestamp: resolvedIgPost?.timestamp || msg.timestamp || msg.createdAt,
-              count: 1
-            });
-          } else {
-            map.get(extractedId).count += 1;
-          }
+    customerMsgs.forEach(msg => {
+      const extractedId = extractPostIdFromMessage(msg);
+
+      if (extractedId) {
+        const resolvedIgPost = igPosts.find(p => String(p.id) === String(extractedId));
+        if (!map.has(extractedId)) {
+          map.set(extractedId, {
+            id: String(extractedId),
+            caption: resolvedIgPost?.caption || msg.messageText?.replace(/^[💬[^]]+]:\s*/, '')?.slice(0, 80) || 'Instagram Post / Reel',
+            thumbnail_url: resolvedIgPost?.thumbnail_url || resolvedIgPost?.media_url || null,
+            permalink: resolvedIgPost?.permalink || `https://www.instagram.com/p/${extractedId}`,
+            media_type: resolvedIgPost?.media_type || 'REEL',
+            like_count: resolvedIgPost?.like_count || 0,
+            comments_count: resolvedIgPost?.comments_count || 0,
+            timestamp: resolvedIgPost?.timestamp || msg.timestamp || msg.createdAt,
+            count: 1
+          });
+        } else {
+          map.get(extractedId).count += 1;
         }
-      });
+      }
+    });
 
     // If no specific post ID tag was found but it's an Instagram comment thread, fallback to posts list
     if (map.size === 0 && (activeCustomerData?.lastMessage?.platform === 'instagram_comment' || isActiveIg) && igPosts.length > 0) {
-      igPosts.slice(0, 3).forEach(p => {
+      igPosts.forEach(p => {
         map.set(String(p.id), {
           id: String(p.id),
           caption: p.caption || 'Recent Instagram Post / Reel',
@@ -347,18 +364,18 @@ export default function Chats() {
           like_count: p.like_count || 0,
           comments_count: p.comments_count || 0,
           timestamp: p.timestamp,
-          count: 1
+          count: customerMsgs.length || 1
         });
       });
     }
 
     return Array.from(map.values());
-  }, [filteredMessages, activeCustomer, igPosts, isActiveIg]);
+  }, [filteredMessages, activeCustomer, igPosts, isActiveIg, activeCustomerData]);
 
   // Active Post for the banner
   const currentBannerPost = useMemo(() => {
     if (postFilter !== 'all') {
-      return activeCustomerPosts.find(p => p.id === postFilter) || activeCustomerPosts[0] || null;
+      return activeCustomerPosts.find(p => String(p.id) === String(postFilter)) || activeCustomerPosts[0] || null;
     }
     return activeCustomerPosts[0] || null;
   }, [activeCustomerPosts, postFilter]);
@@ -367,13 +384,31 @@ export default function Chats() {
     return filteredMessages
       .filter(m => {
         if (m.customerPhone !== activeCustomer) return false;
-        if (platformFilter === 'whatsapp') return m.platform === 'whatsapp';
-        if (platformFilter === 'instagram_dm') return m.platform === 'instagram_dm';
-        if (platformFilter === 'instagram_comment') return m.platform === 'instagram_comment';
+        if (platformFilter === 'whatsapp' && m.platform !== 'whatsapp') return false;
+        if (platformFilter === 'instagram_dm' && m.platform !== 'instagram_dm') return false;
+        if (platformFilter === 'instagram_comment' && m.platform !== 'instagram_comment') return false;
+        
         if (postFilter !== 'all') {
-          const matchesTag = m.tags?.includes(`post_${postFilter}`);
-          const matchesText = m.messageText?.includes(postFilter);
-          return matchesTag || matchesText;
+          const msgPostId = extractPostIdFromMessage(m);
+          if (msgPostId && String(msgPostId) === String(postFilter)) {
+            return true;
+          }
+          const matchesTag = Array.isArray(m.tags) && m.tags.some(t => 
+            typeof t === 'string' && (
+              t === `post_${postFilter}` || 
+              t === postFilter || 
+              t.toLowerCase() === `post_${postFilter}`.toLowerCase()
+            )
+          );
+          if (matchesTag) return true;
+
+          const matchesText = typeof m.messageText === 'string' && (
+            m.messageText.includes(postFilter) || 
+            m.messageText.includes(`#${postFilter}`)
+          );
+          if (matchesText) return true;
+
+          return false;
         }
         return true;
       })
@@ -471,6 +506,7 @@ export default function Chats() {
 
     const targetChannel = (isActiveIg && replyMode === 'public_comment') ? 'instagram_comment' : (isActiveIg ? 'instagram_dm' : 'whatsapp');
     const isPublicComment = isActiveIg && replyMode === 'public_comment';
+    const effectivePostId = postFilter !== 'all' ? postFilter : (currentBannerPost?.id || null);
 
     const newMessage = {
       _id: Date.now(),
@@ -479,7 +515,9 @@ export default function Chats() {
       direction: 'outgoing',
       messageText: replyText,
       sentBy: 'staff',
-      tags: isPublicComment ? ['public_comment_reply'] : [],
+      tags: isPublicComment 
+        ? ['public_comment_reply', ...(effectivePostId ? [`post_${effectivePostId}`] : [])] 
+        : ['staff_dm', ...(effectivePostId ? [`post_${effectivePostId}`] : [])],
       timestamp: new Date().toISOString()
     };
 
@@ -1139,23 +1177,23 @@ export default function Chats() {
                         onClick={() => setPostFilter('all')} 
                         className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all shrink-0 ${
                           postFilter === 'all' 
-                            ? 'bg-pink-600 text-white shadow-sm' 
+                            ? 'bg-pink-600 text-white shadow-sm ring-1 ring-pink-400' 
                             : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
                         }`}
                       >
-                        All ({activeCustomerPosts.length})
+                        All ({activeCustomerPosts.reduce((acc, p) => acc + (p.count || 0), 0) || activeCustomerPosts.length})
                       </button>
                       {activeCustomerPosts.map(p => (
                         <button 
                           key={p.id}
                           onClick={() => setPostFilter(p.id)} 
-                          className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all flex items-center gap-1 shrink-0 ${
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all flex items-center gap-1 shrink-0 ${
                             postFilter === p.id 
-                              ? 'bg-pink-600 text-white shadow-sm' 
+                              ? 'bg-pink-600 text-white shadow-sm ring-1 ring-pink-400' 
                               : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
                           }`}
                         >
-                          🎬 #{p.id.slice(-5)} ({p.count})
+                          🎬 #{p.id.length > 6 ? p.id.slice(-6) : p.id} ({p.count})
                         </button>
                       ))}
                     </div>
@@ -1167,38 +1205,73 @@ export default function Chats() {
 
             {/* Message Feed */}
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-              {activeChatMessages.map((msg, index) => {
-                const msgDateStr = new Date(msg.timestamp || msg.createdAt || 0).toDateString();
-                const prevMsgDateStr = index > 0 ? new Date(activeChatMessages[index - 1].timestamp || activeChatMessages[index - 1].createdAt || 0).toDateString() : null;
-                const showDateBadge = msgDateStr !== prevMsgDateStr;
-                const isFailed = msg.status === 'failed';
+              {activeChatMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-[220px] text-center text-gray-500 p-6">
+                  <div className="w-12 h-12 rounded-full bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 mb-3">
+                    <MessageCircle size={22} />
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-200 mb-1">
+                    {postFilter !== 'all' ? `No comments for Post #${postFilter.slice(-6)}` : 'No messages found'}
+                  </h4>
+                  <p className="text-xs text-gray-500 max-w-xs mb-3">
+                    {postFilter !== 'all' 
+                      ? 'This customer has comments on other posts or DMs.' 
+                      : 'No chat messages match your current filters.'}
+                  </p>
+                  {postFilter !== 'all' && (
+                    <button 
+                      onClick={() => setPostFilter('all')} 
+                      className="text-xs bg-pink-600 hover:bg-pink-500 text-white font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                    >
+                      Show All Posts & Comments
+                    </button>
+                  )}
+                </div>
+              ) : (
+                activeChatMessages.map((msg, index) => {
+                  const msgDateStr = new Date(msg.timestamp || msg.createdAt || 0).toDateString();
+                  const prevMsgDateStr = index > 0 ? new Date(activeChatMessages[index - 1].timestamp || activeChatMessages[index - 1].createdAt || 0).toDateString() : null;
+                  const showDateBadge = msgDateStr !== prevMsgDateStr;
+                  const isFailed = msg.status === 'failed';
+                  const msgPostId = extractPostIdFromMessage(msg);
 
-                return (
-                  <div key={msg._id} className="flex flex-col w-full">
-                    {showDateBadge && (
-                      <div className="flex justify-center my-3">
-                        <span className="bg-[#1a1a1a] border border-gray-800 text-gray-400 text-[11px] font-bold px-3 py-0.5 rounded-full shadow-sm">
-                          {formatDateBadge(msg.timestamp || msg.createdAt)}
-                        </span>
-                      </div>
-                    )}
-                    <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`group p-3.5 max-w-md rounded-2xl relative shadow-md ${
-                        msg.direction === 'outgoing' 
-                          ? (isFailed ? 'bg-rose-950/80 border border-rose-600/60 text-white rounded-br-sm' : (msg.channel === 'instagram_comment' ? 'bg-pink-700 text-white rounded-br-sm' : 'bg-green-600 text-white rounded-br-sm')) 
-                          : 'bg-[#151515] border border-gray-800 text-gray-200 rounded-bl-sm'
-                      }`}>
-                        {/* Channel Badge (Post Comment vs DM) */}
-                        {msg.channel === 'instagram_comment' && (
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-pink-300 bg-pink-950/60 border border-pink-500/30 px-2 py-0.5 rounded-md mb-1.5 w-fit">
-                            <MessageCircle size={11} /> {msg.tags?.includes('public_comment_reply') ? 'Public Comment Reply' : 'Post Comment'}
+                  return (
+                    <div key={msg._id} className="flex flex-col w-full">
+                      {showDateBadge && (
+                        <div className="flex justify-center my-3">
+                          <span className="bg-[#1a1a1a] border border-gray-800 text-gray-400 text-[11px] font-bold px-3 py-0.5 rounded-full shadow-sm">
+                            {formatDateBadge(msg.timestamp || msg.createdAt)}
+                          </span>
+                        </div>
+                      )}
+                      <div className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`group p-3.5 max-w-md rounded-2xl relative shadow-md ${
+                          msg.direction === 'outgoing' 
+                            ? (isFailed ? 'bg-rose-950/80 border border-rose-600/60 text-white rounded-br-sm' : (msg.channel === 'instagram_comment' ? 'bg-pink-700 text-white rounded-br-sm' : 'bg-green-600 text-white rounded-br-sm')) 
+                            : 'bg-[#151515] border border-gray-800 text-gray-200 rounded-bl-sm'
+                        }`}>
+                          {/* Channel Badge (Post Comment vs DM) */}
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                            {msg.channel === 'instagram_comment' && (
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-pink-300 bg-pink-950/60 border border-pink-500/30 px-2 py-0.5 rounded-md w-fit">
+                                <MessageCircle size={11} /> {msg.tags?.includes('public_comment_reply') ? 'Public Comment Reply' : 'Post Comment'}
+                              </div>
+                            )}
+                            {msg.channel === 'instagram_dm' && (
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded-md w-fit">
+                                <Camera size={11} /> {msg.tags?.includes('ig_private_reply') ? 'Auto Private Reply' : 'Instagram DM'}
+                              </div>
+                            )}
+                            {msgPostId && postFilter === 'all' && (
+                              <button 
+                                onClick={() => setPostFilter(msgPostId)}
+                                className="inline-flex items-center gap-1 text-[9px] font-bold text-pink-300 bg-pink-950/40 hover:bg-pink-900/70 border border-pink-500/30 px-1.5 py-0.5 rounded transition-colors"
+                                title={`Filter comments for Post #${msgPostId}`}
+                              >
+                                🎬 #{msgPostId.length > 6 ? msgPostId.slice(-6) : msgPostId}
+                              </button>
+                            )}
                           </div>
-                        )}
-                        {msg.channel === 'instagram_dm' && (
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded-md mb-1.5 w-fit">
-                            <Camera size={11} /> {msg.tags?.includes('ig_private_reply') ? 'Auto Private Reply' : 'Instagram DM'}
-                          </div>
-                        )}
 
                         {/* Reply and Delete buttons on hover / touch */}
                         <div className={`absolute top-1/2 -translate-y-1/2 flex gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
@@ -1236,7 +1309,7 @@ export default function Chats() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
               <div ref={messagesEndRef} />
             </div>
             

@@ -1069,12 +1069,13 @@ exports.getPostInsights = async (req, res) => {
       || user.instagramConfig
       || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
     const accessToken = igConfig?.accessToken;
+    const loginType = igConfig?.loginType || 'facebook_business';
 
     if (!accessToken) {
       return res.status(400).json({ success: false, message: 'Instagram not connected.' });
     }
 
-    const insights = await instagramService.getPostInsights(mediaId, accessToken);
+    const insights = await instagramService.getPostInsights(mediaId, accessToken, loginType);
     res.status(200).json({ success: true, insights });
 
   } catch (error) {
@@ -1103,13 +1104,14 @@ exports.analyzePostPerformance = async (req, res) => {
       : null;
     const igConfig = selectedWorkspace ? selectedWorkspace.instagramConfig : user.instagramConfig;
     const accessToken = igConfig?.accessToken;
+    const loginType = igConfig?.loginType || 'facebook_business';
 
     if (!accessToken) {
       return res.status(400).json({ message: 'Instagram not connected.' });
     }
 
     // Fetch post insights
-    const insights = await instagramService.getPostInsights(mediaId, accessToken);
+    const insights = await instagramService.getPostInsights(mediaId, accessToken, loginType);
 
     // 🚀 NEW: Fetch the most recent previous analysis for this post
     const previousAnalysis = await PostAnalysis.findOne({
