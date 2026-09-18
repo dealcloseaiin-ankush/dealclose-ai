@@ -112,8 +112,8 @@ function FlowBuilder() {
   const [pastedJson, setPastedJson] = useState('');
   const [isCopyingPrompt, setIsCopyingPrompt] = useState(false);
 
-  // 🚀 NEW: AI Flow Builder Assistant States
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  // 🚀 NEW: AI Flow Builder Assistant States (Open by default so user can chat immediately)
+  const [isAiChatOpen, setIsAiChatOpen] = useState(true);
   const [aiInput, setAiInput] = useState('');
   const [aiMessages, setAiMessages] = useState(loadChatHistory);
   const [isAiTyping, setIsAiTyping] = useState(false);
@@ -140,7 +140,7 @@ function FlowBuilder() {
     aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [aiMessages]);
 
-  // 🚀 NEW: Drag Handlers for Chat Box
+  // 🚀 Drag Handlers for Chat Box (Desktop Mouse & Mobile Touch Dragging)
   const handleChatDragStart = (e) => {
     isDragging.current = true;
     dragStart.current = { x: e.clientX - chatOffset.x, y: e.clientY - chatOffset.y };
@@ -158,6 +158,27 @@ function FlowBuilder() {
     isDragging.current = false;
     document.removeEventListener('mousemove', handleChatDragMove);
     document.removeEventListener('mouseup', handleChatDragEnd);
+  };
+
+  const handleChatTouchStart = (e) => {
+    if (e.touches && e.touches[0]) {
+      isDragging.current = true;
+      dragStart.current = { x: e.touches[0].clientX - chatOffset.x, y: e.touches[0].clientY - chatOffset.y };
+      document.addEventListener('touchmove', handleChatTouchMove, { passive: false });
+      document.addEventListener('touchend', handleChatTouchEnd);
+    }
+  };
+
+  const handleChatTouchMove = (e) => {
+    if (isDragging.current && e.touches && e.touches[0]) {
+      setChatOffset({ x: e.touches[0].clientX - dragStart.current.x, y: e.touches[0].clientY - dragStart.current.y });
+    }
+  };
+
+  const handleChatTouchEnd = () => {
+    isDragging.current = false;
+    document.removeEventListener('touchmove', handleChatTouchMove);
+    document.removeEventListener('touchend', handleChatTouchEnd);
   };
 
   const isInitialMount = useRef(true);
@@ -1382,10 +1403,11 @@ Please generate the customized flow for "${biz}" now.`;
 
             <button 
               onClick={() => setIsAiChatOpen(prev => !prev)} 
-              className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-600/30 active:scale-95 shrink-0 cursor-pointer"
+              title="Toggle AI Flow Builder Chatbox"
             >
-              <Bot size={13} />
-              <span>AI Copilot</span>
+              <Bot size={13} className="animate-pulse" />
+              <span>AI Chatbot 🤖</span>
             </button>
           </div>
         </div>
@@ -1572,50 +1594,84 @@ Please generate the customized flow for "${biz}" now.`;
             </button>
           </div>
 
-          {/* AI Flow Assistant Widget Floating */}
+          {/* 🚀 DRAGGABLE FLOATING AI FLOW BUILDER CHATBOX */}
           <div 
-            className="absolute bottom-20 md:bottom-6 left-4 md:left-6 z-50 flex flex-col items-start"
+            className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-[999] flex flex-col items-end pointer-events-auto"
             style={{ transform: `translate(${chatOffset.x}px, ${chatOffset.y}px)`, transition: isDragging.current ? 'none' : 'transform 0.1s' }}
           >
             {isAiChatOpen && (
-              <div className="bg-[#111] border border-blue-500/40 rounded-2xl shadow-2xl w-72 md:w-80 mb-3 overflow-hidden flex flex-col animate-fade-in origin-bottom-left">
+              <div className="bg-[#111116] border border-blue-500/50 rounded-2xl shadow-2xl w-80 sm:w-96 mb-3 overflow-hidden flex flex-col animate-fade-in backdrop-blur-xl">
+                {/* Drag Header */}
                 <div 
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 md:p-4 flex justify-between items-center cursor-move"
+                  className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-3 md:p-4 flex justify-between items-center cursor-move select-none shadow-md"
                   onMouseDown={handleChatDragStart}
+                  onTouchStart={handleChatTouchStart}
+                  title="Click & Drag to move chatbox anywhere"
                 >
-                  <div className="flex items-center gap-2 text-white pointer-events-none">
-                    <Bot size={18} />
-                    <h3 className="font-bold leading-tight text-xs md:text-sm">AI Flow Builder</h3>
+                  <div className="flex items-center gap-2.5 text-white pointer-events-none">
+                    <Bot size={20} className="animate-pulse" />
+                    <div>
+                      <h3 className="font-black leading-tight text-xs md:text-sm">AI Flow Builder 🤖</h3>
+                      <p className="text-[10px] text-blue-100/90 font-medium">Drag me anywhere • Chat to build flow</p>
+                    </div>
                   </div>
-                  <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setIsAiChatOpen(false)} className="text-white/80 hover:text-white cursor-pointer"><X size={16} /></button>
+                  <button 
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={() => setIsAiChatOpen(false)} 
+                    className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer"
+                    title="Minimize Chat"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
                 
-                <div className="h-56 md:h-64 p-3 overflow-y-auto flex flex-col gap-2.5 bg-[#0a0a0a]">
+                {/* Chat Messages */}
+                <div className="h-60 sm:h-72 p-3 overflow-y-auto flex flex-col gap-2.5 bg-[#0a0a0f]/95">
                   {aiMessages.map((msg, idx) => (
-                    <div key={idx} className={`max-w-[88%] p-2.5 rounded-2xl text-xs ${msg.role === 'ai' ? 'bg-[#1a1a1a] text-gray-200 self-start rounded-tl-sm border border-gray-800' : 'bg-blue-600 text-white self-end rounded-tr-sm'}`}>
+                    <div key={idx} className={`max-w-[88%] p-3 rounded-2xl text-xs sm:text-sm leading-relaxed ${msg.role === 'ai' ? 'bg-[#1a1a24] text-gray-200 self-start rounded-tl-sm border border-gray-800 shadow-sm' : 'bg-blue-600 text-white self-end rounded-tr-sm shadow-sm'}`}>
                       {msg.content}
                     </div>
                   ))}
                   {isAiTyping && (
-                    <div className="bg-[#1a1a1a] text-gray-400 self-start p-2.5 rounded-2xl rounded-tl-sm border border-gray-800 text-xs flex gap-1">
-                      <span className="animate-bounce">.</span><span className="animate-bounce" style={{animationDelay: '0.1s'}}>.</span><span className="animate-bounce" style={{animationDelay: '0.2s'}}>.</span>
+                    <div className="bg-[#1a1a24] text-gray-300 self-start p-3 rounded-2xl rounded-tl-sm border border-gray-800 text-xs flex items-center gap-2">
+                      <Bot size={14} className="text-blue-400 animate-spin" />
+                      <span>AI flow bana raha hai...</span>
                     </div>
                   )}
                   <div ref={aiChatEndRef} />
                 </div>
                 
-                <form onSubmit={handleAiSubmit} className="p-2.5 bg-[#111] border-t border-gray-800 flex gap-2">
-                  <input type="text" value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Type 'build lead capture flow'" className="flex-1 bg-[#1a1a1a] border border-gray-700 text-white rounded-xl px-2.5 py-1.5 text-xs focus:border-blue-500 outline-none" disabled={isAiTyping} />
-                  <button type="submit" disabled={isAiTyping || !aiInput.trim()} className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-500 transition-colors disabled:opacity-50">
-                    <Send size={14} />
+                {/* Input Form */}
+                <form onSubmit={handleAiSubmit} className="p-2.5 bg-[#111118] border-t border-gray-800 flex gap-2">
+                  <input 
+                    type="text" 
+                    value={aiInput} 
+                    onChange={(e) => setAiInput(e.target.value)} 
+                    placeholder="Type 'build lead capture flow' or ask in Hindi..." 
+                    className="flex-1 bg-[#1a1a24] border border-gray-700 text-white text-xs rounded-xl px-3 py-2 focus:border-blue-500 outline-none placeholder-gray-500 font-medium" 
+                    disabled={isAiTyping} 
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={isAiTyping || !aiInput.trim()} 
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-2.5 rounded-xl hover:from-blue-500 hover:to-indigo-500 transition-all disabled:opacity-50 shadow-md shadow-blue-600/30 cursor-pointer"
+                    title="Send message"
+                  >
+                    <Send size={15} />
                   </button>
                 </form>
               </div>
             )}
             
-            {/* Desktop only AI trigger button */}
-            <button onClick={() => setIsAiChatOpen(!isAiChatOpen)} className="hidden md:flex w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:scale-110 transition-transform">
-              {isAiChatOpen ? <X size={20} /> : <Bot size={22} />}
+            {/* Floating Toggle Pill Button (Always visible on Desktop & Mobile) */}
+            <button 
+              onClick={() => setIsAiChatOpen(!isAiChatOpen)} 
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-full shadow-[0_0_25px_rgba(59,130,246,0.5)] hover:scale-105 active:scale-95 transition-all font-bold text-xs border border-blue-400/40 cursor-pointer shrink-0"
+              title={isAiChatOpen ? "Minimize AI Chat" : "Open AI Flow Builder Chat"}
+            >
+              {isAiChatOpen ? <X size={18} /> : <Bot size={18} className="animate-pulse" />}
+              <span>{isAiChatOpen ? "Minimize AI" : "AI Flow Chat 🤖"}</span>
             </button>
           </div>
 
