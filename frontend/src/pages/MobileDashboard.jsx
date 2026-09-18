@@ -1985,8 +1985,24 @@ export default function MobileDashboard() {
     setIsAiTyping(true);
 
     try {
-      const { data } = await api.post('/ai/webchat', { message: promptText });
-      const replyText = data.reply || 'AI generated response.';
+      // 🚀 Connect to authenticated Dashboard Assistant with full store context & workspace
+      const history = aiChatMessages.slice(-4).map(m => ({ role: m.role, content: m.text }));
+      let replyText = '';
+
+      try {
+        const { data } = await api.post('/ai/dashboard-assistant', { 
+          message: promptText, 
+          workspaceId: activeWorkspaceId,
+          history 
+        });
+        replyText = data.reply || (data.data && data.data.reply) || '';
+      } catch (authErr) {
+        // Fallback to webchat if unauthenticated
+        const { data } = await api.post('/ai/webchat', { message: promptText });
+        replyText = data.reply || '';
+      }
+
+      if (!replyText) replyText = 'AI generated response.';
 
       let generatedAction = null;
       if (promptText.toLowerCase().includes('template') || promptText.toLowerCase().includes('offer')) {

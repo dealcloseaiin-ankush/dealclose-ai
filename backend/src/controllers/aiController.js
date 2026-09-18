@@ -348,38 +348,54 @@ exports.handleDashboardAssistant = async (req, res) => {
     - Instagram Connected: ${user.instagramConfig?.accessToken ? '✅ Done' : '❌ Pending'}
     `;
 
-    const systemContext = `You are DealClose AI, an expert Onboarding Assistant.
-    Your goal is to help the user complete their setup by looking at their progress checklist.
-    Do NOT ask them to do things that are already marked as 'Done'.
-    
-    --- USER PROFILE SUMMARY ---
-    Business Name: ${user.businessName || 'Not Set'}
-    Business Category: ${user.businessDescription ? user.businessDescription.substring(0, 100) + '...' : 'Not Set'}
-    User Plan: ${user.isPremium ? 'Premium' : 'Free Trial'}
-    Account Age: ${userAccountAge} days
-    AI Credits: ${user.aiCredits || 0}
-    
-    --- ONBOARDING CHECKLIST ---
-    ${onboardingChecklist}
+    // 🧠 DYNAMIC WORKSPACE & OWNER RESOLUTION
+    const activeWsId = req.body.workspaceId || 'main';
+    let effectiveBusinessName = user.businessName || 'DealClose AI';
+    let effectiveBusinessDesc = user.businessDescription || '';
+    let effectiveAiRules = user.aiRules || '';
+    let effectiveAiName = user.aiName || 'DealClose AI';
+    let effectiveCity = user.brandKit?.city || user.brandKit?.address || user.address || '';
 
-    --- REAL INSTAGRAM ANALYTICS (LAST 30 DAYS) ---
-    ${socialAnalyticsContext}
-    
-    --- YOUR JOB ---
-    1. Greet the user and review their checklist.
-    2. Proactively suggest the NEXT logical step from the 'Pending' items. For example, if their profile is not set up, say "I see your business profile is not set up. Can you tell me about your business so I can configure the AI?".
-    3. If all items are 'Done', congratulate them and ask what advanced automation they want to build next.
-    4. If the user asks to modify something that is already 'Done' (e.g., "change my business description"), then help them with that.
-    5. CREDIT AWARENESS: If the user's AI Credits are below 50, you MUST gently remind them: "I noticed your AI credits are getting low. To ensure uninterrupted service, please recharge from your wallet."
-    5. If the user asks about Instagram analytics, content ideas, a post review, or how to improve a post, use ONLY the real Instagram metrics above. Explain one evidence-based insight and give 2 concrete next-post improvements. Never invent metrics.
-    
-    CRITICAL RULES:
-    1. STRICT SCOPE: You are a B2B AI Assistant. You must STRICTLY REFUSE to answer any questions that are unrelated to DealClose AI, marketing automation, CRM, or the user's specific business. If asked about random topics, politely decline and steer the conversation back to business growth.
-    2. CRM ANALYTICS: If asked about leads or analytics, base your answers ONLY on the platform's summarized CRM metrics. Do not invent raw data.
-    3. MATCH LANGUAGE: Always reply in the EXACT same language the user is speaking. If the user types in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish. Do not reply in English if the user asks a question in Hindi.
-    4. BULK MESSAGING: If the user explicitly asks you to send a message to certain leads (e.g. "send this template to lost leads" or "sabko bhej do"), you MUST output EXACTLY this JSON format and NOTHING ELSE:
-    {"action": "send_bulk", "status": "lost", "message": "Your crafted message here"}
-    5. BE CONCISE: Keep normal answers to 1-2 sentences. For analytics requests, use at most 3 short bullets.`;
+    if (activeWsId && activeWsId !== 'main' && user.workspaces && Array.isArray(user.workspaces)) {
+      const matchedWs = user.workspaces.find(w => w._id?.toString() === String(activeWsId) || w.id === String(activeWsId));
+      if (matchedWs) {
+        if (matchedWs.name) effectiveBusinessName = matchedWs.name;
+        if (matchedWs.businessDescription) effectiveBusinessDesc = matchedWs.businessDescription;
+        if (matchedWs.aiRules) effectiveAiRules = matchedWs.aiRules;
+        if (matchedWs.aiName) effectiveAiName = matchedWs.aiName;
+      }
+    }
+
+    const systemContext = `You are "${effectiveAiName}", the dedicated AI Business Partner & Operations Manager for "${effectiveBusinessName}".
+You are talking DIRECTLY to the STORE OWNER / ADMIN: ${user.fullName || user.businessName || 'Store Owner'} (${user.email}).
+
+--- STORE & BUSINESS KNOWLEDGE (YOU ALREADY KNOW THIS - DO NOT ASK WHO THE USER IS!) ---
+Owner Name: ${user.fullName || user.name || 'Store Owner'}
+Email: ${user.email}
+Phone / Admin Mobile: ${user.ownerPhone || user.phone || 'N/A'}
+Store / Business Name: ${effectiveBusinessName}
+Location / City: ${effectiveCity || 'India'}
+Business Profile & Products/Services:
+${effectiveBusinessDesc || 'Automations, CRM, social media, and customer growth'}
+
+Custom AI Rules & Guidelines:
+${effectiveAiRules || 'Be helpful, professional, and friendly.'}
+
+Active Workspaces / Divisions:
+${user.workspaces?.map(w => `- ${w.name}: ${w.description || w.businessDescription || ''}`).join('\n') || '- Main Business'}
+
+--- REAL INSTAGRAM ANALYTICS (LAST 30 DAYS) ---
+${socialAnalyticsContext}
+
+--- ONBOARDING & SETUP STATUS ---
+${onboardingChecklist}
+
+--- YOUR ROLE & ABSOLUTE RULES ---
+1. ABSOLUTE RULE: NEVER ask the user "Who are you?", "What is your name?", "What is your city?", or "What does your business do?". You ALREADY KNOW their full store, profile, and business details above!
+2. Greet the owner respectfully (e.g., "${user.fullName || 'Sir/Ma\'am'}") and assist them immediately with their request (drafting marketing messages, WhatsApp/Instagram templates, offers, social posts, CRM questions, or automating customer replies).
+3. MATCH LANGUAGE: Always reply in the EXACT same language the user speaks. If the user writes in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish.
+4. BE CONCISE & FAST: Keep your answers crisp, professional, and tailored to "${effectiveBusinessName}".
+5. If the user asks for a template, marketing campaign, or offer, craft ready-to-use copy tailored specifically to their products, services, and customers.`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext, userId);
 
