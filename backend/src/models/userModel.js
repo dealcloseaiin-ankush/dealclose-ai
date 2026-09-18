@@ -169,6 +169,8 @@ const userSchema = new Schema({
     aiRules: { type: String, default: '' }, // Custom rules for AI
     aiAgentEnabled: { type: Boolean, default: false },
     commentAiReplyEnabled: { type: Boolean, default: false },
+    instagramDmAiEnabled: { type: Boolean, default: true },
+    whatsappAiReplyEnabled: { type: Boolean, default: true },
     commentAiPostSettings: [{
       postId: { type: String },
       commentAiReplyEnabled: { type: Boolean, default: true }
@@ -245,6 +247,8 @@ const userSchema = new Schema({
   fallbackAction: { type: String, enum: ['notify_owner', 'wait_for_human'], default: 'notify_owner' }, // AI fallback
   aiAgentEnabled: { type: Boolean, default: true }, // Master switch for AI
   commentAiReplyEnabled: { type: Boolean, default: false },
+  instagramDmAiEnabled: { type: Boolean, default: true },
+  whatsappAiReplyEnabled: { type: Boolean, default: true },
   commentAiPostSettings: [{
     postId: { type: String },
     commentAiReplyEnabled: { type: Boolean, default: true }

@@ -24,4 +24,7 @@ router.post('/generate-content-plan-schedule', protect, aiController.generateCon
 // Generate ReactFlow logic using AI Assistant
 router.post('/generate-flow', aiController.generateFlow);
 
+// 1-Click Toggle for AI Channels (Comments, DM, WhatsApp, Master)
+router.post('/toggle-channel', protect, aiController.toggleAiChannel);
+
 module.exports = router;

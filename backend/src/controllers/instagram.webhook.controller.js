@@ -702,8 +702,8 @@ exports.handleInstagramWebhook = async (req, res) => {
 
               const isCreator = user.acceptCollabs === true;
               const isAiEnabled = incomingWorkspaceId !== 'main'
-                ? activeWorkspace?.aiAgentEnabled === true
-                : user.aiAgentEnabled === true;
+                ? (activeWorkspace?.aiAgentEnabled !== false && activeWorkspace?.instagramDmAiEnabled !== false)
+                : (user.aiAgentEnabled !== false && user.instagramDmAiEnabled !== false);
 
               if (!isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
                 const menuMessage = isCreator 

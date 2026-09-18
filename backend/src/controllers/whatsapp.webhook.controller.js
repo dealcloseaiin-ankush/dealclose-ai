@@ -1257,7 +1257,7 @@ Your Role:
               const freeTestNumbers = ['919876543210', '918888888888'];
               const isFreeTestUser = freeTestNumbers.includes(fromNumber);
               
-              const isAiEnabled = user.aiAgentEnabled !== false; // defaults to true
+              const isAiEnabled = user.aiAgentEnabled !== false && user.whatsappAiReplyEnabled !== false;
               const hasTrainingData = user.businessDescription && user.businessDescription.trim().length > 10;
               
               // Auto-Review Links (Bina AI ke fallback message me isolated links jodna)

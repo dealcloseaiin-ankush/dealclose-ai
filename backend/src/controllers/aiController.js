@@ -42,7 +42,11 @@ exports.getTrainingData = async (req, res) => {
       businessName: user?.businessName || 'Main Business',
       workspaces: user?.workspaces || [],
       aiCredits: user?.aiCredits || 0,
-      aiObservations: user?.aiObservations || []
+      aiObservations: user?.aiObservations || [],
+      aiAgentEnabled: user?.aiAgentEnabled !== false,
+      commentAiReplyEnabled: user?.commentAiReplyEnabled === true,
+      instagramDmAiEnabled: user?.instagramDmAiEnabled !== false,
+      whatsappAiReplyEnabled: user?.whatsappAiReplyEnabled !== false
     });
   } catch (error) {
     console.error('AI Training Data Error:', error);
@@ -748,5 +752,56 @@ exports.generateFlow = async (req, res) => {
   } catch (error) {
     console.error('Flow Gen Error:', error.message);
     res.status(500).json({ success: false, reply: "Maafi chahunga, mujhe flow banane me kuch technical error aa raha hai. Kripya dobara try karein." });
+  }
+};
+
+// @desc    1-Click Toggle for individual AI Channels (Comments, DM, WhatsApp, Master)
+// @route   POST /api/ai/toggle-channel
+exports.toggleAiChannel = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const { channel, enabled, workspaceId } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const targetVal = Boolean(enabled);
+
+    // Apply toggle to user (and active workspace if applicable)
+    if (channel === 'comment') {
+      user.commentAiReplyEnabled = targetVal;
+    } else if (channel === 'instagram_dm') {
+      user.instagramDmAiEnabled = targetVal;
+    } else if (channel === 'whatsapp') {
+      user.whatsappAiReplyEnabled = targetVal;
+    } else if (channel === 'master') {
+      user.aiAgentEnabled = targetVal;
+    }
+
+    if (workspaceId && workspaceId !== 'main' && Array.isArray(user.workspaces)) {
+      const ws = user.workspaces.find(w => String(w._id) === String(workspaceId));
+      if (ws) {
+        if (channel === 'comment') ws.commentAiReplyEnabled = targetVal;
+        else if (channel === 'instagram_dm') ws.instagramDmAiEnabled = targetVal;
+        else if (channel === 'whatsapp') ws.whatsappAiReplyEnabled = targetVal;
+        else if (channel === 'master') ws.aiAgentEnabled = targetVal;
+      }
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      channel,
+      enabled: targetVal,
+      commentAiReplyEnabled: user.commentAiReplyEnabled === true,
+      instagramDmAiEnabled: user.instagramDmAiEnabled !== false,
+      whatsappAiReplyEnabled: user.whatsappAiReplyEnabled !== false,
+      aiAgentEnabled: user.aiAgentEnabled !== false
+    });
+  } catch (err) {
+    console.error('Toggle AI Channel Error:', err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
