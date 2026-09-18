@@ -9,6 +9,7 @@ const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const instagramService = require('../services/instagramService');
 const IORedis = require('ioredis');
 const aiTemplateService = require('../services/aiTemplateService'); // 🚀 Use the new TEMPLATE service
+const aiService = require('../services/aiService'); // 🚀 AI Service for post analysis
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 
@@ -137,7 +138,8 @@ exports.getBusinessInsights = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Instagram is not properly connected. Please reconnect in Settings.' });
     }
 
-    const insights = await instagramService.getBusinessInsights(accountId, accessToken);
+    const loginType = selectedWorkspace?.instagramConfig?.loginType || user.instagramConfig?.loginType || 'facebook_business';
+    const insights = await instagramService.getBusinessInsights(accountId, accessToken, loginType);
     const date = new Date();
     date.setUTCHours(0, 0, 0, 0);
     await InstagramInsightSnapshot.findOneAndUpdate(
@@ -1110,8 +1112,13 @@ exports.analyzePostPerformance = async (req, res) => {
       return res.status(400).json({ message: 'Instagram not connected.' });
     }
 
-    // Fetch post insights
-    const insights = await instagramService.getPostInsights(mediaId, accessToken, loginType);
+    // Fetch post insights safely
+    let insights = { likes: 0, comments: 0, reach: 0, impressions: 0, saved: 0, views: 0 };
+    try {
+      insights = await instagramService.getPostInsights(mediaId, accessToken, loginType);
+    } catch (inErr) {
+      console.warn("⚠️ [analyzePostPerformance] Meta insights unavailable, proceeding with basic stats:", inErr.message);
+    }
 
     // 🚀 NEW: Fetch the most recent previous analysis for this post
     const previousAnalysis = await PostAnalysis.findOne({

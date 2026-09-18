@@ -222,33 +222,79 @@ exports.getBusinessInsights = async (igAccountId, accessToken, loginType = 'face
     ? 'https://graph.instagram.com/v19.0'
     : 'https://graph.facebook.com/v19.0';
 
+  const insights = {
+    last_updated: new Date().toISOString(),
+    follower_count: 0,
+    reach: 0,
+    impressions: 0,
+    profile_views: 0,
+    website_clicks: 0,
+    accounts_engaged_count: 0,
+    total_interactions: 0
+  };
+
+  // 1. Fetch live follower count & profile info (reliable endpoint)
+  try {
+    const accountRes = await axios.get(`${baseUrl}/${igAccountId}`, {
+      params: {
+        fields: 'followers_count,follows_count,media_count',
+        access_token: accessToken
+      }
+    });
+    if (accountRes.data?.followers_count !== undefined) {
+      insights.follower_count = accountRes.data.followers_count;
+    }
+  } catch (accErr) {
+    console.warn("⚠️ [getBusinessInsights] Could not fetch basic account fields:", accErr.response?.data?.error?.message || accErr.message);
+  }
+
+  // 2. Fetch daily insights metrics gracefully with fallback
   try {
     const dailyMetrics = 'reach,profile_views,website_clicks,accounts_engaged,total_interactions';
     const insightsUrl = `${baseUrl}/${igAccountId}/insights`;
-    const [dailyResponse, lifetimeResponse] = await Promise.all([
-      axios.get(insightsUrl, {
-        params: { 
-          metric: dailyMetrics, 
-          period: 'day', 
-          access_token: accessToken,
-          metric_type: 'total_value' // Yeh line add ki gayi hai
-        },
-      }),
-      axios.get(insightsUrl, {
-        params: { metric: 'follower_count', period: 'lifetime', access_token: accessToken },
-      }),
-    ]);
-
-    const insights = { last_updated: new Date().toISOString() };
-    [...(dailyResponse.data?.data || []), ...(lifetimeResponse.data?.data || [])].forEach(metric => {
-      const latest = metric.values?.[metric.values.length - 1];
-      if (latest && typeof latest.value !== 'undefined') insights[metric.name] = latest.value;
+    const dailyResponse = await axios.get(insightsUrl, {
+      params: { 
+        metric: dailyMetrics, 
+        period: 'day', 
+        access_token: accessToken,
+        metric_type: 'total_value'
+      },
     });
-    return insights;
-  } catch (error) {
-    console.error("❌ Meta Graph API Business Insights Fetch Error:", error.response?.data?.error?.message || error.message);
-    throw new Error(error.response?.data?.error?.message || 'Failed to fetch Instagram Insights.');
+
+    if (dailyResponse.data?.data) {
+      dailyResponse.data.data.forEach(metric => {
+        const latest = metric.values?.[metric.values.length - 1];
+        const val = (latest && typeof latest.value !== 'undefined') ? latest.value : (metric.total_value?.value ?? 0);
+        insights[metric.name] = val;
+        if (metric.name === 'accounts_engaged') {
+          insights.accounts_engaged_count = val;
+        }
+      });
+    }
+  } catch (metricErr) {
+    console.warn("⚠️ [getBusinessInsights] Full daily metrics failed, trying minimal reach/impressions fallback:", metricErr.response?.data?.error?.message || metricErr.message);
+    try {
+      const fallbackRes = await axios.get(`${baseUrl}/${igAccountId}/insights`, {
+        params: {
+          metric: 'impressions,reach',
+          period: 'day',
+          access_token: accessToken
+        }
+      });
+      if (fallbackRes.data?.data) {
+        fallbackRes.data.data.forEach(metric => {
+          const latest = metric.values?.[metric.values.length - 1];
+          if (latest && typeof latest.value !== 'undefined') {
+            insights[metric.name] = latest.value;
+          }
+        });
+      }
+    } catch (fbErr) {
+      console.warn("⚠️ [getBusinessInsights] Meta insights unavailable for this account:", fbErr.response?.data?.error?.message || fbErr.message);
+    }
   }
+
+  return insights;
 };
 
 /**
