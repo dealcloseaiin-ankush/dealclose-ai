@@ -1163,14 +1163,38 @@ exports.analyzePostPerformance = async (req, res) => {
       ${previousAnalysis ? '5. A "Then vs. Now" comparison highlighting the growth or changes since the last analysis.' : ''}
     `;
 
-    const analysis = await aiService.generateAIResponse(prompt, "You are a social media expert.", "instagram-analysis");
+    let analysis;
+    let isFallback = false;
+    try {
+      analysis = await aiService.generateAIResponse(prompt, "You are a social media expert.", "instagram-analysis");
+    } catch (aiErr) {
+      console.warn("⚠️ [analyzePostPerformance] AI Generation failed, falling back to smart heuristic analysis:", aiErr.message);
+      isFallback = true;
+      const likes = Number(insights.likes) || 0;
+      const comments = Number(insights.comments) || 0;
+      const saves = Number(insights.saved) || 0;
+      const reach = Number(insights.reach) || (likes + comments > 0 ? (likes + comments) * 12 : 0);
+      const totalInteractions = likes + comments + saves;
+      const engagementRate = reach > 0 ? ((totalInteractions / reach) * 100).toFixed(1) : 'N/A';
+
+      analysis = `### 📊 Performance Summary\n` +
+        `This post received **${likes} likes** and **${comments} comments**${reach ? ` with an estimated reach of **${reach.toLocaleString()} accounts**` : ''} (Engagement Rate: **${engagementRate}%**).\n\n` +
+        `### 💪 Key Strengths\n` +
+        `1. **Audience Connection**: ${comments > 0 ? `Active comment conversation with ${comments} direct responses.` : 'Clean visual delivery that attracted direct likes.'}\n` +
+        `2. **Engagement Traction**: Secured ${totalInteractions} total interactions from your community.\n\n` +
+        `### ⚠️ Areas for Improvement\n` +
+        `1. **Call to Action (CTA)**: End your caption with an explicit prompt or question to encourage saves and shares.\n` +
+        `2. **Posting Cadence**: Test posting during peak follower active hours to maximize organic reach velocity.\n\n` +
+        `### 💡 Suggestion for Next Post\n` +
+        `Try a carousel or short video format around this topic with 3-5 high-relevance hashtags to drive discoverability.`;
+    }
 
     // Delete the old analysis to save space
     if (previousAnalysis) {
       await PostAnalysis.findByIdAndDelete(previousAnalysis._id);
     }
 
-    // 🚀 NEW: Save the analysis to the database
+    // 🚀 Save the analysis to the database
     await PostAnalysis.create({
       userId: user._id,
       workspaceId: workspaceId || 'main',
@@ -1179,15 +1203,16 @@ exports.analyzePostPerformance = async (req, res) => {
       metrics: insights, // Save the stats at the time of analysis
     });
 
-    // Deduct 1 credit for the analysis
-    if (user.role !== 'superadmin') {
+    // Deduct 1 credit for the analysis only if full AI was used
+    if (!isFallback && user.role !== 'superadmin') {
       user.aiCredits -= 1;
       await user.save();
     }
 
-    res.status(200).json({ success: true, analysis, remainingCredits: user.aiCredits });
+    res.status(200).json({ success: true, analysis, remainingCredits: user.aiCredits, isFallback });
 
   } catch (error) {
+    console.error("❌ [analyzePostPerformance] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
