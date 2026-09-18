@@ -96,9 +96,11 @@ function FlowBuilder() {
   const [flowName, setFlowName] = useState('');
   const [templates, setTemplates] = useState([]);
   
-  // 🚀 NEW: Flow List Modal States
+  // 🚀 NEW: Flow List Modal & Dropdown States
   const [isFlowListOpen, setIsFlowListOpen] = useState(false);
   const [savedFlows, setSavedFlows] = useState([]);
+  const [loadedFlowId, setLoadedFlowId] = useState('');
+  const skipNextWorkspaceEffect = useRef(false);
 
   // 🚀 NEW: External AI Script Importer / ChatGPT Flow Architect States
   const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
@@ -165,7 +167,15 @@ function FlowBuilder() {
     api.get('/users/profile').then(res => {
       const userData = res.data.user || res.data;
       if (userData && userData.workspaces) {
-        setWorkspaces(userData.workspaces);
+        const normalizedWs = (userData.workspaces || []).map(w => {
+          const idVal = (w._id ? w._id.toString() : w.id ? w.id.toString() : '') || '';
+          return {
+            ...w,
+            _id: idVal,
+            id: idVal
+          };
+        });
+        setWorkspaces(normalizedWs);
       }
 
       if (userData) {
@@ -207,6 +217,7 @@ function FlowBuilder() {
             setNodes(normalizedNodes);
             setEdges(fullFlow.flowData.edges || []);
             setFlowName(fullFlow.name || '');
+            setLoadedFlowId(fullFlow._id);
             if (fullFlow.platform) setPlatform(fullFlow.platform);
             if (fullFlow.workspaceId) setSelectedWorkspace(fullFlow.workspaceId);
             toast.success(`Loaded Flow: ${fullFlow.name}`);
@@ -235,6 +246,7 @@ function FlowBuilder() {
                   setNodes(normalizedNodes);
                   setEdges(full.flowData.edges || []);
                   setFlowName(full.name || '');
+                  setLoadedFlowId(full._id);
                   setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
                 }
               });
@@ -245,10 +257,14 @@ function FlowBuilder() {
     }
   }, []);
 
-  // When workspace or platform is changed manually after initial load, fetch the flows or reset
+  // When workspace or platform is changed manually after initial load, fetch the flows or update
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      return;
+    }
+    if (skipNextWorkspaceEffect.current) {
+      skipNextWorkspaceEffect.current = false;
       return;
     }
     api.get('/whatsapp/flows', {
@@ -269,21 +285,15 @@ function FlowBuilder() {
               setNodes(normalizedNodes);
               setEdges(full.flowData.edges || []);
               setFlowName(full.name || '');
+              setLoadedFlowId(full._id);
               setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 150);
             }
           });
         }
       } else {
-        setNodes(initialNodes);
-        setEdges([]);
-        setFlowName('');
-        setTimeout(() => fitView({ padding: 0.2, duration: 200 }), 50);
+        setLoadedFlowId('');
       }
-    }).catch(() => {
-      setNodes(initialNodes);
-      setEdges([]);
-      setFlowName('');
-    });
+    }).catch(() => {});
   }, [selectedWorkspace, platform]);
 
   useEffect(() => {
@@ -568,8 +578,16 @@ Please generate the customized flow for "${biz}" now.`;
       
       const enrichedPrompt = `Chat History:\n${recentChat}\n\nCurrent Canvas Nodes:\n${JSON.stringify(simplifyNodes)}\n\nCurrent Canvas Edges:\n${JSON.stringify(simplifyEdges)}\n\nUser Request: ${userMsg}\n\nIMPORTANT INSTRUCTIONS:\n1. If modifying the flow, return the FULL updated nodes and edges arrays (do not delete existing ones unless asked).\n2. Put actual conversational text inside data.message or data.question.\n3. If just chatting, return nodes: [] and edges: [].`;
 
-      const activeBizName = selectedWorkspace === 'main' ? mainBusinessName : workspaces.find(w => w._id === selectedWorkspace)?.name || mainBusinessName;
-      const res = await api.post('/ai/generate-flow', { prompt: enrichedPrompt, businessName: activeBizName, platform });
+      const activeWs = workspaces.find(w => (w._id || w.id) === selectedWorkspace);
+      const activeBizName = (selectedWorkspace === 'main' || !selectedWorkspace) 
+        ? mainBusinessName 
+        : (activeWs?.name || mainBusinessName);
+      const res = await api.post('/ai/generate-flow', { 
+        prompt: enrichedPrompt, 
+        businessName: activeBizName, 
+        workspaceId: selectedWorkspace, 
+        platform 
+      });
       if (res.data.nodes && res.data.edges) {
         if (res.data.nodes.length > 0) {
           setNodes(res.data.nodes);
@@ -609,7 +627,11 @@ Please generate the customized flow for "${biz}" now.`;
     try {
       const flowData = reactFlowInstance.toObject();
       const finalName = flowName.trim() === '' ? `Flow-${Math.floor(Math.random() * 1000)}` : flowName;
-      await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace, platform });
+      const saveRes = await api.post('/whatsapp/flows', { name: finalName, flowData, workspaceId: selectedWorkspace, platform });
+      if (saveRes.data?.flow?._id) {
+        setLoadedFlowId(saveRes.data.flow._id);
+      }
+      await fetchSavedFlows();
       toast.success(`🎉 Success! Flow "${finalName}" has been created & saved. You can find it inside the 'My Flows' 📂 folder.`, { duration: 6000 });
     } catch (error) {
       console.error("Failed to save flow:", error);
@@ -623,22 +645,22 @@ Please generate the customized flow for "${biz}" now.`;
   const fetchSavedFlows = useCallback(async () => {
     try {
       const res = await api.get('/whatsapp/flows', {
-        params: { platform, workspaceId: selectedWorkspace }
+        params: { platform: 'all', workspaceId: 'all' }
       });
       setSavedFlows(res.data.data || []);
     } catch (err) {
       console.error("Fetch flows error:", err);
       toast.error("Failed to fetch flows.");
     }
-  }, [platform, selectedWorkspace]);
+  }, []);
 
   useEffect(() => {
-    if (!isFlowListOpen) return;
     fetchSavedFlows();
-  }, [isFlowListOpen, fetchSavedFlows]);
+  }, [fetchSavedFlows]);
 
   const loadFlow = async (flow) => {
     try {
+      skipNextWorkspaceEffect.current = true;
       const res = await api.get(`/whatsapp/flows?flowId=${flow._id}`);
       const fullFlow = res.data.data[0];
 
@@ -655,6 +677,7 @@ Please generate the customized flow for "${biz}" now.`;
       setFlowName(fullFlow.name || '');
       setPlatform(flowPlatform);
       setSelectedWorkspace(fullFlow.workspaceId || 'main');
+      setLoadedFlowId(fullFlow._id);
       setIsFlowListOpen(false);
       setIsMobileDrawerOpen(false);
       toast.success(`Loaded Flow: ${fullFlow.name}`);
@@ -870,7 +893,7 @@ Please generate the customized flow for "${biz}" now.`;
                   <div className="flex-1 pr-2">
                     <h3 className="font-bold text-white text-sm md:text-base">{flow.name}</h3>
                     <p className="text-[11px] text-gray-400">
-                      Workspace: {flow.workspaceId === 'main' ? mainBusinessName : workspaces.find(w => w._id === flow.workspaceId)?.name || 'Default'}
+                      Workspace: {flow.workspaceId === 'main' || !flow.workspaceId ? mainBusinessName : (workspaces.find(w => (w._id || w.id) === flow.workspaceId)?.name || 'Sub-business')}
                     </p>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded mt-1 inline-block ${flow.platform === 'instagram' ? 'bg-pink-500/20 text-pink-400' : 'bg-green-500/20 text-green-400'}`}>
                       {flow.platform === 'instagram' ? 'Instagram' : 'WhatsApp'}
@@ -1248,7 +1271,7 @@ Please generate the customized flow for "${biz}" now.`;
       
       {/* 🚀 TWO-ROW CLEAN RESPONSIVE HEADER */}
       <header className="bg-[#0f0f13] border-b border-gray-800 px-3 py-2 z-40 flex flex-col gap-2 shrink-0">
-        {/* ROW 1: Navigation & Flow Title */}
+        {/* ROW 1: Navigation, Flow Title, Platform & Save Button */}
         <div className="flex items-center gap-2 w-full">
           <button 
             onClick={handleBackToMobile}
@@ -1274,56 +1297,97 @@ Please generate the customized flow for "${biz}" now.`;
             <option value="whatsapp">🟩 WhatsApp</option>
             <option value="instagram">🟪 Instagram</option>
           </select>
-        </div>
-
-        {/* ROW 2: Action Buttons (Flows, Templates, AI, Save) */}
-        <div className="flex items-center justify-between gap-1.5 w-full pt-1 border-t border-gray-800/60">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button 
-              onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} 
-              className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
-            >
-              <FolderOpen size={13} />
-              <span>My Flows</span>
-            </button>
-
-            <button 
-              onClick={() => setIsScriptModalOpen(true)} 
-              className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-purple-600/20 active:scale-95"
-              title="Generate Prompt for ChatGPT/Gemini & Import Script"
-            >
-              <Sparkles size={13} />
-              <span>AI Flow Script ✨</span>
-            </button>
-
-            <button 
-              onClick={() => setIsAiChatOpen(prev => !prev)} 
-              className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
-            >
-              <Bot size={13} />
-              <span>AI Copilot</span>
-            </button>
-
-            <select 
-              value={selectedWorkspace} 
-              onChange={(e) => setSelectedWorkspace(e.target.value)} 
-              className="bg-black/60 border border-gray-700 text-white text-[11px] rounded-xl px-2 py-1 outline-none focus:border-blue-500 cursor-pointer font-semibold max-w-[120px] truncate"
-            >
-              <option value="main">🏢 {mainBusinessName}</option>
-              {workspaces.map(ws => (
-                <option key={ws._id} value={ws._id}>🏢 {ws.name}</option>
-              ))}
-            </select>
-          </div>
 
           <button 
             onClick={handleSave} 
             disabled={isSaving} 
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/30 disabled:opacity-50 shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/30 disabled:opacity-50 shrink-0"
           >
             <Save size={14} />
             <span>{isSaving ? 'Saving...' : 'Save Flow 💾'}</span>
           </button>
+        </div>
+
+        {/* ROW 2: Saved Flows Dropdown, Workspace Selector, Manage List & AI buttons */}
+        <div className="flex items-center justify-between gap-1.5 w-full pt-1 border-t border-gray-800/60 overflow-x-auto no-scrollbar py-0.5">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* 📁 SAVED FLOWS DROPDOWN (Direct 1-click switcher showing flow count) */}
+            <div className="flex items-center bg-gray-900 border border-indigo-500/60 hover:border-indigo-400 rounded-xl px-2 py-1 shadow-sm transition-colors">
+              <FolderOpen size={13} className="text-indigo-400 mr-1.5 shrink-0" />
+              <select
+                value={loadedFlowId}
+                onChange={(e) => {
+                  const targetId = e.target.value;
+                  if (!targetId) return;
+                  const f = savedFlows.find(x => x._id === targetId);
+                  if (f) {
+                    setLoadedFlowId(f._id);
+                    loadFlow(f);
+                  }
+                }}
+                className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer max-w-[170px] sm:max-w-[220px] truncate"
+                title="Select from all saved flows"
+              >
+                <option value="" className="bg-gray-900 text-gray-300">
+                  📁 Flows ({savedFlows.length} Built) ▾
+                </option>
+                {savedFlows.map(flow => {
+                  const wsObj = workspaces.find(w => (w._id || w.id) === flow.workspaceId);
+                  const wsLabel = flow.workspaceId && flow.workspaceId !== 'main' ? (wsObj?.name || 'Sub') : 'DealClose';
+                  return (
+                    <option key={flow._id} value={flow._id} className="bg-gray-900 text-white">
+                      {flow.platform === 'instagram' ? '🟪 IG' : '🟩 WA'} • {flow.name} ({wsLabel})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* 🏢 WORKSPACE SELECTOR DROPDOWN (dealcloseai.in / newpropertyhub.in) */}
+            <div className="flex items-center bg-gray-900 border border-amber-500/60 hover:border-amber-400 rounded-xl px-2 py-1 shadow-sm transition-colors">
+              <span className="text-[12px] font-bold text-amber-400 mr-1 shrink-0">🏢</span>
+              <select 
+                value={selectedWorkspace} 
+                onChange={(e) => setSelectedWorkspace(e.target.value)} 
+                className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer min-w-[130px] max-w-[190px] truncate"
+                title="Active Workspace / Business"
+              >
+                <option value="main" className="bg-gray-900 text-white">🏢 {mainBusinessName}</option>
+                {workspaces.map(ws => (
+                  <option key={ws._id || ws.id} value={ws._id || ws.id} className="bg-gray-900 text-white">
+                    🏢 {ws.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button 
+              onClick={() => { setIsFlowListOpen(true); fetchSavedFlows(); }} 
+              className="flex items-center gap-1 px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white rounded-xl font-bold text-xs transition-colors border border-gray-700 shrink-0"
+              title="Manage, Rename or Delete flows"
+            >
+              <span>Manage List</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button 
+              onClick={() => setIsScriptModalOpen(true)} 
+              className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-purple-600/20 active:scale-95 shrink-0"
+              title="Generate Prompt for ChatGPT/Gemini & Import Script"
+            >
+              <Sparkles size={13} />
+              <span>AI Script ✨</span>
+            </button>
+
+            <button 
+              onClick={() => setIsAiChatOpen(prev => !prev)} 
+              className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-colors shadow-sm shrink-0"
+            >
+              <Bot size={13} />
+              <span>AI Copilot</span>
+            </button>
+          </div>
         </div>
       </header>
 

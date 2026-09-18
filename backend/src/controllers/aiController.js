@@ -595,7 +595,7 @@ ${onboardingChecklist}
 // @route   POST /api/ai/generate-flow
 exports.generateFlow = async (req, res) => {
   try {
-    const { prompt, businessName } = req.body;
+    const { prompt, businessName, workspaceId } = req.body;
     const userId = req.user?._id || req.user?.id;
     if (!prompt) return res.status(400).json({ success: false, message: 'Prompt is required' });
 
@@ -603,9 +603,17 @@ exports.generateFlow = async (req, res) => {
     if (userId) {
       const user = await User.findById(userId);
       if (user) {
-        businessContext = `Business Name: ${user.businessName || businessName || 'Not Set'}. Description: ${user.businessDescription || 'Not Set'}.`;
+        let activeWs = null;
+        if (workspaceId && workspaceId !== 'main' && workspaceId !== 'all') {
+          activeWs = (user.workspaces || []).find(w => (w._id?.toString() === workspaceId || w.id?.toString() === workspaceId));
+        }
+        if (activeWs) {
+          businessContext = `Active Workspace / Business: ${activeWs.name}. Parent Organization: ${user.businessName || 'DealClose AI'}. Description: ${activeWs.description || user.businessDescription || 'Real estate property portal, listings, and customer automation hub'}.`;
+        } else {
+          businessContext = `Business Name: ${user.businessName || businessName || 'Not Set'}. Description: ${user.businessDescription || 'Not Set'}.`;
+        }
         if (user.workspaces && user.workspaces.length > 0) {
-          businessContext += ` Other divisions: ${user.workspaces.map(w => w.name).join(', ')}.`;
+          businessContext += ` All divisions / workspaces: ${user.workspaces.map(w => w.name).join(', ')}.`;
         }
       }
     }

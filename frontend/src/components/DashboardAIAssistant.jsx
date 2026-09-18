@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import api from '../services/api';
 import { Bot, Send, ChevronDown, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import Draggable from 'react-draggable'; // 🚀 NEW: Draggable component import
+import Draggable from 'react-draggable';
 
-const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction prop
+const DashboardAIAssistant = ({ onAiAction, activeWorkspaceId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'ai', content: "Hi! Main aapka DealClose AI Onboarding Assistant hu. Main aapka pura business setup, auto-replies, aur WhatsApp templates configure kar sakta hu. Kaha se shuru karein?" }
@@ -30,16 +30,17 @@ const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction p
     setIsLoading(true);
 
     try {
-      // 🚀 NEW: Send last 4 messages as history for context
       const history = [...messages, userMessage].slice(-4);
 
-      // Use the global 'api' instance which automatically points to the live server and attaches the token
-      const response = await api.post('/ai/dashboard-assistant', { message: userMessage.content, history });
+      const response = await api.post('/ai/dashboard-assistant', { 
+        message: userMessage.content, 
+        history,
+        workspaceId: activeWorkspaceId 
+      });
       const data = response.data;
 
       if (data.success) {
         setMessages((prev) => [...prev, { role: 'ai', content: data.reply }]);
-        // 🚀 NEW: Agar AI ne koi action liya hai, toh user ko batao
         if (data.actionTaken && data.payload) {
           let toastMessage = 'AI has updated your settings!';
           if (data.actionTaken === 'profile_updated') toastMessage = 'AI has updated your business profile!';
@@ -47,7 +48,6 @@ const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction p
           if (data.actionTaken === 'flow_created') toastMessage = 'AI has built a new automation flow!';
           if (data.actionTaken === 'template_drafted') toastMessage = 'AI has drafted the template for you!';
           
-          // 🚀 NEW: Call the callback function with the action and payload
           if (onAiAction) {
             onAiAction(data.actionTaken, data.payload);
           }
@@ -70,7 +70,7 @@ const DashboardAIAssistant = ({ onAiAction }) => { // 🚀 NEW: Add onAiAction p
   return (
     <div className="fixed bottom-6 right-6 z-50 font-sans">
       {/* Chat Window */}
-      {isOpen && ( // 🚀 NEW: Wrap the chat window in Draggable
+      {isOpen && (
         <Draggable handle=".handle">
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-80 sm:w-96 overflow-hidden flex flex-col mb-4 transition-all duration-300 animate-fade-in-up" style={{ height: '500px' }}>
             {/* Header - Added 'handle' class and cursor style for dragging */}

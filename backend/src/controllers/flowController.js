@@ -176,18 +176,22 @@ exports.getIndustryStarterFlows = async (req, res) => {
 const buildFlowListQuery = ({ userId, workspaceId, platform }) => {
   const query = { $and: [{ userId }] };
 
-  if (platform === 'whatsapp') {
-    query.$and.push({ $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
-  } else if (platform) {
-    query.$and.push({ platform });
+  if (platform && platform !== 'all') {
+    if (platform === 'whatsapp') {
+      query.$and.push({ $or: [{ platform: 'whatsapp' }, { platform: { $exists: false } }] });
+    } else {
+      query.$and.push({ platform });
+    }
   }
 
-  if (workspaceId && workspaceId !== 'main') {
-    query.$and.push({ workspaceId });
-  } else if (workspaceId === 'main') {
-    query.$and.push({
-      $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }]
-    });
+  if (workspaceId && workspaceId !== 'all') {
+    if (workspaceId !== 'main') {
+      query.$and.push({ workspaceId });
+    } else {
+      query.$and.push({
+        $or: [{ workspaceId: 'main' }, { workspaceId: { $in: [null, ''] } }, { workspaceId: { $exists: false } }]
+      });
+    }
   }
 
   return query;
