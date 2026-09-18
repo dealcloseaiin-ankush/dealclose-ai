@@ -6,7 +6,8 @@ import { useInboxStore } from '../store/inboxStore';
 import { 
   Search, Camera, MessageSquare, MessageCircle, Check, CheckCheck, Trash2, MapPin, 
   CornerDownLeft, X, ExternalLink, User, Tag, Phone, Mail, FileText, Bot, 
-  PanelRightClose, PanelRightOpen, Sparkles, Send, Copy, CheckCircle2, Edit2, Save, RefreshCw
+  PanelRightClose, PanelRightOpen, Sparkles, Send, Copy, CheckCircle2, Edit2, Save, RefreshCw,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import DashboardAIAssistant from '../components/DashboardAIAssistant';
 
@@ -56,6 +57,16 @@ export default function Chats() {
   const prevActiveCustomerRef = useRef(null);
   const prevMsgCountRef = useRef(0);
   const allMessagesRef = useRef([]);
+  const postPillsContainerRef = useRef(null);
+
+  const scrollPostPills = (direction) => {
+    if (postPillsContainerRef.current) {
+      postPillsContainerRef.current.scrollBy({
+        left: direction === 'left' ? -140 : 140,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // Fetch Instagram Posts for Post Card Resolution (from Graph API & Saved Automations)
   useEffect(() => {
@@ -344,7 +355,8 @@ export default function Chats() {
             like_count: resolvedIgPost?.like_count || 0,
             comments_count: resolvedIgPost?.comments_count || 0,
             timestamp: resolvedIgPost?.timestamp || msg.timestamp || msg.createdAt,
-            count: 1
+            count: 1,
+            isDirectMatch: true
           });
         } else {
           map.get(extractedId).count += 1;
@@ -352,33 +364,62 @@ export default function Chats() {
       }
     });
 
-    // If no specific post ID tag was found but it's an Instagram comment thread, fallback to posts list
-    if (map.size === 0 && (activeCustomerData?.lastMessage?.platform === 'instagram_comment' || isActiveIg) && igPosts.length > 0) {
-      igPosts.forEach(p => {
-        map.set(String(p.id), {
-          id: String(p.id),
-          caption: p.caption || 'Recent Instagram Post / Reel',
-          thumbnail_url: p.thumbnail_url || p.media_url || null,
-          permalink: p.permalink || `https://www.instagram.com/p/${p.id}`,
-          media_type: p.media_type || 'REEL',
-          like_count: p.like_count || 0,
-          comments_count: p.comments_count || 0,
-          timestamp: p.timestamp,
-          count: customerMsgs.length || 1
+    // Check if this customer has any Instagram comments
+    const commentMsgs = customerMsgs.filter(m => 
+      m.channel === 'instagram_comment' || 
+      m.platform === 'instagram_comment' || 
+      (Array.isArray(m.tags) && (m.tags.includes('ig_comment') || m.tags.includes('public_comment_reply')))
+    );
+
+    // If no specific post ID tag was found on messages but customer interacted via comments:
+    // Attach ONLY 1 single post (the most recent / active post) - NEVER loop over the entire account's 96+ posts!
+    if (map.size === 0 && (commentMsgs.length > 0 || activeCustomerData?.lastMessage?.platform === 'instagram_comment' || platformFilter === 'instagram_comment')) {
+      if (igPosts.length > 0) {
+        const defaultPost = igPosts[0];
+        map.set(String(defaultPost.id), {
+          id: String(defaultPost.id),
+          caption: defaultPost.caption || 'Recent Instagram Post / Reel',
+          thumbnail_url: defaultPost.thumbnail_url || defaultPost.media_url || null,
+          permalink: defaultPost.permalink || `https://www.instagram.com/p/${defaultPost.id}`,
+          media_type: defaultPost.media_type || 'REEL',
+          like_count: defaultPost.like_count || 0,
+          comments_count: defaultPost.comments_count || 0,
+          timestamp: defaultPost.timestamp,
+          count: commentMsgs.length || 1,
+          isDefaultFallback: true
         });
-      });
+      } else {
+        map.set('recent_post', {
+          id: 'recent_post',
+          caption: 'Recent Instagram Post / Reel',
+          thumbnail_url: null,
+          permalink: 'https://www.instagram.com',
+          media_type: 'REEL',
+          like_count: 0,
+          comments_count: commentMsgs.length || 1,
+          timestamp: new Date().toISOString(),
+          count: commentMsgs.length || 1,
+          isDefaultFallback: true
+        });
+      }
     }
 
     return Array.from(map.values());
-  }, [filteredMessages, activeCustomer, igPosts, isActiveIg, activeCustomerData]);
+  }, [filteredMessages, activeCustomer, igPosts, platformFilter, activeCustomerData]);
 
   // Active Post for the banner
   const currentBannerPost = useMemo(() => {
+    if (activeCustomerPosts.length === 0) {
+      if (igPosts.length > 0 && (activeCustomerData?.lastMessage?.platform === 'instagram_comment' || platformFilter === 'instagram_comment')) {
+        return igPosts[0];
+      }
+      return null;
+    }
     if (postFilter !== 'all') {
       return activeCustomerPosts.find(p => String(p.id) === String(postFilter)) || activeCustomerPosts[0] || null;
     }
     return activeCustomerPosts[0] || null;
-  }, [activeCustomerPosts, postFilter]);
+  }, [activeCustomerPosts, postFilter, igPosts, activeCustomerData, platformFilter]);
 
   const activeChatMessages = useMemo(() => {
     return filteredMessages
@@ -408,12 +449,23 @@ export default function Chats() {
           );
           if (matchesText) return true;
 
+          // If this customer's comments belong to this post (single post or fallback post), show them
+          const isCommentChannel = m.channel === 'instagram_comment' || 
+                                   m.platform === 'instagram_comment' || 
+                                   (Array.isArray(m.tags) && (m.tags.includes('ig_comment') || m.tags.includes('public_comment_reply')));
+          if (isCommentChannel) {
+            const currentPostObj = activeCustomerPosts.find(p => String(p.id) === String(postFilter));
+            if (currentPostObj && (currentPostObj.isDefaultFallback || activeCustomerPosts.length === 1)) {
+              return true;
+            }
+          }
+
           return false;
         }
         return true;
       })
       .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
-  }, [filteredMessages, activeCustomer, platformFilter, postFilter]);
+  }, [filteredMessages, activeCustomer, platformFilter, postFilter, activeCustomerPosts]);
 
   useEffect(() => {
     const isNewCustomer = prevActiveCustomerRef.current !== activeCustomer;
@@ -1113,18 +1165,18 @@ export default function Chats() {
             {/* ========================================================================= */}
             {/* 📸 RICH INSTAGRAM POST CARD & MULTI-POST SWITCHER BANNER                  */}
             {/* ========================================================================= */}
-            {(activeCustomerPosts.length > 0 || isActiveIg) && currentBannerPost && (
+            {(activeCustomerPosts.length > 0 || isActiveIg || platformFilter === 'instagram_comment') && currentBannerPost && (
               <div className="bg-gradient-to-r from-[#1a121e] via-[#14121a] to-[#0e0e0e] border-b border-pink-500/30 p-3 px-4 shrink-0 shadow-md">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                   
                   {/* Left: Thumbnail & Caption & Link */}
-                  <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+                  <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0 w-full md:w-auto">
                     {/* Post Thumbnail Preview */}
                     <a 
-                      href={currentBannerPost.permalink} 
+                      href={currentBannerPost.permalink || `https://www.instagram.com/p/${currentBannerPost.id}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="block w-14 h-14 bg-gray-900 rounded-xl flex-shrink-0 relative overflow-hidden border border-pink-500/30 group shadow-lg"
+                      className="block w-13 h-13 sm:w-14 sm:h-14 bg-gray-900 rounded-xl flex-shrink-0 relative overflow-hidden border border-pink-500/30 group shadow-lg"
                       title="Click to view original Post/Reel on Instagram"
                     >
                       {currentBannerPost.thumbnail_url ? (
@@ -1145,21 +1197,31 @@ export default function Chats() {
 
                     {/* Post Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                         <span className="text-[9px] bg-pink-500/20 text-pink-300 font-bold px-2 py-0.5 rounded border border-pink-500/30 uppercase tracking-wider">
                           {currentBannerPost.media_type || 'POST/REEL'}
                         </span>
                         <a 
-                          href={currentBannerPost.permalink} 
+                          href={currentBannerPost.permalink || `https://www.instagram.com/p/${currentBannerPost.id}`} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-[11px] font-bold text-pink-400 hover:text-pink-300 flex items-center gap-1"
                         >
-                          #{currentBannerPost.id} <ExternalLink size={11} />
+                          #{currentBannerPost.id?.length > 8 ? currentBannerPost.id.slice(-8) : currentBannerPost.id} <ExternalLink size={11} />
                         </a>
                         {currentBannerPost.timestamp && (
                           <span className="text-[10px] text-gray-500">
                             • {new Date(currentBannerPost.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                          </span>
+                        )}
+                        {postFilter !== 'all' && (
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold">
+                            Viewing #{currentBannerPost.id?.slice(-6)} ({currentBannerPost.count})
+                          </span>
+                        )}
+                        {activeCustomerPosts.length <= 1 && (
+                          <span className="text-[10px] text-pink-300/80 font-medium bg-pink-950/40 px-2 py-0.5 rounded border border-pink-500/20">
+                            {currentBannerPost.count || 1} comment{(currentBannerPost.count || 1) !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
@@ -1169,33 +1231,78 @@ export default function Chats() {
                     </div>
                   </div>
 
-                  {/* Right: Multi-Post Switcher Pills */}
+                  {/* Right: Multi-Post Switcher with Navigation Arrows & Select */}
                   {activeCustomerPosts.length > 1 && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar shrink-0 pt-1 sm:pt-0">
-                      <span className="text-[10px] text-gray-500 font-bold">Posts:</span>
+                    <div className="flex items-center gap-1.5 shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0 border-gray-800">
+                      
+                      {/* Dropdown for quick access when > 3 posts */}
+                      {activeCustomerPosts.length > 3 && (
+                        <select
+                          value={postFilter}
+                          onChange={(e) => setPostFilter(e.target.value)}
+                          className="bg-[#18181b] text-xs font-semibold text-gray-200 border border-pink-500/40 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-pink-500 shrink-0 cursor-pointer max-w-[150px] truncate"
+                          title="Jump to post"
+                        >
+                          <option value="all">All ({activeCustomerPosts.reduce((acc, p) => acc + (p.count || 0), 0)} comments)</option>
+                          {activeCustomerPosts.map(p => (
+                            <option key={p.id} value={p.id}>
+                              #{p.id.slice(-6)} ({p.count}) - {(p.caption || '').slice(0, 18)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Left Navigation Arrow */}
                       <button 
-                        onClick={() => setPostFilter('all')} 
-                        className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all shrink-0 ${
-                          postFilter === 'all' 
-                            ? 'bg-pink-600 text-white shadow-sm ring-1 ring-pink-400' 
-                            : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
-                        }`}
+                        type="button"
+                        onClick={() => scrollPostPills('left')}
+                        className="p-1 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 transition-colors shrink-0"
+                        title="Scroll posts left"
                       >
-                        All ({activeCustomerPosts.reduce((acc, p) => acc + (p.count || 0), 0) || activeCustomerPosts.length})
+                        <ChevronLeft size={14} />
                       </button>
-                      {activeCustomerPosts.map(p => (
+
+                      {/* Scrollable Pills Container */}
+                      <div 
+                        ref={postPillsContainerRef}
+                        className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar scroll-smooth max-w-[220px] sm:max-w-[320px] py-0.5"
+                      >
                         <button 
-                          key={p.id}
-                          onClick={() => setPostFilter(p.id)} 
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all flex items-center gap-1 shrink-0 ${
-                            postFilter === p.id 
+                          onClick={() => setPostFilter('all')} 
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all shrink-0 ${
+                            postFilter === 'all' 
                               ? 'bg-pink-600 text-white shadow-sm ring-1 ring-pink-400' 
                               : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
                           }`}
                         >
-                          🎬 #{p.id.length > 6 ? p.id.slice(-6) : p.id} ({p.count})
+                          All ({activeCustomerPosts.reduce((acc, p) => acc + (p.count || 0), 0)})
                         </button>
-                      ))}
+                        {activeCustomerPosts.map(p => (
+                          <button 
+                            key={p.id}
+                            onClick={() => setPostFilter(p.id)} 
+                            className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all flex items-center gap-1 shrink-0 ${
+                              postFilter === p.id 
+                                ? 'bg-pink-600 text-white shadow-sm ring-1 ring-pink-400' 
+                                : 'bg-gray-800/80 text-gray-400 hover:text-white border border-gray-700'
+                            }`}
+                            title={p.caption || `Post #${p.id}`}
+                          >
+                            🎬 #{p.id.length > 6 ? p.id.slice(-6) : p.id} ({p.count})
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Right Navigation Arrow */}
+                      <button 
+                        type="button"
+                        onClick={() => scrollPostPills('right')}
+                        className="p-1 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 transition-colors shrink-0"
+                        title="Scroll posts right"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+
                     </div>
                   )}
 

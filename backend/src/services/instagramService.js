@@ -345,27 +345,82 @@ exports.getPostInsights = async (mediaId, accessToken, loginType = 'facebook_bus
     : 'https://graph.facebook.com/v19.0';
 
   try {
-    // 🚀 UPGRADE: Fetch all available and useful metrics for a comprehensive analysis.
-    // This includes engagement, reach, saves, and video-specific metrics.
-    const metrics = 'engagement,impressions,reach,saved,video_views,plays,shares,total_interactions';
-    const url = `${baseUrl}/${mediaId}/insights`;
-    
-    const response = await axios.get(url, {
-      params: { 
-        metric: metrics, 
-        access_token: accessToken 
-      },
-    });
-
-    const insights = {};
-    if (response.data?.data) {
-      response.data.data.forEach(metric => {
-        insights[metric.name] = metric.values[0]?.value || 0;
+    // 1. Fetch basic media details first (media_type, like_count, comments_count)
+    let mediaType = 'IMAGE';
+    let basicData = {};
+    try {
+      const mediaRes = await axios.get(`${baseUrl}/${mediaId}`, {
+        params: {
+          fields: 'id,media_type,like_count,comments_count,timestamp',
+          access_token: accessToken
+        }
       });
+      basicData = mediaRes.data || {};
+      mediaType = String(basicData.media_type || 'IMAGE').toUpperCase();
+    } catch (mErr) {
+      console.warn("⚠️ [getPostInsights] Could not fetch basic media details:", mErr.message);
     }
+
+    const insights = {
+      likes: basicData.like_count || 0,
+      comments: basicData.comments_count || 0,
+      reach: 0,
+      impressions: 0,
+      saved: 0,
+      shares: 0,
+      total_interactions: 0,
+      views: 0
+    };
+
+    // 2. Select valid metrics accepted by Meta Graph API based on media_type
+    // Allowed values: impressions, reach, replies, saved, likes, comments, shares, total_interactions, views
+    let metricsToRequest;
+    if (mediaType === 'VIDEO' || mediaType === 'REELS') {
+      metricsToRequest = 'reach,saved,likes,comments,shares,total_interactions,views';
+    } else {
+      metricsToRequest = 'impressions,reach,saved,likes,comments,shares,total_interactions';
+    }
+
+    const url = `${baseUrl}/${mediaId}/insights`;
+
+    try {
+      const response = await axios.get(url, {
+        params: { 
+          metric: metricsToRequest, 
+          access_token: accessToken 
+        },
+      });
+
+      if (response.data?.data) {
+        response.data.data.forEach(metric => {
+          insights[metric.name] = metric.values?.[0]?.value ?? 0;
+        });
+      }
+    } catch (insightErr) {
+      console.warn("⚠️ [getPostInsights] Full metric fetch failed, falling back to core metrics:", insightErr.response?.data?.error?.message || insightErr.message);
+      try {
+        // Safe fallback with standard minimal metrics
+        const fallbackRes = await axios.get(url, {
+          params: {
+            metric: 'reach,saved,total_interactions',
+            access_token: accessToken
+          }
+        });
+        if (fallbackRes.data?.data) {
+          fallbackRes.data.data.forEach(metric => {
+            insights[metric.name] = metric.values?.[0]?.value ?? 0;
+          });
+        }
+      } catch (fbErr) {
+        console.warn("⚠️ [getPostInsights] Core metrics also unavailable:", fbErr.message);
+      }
+    }
+
     return insights;
   } catch (error) {
-    throw new Error(error.response?.data?.error?.message || error.message);
+    const errorMsg = error.response?.data?.error?.message || error.message;
+    console.error("❌ [getPostInsights] Error:", errorMsg);
+    throw new Error(errorMsg);
   }
 };
 

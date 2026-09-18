@@ -1138,7 +1138,7 @@ exports.analyzePostPerformance = async (req, res) => {
       - Likes: ${insights.likes || 'N/A'}
       - Comments: ${insights.comments || 'N/A'}
       - Saves: ${insights.saved || 'N/A'}
-      - Video Views: ${insights.video_views || 'N/A'}
+      - Video Views: ${insights.views || insights.video_views || 'N/A'}
 
       ${previousAnalysis ? `
       ---
