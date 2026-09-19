@@ -248,7 +248,45 @@ async function saveFlow(req, res) {
       );
     }
 
-    res.status(200).json({ success: true, message: 'Flow saved successfully', flow });
+    // 🛡️ SECURITY & CONFLICT INSPECTOR: Check for duplicate trigger keywords across other active flows
+    const conflicts = [];
+    const currentNodes = flowData.nodes || [];
+    const triggerNodes = currentNodes.filter(n => n.type === 'trigger');
+    const currentKeywords = [];
+    for (const t of triggerNodes) {
+      const kwStr = t.data?.keyword || t.data?.keywords || '';
+      if (kwStr) {
+        kwStr.split(',').map(k => k.trim().toLowerCase()).filter(Boolean).forEach(k => currentKeywords.push(k));
+      }
+    }
+
+    if (currentKeywords.length > 0) {
+      const otherFlows = await Flow.find({
+        userId,
+        _id: { $ne: flow._id },
+        workspaceId: targetWorkspaceId,
+        platform: targetPlatform,
+        isActive: { $ne: false }
+      }).select('name flowData').lean();
+
+      for (const other of otherFlows) {
+        const otherTriggers = (other.flowData?.nodes || []).filter(n => n.type === 'trigger');
+        for (const ot of otherTriggers) {
+          const otKwStr = ot.data?.keyword || ot.data?.keywords || '';
+          const otKeywords = otKwStr.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+          const overlap = currentKeywords.filter(k => otKeywords.includes(k));
+          if (overlap.length > 0) {
+            conflicts.push({
+              conflictingFlowName: other.name,
+              keywords: overlap,
+              message: `Keyword(s) [${overlap.join(', ')}] already used in "${other.name}". Same workspace & platform me clash ho sakta hai.`
+            });
+          }
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, message: 'Flow saved successfully', flow, conflicts });
   } catch (error) {
     console.error('❌ Save Flow Error details:', error);
     res.status(500).json({ success: false, message: `DB Error: ${error.message}` });

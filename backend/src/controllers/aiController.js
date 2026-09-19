@@ -690,7 +690,9 @@ exports.generateFlow = async (req, res) => {
     3. Edges must logically connect 'source' to 'target'. If a node has multiple outputs, you MUST specify "sourceHandle" in the edge. 
     4. EVEN IF YOU ARE JUST CHATTING, YOU MUST RETURN JSON! Do NOT output plain text outside the JSON. Format: {"reply": "...", "nodes": [], "edges": []}
     5. Return ONLY a valid JSON object starting with { and ending with }. Do not include markdown formatting, trailing commas, or unescaped newlines in strings. If you need a newline in a message, use \\n.
-    6. FALLBACK MESSAGE RULE: Always ensure your flow has a fallback or ending 'message' node.`;
+    6. FALLBACK MESSAGE RULE: Always ensure your flow has a fallback or ending 'message' node.
+    7. MULTI-BRANCHING & MULTI-OPTION NODES: When creating a 'menu' node with multiple buttons (opt1, opt2, opt3) or 'askQuestion' node with choices, you MUST connect EACH option to its specific target node using edges with sourceHandle: "opt_0" for opt1, "opt_1" for opt2, "opt_2" for opt3, or "yes"/"no"/"other". This clean branching is 100% supported and required so each choice triggers its distinct reply!
+    8. NO DISCONNECTED NODES & NO KEYWORD CLASHES: Every node (except trigger) MUST have at least one incoming edge. Never leave a node floating unlinked. Use distinct, targeted keywords in trigger (e.g. 'flat, 2bhk, property' vs 'support, help') to prevent clash with other flows.`;
 
     let rawResponse = "";
     let flowGenSuccess = false;

@@ -15,7 +15,8 @@ import 'reactflow/dist/style.css';
 import { 
   MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, 
   FolderOpen, ChevronLeft, Menu, ListPlus, Camera, Edit, Trash2,
-  Plus, ZoomIn, ZoomOut, Maximize2, Sparkles, ArrowLeft, Copy, Check, ExternalLink, FileCode
+  Plus, ZoomIn, ZoomOut, Maximize2, Sparkles, ArrowLeft, Copy, Check, ExternalLink, FileCode,
+  Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -101,6 +102,10 @@ function FlowBuilder() {
   const [savedFlows, setSavedFlows] = useState([]);
   const [loadedFlowId, setLoadedFlowId] = useState('');
   const skipNextWorkspaceEffect = useRef(false);
+
+  // 🛡️ Flow Doctor / Security & Conflict Inspector States
+  const [isHealthModalOpen, setIsHealthModalOpen] = useState(false);
+  const [healthReport, setHealthReport] = useState({ score: 100, issues: [], passes: [] });
 
   // 🚀 NEW: External AI Script Importer / ChatGPT Flow Architect States
   const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
@@ -639,11 +644,200 @@ Please generate the customized flow for "${biz}" now.`;
     menu: MenuNode
   }), [templates]);
 
-  const handleSave = async () => {
-    if (!reactFlowInstance) {
-      toast.error("Flow builder is still loading. Please wait.");
-      return;
+  // 🛡️ Comprehensive Flow Security & Conflict Inspector
+  const inspectFlowHealth = useCallback((customNodes = nodes, customEdges = edges) => {
+    const issues = [];
+    const passes = [];
+    let score = 100;
+
+    const currentNodes = customNodes || [];
+    const currentEdges = customEdges || [];
+
+    // 1. Trigger Node Check
+    const triggerNodes = currentNodes.filter(n => n.type === 'trigger');
+    if (triggerNodes.length === 0) {
+      score -= 30;
+      issues.push({
+        severity: 'critical',
+        type: 'missing_trigger',
+        title: 'Start Trigger Missing 🚨',
+        desc: 'Flow start hone ke liye koi "Start Trigger" block nahi hai.',
+        fix: 'Sidebar se "Start Trigger" block drag karein aur use flow ke pehle message se connect karein.'
+      });
+    } else {
+      passes.push({
+        title: 'Start Trigger Configured ✅',
+        desc: `${triggerNodes.length} Start Trigger block(s) canvas par maujood hain.`
+      });
+
+      // Check each trigger's keywords & cross-flow conflict
+      triggerNodes.forEach((trig, idx) => {
+        const kwRaw = trig.data?.keyword || trig.data?.keywords || '';
+        const currentKeywords = kwRaw.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+
+        if (currentKeywords.length === 0) {
+          score -= 10;
+          issues.push({
+            severity: 'warning',
+            type: 'empty_keyword',
+            title: `Trigger ${idx + 1}: Khali Keywords ⚠️`,
+            desc: 'Trigger me koi specific keywords nahi dale hain. Isse ye har incoming message par bina soche start ho sakta hai.',
+            fix: 'Trigger block me specific keywords dalein jaise: "price, offer, booking, flat".'
+          });
+        } else {
+          // Cross-flow conflict check against savedFlows
+          savedFlows.forEach(otherFlow => {
+            const isSameWorkspace = (otherFlow.workspaceId || 'main') === (selectedWorkspace || 'main');
+            const isSamePlatform = (otherFlow.platform || 'whatsapp') === (platform || 'whatsapp');
+            const isDifferentFlow = otherFlow._id !== loadedFlowId && otherFlow.name !== flowName;
+
+            if (isSameWorkspace && isSamePlatform && isDifferentFlow && otherFlow.flowData?.nodes) {
+              const otherTriggers = otherFlow.flowData.nodes.filter(n => n.type === 'trigger');
+              otherTriggers.forEach(ot => {
+                const otKwRaw = ot.data?.keyword || ot.data?.keywords || '';
+                const otKeywords = otKwRaw.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+                const overlap = currentKeywords.filter(k => otKeywords.includes(k));
+
+                if (overlap.length > 0) {
+                  score -= 25;
+                  issues.push({
+                    severity: 'critical',
+                    type: 'keyword_conflict',
+                    title: `Keyword Clash Warning 🚨 ("${overlap.join(', ')}")`,
+                    desc: `Keyword "${overlap.join(', ')}" aapke doosre flow "${otherFlow.name}" me bhi use ho raha hai! Same channel aur business me clash hone se customer ko galat flow ka reply chala jayega.`,
+                    fix: `Is flow me alag keywords dalein ya "${otherFlow.name}" se ye keywords hata dein.`
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // Check if trigger is connected to next block
+        const hasOutgoing = currentEdges.some(e => e.source === trig.id);
+        if (!hasOutgoing) {
+          score -= 20;
+          issues.push({
+            severity: 'error',
+            type: 'broken_trigger',
+            title: `Trigger Kisi Block Se Connect Nahi Hai ⚠️`,
+            desc: 'Start Trigger se koi arrow aage nahi ja raha hai. Customer aayega toh flow wahi ruk jayega.',
+            fix: 'Trigger ke bottom dot ko agle message ya menu block ke top dot se connect karein.'
+          });
+        }
+      });
     }
+
+    // 2. Disconnected / Orphan Nodes Check
+    const nonTriggerNodes = currentNodes.filter(n => n.type !== 'trigger');
+    let orphanCount = 0;
+    nonTriggerNodes.forEach(node => {
+      const hasIncoming = currentEdges.some(e => e.target === node.id);
+      if (!hasIncoming) {
+        orphanCount++;
+        score -= 10;
+        issues.push({
+          severity: 'warning',
+          type: 'orphan_node',
+          title: `Tuta Hua Block: "${node.data?.label || node.data?.message?.slice(0, 25) || node.type}" ⚠️`,
+          desc: 'Ye block canvas par chhota hua hai lekin kisi pichle step se linked nahi hai.',
+          fix: 'Ise pichle step ke arrow se jodein ya delete icon dabakar hata dein.'
+        });
+      }
+    });
+
+    if (orphanCount === 0 && nonTriggerNodes.length > 0) {
+      passes.push({
+        title: 'All Blocks Connected Seamlessly ✅',
+        desc: 'Saare blocks aapas me sahi arrows ke sath jude huye hain.'
+      });
+    }
+
+    // 3. Empty Message / Question Content Check
+    let emptyContentCount = 0;
+    currentNodes.forEach(node => {
+      if (node.type === 'message') {
+        const msgText = node.data?.message || node.data?.label || '';
+        if (!msgText.trim()) {
+          emptyContentCount++;
+          score -= 10;
+          issues.push({
+            severity: 'warning',
+            type: 'empty_content',
+            title: 'Message Block Khali Hai ⚠️',
+            desc: 'Send Message block me koi text nahi likha hai. Customer ko khali message jayega.',
+            fix: 'Message block par click karke apna reply text likhein.'
+          });
+        }
+      }
+      if (node.type === 'askQuestion') {
+        const qText = node.data?.question || node.data?.label || '';
+        if (!qText.trim()) {
+          emptyContentCount++;
+          score -= 10;
+          issues.push({
+            severity: 'warning',
+            type: 'empty_content',
+            title: 'Question Block Khali Hai ⚠️',
+            desc: 'Ask Question block me koi sawal nahi likha hai.',
+            fix: 'Sawal likhein jaise: "Aapka naam kya hai?".'
+          });
+        }
+      }
+      if (node.type === 'menu') {
+        const opt1 = node.data?.opt1;
+        const opt2 = node.data?.opt2;
+        const opt3 = node.data?.opt3;
+        const outgoingEdges = currentEdges.filter(e => e.source === node.id);
+        const usedHandles = outgoingEdges.map(e => e.sourceHandle);
+
+        if (opt1 && !usedHandles.includes('opt_0')) {
+          score -= 5;
+          issues.push({
+            severity: 'info',
+            type: 'unlinked_branch',
+            title: `Menu Button 1 ("${opt1}") Aage Connect Nahi Hai ℹ️`,
+            desc: 'Button 1 par customer click karega toh aage koi agla step linked nahi hai.',
+            fix: 'Menu ke Button 1 ke dot se agle message block ko jodein.'
+          });
+        }
+        if (opt2 && !usedHandles.includes('opt_1')) {
+          score -= 5;
+          issues.push({
+            severity: 'info',
+            type: 'unlinked_branch',
+            title: `Menu Button 2 ("${opt2}") Aage Connect Nahi Hai ℹ️`,
+            desc: 'Button 2 par customer click karega toh aage koi step linked nahi hai.',
+            fix: 'Menu ke Button 2 ke dot se agle message block ko jodein.'
+          });
+        }
+        if (opt3 && !usedHandles.includes('opt_2')) {
+          score -= 5;
+          issues.push({
+            severity: 'info',
+            type: 'unlinked_branch',
+            title: `Menu Button 3 ("${opt3}") Aage Connect Nahi Hai ℹ️`,
+            desc: 'Button 3 par customer click karega toh aage koi step linked nahi hai.',
+            fix: 'Menu ke Button 3 ke dot se agle message block ko jodein.'
+          });
+        }
+      }
+    });
+
+    if (emptyContentCount === 0 && currentNodes.length > 0) {
+      passes.push({
+        title: 'Valid Message Text & Copy ✅',
+        desc: 'Sabhi blocks me proper conversational messages bhare huye hain.'
+      });
+    }
+
+    const finalScore = Math.max(0, Math.min(100, score));
+    const report = { score: finalScore, issues, passes };
+    setHealthReport(report);
+    return report;
+  }, [nodes, edges, savedFlows, loadedFlowId, flowName, selectedWorkspace, platform]);
+
+  const executeSaveToBackend = async () => {
     setIsSaving(true);
     try {
       const flowData = reactFlowInstance.toObject();
@@ -653,13 +847,42 @@ Please generate the customized flow for "${biz}" now.`;
         setLoadedFlowId(saveRes.data.flow._id);
       }
       await fetchSavedFlows();
-      toast.success(`🎉 Success! Flow "${finalName}" has been created & saved. You can find it inside the 'My Flows' 📂 folder.`, { duration: 6000 });
+      
+      if (saveRes.data?.conflicts && saveRes.data.conflicts.length > 0) {
+        toast((t) => (
+          <div className="flex flex-col gap-1">
+            <span className="font-bold text-amber-400">⚠️ Keyword Conflict Detected</span>
+            <span className="text-xs text-gray-200">{saveRes.data.conflicts[0].message}</span>
+          </div>
+        ), { duration: 7000, icon: '⚠️' });
+      } else {
+        toast.success(`🎉 100% Conflict-Free! Flow "${finalName}" saved & active.`, { duration: 5000 });
+      }
     } catch (error) {
       console.error("Failed to save flow:", error);
       toast.error(error.response?.data?.message || "Failed to save automation flow.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!reactFlowInstance) {
+      toast.error("Flow builder is still loading. Please wait.");
+      return;
+    }
+
+    // 🛡️ Auto-Run Flow Doctor Security Check before saving
+    const report = inspectFlowHealth();
+    const hasCriticalIssues = report.issues.some(i => i.severity === 'critical' || i.severity === 'error');
+
+    if (hasCriticalIssues) {
+      setIsHealthModalOpen(true);
+      toast.error("Flow Security Warning: Galtiyan ya Keyword Conflict mila hai! Please review inspector.");
+      return;
+    }
+
+    await executeSaveToBackend();
   };
 
   // 🚀 Fetch and Load Flows Logic
@@ -1157,6 +1380,173 @@ Please generate the customized flow for "${biz}" now.`;
       </div>
     )}
 
+    {/* 🛡️ FLOW DOCTOR / CONFLICT & SECURITY INSPECTOR MODAL */}
+    {isHealthModalOpen && (
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 animate-fade-in">
+        <div className="bg-[#111116] border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-950/40 via-gray-900 to-indigo-950/40 border-b border-gray-800 p-4 md:p-5 flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg text-white shrink-0 ${
+                healthReport.score === 100 ? 'bg-emerald-600 shadow-emerald-600/30' : healthReport.score >= 70 ? 'bg-amber-600 shadow-amber-600/30' : 'bg-rose-600 shadow-rose-600/30'
+              }`}>
+                {healthReport.score === 100 ? <ShieldCheck size={22} /> : healthReport.score >= 70 ? <AlertTriangle size={22} /> : <ShieldAlert size={22} />}
+              </div>
+              <div>
+                <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2">
+                  Flow Doctor & Security Inspector 🛡️
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    healthReport.score === 100 
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                      : healthReport.score >= 70 
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  }`}>
+                    {healthReport.score}% Health Score
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400">Deep conflict scanner, cross-flow keyword verification & node integrity check</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsHealthModalOpen(false)}
+              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/80 transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Health Score Meter & Status Banner */}
+          <div className="p-4 md:p-5 border-b border-gray-800/80 bg-[#0d0d12] space-y-2.5 shrink-0">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-gray-300">Flow Execution Health:</span>
+              <span className={healthReport.score === 100 ? 'text-emerald-400' : healthReport.score >= 70 ? 'text-amber-400' : 'text-rose-400'}>
+                {healthReport.score === 100 
+                  ? '100% Conflict-Free & Production Ready ✅' 
+                  : `${healthReport.issues.length} Issue(s) Detected - Needs Attention ⚠️`}
+              </span>
+            </div>
+            <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 rounded-full ${
+                  healthReport.score === 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : healthReport.score >= 70 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 'bg-gradient-to-r from-rose-500 to-red-400'
+                }`}
+                style={{ width: `${healthReport.score}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              {healthReport.score === 100
+                ? 'Aapka flow perfectly connected hai aur kisi bhi doosre flow ke triggers ke sath conflict nahi kar raha hai.'
+                : 'Agar kisi flow me keyword clashes ya disconnected blocks hote hain toh customer ka message atak sakta hai. Niche diye fixes follow karein:'}
+            </p>
+          </div>
+
+          {/* Report Body: Issues & Passes */}
+          <div className="p-4 md:p-5 overflow-y-auto flex-1 space-y-4">
+            {/* Issues List */}
+            {healthReport.issues.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                  <AlertCircle size={14} /> Issues & Conflicts Found ({healthReport.issues.length}):
+                </h3>
+                <div className="space-y-2.5">
+                  {healthReport.issues.map((iss, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`p-3.5 rounded-2xl border ${
+                        iss.severity === 'critical' 
+                          ? 'bg-rose-950/20 border-rose-500/50' 
+                          : iss.severity === 'error' 
+                            ? 'bg-amber-950/20 border-amber-500/50' 
+                            : 'bg-gray-900/60 border-gray-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <span className="font-bold text-xs md:text-sm text-white flex items-center gap-1.5">
+                          {iss.severity === 'critical' ? '🚨' : iss.severity === 'error' ? '⚠️' : 'ℹ️'} {iss.title}
+                        </span>
+                        <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-md shrink-0 ${
+                          iss.severity === 'critical' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : iss.severity === 'error' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                        }`}>
+                          {iss.severity}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300 leading-relaxed mb-2">
+                        {iss.desc}
+                      </p>
+                      <div className="bg-[#0e0e14] border border-gray-800/80 rounded-xl p-2 flex items-start gap-2">
+                        <span className="text-xs">💡</span>
+                        <p className="text-[11px] text-emerald-300 font-medium">
+                          <strong>Solution:</strong> {iss.fix}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Passes Checklist */}
+            {healthReport.passes.length > 0 && (
+              <div className="space-y-2.5 pt-2">
+                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 size={14} /> Verified Health Passes ({healthReport.passes.length}):
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {healthReport.passes.map((pass, idx) => (
+                    <div key={idx} className="bg-emerald-950/10 border border-emerald-500/25 rounded-xl p-2.5 flex items-start gap-2">
+                      <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-emerald-300">{pass.title}</p>
+                        <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{pass.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Footer */}
+          <div className="p-4 bg-[#0e0e14] border-t border-gray-800 flex items-center justify-between gap-3 shrink-0">
+            <button
+              onClick={() => setIsHealthModalOpen(false)}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl font-bold text-xs transition-all cursor-pointer"
+            >
+              Fix on Canvas ✏️
+            </button>
+
+            <div className="flex items-center gap-2">
+              {healthReport.score < 100 && (
+                <button
+                  onClick={async () => {
+                    setIsHealthModalOpen(false);
+                    await executeSaveToBackend();
+                  }}
+                  disabled={isSaving}
+                  className="px-3.5 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs transition-all cursor-pointer"
+                  title="Save despite warnings"
+                >
+                  Save Anyway ⚠️
+                </button>
+              )}
+
+              <button
+                onClick={async () => {
+                  setIsHealthModalOpen(false);
+                  await executeSaveToBackend();
+                }}
+                disabled={isSaving}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-emerald-600/30 cursor-pointer"
+              >
+                {healthReport.score === 100 ? 'Looks Perfect! Save & Deploy 🚀' : 'Confirm & Save Flow 💾'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* 🚀 MOBILE SLIDE-UP BOTTOM DRAWER FOR ADDING NODES */}
     {isMobileDrawerOpen && (
       <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center md:hidden animate-fade-in" onClick={() => setIsMobileDrawerOpen(false)}>
@@ -1392,6 +1782,15 @@ Please generate the customized flow for "${biz}" now.`;
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <button 
+              onClick={() => { inspectFlowHealth(); setIsHealthModalOpen(true); }}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-xl font-bold text-xs transition-all shadow-sm shrink-0 cursor-pointer active:scale-95"
+              title="Flow Doctor: Run Security, Health & Conflict Inspector"
+            >
+              <ShieldCheck size={14} className="text-emerald-400" />
+              <span>Flow Doctor 🛡️</span>
+            </button>
+
             <button 
               onClick={() => setIsScriptModalOpen(true)} 
               className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-purple-600/20 active:scale-95 shrink-0"
