@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Star, Ticket, CheckSquare, Sparkles, Gift } from 'lucide-react';
+import { Star, Ticket, CheckSquare, Sparkles, Gift, Send } from 'lucide-react';
 import StampCardManager from './components/StampCardManager';
 import CouponGenerator from './components/CouponGenerator';
 import CouponRedeemDesk from './components/CouponRedeemDesk';
+import PassDispatchDesk from './components/PassDispatchDesk';
 
 export default function LoyaltyOffersHub() {
   const [activeTab, setActiveTab] = useState('stamps');
@@ -13,6 +14,12 @@ export default function LoyaltyOffersHub() {
       label: 'विजिट स्टैम्प कार्ड्स',
       icon: Star,
       badge: '3/5/7 Visits'
+    },
+    {
+      id: 'dispatch',
+      label: '📲 पास डिस्पैच डेस्क',
+      icon: Send,
+      badge: '1-Click WhatsApp'
     },
     {
       id: 'coupons',
@@ -84,6 +91,7 @@ export default function LoyaltyOffersHub() {
       {/* Tab Contents */}
       <div className="transition-all">
         {activeTab === 'stamps' && <StampCardManager />}
+        {activeTab === 'dispatch' && <PassDispatchDesk />}
         {activeTab === 'coupons' && <CouponGenerator />}
         {activeTab === 'redeem' && <CouponRedeemDesk />}
       </div>

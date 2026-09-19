@@ -40,6 +40,8 @@ router.post('/coupons/validate', protect, creditController.validateCoupon);
 // ⭐ Loyalty Stamps System (Standalone & Integrated)
 router.post('/stamps/punch', protect, creditController.punchStamp);
 router.get('/stamps/customers', protect, creditController.getStampCustomers);
+router.get('/stamps/registrations', protect, creditController.getRegisteredLoyaltyCustomers);
+router.post('/stamps/mark-pass-sent', protect, creditController.markPassSent);
 
 // 🌐 Public Endpoints (Walk-in Counter QR registration & Customer Digital Pass View)
 router.get('/public/pass/:phone', creditController.getPublicCustomerPass);

@@ -141,6 +141,21 @@ const creditPartySchema = new mongoose.Schema({
     default: '1 मुफ़्त विशेष उपहार (Free Special Gift)'
   },
 
+  // 📲 WhatsApp Pass Dispatch Tracking
+  passSentOnWhatsApp: {
+    type: Boolean,
+    default: false
+  },
+  passSentAt: {
+    type: Date,
+    default: null
+  },
+  registeredVia: {
+    type: String,
+    enum: ['MANUAL', 'COUNTER_QR', 'BILLING'],
+    default: 'MANUAL'
+  },
+
   // 💳 UPI AutoPay / Recurring Mandate Linkage
   upiMandateVpa: { 
     type: String, 

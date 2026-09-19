@@ -1442,7 +1442,9 @@ exports.publicRegisterWalkin = async (req, res) => {
         city: city?.trim() || '',
         loyaltyTargetVisits: 5,
         completedVisitsCount: 0,
-        rewardDescription: '1 मुफ़्त विशेष उपहार'
+        rewardDescription: '1 मुफ़्त विशेष उपहार',
+        registeredVia: 'COUNTER_QR',
+        passSentOnWhatsApp: false
       });
       await party.save();
     } else {
@@ -1473,4 +1475,125 @@ exports.publicRegisterWalkin = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get Registered Loyalty Customers with Time Dropdown Filters (Today, Week, Month, All) & Stats
+// @route   GET /api/credit-mandate/stamps/registrations
+exports.getRegisteredLoyaltyCustomers = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { period = 'today', status = 'ALL', search = '' } = req.query;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Start of week
+    const dayOfWeek = now.getDay();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Start of month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Filter by period
+    let dateFilter = {};
+    if (period === 'today') {
+      dateFilter = { createdAt: { $gte: startOfToday } };
+    } else if (period === 'week') {
+      dateFilter = { createdAt: { $gte: startOfWeek } };
+    } else if (period === 'month') {
+      dateFilter = { createdAt: { $gte: startOfMonth } };
+    }
+
+    let query = { userId, ...dateFilter };
+
+    if (status === 'SENT') {
+      query.passSentOnWhatsApp = true;
+    } else if (status === 'PENDING') {
+      query.passSentOnWhatsApp = { $ne: true };
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { city: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const customers = await CreditParty.find(query)
+      .select('name phone city loyaltyTargetVisits completedVisitsCount rewardUnlocked rewardDescription passSentOnWhatsApp passSentAt registeredVia createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Summary counts
+    const [todayCount, weeklyCount, monthlyCount, allCount, pendingSendCount] = await Promise.all([
+      CreditParty.countDocuments({ userId, createdAt: { $gte: startOfToday } }),
+      CreditParty.countDocuments({ userId, createdAt: { $gte: startOfWeek } }),
+      CreditParty.countDocuments({ userId, createdAt: { $gte: startOfMonth } }),
+      CreditParty.countDocuments({ userId }),
+      CreditParty.countDocuments({ userId, passSentOnWhatsApp: { $ne: true } })
+    ]);
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        todayCount,
+        weeklyCount,
+        monthlyCount,
+        allCount,
+        pendingSendCount
+      },
+      customers
+    });
+  } catch (error) {
+    console.error("Error in getRegisteredLoyaltyCustomers:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Mark Customer Pass as Sent on WhatsApp & Return Formatted Link
+// @route   POST /api/credit-mandate/stamps/mark-pass-sent
+exports.markPassSent = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { partyId, phone } = req.body;
+
+    let query = { userId };
+    if (partyId) query._id = partyId;
+    else if (phone) query.phone = String(phone).replace(/\D/g, '').slice(-10);
+    else {
+      return res.status(400).json({ success: false, message: 'partyId या phone अनिवार्य है।' });
+    }
+
+    const party = await CreditParty.findOne(query);
+    if (!party) {
+      return res.status(404).json({ success: false, message: 'ग्राहक नहीं मिला।' });
+    }
+
+    party.passSentOnWhatsApp = true;
+    party.passSentAt = new Date();
+    await party.save();
+
+    const merchant = await User.findById(userId).select('name fullName businessName brandKit phone').lean();
+    const shopName = merchant?.brandKit?.businessName || merchant?.businessName || merchant?.fullName || 'पार्टनर स्टोर';
+    const cleanPhone = party.phone;
+
+    const passUrl = `${process.env.FRONTEND_URL || 'https://dealclose.in'}/pass/${cleanPhone}?merchantId=${userId}`;
+    const welcomeMsg = `🌟 नमस्ते ${party.name} जी! *${shopName}* के लॉयल्टी क्लब में आपका स्वागत है!\n\n💳 आपका डिजिटल पास तैयार है:\n👉 ${passUrl}\n\n📌 हर बार खरीदारी पर यह पास दिखाकर स्टैम्प लगवाएं और 5वीं विजिट पर पाएं खास इनाम! 🎁\n\nधन्यवाद!\n*${shopName}*`;
+    const waLink = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(welcomeMsg)}`;
+
+    res.status(200).json({
+      success: true,
+      party,
+      messageText: welcomeMsg,
+      waLink,
+      message: `📲 ${party.name} को पास WhatsApp पर भेजने के लिए लिंक तैयार है!`
+    });
+  } catch (error) {
+    console.error("Error in markPassSent:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 

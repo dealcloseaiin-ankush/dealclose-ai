@@ -4,6 +4,8 @@ export const loyaltyOffersApi = {
   // Stamps
   punchStamp: (data) => creditMandateApi.punchStamp(data),
   getStampCustomers: () => creditMandateApi.getStampCustomers(),
+  getRegisteredCustomers: (params) => creditMandateApi.getRegisteredCustomers(params),
+  markPassSent: (data) => creditMandateApi.markPassSent(data),
   
   // Coupons
   getCoupons: (status) => creditMandateApi.getCoupons(status),

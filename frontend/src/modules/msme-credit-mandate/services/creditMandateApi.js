@@ -119,6 +119,16 @@ export const creditMandateApi = {
     return res.data;
   },
 
+  getRegisteredCustomers: async (params = {}) => {
+    const res = await api.get('/credit-mandate/stamps/registrations', { params });
+    return res.data;
+  },
+
+  markPassSent: async (data) => {
+    const res = await api.post('/credit-mandate/stamps/mark-pass-sent', data);
+    return res.data;
+  },
+
   // 🌐 Public Customer Pass & Walk-in Registration
   getPublicCustomerPass: async (phone, merchantId = '') => {
     const res = await api.get(`/credit-mandate/public/pass/${phone}`, { params: { merchantId } });
