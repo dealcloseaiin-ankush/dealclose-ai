@@ -65,6 +65,72 @@ _(माल सुरक्षित प्राप्त होने पर �
   return { text, waLink };
 };
 
+// Build Milestone Threshold (50-60% Limit) OTP Notification
+exports.buildMilestoneThresholdOtpMessage = (shopName, partyName, phone, billNumber, snapshot, otp, thresholdPct = 50) => {
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12 
+    ? cleanPhone 
+    : (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone);
+
+  const todayStr = new Date().toLocaleDateString('hi-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+
+  const text = 
+`⚠️ *${shopName || 'प्रतिष्ठान'} - क्रेडिट लिमिट माइलस्टोन सूचना (${thresholdPct}% पूरी)* ⚠️
+🧾 *बिल नंबर:* #${billNumber}
+📅 *तारीख:* ${todayStr}
+👤 *ग्राहक:* ${partyName}
+
+📊 *5-बिंदु खाता स्थिति:*
+1. 📦 *आज का बिल:* ₹${Number(snapshot.billAmount || 0).toLocaleString('en-IN')}
+2. 📜 *पिछला बकाया:* ₹${Number(snapshot.previousBalance || 0).toLocaleString('en-IN')}
+3. 💰 *कुल नया बकाया:* ₹${Number(snapshot.newTotalBalance || 0).toLocaleString('en-IN')}
+4. 🛡️ *कुल स्वीकृत लिमिट:* ₹${Number(snapshot.sanctionedLimit || 0).toLocaleString('en-IN')}
+5. 🟢 *बची हुई लिमिट:* ₹${Number(snapshot.remainingLimit || 0).toLocaleString('en-IN')}
+
+🔔 *सुरक्षा सूचना:* आपकी स्वीकृत लिमिट का ${thresholdPct}% उपयोग हो चुका है।
+🔐 *आगे खरीदारी जारी रखने के लिए सत्यापन OTP:* *${otp}*
+_(यह 4-अंकों का OTP दुकानदार को बताएं ताकि आपका खाता बिना रुकावट ₹${Number(snapshot.sanctionedLimit || 0).toLocaleString('en-IN')} तक जारी रहे।)_`;
+
+  const waLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+  return { text, waLink };
+};
+
+// Build Frictionless Running Khata Bill Receipt (No OTP block)
+exports.buildRunningLimitKhataReceipt = (shopName, partyName, phone, billNumber, snapshot) => {
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12 
+    ? cleanPhone 
+    : (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone);
+
+  const todayStr = new Date().toLocaleDateString('hi-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+
+  const text = 
+`✅ *${shopName || 'प्रतिष्ठान'} - रनिंग खाता बिल (डिलीवर्ड)* ✅
+🧾 *बिल नंबर:* #${billNumber}
+📅 *तारीख:* ${todayStr}
+👤 *ग्राहक:* ${partyName}
+
+📊 *5-बिंदु खाता स्थिति:*
+1. 📦 *आज का सामान/बिल:* ₹${Number(snapshot.billAmount || 0).toLocaleString('en-IN')}
+2. 📜 *पिछला बकाया:* ₹${Number(snapshot.previousBalance || 0).toLocaleString('en-IN')}
+3. 💰 *कुल नया बकाया:* ₹${Number(snapshot.newTotalBalance || 0).toLocaleString('en-IN')}
+4. 🛡️ *स्वीकृत क्रेडिट लिमिट:* ₹${Number(snapshot.sanctionedLimit || 0).toLocaleString('en-IN')}
+5. 🟢 *बची हुई उपलब्ध लिमिट:* ₹${Number(snapshot.remainingLimit || 0).toLocaleString('en-IN')}
+
+🙏 माल सुपुर्द किया गया। धन्यवाद!`;
+
+  const waLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+  return { text, waLink };
+};
+
 // Build Payment Receipt Hindi text + wa.me link
 exports.buildPaymentReceipt = (shopName, partyName, phone, amount, paymentMode, prevBal, newBal, limit) => {
   const cleanPhone = String(phone).replace(/\D/g, '');

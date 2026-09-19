@@ -31,8 +31,17 @@ const udharBillSchema = new mongoose.Schema({
   },
   paymentMode: {
     type: String,
-    enum: ['CREDIT', 'CASH', 'UPI', 'SPLIT'],
+    enum: ['CREDIT', 'CASH', 'UPI', 'SPLIT', 'DIRECT_UDHAR', 'LIMIT_KHATA'],
     default: 'CREDIT'
+  },
+  creditType: {
+    type: String,
+    enum: ['DIRECT_UDHAR', 'LIMIT_KHATA', 'NONE'],
+    default: 'DIRECT_UDHAR'
+  },
+  isThresholdMilestoneBill: {
+    type: Boolean,
+    default: false
   },
 
   // 📊 Dynamic 5-Point Daily Statement Snapshot

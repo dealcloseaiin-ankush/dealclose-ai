@@ -6,6 +6,7 @@ import { creditMandateApi } from '../services/creditMandateApi';
 export default function SanctionLimitDrawer({ isOpen, onClose, party, onSanctionSuccess }) {
   const [limit, setLimit] = useState(party?.creditLimit || 10000);
   const [validityDays, setValidityDays] = useState(party?.creditLimitValidityDays || 365);
+  const [thresholdPct, setThresholdPct] = useState(party?.creditLimitThresholdPct || 50);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('FORM'); // 'FORM' | 'OTP_WAIT'
   const [promissoryText, setPromissoryText] = useState('');
@@ -29,7 +30,8 @@ export default function SanctionLimitDrawer({ isOpen, onClose, party, onSanction
       const res = await creditMandateApi.sanctionLimit({
         partyId: party._id,
         sanctionedLimit: Number(limit),
-        validityDays: Number(validityDays)
+        validityDays: Number(validityDays),
+        creditLimitThresholdPct: Number(thresholdPct)
       });
 
       if (res.success) {
@@ -171,6 +173,38 @@ export default function SanctionLimitDrawer({ isOpen, onClose, party, onSanction
                   <option value={365}>1 साल (365 दिन) - अनुशंसित</option>
                   <option value={730}>2 साल (730 दिन)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  🛡️ माइलस्टोन OTP सत्यापन ट्रिगर (Threshold):
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { pct: 50, label: '50% (मानक)' },
+                    { pct: 60, label: '60%' },
+                    { pct: 75, label: '75%' }
+                  ].map((t) => (
+                    <button
+                      key={t.pct}
+                      type="button"
+                      onClick={() => setThresholdPct(t.pct)}
+                      className={`py-2 px-1 text-xs rounded-xl border font-bold transition-all text-center ${
+                        Number(thresholdPct) === t.pct
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-2 ring-emerald-200'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div>{t.label}</div>
+                      <div className="text-[10px] font-normal text-slate-500">
+                        ₹{Math.round((Number(limit || 0) * t.pct) / 100).toLocaleString('en-IN')}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  छोटा सामान बिना OTP के जाएगा। इस सीमा पर पहुँचते ही सुरक्षा हेतु OTP सत्यापन होगा।
+                </p>
               </div>
 
               <div className="pt-2">

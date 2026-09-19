@@ -33,8 +33,8 @@ export default function MobileBillingCounter({ onBillCreated }) {
     { name: '', quantity: 1, unitPrice: '' }
   ]);
 
-  // Payment Mode: 'CASH', 'UPI', 'UDHAR'
-  const [paymentMode, setPaymentMode] = useState('UDHAR');
+  // Payment Mode: 'LIMIT_KHATA', 'DIRECT_UDHAR', 'CASH', 'UPI'
+  const [paymentMode, setPaymentMode] = useState('LIMIT_KHATA');
 
   // Coupon Code
   const [couponCode, setCouponCode] = useState('');
@@ -115,12 +115,16 @@ export default function MobileBillingCounter({ onBillCreated }) {
   const discountAmount = appliedCoupon ? (appliedCoupon.discountAmount || 0) : 0;
   const netPayable = Math.max(0, grossTotal - discountAmount);
 
-  // 5-Point Statement Calculation for Selected Party
+  // 5-Point Statement & Threshold Calculation
+  const isCredit = paymentMode === 'LIMIT_KHATA' || paymentMode === 'DIRECT_UDHAR';
   const previousBalance = selectedParty ? (selectedParty.currentOutstandingBalance || 0) : 0;
-  const newTotalBalance = previousBalance + (paymentMode === 'UDHAR' ? netPayable : 0);
+  const newTotalBalance = previousBalance + (isCredit ? netPayable : 0);
   const sanctionedLimit = selectedParty ? (selectedParty.creditLimit || 0) : 0;
   const remainingLimit = Math.max(0, sanctionedLimit - newTotalBalance);
-  const isLimitExceeded = paymentMode === 'UDHAR' && selectedParty && sanctionedLimit > 0 && newTotalBalance > sanctionedLimit;
+  const thresholdPct = selectedParty ? (selectedParty.creditLimitThresholdPct || 50) : 50;
+  const thresholdAmount = (sanctionedLimit * thresholdPct) / 100;
+  const isThresholdCrossing = paymentMode === 'LIMIT_KHATA' && sanctionedLimit > 0 && newTotalBalance >= thresholdAmount && (selectedParty.lastThresholdVerifiedBalance < thresholdAmount || selectedParty.hasThresholdOtpPending);
+  const isLimitExceeded = isCredit && selectedParty && sanctionedLimit > 0 && newTotalBalance > sanctionedLimit;
 
   // Coupon Validate
   const handleApplyCoupon = async () => {
@@ -176,14 +180,24 @@ export default function MobileBillingCounter({ onBillCreated }) {
       return;
     }
 
-    // Gatekeeper check for Udhar
-    if (paymentMode === 'UDHAR') {
+    // Gatekeeper checks
+    if (paymentMode === 'LIMIT_KHATA') {
       if (selectedParty.creditLimitStatus === 'INACTIVE' || selectedParty.creditLimitStatus === 'PENDING_OTP') {
         toast.error('इस ग्राहक की क्रेडिट लिमिट सक्रिय नहीं है! पहले लिमिट स्वीकृत करें।');
         setShowSanctionDrawer(true);
         return;
       }
 
+      if (selectedParty.hasPendingBillApproval) {
+        toast.error('Gatekeeper Lock: पिछला बिल या 50-60% लिमिट माइलस्टोन OTP लंबित है!');
+        return;
+      }
+
+      if (isLimitExceeded) {
+        toast.error(`स्वीकृत लिमिट (₹${sanctionedLimit.toLocaleString('en-IN')}) पार हो रही है! पहले जमा राशि लें।`);
+        return;
+      }
+    } else if (paymentMode === 'DIRECT_UDHAR') {
       if (selectedParty.hasPendingBillApproval) {
         toast.error('Gatekeeper Lock: पिछले बिल का OTP लंबित है!');
         return;
@@ -206,6 +220,7 @@ export default function MobileBillingCounter({ onBillCreated }) {
         items: finalItems,
         totalAmount: netPayable,
         paymentMode,
+        creditType: paymentMode === 'DIRECT_UDHAR' ? 'DIRECT_UDHAR' : (paymentMode === 'LIMIT_KHATA' ? 'LIMIT_KHATA' : 'NONE'),
         couponCode: appliedCoupon?.coupon?.code,
         notes: quickNote.trim()
       };
@@ -213,24 +228,29 @@ export default function MobileBillingCounter({ onBillCreated }) {
       const res = await billingUdharApi.createBill(payload);
 
       if (res.success) {
-        toast.success(res.message || 'बिल सफलतापूर्वक तैयार!');
-        
-        // Refresh parties to reflect new outstanding balance
         await loadParties();
-        
         if (onBillCreated) onBillCreated(res.bill);
 
-        if (paymentMode === 'UDHAR') {
-          // Open Udhar OTP modal
+        // Check if OTP verification is required (Direct Udhar OR Milestone crossed)
+        if (res.bill?.handoverStatus === 'PENDING_OTP' && res.bill?.otpCode) {
+          toast.success(res.message || 'OTP भेजा गया!');
           setActiveUdharBill({
             ...res.bill,
             party: selectedParty,
-            creditLineSnapshot: res.creditLineSnapshot,
-            waLink: res.waLink
+            creditLineSnapshot: res.creditLineSnapshot || res.bill.creditLineSnapshot,
+            waLink: res.waLink || res.bill.waLink
           });
           setShowOtpModal(true);
         } else {
-          // Cash or UPI success
+          // Frictionless delivery: Limit Khata under threshold OR Cash/UPI
+          toast.success(
+            paymentMode === 'LIMIT_KHATA'
+              ? '✅ रनिंग खाता बिल दर्ज! बिना रुकावट सामान डिलीवर किया गया।'
+              : (res.message || 'बिल सफलतापूर्वक तैयार!')
+          );
+          if (res.waLink) {
+            window.open(res.waLink, '_blank');
+          }
           resetForm();
         }
       }
@@ -511,31 +531,79 @@ export default function MobileBillingCounter({ onBillCreated }) {
               भुगतान का माध्यम (Payment Mode)
             </label>
 
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'CASH', label: '💵 नकद (Cash)' },
-                { id: 'UPI', label: '📱 UPI' },
-                { id: 'UDHAR', label: '🛡️ उधार (Udhar)' }
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setPaymentMode(m.id)}
-                  className={`py-3 px-2 rounded-xl text-xs font-black border transition-all text-center ${
-                    paymentMode === m.id
-                      ? m.id === 'UDHAR'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
-                        : 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300'
-                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
+            {/* 4 Distinct Payment Mode Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMode('LIMIT_KHATA')}
+                className={`p-3 rounded-xl border transition-all text-left ${
+                  paymentMode === 'LIMIT_KHATA'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs">🛡️ लिमिट खाता (Running)</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold ${
+                    paymentMode === 'LIMIT_KHATA' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {thresholdPct}% पर OTP
+                  </span>
+                </div>
+                <div className={`text-[10px] mt-1 ${paymentMode === 'LIMIT_KHATA' ? 'text-blue-100' : 'text-gray-500'}`}>
+                  हार्डवेयर/छोटा सामान, बिना हर बार OTP
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMode('DIRECT_UDHAR')}
+                className={`p-3 rounded-xl border transition-all text-left ${
+                  paymentMode === 'DIRECT_UDHAR'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs">📄 सीधा उधार (Direct)</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold ${
+                    paymentMode === 'DIRECT_UDHAR' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+                  }`}>
+                    तत्काल OTP
+                  </span>
+                </div>
+                <div className={`text-[10px] mt-1 ${paymentMode === 'DIRECT_UDHAR' ? 'text-indigo-100' : 'text-gray-500'}`}>
+                  बड़ा बिल / 1-टाइम बिल, डिलीवरी OTP अनिवार्य
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMode('CASH')}
+                className={`p-2.5 rounded-xl border transition-all text-center ${
+                  paymentMode === 'CASH'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 font-bold'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50 font-medium'
+                } text-xs`}
+              >
+                💵 नकद (Cash)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMode('UPI')}
+                className={`p-2.5 rounded-xl border transition-all text-center ${
+                  paymentMode === 'UPI'
+                    ? 'bg-teal-600 text-white border-teal-600 shadow-md ring-2 ring-teal-300 font-bold'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50 font-medium'
+                } text-xs`}
+              >
+                📱 UPI
+              </button>
             </div>
 
-            {/* Dynamic 5-Point Statement (Shown when UDHAR is selected) */}
-            {paymentMode === 'UDHAR' && selectedParty && (
+            {/* Dynamic 5-Point Statement (Shown when LIMIT_KHATA or DIRECT_UDHAR is selected) */}
+            {isCredit && selectedParty && (
               <div className="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl p-4.5 shadow-md space-y-3">
                 <div className="flex items-center justify-between border-b border-white/10 pb-2">
                   <span className="text-xs font-bold text-blue-200 flex items-center gap-1.5">
@@ -543,7 +611,7 @@ export default function MobileBillingCounter({ onBillCreated }) {
                     5-Point Real-time Statement
                   </span>
                   <span className="text-[10px] bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded-full font-mono">
-                    Live
+                    {paymentMode === 'LIMIT_KHATA' ? 'रनिंग लिमिट' : 'सीधा उधार'}
                   </span>
                 </div>
 
@@ -574,17 +642,63 @@ export default function MobileBillingCounter({ onBillCreated }) {
                   </div>
                 </div>
 
-                {/* Gatekeeper Limit Warnings */}
+                {/* Milestone threshold progress indicator for LIMIT_KHATA */}
+                {paymentMode === 'LIMIT_KHATA' && sanctionedLimit > 0 && (
+                  <div className="bg-white/10 rounded-xl p-3 space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-blue-200 font-medium">लिमिट उपयोग प्रोग्रेस:</span>
+                      <span className="font-bold text-white font-mono">
+                        ₹{newTotalBalance.toLocaleString('en-IN')} / ₹{sanctionedLimit.toLocaleString('en-IN')} ({Math.min(100, Math.round((newTotalBalance / sanctionedLimit) * 100))}%)
+                      </span>
+                    </div>
+
+                    <div className="relative w-full h-2.5 bg-white/20 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all ${
+                          newTotalBalance >= thresholdAmount ? 'bg-amber-400' : 'bg-emerald-400'
+                        }`}
+                        style={{ width: `${Math.min(100, (newTotalBalance / sanctionedLimit) * 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-[10px] text-blue-200 pt-0.5">
+                      <span>0% (बिना OTP)</span>
+                      <span className="text-amber-300 font-bold">📍 {thresholdPct}% ट्रिगर (₹{thresholdAmount.toLocaleString('en-IN')})</span>
+                      <span>100% (₹{sanctionedLimit.toLocaleString('en-IN')})</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Status / Gatekeeper Alerts */}
+                {paymentMode === 'LIMIT_KHATA' ? (
+                  isThresholdCrossing ? (
+                    <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl p-2.5 text-amber-200 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>⚠️ <strong>{thresholdPct}% लिमिट पूरी!</strong> इस बिल पर ग्राहक के WhatsApp पर OTP सत्यापन आवश्यक होगा।</span>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-xl p-2.5 text-emerald-200 text-xs flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>🟢 <strong>छोटा/रनिंग बिल:</strong> कोई OTP नहीं लगेगा! 1 क्लिक में बिल दर्ज होगा व सामान तुरंत दे सकते हैं।</span>
+                    </div>
+                  )
+                ) : (
+                  <div className="bg-indigo-500/20 border border-indigo-500/40 rounded-xl p-2.5 text-indigo-200 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-indigo-300 shrink-0" />
+                    <span>📄 <strong>सीधा उधार (बड़ा बिल):</strong> ग्राहक के WhatsApp पर डिलीवरी सत्यापन OTP भेजा जाएगा।</span>
+                  </div>
+                )}
+
                 {selectedParty.hasPendingBillApproval && (
                   <div className="bg-red-500/20 border border-red-500/40 rounded-xl p-2.5 text-red-200 text-xs flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                    <span>Gatekeeper Alert: पिछले बिल का OTP पेंडिंग है!</span>
+                    <span>Gatekeeper Alert: पिछले बिल या माइलस्टोन का OTP पेंडिंग है!</span>
                   </div>
                 )}
 
                 {isLimitExceeded && (
-                  <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl p-2.5 text-amber-200 text-xs flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div className="bg-red-500/20 border border-red-500/40 rounded-xl p-2.5 text-red-200 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                     <span>चेतावनी: यह बिल स्वीकृत लिमिट (₹{sanctionedLimit}) को पार कर रहा है!</span>
                   </div>
                 )}
@@ -617,8 +731,12 @@ export default function MobileBillingCounter({ onBillCreated }) {
               onClick={handleCreateBill}
               disabled={submitting || !selectedParty || netPayable <= 0}
               className={`w-full font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg transition-all text-white ${
-                paymentMode === 'UDHAR'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800'
+                paymentMode === 'LIMIT_KHATA'
+                  ? isThresholdCrossing
+                    ? 'bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800'
+                  : paymentMode === 'DIRECT_UDHAR'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800'
                   : 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800'
               } disabled:opacity-50`}
             >
@@ -628,8 +746,12 @@ export default function MobileBillingCounter({ onBillCreated }) {
                 <>
                   <Zap className="w-5 h-5" />
                   <span>
-                    {paymentMode === 'UDHAR' 
-                      ? 'उधार बिल बनाएं और OTP भेजें' 
+                    {paymentMode === 'LIMIT_KHATA'
+                      ? isThresholdCrossing
+                        ? '⚠️ 50% लिमिट OTP भेजें व सत्यापित करें'
+                        : '✅ रनिंग खाता बिल दर्ज करें (बिना OTP तुरंत डिलीवर)'
+                      : paymentMode === 'DIRECT_UDHAR'
+                      ? '📄 सीधा उधार बिल बनाएं व OTP भेजें'
                       : 'बिल बनाएं और रसीद दें'}
                   </span>
                   <ArrowRight className="w-4 h-4" />

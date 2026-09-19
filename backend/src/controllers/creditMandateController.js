@@ -145,6 +145,9 @@ exports.sanctionLimit = async (req, res) => {
 
     party.creditLimit = limitNum;
     party.creditLimitValidityDays = daysNum;
+    if (req.body.creditLimitThresholdPct) {
+      party.creditLimitThresholdPct = Number(req.body.creditLimitThresholdPct) || 50;
+    }
     party.creditLimitOtp = otp;
     party.creditLimitOtpExpiresAt = expiry;
     party.creditLimitAgreementText = text;
@@ -308,6 +311,7 @@ exports.createBill = async (req, res) => {
       items, 
       totalAmount, 
       paymentMode, 
+      creditType,
       bypassPendingLock, 
       bypassReason,
       appliedCouponCode
@@ -323,7 +327,10 @@ exports.createBill = async (req, res) => {
     const user = await User.findById(userId).lean();
     const shopName = user?.businessName || user?.fullName || 'हमारा प्रतिष्ठान';
 
-    const isCredit = paymentMode === 'CREDIT' || !paymentMode;
+    const isDirectUdhar = paymentMode === 'DIRECT_UDHAR' || creditType === 'DIRECT_UDHAR';
+    const isLimitKhata = paymentMode === 'LIMIT_KHATA' || creditType === 'LIMIT_KHATA' || paymentMode === 'CREDIT';
+    const isCredit = isDirectUdhar || isLimitKhata;
+    const finalCreditType = isDirectUdhar ? 'DIRECT_UDHAR' : (isLimitKhata ? 'LIMIT_KHATA' : 'NONE');
 
     // 🛡️ GATEKEEPER CHECK:
     if (isCredit) {
@@ -334,12 +341,12 @@ exports.createBill = async (req, res) => {
         });
       }
 
-      // Check if previous bill is still locked
+      // Check if previous bill or threshold milestone is still locked
       if (party.hasPendingBillApproval && !bypassPendingLock) {
         return res.status(400).json({
           success: false,
           isPendingApprovalBlocked: true,
-          message: '🛑 पिछला बिल अभी तक पेंडिंग है! ग्राहक से डिलीवरी पुष्टि OTP प्राप्त करें, या यदि ग्राहक दूर है तो "काम न रुके (बायपास)" का चयन करें।'
+          message: '🛑 पिछला बिल या 50-60% लिमिट माइलस्टोन OTP अभी तक लंबित है! ग्राहक से OTP प्राप्त कर सत्यापित करें, या "काम न रुके (बायपास)" का चयन करें।'
         });
       }
     }
@@ -361,18 +368,58 @@ exports.createBill = async (req, res) => {
     const billNumber = `UB-${Date.now().toString().slice(-6)}`;
     const otp = creditService.generateOtp();
     const expiry = new Date(Date.now() + 30 * 60 * 1000);
-
-    // Build 5-Point Statement message & wa.me link
-    const { waLink } = creditService.build5PointDailyStatement(
-      shopName,
-      party.name,
-      party.phone,
-      billNumber,
-      snapshot,
-      otp
-    );
-
     const isBypassed = Boolean(bypassPendingLock);
+
+    let requiresOtp = false;
+    let isMilestone = false;
+    let waLink = '';
+
+    if (isDirectUdhar) {
+      // 1. Direct one-off/large bill: requires immediate OTP delivery handover
+      requiresOtp = !isBypassed;
+      const resMsg = creditService.build5PointDailyStatement(
+        shopName,
+        party.name,
+        party.phone,
+        billNumber,
+        snapshot,
+        otp
+      );
+      waLink = resMsg.waLink;
+    } else if (isLimitKhata) {
+      // 2. Revolving running limit khata: e.g. Hardware/routine goods
+      const thresholdPct = Number(party.creditLimitThresholdPct) || 50;
+      const thresholdAmount = (limit * thresholdPct) / 100;
+
+      // Check if this bill pushes balance across the 50-60% threshold
+      const crossesThreshold = limit > 0 && newBal >= thresholdAmount && (party.lastThresholdVerifiedBalance < thresholdAmount || party.hasThresholdOtpPending);
+
+      if (crossesThreshold) {
+        isMilestone = true;
+        requiresOtp = !isBypassed;
+        const resMsg = creditService.buildMilestoneThresholdOtpMessage(
+          shopName,
+          party.name,
+          party.phone,
+          billNumber,
+          snapshot,
+          otp,
+          thresholdPct
+        );
+        waLink = resMsg.waLink;
+      } else {
+        // Frictionless small bill under threshold or already verified
+        requiresOtp = false;
+        const resMsg = creditService.buildRunningLimitKhataReceipt(
+          shopName,
+          party.name,
+          party.phone,
+          billNumber,
+          snapshot
+        );
+        waLink = resMsg.waLink;
+      }
+    }
 
     const bill = await UdharBill.create({
       userId,
@@ -381,12 +428,14 @@ exports.createBill = async (req, res) => {
       items: Array.isArray(items) && items.length > 0 ? items : [{ name: 'विविध सामान (General Goods)', quantity: 1, rate: billAmount, amount: billAmount }],
       totalAmount: billAmount,
       paymentMode: paymentMode || 'CREDIT',
+      creditType: finalCreditType,
+      isThresholdMilestoneBill: isMilestone,
       creditLineSnapshot: snapshot,
       isCreditLineBill: isCredit,
       isUdharProtected: isCredit,
-      otpCode: otp,
-      otpExpiresAt: expiry,
-      handoverStatus: isBypassed ? 'BYPASSED' : 'PENDING_OTP',
+      otpCode: requiresOtp ? otp : null,
+      otpExpiresAt: requiresOtp ? expiry : null,
+      handoverStatus: isBypassed ? 'BYPASSED' : (requiresOtp ? 'PENDING_OTP' : 'DELIVERED'),
       isOwnerBypassed: isBypassed,
       ownerBypassedAt: isBypassed ? new Date() : null,
       bypassReason: bypassReason || (isBypassed ? 'Merchant 1-click bypass' : ''),
@@ -400,9 +449,20 @@ exports.createBill = async (req, res) => {
       if (isBypassed) {
         party.hasPendingBillApproval = false;
         party.pendingApprovalBillId = null;
-      } else {
+        if (isMilestone) {
+          party.hasThresholdOtpPending = false;
+          party.lastThresholdVerifiedBalance = newBal;
+        }
+      } else if (requiresOtp) {
         party.hasPendingBillApproval = true;
         party.pendingApprovalBillId = bill._id;
+        if (isMilestone) {
+          party.hasThresholdOtpPending = true;
+        }
+      } else {
+        // Frictionless bill: delivered directly without blocking
+        party.hasPendingBillApproval = false;
+        party.pendingApprovalBillId = null;
       }
 
       // Check if overlimit
@@ -537,11 +597,15 @@ exports.verifyBillOtp = async (req, res) => {
     // Release party Gatekeeper lock
     const party = await CreditParty.findById(bill.partyId);
     if (party) {
+      if (bill.isThresholdMilestoneBill) {
+        party.hasThresholdOtpPending = false;
+        party.lastThresholdVerifiedBalance = party.currentOutstandingBalance;
+      }
       if (String(party.pendingApprovalBillId) === String(bill._id)) {
         party.hasPendingBillApproval = false;
         party.pendingApprovalBillId = null;
-        await party.save();
       }
+      await party.save();
     }
 
     res.status(200).json({
@@ -621,11 +685,15 @@ exports.bypassBill = async (req, res) => {
     // Release Gatekeeper lock
     const party = await CreditParty.findById(bill.partyId);
     if (party) {
+      if (bill.isThresholdMilestoneBill) {
+        party.hasThresholdOtpPending = false;
+        party.lastThresholdVerifiedBalance = party.currentOutstandingBalance;
+      }
       if (String(party.pendingApprovalBillId) === String(bill._id)) {
         party.hasPendingBillApproval = false;
         party.pendingApprovalBillId = null;
-        await party.save();
       }
+      await party.save();
     }
 
     res.status(200).json({

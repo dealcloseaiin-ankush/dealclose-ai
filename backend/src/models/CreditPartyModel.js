@@ -93,6 +93,18 @@ const creditPartySchema = new mongoose.Schema({
     type: String, 
     default: '' 
   },
+  creditLimitThresholdPct: {
+    type: Number,
+    default: 50 // e.g. 50% or 60% threshold for running limit accounts
+  },
+  hasThresholdOtpPending: {
+    type: Boolean,
+    default: false
+  },
+  lastThresholdVerifiedBalance: {
+    type: Number,
+    default: 0
+  },
 
   // 🎁 Gamified Visit Milestones (Stamp Card Loyalty)
   loyaltyTargetVisits: { 
