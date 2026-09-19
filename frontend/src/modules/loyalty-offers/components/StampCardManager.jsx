@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Award, Star, Send, Plus, CheckCircle, RefreshCw, 
-  Search, Phone, MapPin, User, Gift, Sparkles, ExternalLink 
+  Search, Phone, MapPin, User, Gift, Sparkles, ExternalLink,
+  Camera, Printer, QrCode, X, Download, ShieldCheck
 } from 'lucide-react';
 import loyaltyOffersApi from '../services/loyaltyOffersApi';
+import QrCameraModal from '../../../components/common/QrCameraModal';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function StampCardManager() {
+  const { user } = useAuthStore();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,6 +26,10 @@ export default function StampCardManager() {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+
+  // QR Scanner & Standee Modals
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [isStandeeModalOpen, setIsStandeeModalOpen] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -104,6 +112,43 @@ export default function StampCardManager() {
     }
   };
 
+  const handleQrScanSuccess = async (decodedText) => {
+    let rawPhone = decodedText || '';
+    if (rawPhone.includes('dealclose-stamp:')) {
+      rawPhone = rawPhone.split('dealclose-stamp:')[1];
+    }
+    const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      alert('अमान्य QR कोड: 10 अंकों का मान्य नंबर नहीं मिला (' + decodedText + ')');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const payload = {
+        phone: cleanPhone,
+        targetVisits: Number(targetVisits) || 5,
+        rewardDescription: rewardDescription.trim(),
+        rewardDiscountType: rewardType,
+        rewardDiscountValue: Number(rewardValue) || 100,
+        qrCode: decodedText
+      };
+
+      const res = await loyaltyOffersApi.punchStamp(payload);
+      if (res.success) {
+        setLastResult(res);
+        loadCustomers();
+        if (res.waLink) {
+          window.open(res.waLink, '_blank');
+        }
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'QR स्टैम्प लगाने में त्रुटि हुई।');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const filteredCustomers = customers.filter(c => {
     const q = searchQuery.toLowerCase();
     return (
@@ -115,6 +160,32 @@ export default function StampCardManager() {
 
   return (
     <div className="space-y-6">
+      {/* Quick Action Bar for Cashier: Camera Scanner & Counter Standee */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#171720] border border-gray-800 p-4 rounded-2xl">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setIsQrScannerOpen(true)}
+            className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-sm rounded-xl shadow-lg shadow-purple-600/30 flex items-center gap-2.5 transition-all transform active:scale-95 cursor-pointer"
+          >
+            <Camera className="w-5 h-5 text-purple-200" />
+            <span>📷 ग्राहक QR स्कैन करें (+1 स्टैम्प)</span>
+          </button>
+
+          <button
+            onClick={() => setIsStandeeModalOpen(true)}
+            className="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>🖨️ काउंटर स्टैंडी QR प्रिंट करें</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-gray-400 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <span>कैमरा स्कैन से फ्रॉड-प्रूफ +1 स्टैम्प दर्ज होता है</span>
+        </div>
+      </div>
+
       {/* Top Banner & Strategy Configuration */}
       <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-6 text-white shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -478,6 +549,124 @@ export default function StampCardManager() {
           </div>
         </div>
       </div>
+
+      {/* 📷 Merchant Camera QR Scanner Modal */}
+      <QrCameraModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={handleQrScanSuccess}
+        title="ग्राहक स्टैम्प पास QR स्कैन करें"
+        subtitle="ग्राहक के फोन में खुला हुआ डिजिटल पास QR कैमरे के सामने रखें। स्कैन होते ही +1 स्टैम्प दर्ज होगा।"
+      />
+
+      {/* 🖨️ Counter Acrylic Standee Printable Modal */}
+      {isStandeeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#121217] border border-gray-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-[#181820]">
+              <div className="flex items-center gap-2.5">
+                <Printer className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">काउंटर स्टैंडी QR (Counter Standee Card)</h3>
+              </div>
+              <button
+                onClick={() => setIsStandeeModalOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Printable Standee Preview */}
+            <div className="p-6 overflow-y-auto bg-gray-950 flex flex-col items-center">
+              <div 
+                id="standee-print-card"
+                className="w-full max-w-sm bg-white text-gray-900 rounded-3xl p-6 shadow-2xl border-4 border-amber-400 text-center relative overflow-hidden"
+              >
+                {/* Header ribbon */}
+                <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-xs uppercase tracking-widest py-1.5 px-4 rounded-full inline-block shadow-md mb-3">
+                  ⭐ VIP LOYALTY CLUB ⭐
+                </div>
+
+                <h2 className="text-2xl font-black text-gray-950 tracking-tight leading-tight">
+                  {user?.brandKit?.businessName || user?.businessName || user?.fullName || 'पार्टनर स्टोर'}
+                </h2>
+                <p className="text-xs font-bold text-amber-700 mt-1">
+                  हर {targetVisits}वीं विजिट पर पाएं {rewardDescription}! 🎁
+                </p>
+
+                {/* Big Standee QR Code */}
+                <div className="my-5 bg-gray-50 border-2 border-dashed border-amber-400 p-3 rounded-2xl inline-block shadow-inner">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=${encodeURIComponent(
+                      `${window.location.origin}/register-loyalty?merchantId=${user?._id || ''}`
+                    )}`}
+                    alt="Counter Standee Registration QR"
+                    className="w-52 h-52 object-contain mx-auto rounded-xl"
+                  />
+                </div>
+
+                {/* Clear instructions */}
+                <div className="space-y-1.5 text-left bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200/80 text-xs text-gray-800 font-medium">
+                  <div className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                    <span>फोन कैमरे से QR स्कैन करें</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                    <span>नाम और व्हाट्सएप नंबर डालकर पास पाएं</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                    <span>बिलिंग पर अपना पास दिखाकर स्टैम्प पाएं!</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-200 text-[10px] text-gray-500 flex items-center justify-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>सुरक्षित डिजिटल स्टैम्प पास • DealClose MSME</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer with Print & Download Action */}
+            <div className="p-4 bg-[#181820] border-t border-gray-800 flex items-center justify-between">
+              <p className="text-xs text-gray-400">
+                A5 / A4 एक्रेलिक स्टैंडी पर चिपकाने के लिए प्रिंट करें
+              </p>
+              <button
+                onClick={() => {
+                  const printContent = document.getElementById('standee-print-card');
+                  const win = window.open('', '', 'width=700,height=900');
+                  win.document.write(`
+                    <html>
+                      <head>
+                        <title>Counter Standee - ${user?.brandKit?.businessName || 'Loyalty'}</title>
+                        <style>
+                          body { margin: 0; padding: 40px; display: flex; justify-content: center; align-items: center; font-family: system-ui, sans-serif; }
+                          @media print { body { padding: 0; } }
+                        </style>
+                        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                      </head>
+                      <body>
+                        ${printContent.outerHTML}
+                        <script>
+                          window.onload = () => { window.print(); window.close(); }
+                        </script>
+                      </body>
+                    </html>
+                  `);
+                  win.document.close();
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>🖨️ प्रिंट करें (Print Standee)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

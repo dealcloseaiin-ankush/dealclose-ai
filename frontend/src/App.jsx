@@ -76,8 +76,11 @@ const IndustryPage = lazyWithRetry(() => import('./pages/IndustryPage'));
 const MobileDashboard = lazyWithRetry(() => import('./pages/MobileDashboard'));
 const ProductStudio = lazyWithRetry(() => import('./pages/ProductStudio'));
 const LoyaltyOffersHub = lazyWithRetry(() => import('./modules/loyalty-offers/LoyaltyOffersHub'));
+const CustomerPassView = lazyWithRetry(() => import('./modules/loyalty-offers/CustomerPassView'));
+const CustomerRegisterLoyalty = lazyWithRetry(() => import('./modules/loyalty-offers/CustomerRegisterLoyalty'));
 const BillingUdharHub = lazyWithRetry(() => import('./modules/msme-billing-udhar/BillingUdharHub'));
 const CreditMandateHub = lazyWithRetry(() => import('./modules/msme-credit-mandate/CreditMandateHub'));
+
 
 // Smart Redirects for Logged In Users
 const PublicRoute = ({ children }) => {
@@ -281,6 +284,12 @@ export default function App() {
           <Route path="/card/:userId" element={<DigitalCard />} />
           <Route path="/link-page/:userId" element={<DigitalCard />} />
           <Route path="/link-page" element={<DigitalCard />} />
+
+          {/* 🌟 Customer Loyalty Digital Pass & Counter Standee Walk-in Routes */}
+          <Route path="/pass/:phone" element={<CustomerPassView />} />
+          <Route path="/loyalty/pass/:phone" element={<CustomerPassView />} />
+          <Route path="/register-loyalty" element={<CustomerRegisterLoyalty />} />
+          <Route path="/register-loyalty/:merchantId" element={<CustomerRegisterLoyalty />} />
           
           {/* Onboarding Page (Replaces Setup) */}
           <Route path="/onboarding" element={<Onboarding />} />

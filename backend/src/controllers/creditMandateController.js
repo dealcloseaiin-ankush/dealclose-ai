@@ -1036,16 +1036,16 @@ exports.createCoupon = async (req, res) => {
 exports.punchStamp = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const shopName = req.user?.businessName || req.user?.name || 'प्रतिष्ठान';
-    const { name, phone, city, targetVisits, rewardDescription, rewardDiscountType, rewardDiscountValue } = req.body;
+    const shopName = req.user?.businessName || req.user?.name || req.user?.brandKit?.businessName || 'प्रतिष्ठान';
+    const { name, phone, city, targetVisits, rewardDescription, rewardDiscountType, rewardDiscountValue, qrCode } = req.body;
 
-    if (!name || !phone) {
-      return res.status(400).json({ success: false, message: 'ग्राहक का नाम और मोबाइल नंबर अनिवार्य है।' });
+    let rawPhone = phone || qrCode || '';
+    if (rawPhone.includes('dealclose-stamp:')) {
+      rawPhone = rawPhone.split('dealclose-stamp:')[1];
     }
-
-    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
     if (cleanPhone.length !== 10) {
-      return res.status(400).json({ success: false, message: 'कृपया 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।' });
+      return res.status(400).json({ success: false, message: 'कृपया 10 अंकों का मान्य मोबाइल नंबर या वैध ग्राहक QR कोड दें।' });
     }
 
     let party = await CreditParty.findOne({ userId, phone: cleanPhone });
@@ -1054,7 +1054,7 @@ exports.punchStamp = async (req, res) => {
     if (!party) {
       party = new CreditParty({
         userId,
-        name: name.trim(),
+        name: (name?.trim()) || 'सम्मानित ग्राहक',
         phone: cleanPhone,
         city: city?.trim() || '',
         loyaltyTargetVisits: target,
@@ -1064,10 +1064,10 @@ exports.punchStamp = async (req, res) => {
         completedVisitsCount: 1
       });
     } else {
-      if (name) party.name = name.trim();
-      if (city) party.city = city.trim();
+      if (name?.trim()) party.name = name.trim();
+      if (city?.trim()) party.city = city.trim();
       if (targetVisits) party.loyaltyTargetVisits = target;
-      if (rewardDescription) party.rewardDescription = rewardDescription.trim();
+      if (rewardDescription?.trim()) party.rewardDescription = rewardDescription.trim();
       if (rewardDiscountType) party.rewardDiscountType = rewardDiscountType;
       if (rewardDiscountValue) party.rewardDiscountValue = Number(rewardDiscountValue);
 
@@ -1319,6 +1319,157 @@ exports.redeemCoupon = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in redeemCoupon:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Public View: Get Customer Digital Pass by Phone (No login required)
+// @route   GET /api/credit-mandate/public/pass/:phone
+exports.getPublicCustomerPass = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const { merchantId } = req.query;
+
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'कृपया 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।' });
+    }
+
+    let partyQuery = { phone: cleanPhone };
+    if (merchantId) {
+      partyQuery.userId = merchantId;
+    }
+
+    const party = await CreditParty.findOne(partyQuery).sort({ updatedAt: -1 }).lean();
+
+    let merchant = null;
+    if (party?.userId) {
+      merchant = await User.findById(party.userId).select('name fullName businessName brandKit phone email').lean();
+    } else if (merchantId) {
+      merchant = await User.findById(merchantId).select('name fullName businessName brandKit phone email').lean();
+    }
+
+    const shopName = merchant?.brandKit?.businessName || merchant?.businessName || merchant?.fullName || merchant?.name || 'पार्टनर स्टोर';
+    const shopPhone = merchant?.brandKit?.phone || merchant?.phone || '';
+    const shopAddress = merchant?.brandKit?.address || '';
+
+    // Active coupons
+    const coupons = await Coupon.find({
+      customerPhone: cleanPhone,
+      status: 'ACTIVE'
+    }).sort({ createdAt: -1 }).lean();
+
+    const customerData = party ? {
+      name: party.name,
+      phone: party.phone,
+      city: party.city || '',
+      completedVisits: party.completedVisitsCount || 0,
+      targetVisits: party.loyaltyTargetVisits || 5,
+      rewardUnlocked: !!party.rewardUnlocked,
+      activeRewardCoupon: party.activeRewardCoupon || null,
+      rewardDescription: party.rewardDescription || 'विशेष उपहार / डिस्काउंट',
+      rewardDiscountType: party.rewardDiscountType || 'FREE_ITEM',
+      rewardDiscountValue: party.rewardDiscountValue || 100,
+      qrData: `dealclose-stamp:${party.phone}`
+    } : {
+      name: 'सम्मानित ग्राहक',
+      phone: cleanPhone,
+      city: '',
+      completedVisits: 0,
+      targetVisits: 5,
+      rewardUnlocked: false,
+      activeRewardCoupon: null,
+      rewardDescription: 'विशेष उपहार / डिस्काउंट',
+      rewardDiscountType: 'FREE_ITEM',
+      rewardDiscountValue: 100,
+      qrData: `dealclose-stamp:${cleanPhone}`
+    };
+
+    res.status(200).json({
+      success: true,
+      customer: customerData,
+      shop: {
+        id: merchant?._id || null,
+        name: shopName,
+        phone: shopPhone,
+        address: shopAddress
+      },
+      coupons: coupons || []
+    });
+  } catch (error) {
+    console.error("Error in getPublicCustomerPass:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Public Walk-in: Register customer from Counter QR (No login required)
+// @route   POST /api/credit-mandate/public/register-walkin
+exports.publicRegisterWalkin = async (req, res) => {
+  try {
+    const { merchantId, name, phone, city } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'मोबाइल नंबर अनिवार्य है।' });
+    }
+
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'कृपया 10 अंकों का मान्य मोबाइल नंबर दें।' });
+    }
+
+    // Determine target merchant
+    let targetUserId = merchantId;
+    if (!targetUserId) {
+      const defaultUser = await User.findOne({ role: 'owner' }).select('_id').lean();
+      targetUserId = defaultUser?._id;
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({ success: false, message: 'स्टोर आईडी अमान्य है।' });
+    }
+
+    const merchant = await User.findById(targetUserId).select('name fullName businessName brandKit phone').lean();
+    const shopName = merchant?.brandKit?.businessName || merchant?.businessName || merchant?.fullName || 'पार्टनर स्टोर';
+
+    let party = await CreditParty.findOne({ userId: targetUserId, phone: cleanPhone });
+    const isNew = !party;
+
+    if (!party) {
+      party = new CreditParty({
+        userId: targetUserId,
+        name: (name?.trim()) || 'सम्मानित ग्राहक',
+        phone: cleanPhone,
+        city: city?.trim() || '',
+        loyaltyTargetVisits: 5,
+        completedVisitsCount: 0,
+        rewardDescription: '1 मुफ़्त विशेष उपहार'
+      });
+      await party.save();
+    } else {
+      if (name?.trim() && party.name === 'सम्मानित ग्राहक') {
+        party.name = name.trim();
+      }
+      if (city?.trim() && !party.city) {
+        party.city = city.trim();
+      }
+      await party.save();
+    }
+
+    // Prepare WhatsApp link so customer can bookmark/open their digital pass
+    const passUrl = `${process.env.FRONTEND_URL || 'https://dealclose.in'}/pass/${cleanPhone}?merchantId=${targetUserId}`;
+    const welcomeMsg = `नमस्ते ${party.name} ji! 🌟\n\n*${shopName}* के लॉयल्टी क्लब में आपका स्वागत है!\n\n💳 आपका डिजिटल लॉयल्टी पास तैयार है:\n👉 ${passUrl}\n\n📌 हर बार स्टोर पर खरीदारी के समय काउंटर पर अपना यह पास QR दिखाएं और हर 5वीं विजिट पर पाएं खास इनाम! 🎁\n\nधन्यवाद!\n*${shopName}*`;
+    const waLink = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(welcomeMsg)}`;
+
+    res.status(200).json({
+      success: true,
+      isNew,
+      party,
+      passUrl,
+      waLink,
+      message: isNew ? '🎉 लॉयल्टी क्लब में सफल पंजीकरण!' : '✨ आपका लॉयल्टी पास तैयार है!'
+    });
+  } catch (error) {
+    console.error("Error in publicRegisterWalkin:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

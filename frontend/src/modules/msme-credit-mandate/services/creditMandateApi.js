@@ -117,5 +117,17 @@ export const creditMandateApi = {
   getStampCustomers: async () => {
     const res = await api.get('/credit-mandate/stamps/customers');
     return res.data;
+  },
+
+  // 🌐 Public Customer Pass & Walk-in Registration
+  getPublicCustomerPass: async (phone, merchantId = '') => {
+    const res = await api.get(`/credit-mandate/public/pass/${phone}`, { params: { merchantId } });
+    return res.data;
+  },
+
+  publicRegisterWalkin: async (data) => {
+    const res = await api.post('/credit-mandate/public/register-walkin', data);
+    return res.data;
   }
 };
+

@@ -11,6 +11,11 @@ export const loyaltyOffersApi = {
   lookupCoupon: (query) => creditMandateApi.lookupCoupon(query),
   redeemCoupon: (code) => creditMandateApi.redeemCoupon(code),
   validateCoupon: (data) => creditMandateApi.validateCoupon(data),
+
+  // Public Pass & Walk-in
+  getPublicCustomerPass: (phone, merchantId) => creditMandateApi.getPublicCustomerPass(phone, merchantId),
+  publicRegisterWalkin: (data) => creditMandateApi.publicRegisterWalkin(data),
 };
 
 export default loyaltyOffersApi;
+

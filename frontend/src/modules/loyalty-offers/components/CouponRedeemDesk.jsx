@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { 
   CheckCircle, Search, AlertCircle, Phone, User, 
-  MapPin, Gift, Clock, RefreshCw, Send, ShieldCheck, Ticket 
+  MapPin, Gift, Clock, RefreshCw, Send, ShieldCheck, Ticket, Camera 
 } from 'lucide-react';
 import loyaltyOffersApi from '../services/loyaltyOffersApi';
+import QrCameraModal from '../../../components/common/QrCameraModal';
 
 export default function CouponRedeemDesk() {
   const [query, setQuery] = useState('');
@@ -12,16 +13,15 @@ export default function CouponRedeemDesk() {
   const [redeeming, setRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
-  const handleSearch = async (e) => {
-    if (e) e.preventDefault();
-    if (!query.trim()) return;
-
+  const lookupCodeDirectly = async (searchStr) => {
+    if (!searchStr) return;
     try {
       setLoading(true);
       setErrorMsg('');
       setRedeemSuccess(null);
-      const res = await loyaltyOffersApi.lookupCoupon(query.trim());
+      const res = await loyaltyOffersApi.lookupCoupon(searchStr);
       if (res.success && res.coupons?.length > 0) {
         setSearchedCoupons(res.coupons);
       } else {
@@ -34,6 +34,23 @@ export default function CouponRedeemDesk() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQrScanSuccess = (decodedText) => {
+    let cleanCode = decodedText.trim();
+    if (cleanCode.includes('dealclose-coupon:')) {
+      cleanCode = cleanCode.split('dealclose-coupon:')[1];
+    } else if (cleanCode.includes('dealclose-stamp:')) {
+      cleanCode = cleanCode.split('dealclose-stamp:')[1];
+    }
+    setQuery(cleanCode);
+    lookupCodeDirectly(cleanCode);
+  };
+
+  const handleSearch = async (e) => {
+    if (e) e.preventDefault();
+    if (!query.trim()) return;
+    lookupCodeDirectly(query.trim());
   };
 
   const handleRedeem = async (code) => {
@@ -96,9 +113,19 @@ export default function CouponRedeemDesk() {
           </div>
 
           <button
+            type="button"
+            onClick={() => setIsQrScannerOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-5 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors shrink-0 text-sm cursor-pointer"
+            title="कूपन QR कोड स्कैन करें"
+          >
+            <Camera className="w-5 h-5 text-purple-200" />
+            <span>📷 QR स्कैन करें</span>
+          </button>
+
+          <button
             type="submit"
             disabled={loading}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors shrink-0 text-sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors shrink-0 text-sm cursor-pointer"
           >
             {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
             <span>जांचें (Verify Coupon)</span>
@@ -240,6 +267,16 @@ export default function CouponRedeemDesk() {
           </div>
         </div>
       )}
+
+      {/* 📷 Merchant Camera QR Scanner Modal for Coupons */}
+      <QrCameraModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={handleQrScanSuccess}
+        title="कूपन QR कोड स्कैन करें"
+        subtitle="ग्राहक के मोबाइल या वाउचर पर दिया गया कूपन QR कोड कैमरे के सामने लाएं।"
+      />
     </div>
   );
 }
+
