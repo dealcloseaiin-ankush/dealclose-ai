@@ -306,7 +306,7 @@ exports.handleDashboardAssistant = async (req, res) => {
     console.log(`🤖 [Dashboard Assistant] Received message: "${message}" from user: ${userId}`);
     const user = await User.findById(userId).lean();
     // 🚀 NEW: Fetch user's created flows to give AI context
-    const userFlows = await Flow.find({ userId }).select('name').lean();
+    const userFlows = await Flow.find({ userId }).select('name platform workspaceId').lean();
     const flowNames = userFlows.map(f => f.name).join(', ');
     const userAccountAge = Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24));
 
@@ -383,6 +383,9 @@ ${effectiveAiRules || 'Be helpful, professional, and friendly.'}
 
 Active Workspaces / Divisions:
 ${user.workspaces?.map(w => `- ${w.name}: ${w.description || w.businessDescription || ''}`).join('\n') || '- Main Business'}
+
+Active Automation Flows in Database (${userFlows.length} Total):
+${userFlows.map(f => `- "${f.name}" [Platform: ${f.platform || 'whatsapp'}, Workspace: ${f.workspaceId || 'main'}]`).join('\n') || '- None created yet'}
 
 --- REAL INSTAGRAM ANALYTICS (LAST 30 DAYS) ---
 ${socialAnalyticsContext}
