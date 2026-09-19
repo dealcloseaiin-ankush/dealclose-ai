@@ -49,6 +49,17 @@ const couponSchema = new mongoose.Schema({
     type: String, 
     default: '' 
   },
+  customerPhone: {
+    type: String,
+    default: '',
+    trim: true,
+    index: true
+  },
+  customerCity: {
+    type: String,
+    default: '',
+    trim: true
+  },
   usageLimit: { 
     type: Number, 
     default: 1 // 1 for single-use, e.g. loyalty reward
@@ -56,6 +67,10 @@ const couponSchema = new mongoose.Schema({
   timesUsed: { 
     type: Number, 
     default: 0 
+  },
+  redeemedAt: {
+    type: Date,
+    default: null
   },
   status: { 
     type: String, 

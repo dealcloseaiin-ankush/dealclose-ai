@@ -33,6 +33,11 @@ const creditPartySchema = new mongoose.Schema({
     default: '', 
     trim: true 
   },
+  city: {
+    type: String,
+    default: '',
+    trim: true
+  },
 
   // 🛡️ Credit Limit & Promissory Legal Mandate
   creditLimit: { 
@@ -112,12 +117,16 @@ const creditPartySchema = new mongoose.Schema({
   },
   rewardDiscountType: {
     type: String,
-    enum: ['PERCENTAGE', 'FLAT_AMOUNT', 'FREE_ITEM'],
-    default: 'PERCENTAGE'
+    enum: ['PERCENTAGE', 'FLAT_AMOUNT', 'FREE_ITEM', 'CUSTOM'],
+    default: 'FREE_ITEM'
   },
   rewardDiscountValue: {
     type: Number,
-    default: 20 // e.g. 20% off or Rs. 200
+    default: 100 // e.g. 20% off or Rs. 100
+  },
+  rewardDescription: {
+    type: String,
+    default: '1 मुफ़्त विशेष उपहार (Free Special Gift)'
   },
 
   // 💳 UPI AutoPay / Recurring Mandate Linkage

@@ -75,6 +75,8 @@ const ComparePage = lazyWithRetry(() => import('./pages/ComparePage'));
 const IndustryPage = lazyWithRetry(() => import('./pages/IndustryPage'));
 const MobileDashboard = lazyWithRetry(() => import('./pages/MobileDashboard'));
 const ProductStudio = lazyWithRetry(() => import('./pages/ProductStudio'));
+const LoyaltyOffersHub = lazyWithRetry(() => import('./modules/loyalty-offers/LoyaltyOffersHub'));
+const BillingUdharHub = lazyWithRetry(() => import('./modules/msme-billing-udhar/BillingUdharHub'));
 const CreditMandateHub = lazyWithRetry(() => import('./modules/msme-credit-mandate/CreditMandateHub'));
 
 // Smart Redirects for Logged In Users
@@ -323,8 +325,10 @@ export default function App() {
               <Route path="product-studio" element={<ProductStudio />} />
               <Route path="meta-ads" element={<MetaAdsManager />} />
               <Route path="billing" element={<BillingPage />} />
-              <Route path="credit-mandate" element={<CreditMandateHub />} />
-              <Route path="udhar" element={<CreditMandateHub />} />
+              <Route path="loyalty-offers" element={<LoyaltyOffersHub />} />
+              <Route path="billing-udhar" element={<BillingUdharHub />} />
+              <Route path="credit-mandate" element={<BillingUdharHub />} />
+              <Route path="udhar" element={<BillingUdharHub />} />
             </Route>
           </Route>
         </Routes>

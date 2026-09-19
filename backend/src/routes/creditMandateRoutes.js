@@ -32,6 +32,13 @@ router.post('/generate-upi-mandate', protect, creditController.generateUpiMandat
 // 🎟️ Coupons & Offers Engine
 router.get('/coupons', protect, creditController.getCoupons);
 router.post('/coupons', protect, creditController.createCoupon);
+router.post('/coupons/create-unique', protect, creditController.createUniqueCoupon);
+router.get('/coupons/lookup', protect, creditController.lookupCoupon);
+router.post('/coupons/redeem', protect, creditController.redeemCoupon);
 router.post('/coupons/validate', protect, creditController.validateCoupon);
+
+// ⭐ Loyalty Stamps System (Standalone & Integrated)
+router.post('/stamps/punch', protect, creditController.punchStamp);
+router.get('/stamps/customers', protect, creditController.getStampCustomers);
 
 module.exports = router;

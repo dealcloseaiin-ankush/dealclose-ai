@@ -963,3 +963,295 @@ exports.createCoupon = async (req, res) => {
   }
 };
 
+// @desc    Punch Stamp for Customer (Standalone, no bill required)
+// @route   POST /api/credit-mandate/stamps/punch
+exports.punchStamp = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const shopName = req.user?.businessName || req.user?.name || 'प्रतिष्ठान';
+    const { name, phone, city, targetVisits, rewardDescription, rewardDiscountType, rewardDiscountValue } = req.body;
+
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, message: 'ग्राहक का नाम और मोबाइल नंबर अनिवार्य है।' });
+    }
+
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json({ success: false, message: 'कृपया 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।' });
+    }
+
+    let party = await CreditParty.findOne({ userId, phone: cleanPhone });
+    const target = Number(targetVisits) || (party ? party.loyaltyTargetVisits : 5);
+
+    if (!party) {
+      party = new CreditParty({
+        userId,
+        name: name.trim(),
+        phone: cleanPhone,
+        city: city?.trim() || '',
+        loyaltyTargetVisits: target,
+        rewardDescription: rewardDescription?.trim() || '1 मुफ़्त विशेष उपहार',
+        rewardDiscountType: rewardDiscountType || 'FREE_ITEM',
+        rewardDiscountValue: Number(rewardDiscountValue) || 100,
+        completedVisitsCount: 1
+      });
+    } else {
+      if (name) party.name = name.trim();
+      if (city) party.city = city.trim();
+      if (targetVisits) party.loyaltyTargetVisits = target;
+      if (rewardDescription) party.rewardDescription = rewardDescription.trim();
+      if (rewardDiscountType) party.rewardDiscountType = rewardDiscountType;
+      if (rewardDiscountValue) party.rewardDiscountValue = Number(rewardDiscountValue);
+
+      party.completedVisitsCount = (party.completedVisitsCount || 0) + 1;
+    }
+
+    let rewardUnlockedNow = false;
+    let unlockedCouponCode = null;
+
+    if (party.completedVisitsCount >= target) {
+      rewardUnlockedNow = true;
+      party.rewardUnlocked = true;
+      unlockedCouponCode = `GIFT-${cleanPhone.slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      party.activeRewardCoupon = unlockedCouponCode;
+
+      // Auto create coupon
+      try {
+        await Coupon.create({
+          userId,
+          code: unlockedCouponCode,
+          title: `${party.name} - ${target} विजिट्स लॉयल्टी उपहार (${party.rewardDescription || 'मुफ़्त गिफ्ट'})`,
+          discountType: party.rewardDiscountType || 'FREE_ITEM',
+          discountValue: party.rewardDiscountValue || 100,
+          freeItemName: party.rewardDescription || 'मुफ़्त उपहार',
+          customerPhone: party.phone,
+          customerCity: party.city || '',
+          assignedPartyId: party._id,
+          assignedPartyName: party.name,
+          usageLimit: 1
+        });
+      } catch (cErr) {
+        console.warn('Loyalty reward coupon create notice:', cErr.message);
+      }
+
+      // Reset count for next milestone cycle
+      party.completedVisitsCount = 0;
+    }
+
+    await party.save();
+
+    const currentVisitsForMsg = rewardUnlockedNow ? target : party.completedVisitsCount;
+    const { text, waLink } = creditService.buildLoyaltyStampMessage(
+      shopName,
+      party.name,
+      party.phone,
+      currentVisitsForMsg,
+      target,
+      rewardUnlockedNow,
+      unlockedCouponCode,
+      party.city,
+      party.rewardDescription
+    );
+
+    res.status(200).json({
+      success: true,
+      party,
+      rewardUnlocked: rewardUnlockedNow,
+      unlockedCouponCode,
+      completedVisits: currentVisitsForMsg,
+      targetVisits: target,
+      messageText: text,
+      waLink,
+      message: rewardUnlockedNow 
+        ? `🎉 बधाई! ${party.name} के ${target} स्टैम्प्स पूरे हो गए! कूपन: ${unlockedCouponCode}` 
+        : `⭐ स्टैम्प लग गया! कुल विजिट्स: ${party.completedVisitsCount}/${target}`
+    });
+  } catch (error) {
+    console.error("Error in punchStamp:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get all loyalty stamp customers
+// @route   GET /api/credit-mandate/stamps/customers
+exports.getStampCustomers = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const customers = await CreditParty.find({ userId })
+      .select('name phone city loyaltyTargetVisits completedVisitsCount rewardUnlocked activeRewardCoupon rewardDescription rewardDiscountType rewardDiscountValue updatedAt')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    res.status(200).json({ success: true, count: customers.length, customers });
+  } catch (error) {
+    console.error("Error in getStampCustomers:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Create unique customer coupon & generate WhatsApp link
+// @route   POST /api/credit-mandate/coupons/create-unique
+exports.createUniqueCoupon = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const shopName = req.user?.businessName || req.user?.name || 'प्रतिष्ठान';
+    const { 
+      customerName, 
+      customerPhone, 
+      customerCity, 
+      code, 
+      title, 
+      discountType, 
+      discountValue, 
+      freeItemName, 
+      minBillAmount, 
+      maxDiscountAmount, 
+      validDays 
+    } = req.body;
+
+    if (!customerPhone) {
+      return res.status(400).json({ success: false, message: 'ग्राहक का मोबाइल नंबर दर्ज करें।' });
+    }
+
+    const cleanPhone = String(customerPhone).replace(/\D/g, '').slice(-10);
+    const finalCode = (code?.trim() || `OFFER-${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase();
+
+    const existing = await Coupon.findOne({ userId, code: finalCode });
+    if (existing) {
+      return res.status(400).json({ success: false, message: `कूपन कोड "${finalCode}" पहले से उपयोग में है।` });
+    }
+
+    const validUntil = new Date(Date.now() + (Number(validDays) || 30) * 24 * 60 * 60 * 1000);
+
+    let displayTitle = title?.trim();
+    if (!displayTitle) {
+      if (discountType === 'FREE_ITEM') {
+        displayTitle = `${freeItemName || 'मुफ़्त उपहार'} (Free Item)`;
+      } else if (discountType === 'PERCENTAGE') {
+        displayTitle = `${discountValue}% छूट (Discount)`;
+      } else {
+        displayTitle = `₹${discountValue} सीधी छूट (Flat Off)`;
+      }
+    }
+
+    const coupon = await Coupon.create({
+      userId,
+      code: finalCode,
+      title: displayTitle,
+      discountType: discountType || 'FLAT_AMOUNT',
+      discountValue: Number(discountValue) || 50,
+      freeItemName: freeItemName?.trim() || '',
+      minBillAmount: Number(minBillAmount) || 0,
+      maxDiscountAmount: Number(maxDiscountAmount) || 1000,
+      customerPhone: cleanPhone,
+      customerCity: customerCity?.trim() || '',
+      assignedPartyName: customerName?.trim() || 'सम्मानित ग्राहक',
+      usageLimit: 1,
+      validUntil
+    });
+
+    const { text, waLink } = creditService.buildCouponWhatsAppMessage(
+      shopName,
+      customerName?.trim() || 'ग्राहक',
+      cleanPhone,
+      coupon.code,
+      coupon.title,
+      coupon.validUntil,
+      customerCity?.trim() || ''
+    );
+
+    res.status(201).json({
+      success: true,
+      coupon,
+      messageText: text,
+      waLink,
+      message: `कूपन "${coupon.code}" तैयार! WhatsApp पर भेजने के लिए लिंक तैयार है।`
+    });
+  } catch (error) {
+    console.error("Error in createUniqueCoupon:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Redeem Desk: Lookup Coupon by code or phone
+// @route   GET /api/credit-mandate/coupons/lookup
+exports.lookupCoupon = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'कूपन कोड या मोबाइल नंबर दर्ज करें।' });
+    }
+
+    const clean = String(query).trim().toUpperCase();
+    const cleanPhone = String(query).replace(/\D/g, '').slice(-10);
+
+    const coupons = await Coupon.find({
+      userId,
+      $or: [
+        { code: clean },
+        ...(cleanPhone ? [{ customerPhone: cleanPhone }] : [])
+      ]
+    }).sort({ createdAt: -1 }).limit(10).lean();
+
+    if (!coupons || coupons.length === 0) {
+      return res.status(404).json({ success: false, message: 'कोई कूपन नहीं मिला।' });
+    }
+
+    res.status(200).json({ success: true, count: coupons.length, coupons });
+  } catch (error) {
+    console.error("Error in lookupCoupon:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Redeem Desk: Mark Coupon as REDEEMED
+// @route   POST /api/credit-mandate/coupons/redeem
+exports.redeemCoupon = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'कूपन कोड दर्ज करें।' });
+    }
+
+    const coupon = await Coupon.findOne({ 
+      userId, 
+      code: String(code).trim().toUpperCase() 
+    });
+
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'कूपन नहीं मिला।' });
+    }
+
+    if (coupon.status === 'REDEEMED' || coupon.timesUsed >= (coupon.usageLimit || 1)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `यह कूपन पहले ही ${coupon.redeemedAt ? new Date(coupon.redeemedAt).toLocaleString('hi-IN') : ''} को रिडीम हो चुका है!` 
+      });
+    }
+
+    if (coupon.validUntil && new Date() > new Date(coupon.validUntil)) {
+      coupon.status = 'EXPIRED';
+      await coupon.save();
+      return res.status(400).json({ success: false, message: 'यह कूपन समाप्त (Expired) हो चुका है।' });
+    }
+
+    coupon.status = 'REDEEMED';
+    coupon.timesUsed = (coupon.timesUsed || 0) + 1;
+    coupon.redeemedAt = new Date();
+    await coupon.save();
+
+    res.status(200).json({
+      success: true,
+      coupon,
+      message: `🎉 कूपन "${coupon.code}" सफलतापूर्वक रिडीम कर लिया गया! ग्राहक: ${coupon.assignedPartyName || 'ग्राहक'}`
+    });
+  } catch (error) {
+    console.error("Error in redeemCoupon:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

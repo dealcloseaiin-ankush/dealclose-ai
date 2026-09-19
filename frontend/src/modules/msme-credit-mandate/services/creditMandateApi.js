@@ -88,8 +88,34 @@ export const creditMandateApi = {
     return res.data;
   },
 
+  createUniqueCoupon: async (data) => {
+    const res = await api.post('/credit-mandate/coupons/create-unique', data);
+    return res.data;
+  },
+
+  lookupCoupon: async (query) => {
+    const res = await api.get('/credit-mandate/coupons/lookup', { params: { query } });
+    return res.data;
+  },
+
+  redeemCoupon: async (code) => {
+    const res = await api.post('/credit-mandate/coupons/redeem', { code });
+    return res.data;
+  },
+
   validateCoupon: async (data) => {
     const res = await api.post('/credit-mandate/coupons/validate', data);
+    return res.data;
+  },
+
+  // ⭐ Loyalty Stamps
+  punchStamp: async (data) => {
+    const res = await api.post('/credit-mandate/stamps/punch', data);
+    return res.data;
+  },
+
+  getStampCustomers: async () => {
+    const res = await api.get('/credit-mandate/stamps/customers');
     return res.data;
   }
 };

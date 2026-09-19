@@ -93,7 +93,7 @@ exports.buildPaymentReceipt = (shopName, partyName, phone, amount, paymentMode, 
 };
 
 // Build Loyalty Stamp Card Hindi text + wa.me link
-exports.buildLoyaltyStampMessage = (shopName, partyName, phone, completedVisits, targetVisits, rewardUnlocked, couponCode) => {
+exports.buildLoyaltyStampMessage = (shopName, partyName, phone, completedVisits, targetVisits, rewardUnlocked, couponCode, city = '', rewardDescription = '') => {
   const cleanPhone = String(phone).replace(/\D/g, '');
   const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12 
     ? cleanPhone 
@@ -104,20 +104,56 @@ exports.buildLoyaltyStampMessage = (shopName, partyName, phone, completedVisits,
     stars += i < completedVisitsCountSafe(completedVisits) ? '⭐ ' : '⚪ ';
   }
 
+  const cityTag = city ? ` (${city})` : '';
+  const rewardName = rewardDescription || 'स्पेशल रिवॉर्ड / मुफ़्त गिफ्ट';
+
   let rewardMsg = '';
   if (rewardUnlocked && couponCode) {
-    rewardMsg = `\n\n🎉 *बधाई हो! आपने ${targetVisits} विजिट्स पूरी कर ली हैं!* 🎉\n🎁 आपका स्पेशल रिवॉर्ड कूपन: *${couponCode}*\n(अगली बिलिंग पर यह कूपन दिखाकर स्पेशल डिस्काउंट / फ्री गिफ्ट प्राप्त करें!)`;
+    rewardMsg = `\n\n🎉 *बधाई हो! आपने ${targetVisits} विजिट्स पूरी कर ली हैं!* 🎉\n🎁 *आपका अनलॉक इनाम:* *${rewardName}*\n🎟️ *कूपन कोड:* *${couponCode}*\n(दुकान पर यह कूपन दिखाकर सीधे अपना इनाम प्राप्त करें!)`;
   } else {
     const remaining = Math.max(0, targetVisits - completedVisitsCountSafe(completedVisits));
-    rewardMsg = `\n\n🎯 केवल *${remaining} विजिट्स और*, और पाइए अपना स्पेशल रिवॉर्ड / गिफ्ट! 🎁`;
+    rewardMsg = `\n\n🎯 केवल *${remaining} विजिट्स और*, और पाइए:\n🎁 *${rewardName}* मुफ़्त!`;
   }
 
   const text = 
-`🌟 *${shopName || 'प्रतिष्ठान'} - लॉयल्टी स्टैम्प कार्ड* 🌟
-👤 *ग्राहक:* ${partyName}
+`🌟 *${shopName || 'प्रतिष्ठान'} - डिजिटल लॉयल्टी स्टैम्प कार्ड* 🌟
+👤 *ग्राहक:* ${partyName}${cityTag}
+📱 *मोबाइल:* ${cleanPhone}
 
+⭐ *आपकी प्रोग्रेस:*
 [ ${stars.trim()} ]
-विजिट्स प्रोग्रेस: *${completedVisitsCountSafe(completedVisits)} / ${targetVisits} पूरी!*${rewardMsg}`;
+विजिट्स: *${completedVisitsCountSafe(completedVisits)} / ${targetVisits} पूरी!*${rewardMsg}
+
+🙏 हमारे यहाँ आने के लिए हार्दिक धन्यवाद!`;
+
+  const waLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+  return { text, waLink };
+};
+
+// Build Coupon WhatsApp message + wa.me link
+exports.buildCouponWhatsAppMessage = (shopName, customerName, phone, code, offerTitle, validUntil, city = '') => {
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12 
+    ? cleanPhone 
+    : (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone);
+
+  const cityTag = city ? ` (${city})` : '';
+  const expiryDate = validUntil ? new Date(validUntil).toLocaleDateString('hi-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'सीमित समय के लिए';
+
+  const text = 
+`🎟️ *${shopName || 'प्रतिष्ठान'} - विशेष डिस्काउंट कूपन!* 🎟️
+
+नमस्ते *${customerName || 'सम्मानित ग्राहक'}* जी${cityTag},
+
+आपके लिए हमारी दुकान से विशेष ऑफर:
+🎁 *${offerTitle || 'विशेष छूट'}*
+
+🔑 *आपका कूपन कोड:* *${code}*
+📅 *वैधता:* ${expiryDate} तक
+
+दुकान पर काउंटर पर यह कोड बताएं और सीधे लाभ उठाएं!
+📍 *${shopName || 'हमारी दुकान'}*
+🙏 आपका दिन शुभ हो!`;
 
   const waLink = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
   return { text, waLink };

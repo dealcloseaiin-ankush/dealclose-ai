@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth'; // Assuming you have this hook
 import useWorkspaceStore from '../store/workspaceStore'; // 🚀 NEW: Import useWorkspaceStore
 import { useInboxStore } from '../store/inboxStore';
-import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home, Sparkles, Link2, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Menu, LayoutDashboard, MessageSquare, Users, ShoppingBag, Briefcase, Megaphone, FileText, Bot, Repeat, TrendingUp, Package, Phone, BarChart2, Settings, Wallet, UserCog, Clipboard, ScanEye, Shield, DollarSign, CreditCard, Lock, Code, Calendar, Home, Sparkles, Link2, ShieldCheck, Gift } from 'lucide-react';
 import { FaInstagram, FaFacebookF } from 'react-icons/fa'; // For Instagram/Facebook specific icons
 
 export default function Sidebar() {
@@ -37,7 +37,8 @@ export default function Sidebar() {
         { name: 'Product Studio', path: '/product-studio', icon: <Sparkles size={18} className="text-amber-400" /> },
         { name: 'CRM', path: '/crm', icon: <Briefcase size={18} /> },
         { name: 'Campaigns', path: '/campaigns', icon: <Megaphone size={18} /> },
-        { name: 'उधार & क्रेडिट हब', path: '/credit-mandate', icon: <ShieldCheck size={18} className="text-emerald-400" /> },
+        { name: 'मोबाइल बिलिंग & उधार', path: '/billing-udhar', icon: <ShieldCheck size={18} className="text-emerald-400" /> },
+        { name: 'लॉयल्टी & कूपन्स', path: '/loyalty-offers', icon: <Gift size={18} className="text-amber-400" /> },
         { name: 'Templates', path: '/templates', icon: <FileText size={18} /> }
       ]
     },
