@@ -16,11 +16,12 @@ import {
   MessageSquare, Zap, Clock, GitBranch, Save, HelpCircle, X, Bot, Send, 
   FolderOpen, ChevronLeft, Menu, ListPlus, Camera, Edit, Trash2,
   Plus, ZoomIn, ZoomOut, Maximize2, Sparkles, ArrowLeft, Copy, Check, ExternalLink, FileCode,
-  Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2
+  Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2, Smartphone
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { TriggerNode, MessageNode, AskQuestionNode, DelayNode, ConditionNode, MenuNode } from '../components/flow/CustomNodes';
+import FlowSimulatorModal from '../components/flow/FlowSimulatorModal';
 
 const initialNodes = [
   {
@@ -106,6 +107,9 @@ function FlowBuilder() {
   // 🛡️ Flow Doctor / Security & Conflict Inspector States
   const [isHealthModalOpen, setIsHealthModalOpen] = useState(false);
   const [healthReport, setHealthReport] = useState({ score: 100, issues: [], passes: [] });
+
+  // 📱 Interactive Flow Simulator / Phone Sandbox State
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
 
   // 🚀 NEW: External AI Script Importer / ChatGPT Flow Architect States
   const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
@@ -856,7 +860,17 @@ Please generate the customized flow for "${biz}" now.`;
           </div>
         ), { duration: 7000, icon: '⚠️' });
       } else {
-        toast.success(`🎉 100% Conflict-Free! Flow "${finalName}" saved & active.`, { duration: 5000 });
+        toast.success((t) => (
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-bold text-xs">🎉 Flow "{finalName}" saved!</span>
+            <button 
+              onClick={() => { toast.dismiss(t.id); setIsSimulatorOpen(true); }}
+              className="px-2.5 py-1 bg-emerald-800 hover:bg-emerald-700 text-white font-black text-[11px] rounded-lg shadow-sm shrink-0 border border-emerald-400/40 cursor-pointer active:scale-95"
+            >
+              Test Flow 📱
+            </button>
+          </div>
+        ), { duration: 6000 });
       }
     } catch (error) {
       console.error("Failed to save flow:", error);
@@ -1547,6 +1561,17 @@ Please generate the customized flow for "${biz}" now.`;
       </div>
     )}
 
+    {/* 📱 PURE CLIENT-SIDE FLOW SIMULATOR (PHONE SANDBOX) */}
+    <FlowSimulatorModal
+      isOpen={isSimulatorOpen}
+      onClose={() => setIsSimulatorOpen(false)}
+      nodes={nodes}
+      edges={edges}
+      platform={platform}
+      flowName={flowName}
+      businessName={workspaces.find(w => (w._id || w.id) === selectedWorkspace)?.name || mainBusinessName}
+    />
+
     {/* 🚀 MOBILE SLIDE-UP BOTTOM DRAWER FOR ADDING NODES */}
     {isMobileDrawerOpen && (
       <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center md:hidden animate-fade-in" onClick={() => setIsMobileDrawerOpen(false)}>
@@ -1783,6 +1808,15 @@ Please generate the customized flow for "${biz}" now.`;
 
           <div className="flex items-center gap-1.5 shrink-0">
             <button 
+              onClick={() => setIsSimulatorOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-xl font-bold text-xs transition-all shadow-sm shrink-0 cursor-pointer active:scale-95"
+              title="Test & Simulate Customer Flow Live (Pure Sandbox)"
+            >
+              <Smartphone size={14} className="text-blue-400" />
+              <span>Test Flow 📱</span>
+            </button>
+
+            <button 
               onClick={() => { inspectFlowHealth(); setIsHealthModalOpen(true); }}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-xl font-bold text-xs transition-all shadow-sm shrink-0 cursor-pointer active:scale-95"
               title="Flow Doctor: Run Security, Health & Conflict Inspector"
@@ -1982,6 +2016,14 @@ Please generate the customized flow for "${biz}" now.`;
               title="Auto Align Flow"
             >
               <Sparkles size={15} />
+            </button>
+
+            <button 
+              onClick={() => setIsSimulatorOpen(true)}
+              className="p-2 bg-blue-600 active:bg-blue-500 text-white rounded-xl shadow-md" 
+              title="Test Flow Simulator"
+            >
+              <Smartphone size={15} />
             </button>
 
             <button 
