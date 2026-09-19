@@ -1,6 +1,7 @@
 const CreditParty = require('../models/CreditPartyModel');
 const UdharBill = require('../models/UdharBillModel');
 const CreditPayment = require('../models/CreditPaymentModel');
+const Coupon = require('../models/CouponModel');
 const User = require('../models/userModel');
 const creditService = require('../services/creditMandateService');
 
@@ -421,7 +422,26 @@ exports.createBill = async (req, res) => {
       const target = party.loyaltyTargetVisits || 5;
       if (party.completedVisitsCount >= target) {
         party.rewardUnlocked = true;
-        party.activeRewardCoupon = `VIP-GIFT-${party.phone.slice(-4)}-${Date.now().toString().slice(-4)}`;
+        const newCouponCode = `VIP-GIFT-${party.phone.slice(-4)}-${Date.now().toString().slice(-4)}`;
+        party.activeRewardCoupon = newCouponCode;
+        
+        // 🎟️ Insert into Coupon collection for checkout validation
+        try {
+          await Coupon.create({
+            userId,
+            code: newCouponCode,
+            title: `${party.name} - ${target}-विजिट्स लॉयल्टी गिफ्ट कूपन`,
+            discountType: party.rewardDiscountType || 'FLAT_AMOUNT',
+            discountValue: party.rewardDiscountValue || 100,
+            minBillAmount: party.minBillAmountForStamp || 200,
+            assignedPartyId: party._id,
+            assignedPartyName: party.name,
+            usageLimit: 1
+          });
+        } catch (cErr) {
+          console.warn('Coupon auto-create notice:', cErr.message);
+        }
+
         // reset stamp count for next cycle
         party.completedVisitsCount = 0;
       }
@@ -443,6 +463,22 @@ exports.createBill = async (req, res) => {
         activeRewardCoupon: party.activeRewardCoupon,
         loyaltyWaLink: loyaltyMsg.waLink
       };
+    }
+
+    // 🎟️ Mark coupon as redeemed if one was applied
+    if (appliedCouponCode) {
+      try {
+        const coupon = await Coupon.findOne({ userId, code: String(appliedCouponCode).trim().toUpperCase() });
+        if (coupon) {
+          coupon.timesUsed = (coupon.timesUsed || 0) + 1;
+          if (coupon.timesUsed >= (coupon.usageLimit || 1)) {
+            coupon.status = 'REDEEMED';
+          }
+          await coupon.save();
+        }
+      } catch (cpnErr) {
+        console.warn('Coupon redemption update notice:', cpnErr.message);
+      }
     }
 
     await party.save();
@@ -788,3 +824,142 @@ exports.generateUpiMandate = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Validate Coupon Code for POS Billing
+// @route   POST /api/credit-mandate/coupons/validate
+exports.validateCoupon = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { code, billAmount, partyId } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'कूपन कोड दर्ज करें।' });
+    }
+
+    const coupon = await Coupon.findOne({ 
+      userId, 
+      code: String(code).trim().toUpperCase() 
+    });
+
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'अमान्य कूपन कोड (Coupon not found)।' });
+    }
+
+    if (coupon.status !== 'ACTIVE') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `यह कूपन पहले ही ${coupon.status === 'REDEEMED' ? 'उपयोग (Redeemed)' : 'समाप्त'} हो चुका है।` 
+      });
+    }
+
+    if (coupon.validUntil && new Date() > new Date(coupon.validUntil)) {
+      coupon.status = 'EXPIRED';
+      await coupon.save();
+      return res.status(400).json({ success: false, message: 'यह कूपन समाप्त (Expired) हो चुका है।' });
+    }
+
+    if (coupon.timesUsed >= (coupon.usageLimit || 1)) {
+      coupon.status = 'REDEEMED';
+      await coupon.save();
+      return res.status(400).json({ success: false, message: 'इस कूपन की अधिकतम उपयोग सीमा पूरी हो चुकी है।' });
+    }
+
+    if (partyId && coupon.assignedPartyId && String(coupon.assignedPartyId) !== String(partyId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `यह कूपन विशेष रूप से केवल ${coupon.assignedPartyName || 'दूसरे ग्राहक'} के लिए मान्य है।` 
+      });
+    }
+
+    const total = Number(billAmount) || 0;
+    if (coupon.minBillAmount > 0 && total < coupon.minBillAmount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `इस कूपन के लिए न्यूनतम बिल राशि ₹${coupon.minBillAmount.toLocaleString('en-IN')} होनी चाहिए।` 
+      });
+    }
+
+    // Calculate discount
+    let discountAmount = 0;
+    if (coupon.discountType === 'FLAT_AMOUNT') {
+      discountAmount = Math.min(coupon.discountValue, total);
+    } else if (coupon.discountType === 'PERCENTAGE') {
+      const calculated = (total * coupon.discountValue) / 100;
+      discountAmount = Math.min(calculated, coupon.maxDiscountAmount || 1000);
+    }
+
+    res.status(200).json({
+      success: true,
+      valid: true,
+      discountAmount,
+      freeItemName: coupon.freeItemName || null,
+      coupon: {
+        code: coupon.code,
+        title: coupon.title,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        freeItemName: coupon.freeItemName
+      },
+      message: `✅ कूपन "${coupon.code}" लागू हुआ! ₹${discountAmount.toLocaleString('en-IN')} की छूट मिलेगी।`
+    });
+  } catch (error) {
+    console.error("Error in validateCoupon:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get all Coupons for Merchant
+// @route   GET /api/credit-mandate/coupons
+exports.getCoupons = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { status } = req.query;
+    let query = { userId };
+    if (status && status !== 'ALL') query.status = status;
+
+    const coupons = await Coupon.find(query).sort({ createdAt: -1 }).lean();
+    res.status(200).json({ success: true, count: coupons.length, coupons });
+  } catch (error) {
+    console.error("Error in getCoupons:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Create Promotional or Loyalty Coupon
+// @route   POST /api/credit-mandate/coupons
+exports.createCoupon = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { code, title, discountType, discountValue, freeItemName, minBillAmount, maxDiscountAmount, usageLimit, validDays } = req.body;
+
+    if (!code || !discountValue) {
+      return res.status(400).json({ success: false, message: 'कूपन कोड और डिस्काउंट राशि अनिवार्य हैं।' });
+    }
+
+    const existing = await Coupon.findOne({ userId, code: String(code).trim().toUpperCase() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'इस कोड का कूपन पहले से मौजूद है।' });
+    }
+
+    const validUntil = new Date(Date.now() + (Number(validDays) || 30) * 24 * 60 * 60 * 1000);
+
+    const coupon = await Coupon.create({
+      userId,
+      code: String(code).trim().toUpperCase(),
+      title: title?.trim() || 'स्पेशल डिस्काउंट कूपन',
+      discountType: discountType || 'FLAT_AMOUNT',
+      discountValue: Number(discountValue),
+      freeItemName: freeItemName?.trim() || '',
+      minBillAmount: Number(minBillAmount) || 0,
+      maxDiscountAmount: Number(maxDiscountAmount) || 1000,
+      usageLimit: Number(usageLimit) || 1,
+      validUntil
+    });
+
+    res.status(201).json({ success: true, message: `कूपन "${coupon.code}" तैयार हो गया!`, coupon });
+  } catch (error) {
+    console.error("Error in createCoupon:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

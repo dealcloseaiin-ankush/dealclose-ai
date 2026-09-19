@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Users, ShoppingCart, Receipt, Plus, Search, 
   RefreshCw, Filter, Banknote, AlertTriangle, CheckCircle2, Lock, 
-  Sparkles, ArrowRight, Zap, Send
+  Sparkles, ArrowRight, Zap, Send, Tag
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { creditMandateApi } from './services/creditMandateApi';
@@ -13,6 +13,7 @@ import PartyLedgerModal from './components/PartyLedgerModal';
 import LoyaltyStampDrawer from './components/LoyaltyStampDrawer';
 import FastPosBilling from './components/FastPosBilling';
 import UdharOtpModal from './components/UdharOtpModal';
+import CouponsManagerDrawer from './components/CouponsManagerDrawer';
 
 export default function CreditMandateHub() {
   const [activeTab, setActiveTab] = useState('PARTIES'); // 'PARTIES' | 'POS' | 'BILLS'
@@ -42,6 +43,9 @@ export default function CreditMandateHub() {
 
   // Bill OTP modal from bills tab
   const [selectedBillForOtp, setSelectedBillForOtp] = useState(null);
+
+  // Coupons Manager Drawer state
+  const [showCouponsDrawer, setShowCouponsDrawer] = useState(false);
 
   // Quick Add Party Modal state
   const [showAddPartyModal, setShowAddPartyModal] = useState(false);
@@ -174,6 +178,14 @@ export default function CreditMandateHub() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowCouponsDrawer(true)}
+            className="px-3.5 py-2.5 rounded-xl bg-purple-100/80 hover:bg-purple-200 text-purple-900 font-bold text-xs flex items-center gap-1.5 border border-purple-200 shadow-sm transition-all"
+          >
+            <Tag className="w-4 h-4 text-purple-700" />
+            🎟️ कूपन व ऑफर्स
+          </button>
+
           <button
             onClick={() => setShowAddPartyModal(true)}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all"
@@ -626,6 +638,13 @@ export default function CreditMandateHub() {
           fetchParties();
           fetchRecentBills();
         }}
+      />
+
+      {/* 🎟️ COUPONS & OFFERS MANAGER DRAWER */}
+      <CouponsManagerDrawer
+        isOpen={showCouponsDrawer}
+        onClose={() => setShowCouponsDrawer(false)}
+        onCouponCreated={() => {}}
       />
 
     </div>

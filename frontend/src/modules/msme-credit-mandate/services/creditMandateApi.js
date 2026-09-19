@@ -75,5 +75,21 @@ export const creditMandateApi = {
   generateUpiMandate: async (data) => {
     const res = await api.post('/credit-mandate/generate-upi-mandate', data);
     return res.data;
+  },
+
+  // 🎟️ Coupons & Offers
+  getCoupons: async (status = 'ALL') => {
+    const res = await api.get('/credit-mandate/coupons', { params: { status } });
+    return res.data;
+  },
+
+  createCoupon: async (data) => {
+    const res = await api.post('/credit-mandate/coupons', data);
+    return res.data;
+  },
+
+  validateCoupon: async (data) => {
+    const res = await api.post('/credit-mandate/coupons/validate', data);
+    return res.data;
   }
 };

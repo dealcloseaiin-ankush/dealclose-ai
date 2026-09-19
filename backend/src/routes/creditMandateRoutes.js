@@ -29,4 +29,9 @@ router.get('/party/:partyId/ledger', protect, creditController.getPartyLedger);
 // UPI Mandate URI Generation
 router.post('/generate-upi-mandate', protect, creditController.generateUpiMandate);
 
+// 🎟️ Coupons & Offers Engine
+router.get('/coupons', protect, creditController.getCoupons);
+router.post('/coupons', protect, creditController.createCoupon);
+router.post('/coupons/validate', protect, creditController.validateCoupon);
+
 module.exports = router;

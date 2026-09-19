@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Trash2, ShoppingCart, PauseCircle, PlayCircle, ShieldCheck, 
   AlertTriangle, Check, UserPlus, Phone, Search, Zap, Send, ArrowRight,
-  CreditCard, Banknote, QrCode, Layers, RefreshCw
+  CreditCard, Banknote, QrCode, Layers, RefreshCw, Tag
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { creditMandateApi } from '../services/creditMandateApi';
@@ -14,11 +14,22 @@ const HELD_BILLS_STORAGE_KEY = 'msme_pos_held_bills_v1';
 export default function FastPosBilling({ parties = [], onBillCompleted, onRefreshParties }) {
   // Multi-Bill Tabs state
   const [tabs, setTabs] = useState([
-    { id: 1, name: 'बिल #1', customerId: '', items: [{ name: '', quantity: 1, rate: 0 }], paymentMode: 'CREDIT', bypassPending: false }
+    { 
+      id: 1, 
+      name: 'बिल #1', 
+      customerId: '', 
+      items: [{ name: '', quantity: 1, rate: 0 }], 
+      paymentMode: 'CREDIT', 
+      bypassPending: false,
+      couponInput: '',
+      appliedCoupon: null,
+      discountAmount: 0
+    }
   ]);
   const [activeTabId, setActiveTabId] = useState(1);
   const [heldBills, setHeldBills] = useState([]);
   const [showHeldDrawer, setShowHeldDrawer] = useState(false);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
   // Active Tab derived data
   const currentTab = tabs.find(t => t.id === activeTabId) || tabs[0];
@@ -70,12 +81,60 @@ export default function FastPosBilling({ parties = [], onBillCompleted, onRefres
     setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, ...updates } : t));
   };
 
-  // Cart total calculations
-  const totalBillAmount = currentTab.items.reduce((sum, item) => {
+  // Cart subtotal & final payable after discount
+  const cartSubtotal = currentTab.items.reduce((sum, item) => {
     const q = Number(item.quantity) || 0;
     const r = Number(item.rate) || 0;
     return sum + (q * r);
   }, 0);
+
+  const discount = Number(currentTab.discountAmount) || 0;
+  const totalBillAmount = Math.max(0, cartSubtotal - discount);
+
+  // Validate & Apply Coupon
+  const handleApplyCoupon = async (e) => {
+    e?.preventDefault();
+    const code = currentTab.couponInput?.trim();
+    if (!code) {
+      toast.error('कृपया कूपन कोड दर्ज करें।');
+      return;
+    }
+
+    if (cartSubtotal <= 0) {
+      toast.error('कूपन लागू करने के लिए बिल में सामान होना चाहिए।');
+      return;
+    }
+
+    try {
+      setValidatingCoupon(true);
+      const res = await creditMandateApi.validateCoupon({
+        code,
+        billAmount: cartSubtotal,
+        partyId: currentTab.customerId || null
+      });
+
+      if (res.success && res.valid) {
+        toast.success(res.message);
+        updateCurrentTab({
+          appliedCoupon: res.coupon,
+          discountAmount: res.discountAmount || 0
+        });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'अमान्य कूपन कोड');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    updateCurrentTab({
+      appliedCoupon: null,
+      discountAmount: 0,
+      couponInput: ''
+    });
+    toast('कूपन हटा दिया गया।');
+  };
 
   // Real-time Statement Calculation on Customer or Amount Change
   useEffect(() => {
@@ -114,7 +173,10 @@ export default function FastPosBilling({ parties = [], onBillCompleted, onRefres
       customerId: '',
       items: [{ name: '', quantity: 1, rate: 0 }],
       paymentMode: 'CREDIT',
-      bypassPending: false
+      bypassPending: false,
+      couponInput: '',
+      appliedCoupon: null,
+      discountAmount: 0
     };
     setTabs([...tabs, newTab]);
     setActiveTabId(nextId);
@@ -228,7 +290,9 @@ export default function FastPosBilling({ parties = [], onBillCompleted, onRefres
       totalAmount: totalBillAmount,
       paymentMode: currentTab.paymentMode,
       bypassPendingLock: bypassLock || currentTab.bypassPending,
-      bypassReason: bypassLock ? 'काउंटर पर ग्राहक व्यस्त होने के कारण 1-क्लिक बायपास' : ''
+      bypassReason: bypassLock ? 'काउंटर पर ग्राहक व्यस्त होने के कारण 1-क्लिक बायपास' : '',
+      appliedCouponCode: currentTab.appliedCoupon?.code || null,
+      discountAmount: currentTab.discountAmount || 0
     };
 
     try {
@@ -255,7 +319,10 @@ export default function FastPosBilling({ parties = [], onBillCompleted, onRefres
         updateCurrentTab({
           customerId: '',
           items: [{ name: '', quantity: 1, rate: 0 }],
-          bypassPending: false
+          bypassPending: false,
+          appliedCoupon: null,
+          couponInput: '',
+          discountAmount: 0
         });
       }
     } catch (err) {
@@ -532,6 +599,50 @@ export default function FastPosBilling({ parties = [], onBillCompleted, onRefres
       {/* 💰 BILLING FOOTER & 5-POINT PREVIEW */}
       <div className="p-4 bg-slate-50 border-t border-slate-200">
         
+        {/* 🎟️ COUPON / REWARD REDEMPTION STRIP */}
+        <div className="mb-3 p-2.5 rounded-xl bg-purple-50/70 border border-purple-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 flex-1 min-w-[260px]">
+            <Tag className="w-4 h-4 text-purple-600 shrink-0" />
+            {currentTab.appliedCoupon ? (
+              <div className="flex items-center gap-2 bg-emerald-100 text-emerald-900 px-3 py-1 rounded-lg text-xs font-bold border border-emerald-300">
+                <span>✅ कूपन "{currentTab.appliedCoupon.code}" लागू: -₹{currentTab.discountAmount} छूट ({currentTab.appliedCoupon.title})</span>
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="hover:text-red-600 font-bold ml-1 text-slate-500"
+                  title="कूपन हटाएं"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCoupon} className="flex items-center gap-1.5 flex-1">
+                <input
+                  type="text"
+                  value={currentTab.couponInput || ''}
+                  onChange={(e) => updateCurrentTab({ couponInput: e.target.value.toUpperCase().replace(/\s/g, '') })}
+                  placeholder="🎟️ कूपन कोड दर्ज करें (e.g. VIP-GIFT-..., FESTIVAL50)"
+                  className="px-3 py-1.5 text-xs font-mono font-bold uppercase rounded-lg border border-purple-200 bg-white focus:ring-2 focus:ring-purple-500 text-slate-900 flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={validatingCoupon || !currentTab.couponInput}
+                  className="px-3 py-1.5 rounded-lg bg-purple-900 hover:bg-purple-950 text-white font-bold text-xs shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {validatingCoupon ? 'जाँच...' : 'लागू करें'}
+                </button>
+              </form>
+            )}
+          </div>
+
+          {currentTab.appliedCoupon && (
+            <div className="text-[11px] text-purple-900 font-medium">
+              सबटोटल: ₹{cartSubtotal.toLocaleString('en-IN')} | छूट: -₹{currentTab.discountAmount}
+            </div>
+          )}
+        </div>
+
         {/* Dynamic Statement 5-Point Box if Credit */}
         {statementPreview && currentTab.paymentMode === 'CREDIT' && (
           <div className="mb-3 p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs space-y-1">
@@ -555,7 +666,14 @@ export default function FastPosBilling({ parties = [], onBillCompleted, onRefres
 
         <div className="flex items-center justify-between gap-4">
           <div>
-            <span className="text-xs text-slate-500 font-medium">कुल देय राशि (Total Amount):</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium">कुल देय राशि (Payable Amount):</span>
+              {discount > 0 && (
+                <span className="text-[11px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.2 rounded-full">
+                  -₹{discount} छूट लागू
+                </span>
+              )}
+            </div>
             <div className="text-2xl font-black text-slate-900">
               ₹{totalBillAmount.toLocaleString('en-IN')}
             </div>
