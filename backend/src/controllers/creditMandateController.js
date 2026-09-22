@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const CreditParty = require('../models/CreditPartyModel');
 const UdharBill = require('../models/UdharBillModel');
 const CreditPayment = require('../models/CreditPaymentModel');
@@ -1336,16 +1337,16 @@ exports.getPublicCustomerPass = async (req, res) => {
     }
 
     let partyQuery = { phone: cleanPhone };
-    if (merchantId) {
+    if (merchantId && mongoose.Types.ObjectId.isValid(merchantId)) {
       partyQuery.userId = merchantId;
     }
 
     const party = await CreditParty.findOne(partyQuery).sort({ updatedAt: -1 }).lean();
 
     let merchant = null;
-    if (party?.userId) {
+    if (party?.userId && mongoose.Types.ObjectId.isValid(party.userId)) {
       merchant = await User.findById(party.userId).select('name fullName businessName brandKit phone email').lean();
-    } else if (merchantId) {
+    } else if (merchantId && mongoose.Types.ObjectId.isValid(merchantId)) {
       merchant = await User.findById(merchantId).select('name fullName businessName brandKit phone email').lean();
     }
 
@@ -1418,7 +1419,7 @@ exports.publicRegisterWalkin = async (req, res) => {
     }
 
     // Determine target merchant
-    let targetUserId = merchantId;
+    let targetUserId = (merchantId && mongoose.Types.ObjectId.isValid(merchantId)) ? merchantId : null;
     if (!targetUserId) {
       const defaultUser = await User.findOne({ role: 'owner' }).select('_id').lean();
       targetUserId = defaultUser?._id;
@@ -1560,10 +1561,10 @@ exports.markPassSent = async (req, res) => {
     const { partyId, phone } = req.body;
 
     let query = { userId };
-    if (partyId) query._id = partyId;
+    if (partyId && mongoose.Types.ObjectId.isValid(partyId)) query._id = partyId;
     else if (phone) query.phone = String(phone).replace(/\D/g, '').slice(-10);
     else {
-      return res.status(400).json({ success: false, message: 'partyId या phone अनिवार्य है।' });
+      return res.status(400).json({ success: false, message: 'वैध partyId या phone अनिवार्य है।' });
     }
 
     const party = await CreditParty.findOne(query);

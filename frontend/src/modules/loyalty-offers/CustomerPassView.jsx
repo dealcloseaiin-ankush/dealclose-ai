@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, Link } from 'react';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { 
   Award, Star, Gift, CheckCircle, Smartphone, 
   MapPin, Store, Sparkles, ExternalLink, ShieldCheck, 
