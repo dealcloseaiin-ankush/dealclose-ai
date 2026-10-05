@@ -37,8 +37,8 @@ export default function Sidebar() {
         { name: 'Product Studio', path: '/product-studio', icon: <Sparkles size={18} className="text-amber-400" /> },
         { name: 'CRM', path: '/crm', icon: <Briefcase size={18} /> },
         { name: 'Campaigns', path: '/campaigns', icon: <Megaphone size={18} /> },
-        { name: 'मोबाइल बिलिंग & उधार', path: '/billing-udhar', icon: <ShieldCheck size={18} className="text-emerald-400" /> },
-        { name: 'लॉयल्टी & कूपन्स', path: '/loyalty-offers', icon: <Gift size={18} className="text-amber-400" /> },
+        { name: 'Mobile Billing & Khata', path: '/billing-udhar', icon: <ShieldCheck size={18} className="text-emerald-400" /> },
+        { name: 'Loyalty & Offers', path: '/loyalty-offers', icon: <Gift size={18} className="text-amber-400" /> },
         { name: 'Templates', path: '/templates', icon: <FileText size={18} /> }
       ]
     },

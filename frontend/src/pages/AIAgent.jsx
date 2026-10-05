@@ -153,10 +153,10 @@ export default function AIAgent() {
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
               <Shield className="text-purple-400" size={22} />
-              <span>AI Channel Permissions & Kill Switches (नियंत्रण केंद्र)</span>
+              <span>AI Channel Permissions & Kill Switches (Control Center)</span>
             </h2>
             <p className="text-xs text-gray-400 mt-1 max-w-2xl leading-relaxed">
-              यहाँ से आप तय कर सकते हैं कि आपका AI किन चैनल्स पर अपने आप रिप्लाई करेगा। किसी भी चैनल को बंद (OFF) करने पर AI उस चैनल पर 100% ब्लॉक रहेगा।
+              Configure which channels AI is allowed to auto-reply to. Disabling any channel completely blocks automated AI replies on that channel.
             </p>
           </div>
           
@@ -208,8 +208,8 @@ export default function AIAgent() {
             </div>
             <p className="text-xs text-gray-400 leading-relaxed mb-3">
               {channelToggles.comment 
-                ? '✅ AI आपके Instagram Reels/Posts के कमैंट्स पर ऑटो रिप्लाई कर रहा है।' 
-                : '⛔ सुरक्षित (Default): Instagram कमैंट्स पर AI रिप्लाई पूरी तरह बंद है। जब तक आप इसे खुद ON नहीं करेंगे, AI शांत रहेगा।'}
+                ? '✅ AI is actively auto-replying to comments on your Instagram Reels and Posts.' 
+                : '⛔ Protected (Default): AI reply to Instagram comments is disabled until you turn it ON.'}
             </p>
             <div className="pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
               <span className="font-semibold text-pink-400/90">Restricted by default</span>
@@ -245,8 +245,8 @@ export default function AIAgent() {
             </div>
             <p className="text-xs text-gray-400 leading-relaxed mb-3">
               {channelToggles.instagram_dm 
-                ? '✅ Instagram Inbox में कस्टमर्स के सवालों पर AI अपने आप चैट रिप्लाई करता है।' 
-                : '⛔ Instagram DMs में AI रिप्लाई बंद है। कस्टमर्स के संदेश आने पर कोई टोकन नहीं कटेगा।'}
+                ? '✅ AI is actively responding to customer direct messages in Instagram Inbox.' 
+                : '⛔ AI reply to Instagram DMs is paused. Incoming messages will not trigger automated replies.'}
             </p>
             <div className="pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
               <span className="font-semibold text-purple-400/90">Private Chat Protection</span>
@@ -282,8 +282,8 @@ export default function AIAgent() {
             </div>
             <p className="text-xs text-gray-400 leading-relaxed mb-3">
               {channelToggles.whatsapp 
-                ? '✅ WhatsApp पर आने वाले ग्राहकों को 24/7 AI ऑटो सेल्स रिप्लाई और कैटलॉग भेजता है।' 
-                : '⛔ WhatsApp पर AI रिप्लाई बंद है। केवल डिफ़ॉल्ट ह्यूमन मैसेज या ऑटो-रूल्स चलेंगे।'}
+                ? '✅ AI actively replies 24/7 and shares catalogs to incoming WhatsApp customers.' 
+                : '⛔ AI reply on WhatsApp is paused. Only default manual or custom auto-rules will run.'}
             </p>
             <div className="pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
               <span className="font-semibold text-emerald-400/90">Direct WhatsApp Bot</span>
