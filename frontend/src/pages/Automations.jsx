@@ -23,7 +23,7 @@ export default function Automations() {
 <script>
   !function(e,t,n,a){var c=e.DealCloseTracker=e.DealCloseTracker||[];
   c.init=function(e){c.apiKey=e};c.track=function(){};var r=t.createElement(n),
-  s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://dealclose-ai.onrender.com/api/pixel.js",
+  s=t.getElementsByTagName(n)[0];r.async=1,r.src="https://www.dealcloseai.in/api/pixel.js",
   s.parentNode.insertBefore(r,s)}(window,document,"script");
   
   DealCloseTracker.init("${trackingId}");

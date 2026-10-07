@@ -650,7 +650,8 @@ exports.handleWhatsApp = async (req, res) => {
                           flowData: flowData
                         });
 
-                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n✨ *MAGIC ONBOARDING:* I didn't want you to do manual work, so I have ALREADY deployed a fully working *${flowName}* into your account! It will automatically reply to your customers.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ Log in to connect your Meta API keys, customize your automation using AI, or explore our Template Library!`;
+                        const frontendUrl = process.env.FRONTEND_URL || 'https://www.dealcloseai.in';
+                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n✨ *MAGIC ONBOARDING:* I didn't want you to do manual work, so I have ALREADY deployed a fully working *${flowName}* into your account! It will automatically reply to your customers.\n\n*Login URL:* ${frontendUrl}/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ Log in to connect your Meta API keys, customize your automation using AI, or explore our Template Library!`;
                       }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "send_whatsapp_menu") {
@@ -815,9 +816,9 @@ exports.handleMetaDataDeletion = async (req, res) => {
   try {
     console.log("➡️ [Meta Webhook] Data deletion request received.");
     
-    // Meta requires us to return a JSON response with a status URL and a confirmation code
+    const frontendUrl = process.env.FRONTEND_URL || 'https://www.dealcloseai.in';
     res.status(200).json({
-      url: "https://dealclose-ai.onrender.com/privacy", // Ye aapka Privacy Policy page ka URL hoga
+      url: `${frontendUrl}/privacy`, // Ye aapka Privacy Policy page ka URL hoga
       confirmation_code: "DEL-" + Date.now()
     });
   } catch (error) {

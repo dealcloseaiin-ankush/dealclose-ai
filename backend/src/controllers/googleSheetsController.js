@@ -16,7 +16,8 @@ const getOAuth2Client = (req = null) => {
       const urlObj = new URL(origin);
       redirectUri = `${urlObj.origin}/settings`; // Automatically handles http/https and exact domain
     } else {
-      redirectUri = 'https://dealclose-ai.onrender.com/settings';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://www.dealcloseai.in';
+      redirectUri = `${frontendUrl}/settings`;
     }
   }
   

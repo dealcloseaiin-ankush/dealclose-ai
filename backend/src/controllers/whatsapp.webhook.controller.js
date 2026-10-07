@@ -15,6 +15,15 @@ const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 NEW: Auto
 const instagramService = require('../services/instagramService'); // 🚀 NEW: IG Publisher
 const { automationQueue } = require('../workers/automationWorker'); // 🚀 FIX: Import Queue to prevent ReferenceError crash
 
+// 🚀 IN-MEMORY DEDUPLICATION CACHE: Prevents duplicate webhook execution when Meta retries
+const processedWebhookMsgIds = new Map();
+const cleanupOldMsgIds = () => {
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+  for (const [id, time] of processedWebhookMsgIds.entries()) {
+    if (time < tenMinutesAgo) processedWebhookMsgIds.delete(id);
+  }
+};
+
 // 🚀 CENTRAL WORKSPACE & SOCIAL PROFILE RESOLVER (Isolates Main vs Sub-Workspaces)
 const getWorkspaceDetails = (user, targetWorkspaceId) => {
   const isMain = !targetWorkspaceId || targetWorkspaceId === 'main' || targetWorkspaceId === 'default';
@@ -194,11 +203,19 @@ exports.handleWhatsApp = async (req, res) => {
 
           // 🚀 MESSAGE DEDUPLICATION: Prevents duplicate bot replies & double reports when Meta retries
           if (msgId) {
-            const isDuplicate = await Message.findOne({ wamid: msgId, userId: user._id });
-            if (isDuplicate) {
-              console.log(`⚠️ [Webhook Deduplication] Message ID ${msgId} already processed. Skipping duplicate execution.`);
+            cleanupOldMsgIds();
+            if (processedWebhookMsgIds.has(msgId)) {
+              console.log(`⚠️ [Webhook Deduplication] Message ID ${msgId} already processed (memory cache). Skipping duplicate execution.`);
               continue;
             }
+            const isDuplicate = await Message.findOne({ wamid: msgId, userId: user._id });
+            if (isDuplicate) {
+              console.log(`⚠️ [Webhook Deduplication] Message ID ${msgId} already processed (database). Skipping duplicate execution.`);
+              processedWebhookMsgIds.set(msgId, Date.now());
+              continue;
+            }
+            // Mark as processed immediately so subsequent fast retries are blocked
+            processedWebhookMsgIds.set(msgId, Date.now());
           }
 
           // 🚀 DEBUG LOG: Check what ID Meta is sending for Instagram
@@ -1603,7 +1620,8 @@ If you don't know the answer, use the 'escalate_to_staff' tool.`;
                           businessDescription: accData.businessDescription,
                           aiCredits: 50 // 50 Free trial credits for customer chats
                         });
-                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* https://dealclose-ai.onrender.com/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
+                        const frontendUrl = process.env.FRONTEND_URL || 'https://www.dealcloseai.in';
+                        responseMessage = `🎉 *Congratulations ${accData.fullName}!* I have successfully created your DealClose AI account for '${accData.businessName}'.\n\n*Login URL:* ${frontendUrl}/login\n*Email:* ${accData.email}\n*Temporary Password:* ${tempPassword}\n\n⚠️ *Important:* Please log in and check your dashboard. (The "Change Password" feature is being added to Settings shortly!)`;
                       }
                       repliedBy = 'ai';
                     } else if (toolCall.function.name === "send_whatsapp_menu") {
@@ -1768,9 +1786,9 @@ exports.handleMetaDataDeletion = async (req, res) => {
   try {
     console.log("➡️ [Meta Webhook] Data deletion request received.");
     
-    // Meta requires us to return a JSON response with a status URL and a confirmation code
+    const frontendUrl = process.env.FRONTEND_URL || 'https://www.dealcloseai.in';
     res.status(200).json({
-      url: "https://dealclose-ai.onrender.com/data-deletion", 
+      url: `${frontendUrl}/data-deletion`, 
       confirmation_code: "DEL-" + Date.now()
     });
   } catch (error) {
