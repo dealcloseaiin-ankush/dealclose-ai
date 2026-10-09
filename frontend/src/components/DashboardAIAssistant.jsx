@@ -4,6 +4,62 @@ import { Bot, Send, ChevronDown, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Draggable from 'react-draggable';
 
+const FormattedMessage = ({ content, isUser }) => {
+  if (isUser) {
+    return <p className="whitespace-pre-wrap">{content}</p>;
+  }
+
+  // Strip raw code fences (```) and clean brackets
+  const cleanContent = content
+    .replace(/```[a-z]*\n?/gi, '')
+    .replace(/```/g, '');
+
+  const lines = cleanContent.split('\n');
+
+  const renderLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+
+    // Headings (### or ##)
+    if (trimmed.startsWith('#')) {
+      const headingText = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '');
+      return (
+        <span className="block font-bold text-blue-700 text-sm mt-2 mb-0.5 border-b border-blue-100 pb-0.5">
+          {headingText}
+        </span>
+      );
+    }
+
+    // Dividers (---)
+    if (trimmed === '---' || trimmed === '***') {
+      return <hr className="my-1.5 border-gray-200" />;
+    }
+
+    // Bold formatting (**text**)
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <span>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+          }
+          return part;
+        })}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-1 text-xs sm:text-sm text-gray-800 leading-relaxed">
+      {lines.map((line, i) => {
+        const rendered = renderLine(line);
+        if (!rendered) return <div key={i} className="h-0.5" />;
+        return <p key={i} className="mb-0.5 last:mb-0">{rendered}</p>;
+      })}
+    </div>
+  );
+};
+
 const DashboardAIAssistant = ({ onAiAction, activeWorkspaceId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -92,7 +148,7 @@ const DashboardAIAssistant = ({ onAiAction, activeWorkspaceId }) => {
               {messages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none shadow-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'}`}>
-                    {msg.content.split('\n').map((line, i) => <p key={i} className="mb-1 last:mb-0">{line}</p>)}
+                    <FormattedMessage content={msg.content} isUser={msg.role === 'user'} />
                   </div>
                 </div>
               ))}

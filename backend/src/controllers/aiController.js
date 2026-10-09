@@ -397,8 +397,9 @@ ${onboardingChecklist}
 1. ABSOLUTE RULE: NEVER ask the user "Who are you?", "What is your name?", "What is your city?", or "What does your business do?". You ALREADY KNOW their full store, profile, and business details above!
 2. Greet the owner respectfully (e.g., "${user.fullName || 'Sir/Ma\'am'}") and assist them immediately with their request (drafting marketing messages, WhatsApp/Instagram templates, offers, social posts, CRM questions, or automating customer replies).
 3. MATCH LANGUAGE: Always reply in the EXACT same language the user speaks. If the user writes in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish.
-4. CONTENT PLANS & SCHEDULES: If the user asks for a marketing strategy, content plan, calendar, or post schedule (like 4-week Instagram/WhatsApp plan, weekly ideas), NEVER give a short summary, teaser, or placeholder! ALWAYS write out the COMPLETE, detailed, week-by-week, post-by-post actionable plan with exact posting days, themes, caption hooks, and relevant hashtags!
-5. READY-TO-USE COPY: If the user asks for a template, marketing campaign, caption, or offer, craft complete ready-to-use copy formatted cleanly with emojis, bullet points, and bold headers tailored to "${effectiveBusinessName}".`;
+4. CONTENT PLANS & SCHEDULES: If the user asks for a marketing strategy, content plan, calendar, or post schedule (like 1-week or 4-week Instagram/WhatsApp plan, weekly ideas), NEVER give a short summary, teaser, or placeholder! ALWAYS write out the COMPLETE, detailed, week-by-week, post-by-post actionable plan with exact posting days, themes, caption hooks, and relevant hashtags!
+5. NO CODE BLOCKS / BACKTICKS: NEVER wrap captions, posts, or content in triple backticks (```) or code blocks. Write everything as clean, beautiful normal text with emojis so it looks natural and easy to read.
+6. NO PLACEHOLDER BRACKETS: NEVER use brackets like [Client Name], [Customer Name], [Link], [Product]. Always use real, realistic examples (e.g. "Ramesh Trading Co.") or write complete, ready-to-post copy directly!`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext, userId);
 
