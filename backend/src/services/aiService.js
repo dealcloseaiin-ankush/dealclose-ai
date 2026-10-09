@@ -56,14 +56,45 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     let rawResponse = "";
     let aiSuccess = false;
 
-    // 🚀 DYNAMIC GEMINI MULTI-MODEL FALLBACK (2.5 Flash -> 2.5 Flash Lite -> 2.0 Flash -> 1.5 Flash)
-    if (genAI) {
+    // 🚀 MULTI-MODEL DYNAMIC CHAIN (Priority 1: OpenAI gpt-4o-mini | Priority 2: Gemini 1.5/2.0 Flash)
+    const hasOpenAI = process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
+
+    if (hasOpenAI) {
+      try {
+        console.log(`[AI Service] 🤖 Requesting primary model: ${MODELS.OPENAI_MINI}`);
+        const completion = await openai.chat.completions.create({
+          messages: [
+            { role: "system", content: finalContext },
+            { role: "user", content: prompt }
+          ],
+          model: MODELS.OPENAI_MINI,
+          max_tokens: 600,
+          temperature: 0.4,
+        });
+
+        console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
+        rawResponse = completion.choices[0].message.content;
+        aiSuccess = true;
+
+        if (userId) {
+          aiUsageTracker.trackUsage({
+            userId,
+            feature: `${feature}-${platform}`,
+            provider: 'openai',
+            model: MODELS.OPENAI_MINI,
+            usage: completion.usage
+          });
+        }
+      } catch (openaiError) {
+        console.warn(`⚠️ [AI Service] ${MODELS.OPENAI_MINI} failed: ${openaiError.message}. Trying Gemini fallback...`);
+      }
+    }
+
+    // 🚀 Fallback to Google Gemini (Official valid models: 1.5 Flash -> 2.0 Flash -> 1.5 Pro)
+    if (!aiSuccess && genAI) {
       const geminiOrder = [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
         'gemini-1.5-flash',
+        'gemini-2.0-flash',
         'gemini-1.5-flash-8b',
         'gemini-1.5-pro'
       ];
@@ -71,11 +102,11 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
       for (const modelName of geminiOrder) {
         if (aiSuccess) break;
         try {
-          console.log(`[AI Service] 🤖 Requesting model: ${modelName}`);
+          console.log(`[AI Service] 🤖 Requesting fallback model: ${modelName}`);
           const model = genAI.getGenerativeModel({ 
             model: modelName,
             generationConfig: {
-              maxOutputTokens: 350,
+              maxOutputTokens: 600,
               temperature: 0.4,
             }
           });
@@ -102,39 +133,6 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
       }
     }
 
-    // 🚀 Priority 4: Fallback to OpenAI gpt-4o-mini (Cheapest OpenAI Model)
-    if (!aiSuccess && process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy')) {
-      try { 
-        console.log(`[AI Service] 🤖 Requesting fallback model: ${MODELS.OPENAI_MINI}`);
-        const completion = await openai.chat.completions.create({
-            messages: [
-                { role: "system", content: finalContext },
-                { role: "user", content: prompt }
-            ], 
-            model: MODELS.OPENAI_MINI,
-            max_tokens: 350,
-            temperature: 0.4,
-        });
-
-        console.log(`✅ [AI Service] Responded using model: ${MODELS.OPENAI_MINI}`);
-        rawResponse = completion.choices[0].message.content;
-        aiSuccess = true;
-
-        if (userId) {
-          aiUsageTracker.trackUsage({
-            userId,
-            feature: `${feature}-${platform}`,
-            provider: 'openai',
-            model: MODELS.OPENAI_MINI,
-            usage: completion.usage
-          });
-        }
-      } catch (openaiError) {
-        console.error(`❌ [AI Service] OpenAI fallback also failed: ${openaiError.message}`);
-        throw openaiError;
-      }
-    } 
-
     if (!aiSuccess) throw new Error('All AI models failed to respond. Please check API keys in the .env file.');
 
     return rawResponse;
@@ -156,23 +154,49 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext, userI
     const apiKey = process.env.GEMINI_API_KEY;
     const hasOpenAI = !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('dummy');
 
-    if (apiKey && genAI) {
+    // 🚀 Priority 1: OpenAI gpt-4o-mini (Guarantees detailed, full plans and no truncation)
+    if (hasOpenAI) {
+      try {
+        console.log(`[Dashboard Assistant] 🤖 Requesting primary model: ${MODELS.OPENAI_MINI}`);
+        const completion = await openai.chat.completions.create({
+          model: MODELS.OPENAI_MINI,
+          messages: [
+            { role: "system", content: systemContext },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: 3000,
+          temperature: 0.7,
+        });
+
+        if (userId) {
+          aiUsageTracker.trackUsage({ userId, feature: 'dashboard-assistant', provider: 'openai', model: MODELS.OPENAI_MINI, usage: completion.usage });
+        }
+
+        console.log(`✅ [Dashboard Assistant] Responded using model: ${MODELS.OPENAI_MINI}`);
+        return completion.choices[0].message;
+      } catch (openaiErr) {
+        console.warn(`⚠️ [Dashboard Assistant] OpenAI gpt-4o-mini failed: ${openaiErr.message}. Trying Gemini fallback...`);
+      }
+    }
+
+    // 🚀 Priority 2: Fallback to Google Gemini (Official valid models: 1.5 Flash -> 2.0 Flash -> 1.5 Pro)
+    if (!aiSuccess && apiKey && genAI) {
       const geminiOrder = [
-        'gemini-2.5-flash-lite',
-        'gemini-2.5-flash',
-        'gemini-3.1-flash-lite',
-        'gemini-3.5-flash-lite'
+        'gemini-1.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash-8b'
       ];
 
       for (const modelName of geminiOrder) {
         if (aiSuccess) break;
         try {
-          console.log(`[Dashboard Assistant] 🤖 Requesting model: ${modelName}`);
+          console.log(`[Dashboard Assistant] 🤖 Requesting fallback model: ${modelName}`);
           const model = genAI.getGenerativeModel({ 
             model: modelName,
             generationConfig: {
-              maxOutputTokens: 500,
-              temperature: 0.4,
+              maxOutputTokens: 3000,
+              temperature: 0.7,
             }
           });
           const result = await model.generateContent([systemContext, prompt]);
@@ -190,25 +214,6 @@ exports.generateDashboardAssistantResponse = async (prompt, systemContext, userI
           console.warn(`⚠️ [Dashboard Assistant] ${modelName} failed: ${geminiErr.message}. Trying next fallback...`);
         }
       }
-    }
-
-    // 🚀 Fallback to OpenAI gpt-4o-mini
-    if (!aiSuccess && hasOpenAI) {
-      console.log(`[Dashboard Assistant] 🤖 Requesting model: ${MODELS.OPENAI_MINI}`);
-      const completion = await openai.chat.completions.create({
-        model: MODELS.OPENAI_MINI,
-        messages: [
-          { role: "system", content: systemContext },
-          { role: "user", content: prompt }
-        ],
-      });
-
-      if (userId) {
-        aiUsageTracker.trackUsage({ userId, feature: 'dashboard-assistant', provider: 'openai', model: MODELS.OPENAI_MINI, usage: completion.usage });
-      }
-
-      console.log(`✅ [Dashboard Assistant] Responded using model: ${MODELS.OPENAI_MINI}`);
-      return completion.choices[0].message;
     }
 
     throw new Error('All AI Models failed or API keys are missing/dummy.');

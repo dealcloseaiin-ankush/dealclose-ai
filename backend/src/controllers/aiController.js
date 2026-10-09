@@ -397,8 +397,8 @@ ${onboardingChecklist}
 1. ABSOLUTE RULE: NEVER ask the user "Who are you?", "What is your name?", "What is your city?", or "What does your business do?". You ALREADY KNOW their full store, profile, and business details above!
 2. Greet the owner respectfully (e.g., "${user.fullName || 'Sir/Ma\'am'}") and assist them immediately with their request (drafting marketing messages, WhatsApp/Instagram templates, offers, social posts, CRM questions, or automating customer replies).
 3. MATCH LANGUAGE: Always reply in the EXACT same language the user speaks. If the user writes in Hindi or Hinglish, YOU MUST reply entirely in natural, friendly Hinglish.
-4. BE CONCISE & FAST: Keep your answers crisp, professional, and tailored to "${effectiveBusinessName}".
-5. If the user asks for a template, marketing campaign, or offer, craft ready-to-use copy tailored specifically to their products, services, and customers.`;
+4. CONTENT PLANS & SCHEDULES: If the user asks for a marketing strategy, content plan, calendar, or post schedule (like 4-week Instagram/WhatsApp plan, weekly ideas), NEVER give a short summary, teaser, or placeholder! ALWAYS write out the COMPLETE, detailed, week-by-week, post-by-post actionable plan with exact posting days, themes, caption hooks, and relevant hashtags!
+5. READY-TO-USE COPY: If the user asks for a template, marketing campaign, caption, or offer, craft complete ready-to-use copy formatted cleanly with emojis, bullet points, and bold headers tailored to "${effectiveBusinessName}".`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext, userId);
 

@@ -8,10 +8,9 @@ const OpenAI = require('openai');
 
 // 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS FOR AUTOMARKETER
 const MODELS = {
-  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Model
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Flash-Lite Model
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Flash-Lite Model
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Cheapest Model Fallback
+  OPENAI_MINI: 'gpt-4o-mini',                // Priority 1: Primary High-Quality Model
+  GEMINI_1_5_FLASH: 'gemini-1.5-flash',      // Priority 2: Google Gemini 1.5 Flash
+  GEMINI_2_0_FLASH: 'gemini-2.0-flash',      // Priority 3: Google Gemini 2.0 Flash
 };
 
 // 🚀 NEW: Replicate client for image generation
@@ -64,19 +63,37 @@ exports.generatePost = async (req, res) => {
     let aiSuccess = false;
 
     let rawAiResponse = "";
-    // 🚀 MULTI-MODEL DYNAMIC CHAIN FOR CONTENT SCRIPT GENERATION
-    if (apiKey) {
+    // 🚀 MULTI-MODEL DYNAMIC CHAIN (Priority 1: OpenAI gpt-4o-mini | Priority 2: Gemini 1.5/2.0 Flash)
+    if (hasOpenAI) {
+      try {
+        console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.OPENAI_MINI}`);
+        const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const chatCompletion = await openaiClient.chat.completions.create({
+          model: MODELS.OPENAI_MINI,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Topic: "${prompt}"` }
+          ],
+        });
+        console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.OPENAI_MINI}`);
+        rawAiResponse = chatCompletion.choices[0].message.content;
+        aiSuccess = true;
+      } catch (openaiErr) {
+        console.warn(`⚠️ [Auto-Marketer] ${MODELS.OPENAI_MINI} failed: ${openaiErr.message}. Trying Gemini fallback...`);
+      }
+    }
+
+    if (!aiSuccess && apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const geminiOrder = [
-        MODELS.GEMINI_3_5_LITE,
-        MODELS.GEMINI_3_1_LITE,
-        MODELS.GEMINI_2_5_LITE,
+        MODELS.GEMINI_1_5_FLASH,
+        MODELS.GEMINI_2_0_FLASH,
       ];
 
       for (const modelName of geminiOrder) {
         if (aiSuccess) break;
         try {
-          console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${modelName}`);
+          console.log(`[Auto-Marketer] 🤖 Requesting fallback model: ${modelName}`);
           const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([systemPrompt, `Topic: "${prompt}"`]);
           console.log(`✅ [Auto-Marketer] Responded using model: ${modelName}`);
@@ -86,22 +103,6 @@ exports.generatePost = async (req, res) => {
           console.warn(`⚠️ [Auto-Marketer] ${modelName} busy/failed, trying next fallback...`);
         }
       }
-    }
-
-    // Level 3: Final Fallback to OpenAI gpt-4o-mini
-    if (!aiSuccess && hasOpenAI) {
-      console.log(`[Auto-Marketer] 🤖 Requesting caption model: ${MODELS.OPENAI_MINI}`);
-      const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const chatCompletion = await openaiClient.chat.completions.create({
-        model: MODELS.OPENAI_MINI,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Topic: "${prompt}"` }
-        ],
-      });
-      console.log(`✅ [Auto-Marketer] Responded using model: ${MODELS.OPENAI_MINI}`);
-      rawAiResponse = chatCompletion.choices[0].message.content;
-      aiSuccess = true;
     }
 
     // Fallback static caption structure if all AI keys are offline
