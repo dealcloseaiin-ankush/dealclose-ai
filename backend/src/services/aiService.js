@@ -52,6 +52,7 @@ exports.generateAIResponse = async (prompt, systemContext = "You are a helpful A
     }
     
     finalContext += "\n\n[STRICT BUSINESS BOUNDARY]: You are exclusively an AI sales representative for THIS business only. Never answer coding or unrelated general knowledge. If out of scope, say: 'Main sirf [Business Name] se related services me help kar sakta hoon.'";
+    finalContext += "\n\n[NO UNAUTHORIZED DISCOUNTS (STRICT RULE)]: NEVER invent, assume, or commit to any discounts, percentage off (% OFF), cashbacks, or price cuts on your own! Business margins belong strictly to the owner. Only mention a specific discount if it is explicitly stated in the business profile/catalog above. If a customer asks for a discount or bargain, politely say that our rates are already the best/wholesale rates, or that the owner/manager will confirm any special custom deal for them.";
 
     let rawResponse = "";
     let aiSuccess = false;
