@@ -16,7 +16,8 @@ export default function Publisher() {
   const [filter, setFilter] = useState('all'); // all, scheduled, published, drafts, failed
   const [analytics, setAnalytics] = useState(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
-  const [plannerPrompt, setPlannerPrompt] = useState('Create a 4-week Instagram content plan for my business. Suggest 3 posts per week, ideal posting days, and how to improve the caption angle for better engagement.');
+  const DEFAULT_1WEEK_PROMPT = 'Create a 1-week Instagram content plan starting from today. Suggest high-converting posts and reels, ideal posting times, clear captions, and hashtags for our business.';
+  const [plannerPrompt, setPlannerPrompt] = useState(DEFAULT_1WEEK_PROMPT);
   const [plannerResponse, setPlannerResponse] = useState('');
   const [plannerLoading, setPlannerLoading] = useState(false);
   const [plannerScheduleLoading, setPlannerScheduleLoading] = useState(false);
@@ -42,6 +43,33 @@ export default function Publisher() {
       setWorkspaces([{ _id: 'main', name: user.businessName || 'Main Business' }, ...(user.workspaces || [])]);
     }
   }, [user]);
+
+  // 💾 Auto-save & Restore AI Content Planner from LocalStorage (Never Lose Prompts or Plans)
+  useEffect(() => {
+    const savedPrompt = localStorage.getItem('dealclose_saved_planner_prompt');
+    const savedResponse = localStorage.getItem('dealclose_saved_planner_response');
+    if (savedPrompt) setPlannerPrompt(savedPrompt);
+    if (savedResponse) setPlannerResponse(savedResponse);
+  }, []);
+
+  const handleUpdatePlannerPrompt = (newPrompt) => {
+    setPlannerPrompt(newPrompt);
+    localStorage.setItem('dealclose_saved_planner_prompt', newPrompt);
+  };
+
+  const handleClearSavedPlan = () => {
+    if (window.confirm('Kya aap saved content plan clear karna chahte hain?')) {
+      setPlannerResponse('');
+      localStorage.removeItem('dealclose_saved_planner_response');
+      toast.success('Saved plan cleared.');
+    }
+  };
+
+  const handleCopyPlan = () => {
+    if (!plannerResponse) return;
+    navigator.clipboard.writeText(plannerResponse);
+    toast.success('Full content plan copied to clipboard! 📋');
+  };
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -317,8 +345,10 @@ export default function Publisher() {
       });
 
       if (data.success) {
-        setPlannerResponse(data.reply || 'No AI planning response received.');
-        toast.success('AI content plan generated.');
+        const reply = data.reply || 'No AI planning response received.';
+        setPlannerResponse(reply);
+        localStorage.setItem('dealclose_saved_planner_response', reply);
+        toast.success('AI content plan generated & saved! 🚀');
       } else {
         throw new Error(data.message || 'Unable to generate AI plan.');
       }
@@ -444,50 +474,114 @@ export default function Publisher() {
         {view === 'planner' && (
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
             <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
-              <h3 className="text-xl font-bold text-white mb-2">AI Content Planner</h3>
-              <p className="text-sm text-gray-400 mb-4">Weekly or monthly content plan create karne ke liye goal, cadence aur content pillars describe karein. AI se plan generate hoga.</p>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>🤖</span> AI Content Planner
+                </h3>
+                <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                  💾 Auto-Saved
+                </span>
+              </div>
+              <p className="text-sm text-gray-400 mb-3">Goal aur topic chunein ya quick buttons dabayein. AI pure hafte ka day-by-day plan ready karega.</p>
+
+              {/* 🎯 QUICK 1-WEEK PRESET BUTTONS */}
+              <div className="flex gap-2 flex-wrap mb-3">
+                <button
+                  type="button"
+                  onClick={() => handleUpdatePlannerPrompt('Create a 1-week Instagram Post Graphics plan starting from today. Provide exact graphic banner headlines, product visual prompts, offer badges, ready-to-copy captions, and hashtags for all 7 days.')}
+                  className="px-3 py-1.5 text-xs font-semibold bg-blue-900/40 text-blue-300 border border-blue-700/50 rounded-lg hover:bg-blue-800/60 transition-colors flex items-center gap-1.5"
+                >
+                  <span>📸</span> 1-Week Post Graphics Plan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdatePlannerPrompt('Create a 1-week Instagram Reels & Short Video plan starting from today. For each reel, provide a 0-3s visual hook, word-by-word spoken Hindi/Hinglish script, screen action, and text overlay for all 7 days.')}
+                  className="px-3 py-1.5 text-xs font-semibold bg-purple-900/40 text-purple-300 border border-purple-700/50 rounded-lg hover:bg-purple-800/60 transition-colors flex items-center gap-1.5"
+                >
+                  <span>🎬</span> 1-Week Reels & Video Plan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdatePlannerPrompt('Create a complete 7-day Instagram content plan starting from today, covering a balanced mix of single image graphics, carousels, and viral reels with full scripts and captions.')}
+                  className="px-3 py-1.5 text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 rounded-lg hover:bg-emerald-800/60 transition-colors flex items-center gap-1.5"
+                >
+                  <span>🌟</span> 1-Week Mixed (Posts + Reels)
+                </button>
+              </div>
+
               <textarea
                 value={plannerPrompt}
-                onChange={(e) => setPlannerPrompt(e.target.value)}
-                rows={8}
-                className="w-full bg-[#0a0a0a] border border-gray-700 text-white rounded-xl p-4 outline-none focus:border-purple-500"
-                placeholder="Example: Create a 4-week Instagram content calendar for our business. Suggest 3 posts every week, the best days to publish, and a CTA for each post."
+                onChange={(e) => handleUpdatePlannerPrompt(e.target.value)}
+                rows={7}
+                className="w-full bg-[#0a0a0a] border border-gray-700 text-white rounded-xl p-4 outline-none focus:border-purple-500 text-sm leading-relaxed"
+                placeholder="Example: Create a 1-week Instagram content plan starting from today. Suggest posts, reels scripts, best times to publish, and CTA..."
               />
-              <div className="mt-4 flex gap-3 flex-wrap">
+
+              <div className="mt-4 flex gap-2.5 flex-wrap">
                 <button
                   onClick={handleGeneratePlanner}
                   disabled={plannerLoading}
-                  className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl"
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-purple-900/20"
                 >
-                  {plannerLoading ? 'Generating...' : 'Generate AI Plan'}
+                  {plannerLoading ? 'Generating Plan...' : '🚀 Generate AI Plan'}
                 </button>
                 <button
                   onClick={handleSchedulePlanner}
                   disabled={plannerScheduleLoading || !plannerResponse.trim()}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl disabled:opacity-50"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm disabled:opacity-50 transition-colors"
                 >
-                  {plannerScheduleLoading ? 'Scheduling...' : 'Schedule AI Plan'}
+                  {plannerScheduleLoading ? 'Scheduling...' : '📅 Schedule AI Plan'}
                 </button>
+                {plannerResponse && (
+                  <>
+                    <button
+                      onClick={handleCopyPlan}
+                      className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl text-sm border border-gray-700 transition-colors"
+                    >
+                      📋 Copy Plan
+                    </button>
+                    <button
+                      onClick={handleClearSavedPlan}
+                      className="px-3 py-2 bg-rose-900/30 hover:bg-rose-900/50 text-rose-300 font-medium rounded-xl text-sm border border-rose-800/40 transition-colors"
+                    >
+                      🗑️ Clear Plan
+                    </button>
+                  </>
+                )}
                 <button
-                  onClick={() => setPlannerPrompt('Create a 4-week Instagram content calendar for my business. Suggest 3 posts per week, the best posting days, and optimization ideas for better engagement.')}
-                  className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700"
+                  onClick={() => handleUpdatePlannerPrompt(DEFAULT_1WEEK_PROMPT)}
+                  className="px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white font-medium rounded-xl text-xs border border-gray-800 transition-colors"
                 >
-                  Reset Prompt
+                  Reset Default
                 </button>
               </div>
             </div>
 
-            <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
-              <h3 className="text-xl font-bold text-white mb-2">Smart Content Roadmap</h3>
-              <p className="text-sm text-gray-400 mb-4">AI generated schedule ko yahan clear roadmap ke roop me dekhna easy hoga.</p>
-              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-                {plannerResponse ? plannerResponse.split('\n').filter(Boolean).map((item, idx) => (
-                  <div key={idx} className="bg-[#0d0d0d] border border-gray-800 rounded-xl p-3 text-sm text-gray-300">
-                    {item}
+            <div className="bg-[#111] border border-gray-800 rounded-2xl p-5 flex flex-col">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>🗺️</span> Smart Content Roadmap
+                </h3>
+                {plannerResponse && (
+                  <button
+                    onClick={handleCopyPlan}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-medium underline flex items-center gap-1"
+                  >
+                    📋 Copy Text
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-gray-400 mb-4">Aapka plan automatically browser me saved rehta hai taaki baad me bhi access kar sakein.</p>
+              
+              <div className="flex-1 space-y-3 max-h-[540px] overflow-y-auto pr-1">
+                {plannerResponse ? (
+                  <div className="bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-sm text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">
+                    {plannerResponse}
                   </div>
-                )) : (
-                  <div className="bg-[#0d0d0d] border border-dashed border-gray-800 rounded-xl p-6 text-center text-gray-500 text-sm">
-                    AI plan generate karne ke liye prompt fill kijiye.
+                ) : (
+                  <div className="bg-[#0d0d0d] border border-dashed border-gray-800 rounded-xl p-8 text-center text-gray-500 text-sm flex flex-col items-center justify-center h-48">
+                    <span className="text-3xl mb-2">💡</span>
+                    <span>AI plan generate karne ke liye upar diye buttons par click karein.</span>
                   </div>
                 )}
               </div>
