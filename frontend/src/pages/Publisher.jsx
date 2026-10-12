@@ -71,6 +71,61 @@ export default function Publisher() {
     toast.success('Full content plan copied to clipboard! 📋');
   };
 
+  const handleCopyDayPost = (postText) => {
+    if (!postText) return;
+    navigator.clipboard.writeText(postText);
+    toast.success('Day post copied! Ab aap isse Instagram ya Canva me paste kar sakte hain 📋');
+  };
+
+  const parsePlanIntoDayCards = (rawText) => {
+    if (!rawText || !rawText.trim()) return [];
+
+    const lines = rawText.split('\n');
+    const cards = [];
+    let currentCard = { title: '', content: [] };
+
+    const isDayHeader = (line) => {
+      const trimmed = line.trim();
+      return (
+        /^#{1,4}\s*(Day\s*\d+|Post\s*\d+|Week\s*\d+)/i.test(trimmed) ||
+        /^(\*{0,2})(Day\s*\d+|DAY\s*\d+|Post\s*\d+|POST\s*\d+):/i.test(trimmed) ||
+        /^(?:📅|🎬|📸|📑|✨)?\s*(Day\s*\d+|DAY\s*\d+|Post\s*\d+|POST\s*\d+)/i.test(trimmed)
+      );
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (trimmed === '---' || trimmed === '***') {
+        if (currentCard.content.length > 0 || currentCard.title) {
+          cards.push(currentCard);
+          currentCard = { title: '', content: [] };
+        }
+        continue;
+      }
+
+      if (isDayHeader(line)) {
+        if (currentCard.content.length > 0 || currentCard.title) {
+          cards.push(currentCard);
+        }
+        currentCard = { 
+          title: trimmed.replace(/^[#*📅🎬📸📑✨\s]+/, '').replace(/[*#]+$/, '').trim(), 
+          content: [line] 
+        };
+      } else {
+        currentCard.content.push(line);
+      }
+    }
+
+    if (currentCard.content.length > 0 || currentCard.title) {
+      cards.push(currentCard);
+    }
+
+    const validCards = cards.filter(c => c.content.join('').trim().length > 0);
+    return validCards.length > 0 ? validCards : [{ title: 'Full 1-Week Content Plan', content: lines }];
+  };
+
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
@@ -573,10 +628,36 @@ export default function Publisher() {
               </div>
               <p className="text-sm text-gray-400 mb-4">Aapka plan automatically browser me saved rehta hai taaki baad me bhi access kar sakein.</p>
               
-              <div className="flex-1 space-y-3 max-h-[540px] overflow-y-auto pr-1">
+              <div className="flex-1 space-y-3.5 max-h-[540px] overflow-y-auto pr-1">
                 {plannerResponse ? (
-                  <div className="bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-sm text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">
-                    {plannerResponse}
+                  <div className="space-y-3">
+                    {parsePlanIntoDayCards(plannerResponse).map((card, cardIdx) => {
+                      const cardText = card.content.join('\n').trim();
+                      return (
+                        <div key={cardIdx} className="bg-[#0c0c10] border border-gray-800 hover:border-purple-500/40 rounded-xl p-3.5 transition-all shadow-md space-y-2">
+                          <div className="flex items-center justify-between border-b border-gray-800/80 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-md bg-purple-500/20 text-purple-300 font-black text-xs flex items-center justify-center">
+                                {cardIdx + 1}
+                              </span>
+                              <h4 className="font-bold text-white text-xs sm:text-sm">
+                                {card.title || `Post #${cardIdx + 1}`}
+                              </h4>
+                            </div>
+                            <button
+                              onClick={() => handleCopyDayPost(cardText)}
+                              className="text-xs bg-gray-800 hover:bg-purple-600 text-gray-200 hover:text-white px-2.5 py-1 rounded-lg border border-gray-700 hover:border-purple-500 transition-all flex items-center gap-1 font-semibold shadow-sm"
+                              title="Copy only this Day's Post"
+                            >
+                              <span>📋</span> Copy Post
+                            </button>
+                          </div>
+                          <div className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed font-sans">
+                            {cardText}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="bg-[#0d0d0d] border border-dashed border-gray-800 rounded-xl p-8 text-center text-gray-500 text-sm flex flex-col items-center justify-center h-48">

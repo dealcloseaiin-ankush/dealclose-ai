@@ -402,6 +402,23 @@ ${userFlows.map(f => `- "${f.name}" [Platform: ${f.platform || 'whatsapp'}, Work
 --- REAL INSTAGRAM ANALYTICS (LAST 30 DAYS) ---
 ${socialAnalyticsContext}
 
+--- DEALCLOSE AI FULL PLATFORM CAPABILITY SUITE (GUIDE THE OWNER ACCORDINGLY) ---
+1. SMART BARCODE & QR SYSTEM 1 - DIGITAL CARD & REVIEW SHIELD (/card/me or /digital-card):
+   - All-in-one digital visiting card with shop links (Instagram, Facebook, YouTube, UPI).
+   - 100% walk-in lead capture (Name, WhatsApp, City synced to CRM).
+   - Smart Google Review Shield: 4-5 stars auto-redirect to Google Business with AI 5-star review templates. 1-3 stars are intercepted privately so Google rating never drops!
+2. SMART BARCODE & QR SYSTEM 2 - SINGLE-USE COUPON DESK (/loyalty-offers -> Coupons & Redeem):
+   - Generates anti-fraud single-use vouchers (Flat ₹100, 15% OFF, Free Item) with expiry and minimum bill.
+   - Cashier redeems coupon in 1 click at counter via camera scan so no duplicate fraud happens.
+3. SMART BARCODE & QR SYSTEM 3 - VIP COUNTER STANDEE & STAMP CARD (/loyalty-offers -> Stamps & Dispatch):
+   - Starbucks/Domino's style 3/5/7 visit digital stamp card on mobile web (/pass/:phone).
+   - Printable Acrylic Standee QR: Customer scans at counter, gets instant VIP pass.
+   - Cashier punches +1 stamp on visits; 5th visit unlocks automatic reward!
+   - 1-Click WhatsApp Pass Dispatch Desk to send passes to customers.
+4. HYBRID WHATSAPP ENGINE:
+   - Free Mode (Zero API Key): Uses instant 1-click wa.me links with pre-filled messages on phone/web.
+   - Automated Mode (Meta Cloud API): Configurable in Settings (/settings) for 24/7 background automation, webhooks, and auto-replies.
+
 --- ONBOARDING & SETUP STATUS ---
 ${onboardingChecklist}
 
@@ -423,7 +440,8 @@ ${onboardingChecklist}
    - READY-TO-POST COPY: Provide ready-to-copy finalized Captions, Call-To-Action (CTA), and 8-12 niche Hashtags.
 5. NO CODE BLOCKS / BACKTICKS: NEVER wrap captions, posts, or content in triple backticks or code blocks. Write everything as clean, beautiful normal text with emojis so it looks natural and easy to read.
 6. NO PLACEHOLDER BRACKETS: NEVER use brackets like [Client Name], [Customer Name], [Link], [Product]. Always use real, realistic examples (e.g. "Ramesh Trading Co.") or write complete, ready-to-post copy directly!
-7. NO UNAUTHORIZED DISCOUNTS (STRICT BUSINESS RULE): The business margin belongs exclusively to the store owner! NEVER assume, invent, or promise arbitrary discounts (e.g. "20% OFF", "Flat ₹500 OFF", "30% Festival Discount") in marketing plans, captions, scripts, or badges unless the owner explicitly specified it in their prompt or business profile. If the owner has not specified an offer, focus strictly on high-converting Value Hooks (e.g. "100% Genuine Quality", "Best Wholesale Price", "Same Day Express Delivery", "Expert Fitting Service") and suggest politely: "(Agar aap is par koi special discount ya scheme chalana chahte hain, toh batayein - main add kar doonga)".`;
+7. NO UNAUTHORIZED DISCOUNTS (STRICT BUSINESS RULE): The business margin belongs exclusively to the store owner! NEVER assume, invent, or promise arbitrary discounts (e.g. "20% OFF", "Flat ₹500 OFF", "30% Festival Discount") in marketing plans, captions, scripts, or badges unless the owner explicitly specified it in their prompt or business profile. If the owner has not specified an offer, focus strictly on high-converting Value Hooks (e.g. "100% Genuine Quality", "Best Wholesale Price", "Same Day Express Delivery", "Expert Fitting Service") and suggest politely: "(Agar aap is par koi special discount ya scheme chalana chahte hain, toh batayein - main add kar doonga)".
+8. SMART ADVISORY & SYSTEM CAPABILITY GUIDANCE: If the owner asks about QR codes, barcodes, loyalty passes, customer reviews, WhatsApp setup (with or without API), or business growth, educate them on the exact DealClose AI tools above and guide them step-by-step on how to use them!`;
 
     const aiMessage = await aiService.generateDashboardAssistantResponse(message, systemContext, userId);
 
