@@ -497,9 +497,9 @@ export default function DigitalCard() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            🛍️ WHAT WE SELL / FEATURED PRODUCTS & SERVICES
+            🛍️ WHAT WE SELL / FEATURED PRODUCTS & WHATSAPP CATALOG
         ───────────────────────────────────────────────────────────── */}
-        {products && products.length > 0 && (
+        {products && products.length > 0 ? (
           <div className="space-y-3 pt-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -552,8 +552,42 @@ export default function DigitalCard() {
                 </div>
               ))}
             </div>
+
+            {businessPhone && (
+              <a
+                href={`https://wa.me/c/${businessPhone.replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-2.5 px-3 bg-[#122e1b]/80 hover:bg-[#163821] border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
+                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                <span>Open Full Catalog on WhatsApp ↗</span>
+              </a>
+            )}
           </div>
-        )}
+        ) : businessPhone ? (
+          <div className="pt-1">
+            <a
+              href={`https://wa.me/c/${businessPhone.replace(/[^0-9]/g, '')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full p-3.5 bg-gradient-to-r from-emerald-950/40 to-[#122e1b] hover:from-emerald-950/70 hover:to-[#163821] border border-emerald-500/40 rounded-2xl flex items-center justify-between group transition-all shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-300">
+                    Browse WhatsApp Business Catalog
+                  </div>
+                  <span className="text-[10px] text-gray-400">View all items & pricing directly on WhatsApp</span>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-emerald-400" />
+            </a>
+          </div>
+        ) : null}
 
         {/* ─────────────────────────────────────────────────────────────
             🎥 RECENT REELS & POSTS SHOWCASE (AUTO-FETCHED ZERO URL INPUT)
