@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getProfile, updateProfile, getStaff, addStaff, deleteStaff } = require('../controllers/authController');
+const { getProfile, updateProfile, getStaff, addStaff, deleteStaff, getPublicDigitalCard } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware'); 
+
+// @route   GET /api/users/public-card/:userId (Public Visiting Card & NFC Profile)
+router.get('/public-card/:userId', getPublicDigitalCard);
 
 // @route   GET /api/users/profile
 router.get('/profile', protect, getProfile);

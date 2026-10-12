@@ -13,6 +13,7 @@ console.log('========================================================');
 
 const bcrypt = require('bcryptjs');
 const Flow = require('../models/flowModel');
+const Post = require('../models/postModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
 
@@ -1550,5 +1551,142 @@ exports.deleteStaff = async (req, res) => {
   } catch (error) {
     console.error('Delete Staff Error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get Public Digital Card & NFC Smart Profile
+// @route   GET /api/users/public-card/:userId
+exports.getPublicDigitalCard = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { workspaceId, ws } = req.query;
+
+    let user = null;
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
+
+    // Fallback: If not found or if userId is 'me' or 'demo', search by email, phone, or find first registered business
+    if (!user) {
+      if (userId === 'me' || userId === 'demo' || userId === 'demo-business') {
+        user = await User.findOne({ role: { $in: ['owner', 'superadmin'] } }).sort({ createdAt: 1 });
+      } else {
+        user = await User.findOne({ $or: [{ email: userId }, { phone: userId }] });
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Digital Card not found' });
+    }
+
+    const cardConfig = user.digitalCardConfig || {};
+    const brandKit = user.brandKit || {};
+
+    // Match workspace if provided
+    let targetWs = null;
+    const wsParam = workspaceId || ws;
+    if (wsParam && user.workspaces && Array.isArray(user.workspaces)) {
+      targetWs = user.workspaces.find(
+        w => String(w._id) === String(wsParam) ||
+             String(w.id) === String(wsParam) ||
+             String(w.name).toLowerCase() === String(wsParam).toLowerCase()
+      ) || (user.workspaces[parseInt(wsParam, 10)] || null);
+    }
+
+    const businessName = targetWs ? targetWs.name : (brandKit.businessName || user.businessName || 'Our Business');
+    const phone = targetWs?.phone || user.phone || user.ownerPhone || '';
+    const email = targetWs?.email || user.email || '';
+    const address = cardConfig.address || brandKit.address || '';
+    const mapsUrl = cardConfig.mapsUrl || targetWs?.googleBusinessLink || cardConfig.googleBusiness || (address ? `https://maps.google.com/?q=${encodeURIComponent(address)}` : '');
+
+    const publicProfile = {
+      userId: user._id,
+      businessName,
+      ownerName: cardConfig.ownerName || user.name || 'Business Manager',
+      designation: cardConfig.designation || (targetWs ? 'Branch Manager' : 'Business Owner'),
+      tagline: cardConfig.tagline || brandKit.category || user.businessDescription || 'Welcome to our official digital profile',
+      phone,
+      email,
+      logoUrl: brandKit.logoUrl || cardConfig.avatarUrl || '',
+      address,
+      mapsUrl,
+      upiId: cardConfig.upiId || targetWs?.upiId || '',
+      socialLinks: {
+        instagram: cardConfig.instagram || targetWs?.instagramLink || (user.instagramConfig?.username ? `https://instagram.com/${user.instagramConfig.username}` : ''),
+        youtube: cardConfig.youtube || targetWs?.youtubeLink || '',
+        facebook: cardConfig.facebook || targetWs?.facebookLink || '',
+        googleReview: targetWs?.googleBusinessLink || cardConfig.googleReview || cardConfig.googleReviewLink || (cardConfig.googlePlaceId ? `https://search.google.com/local/writereview?placeid=${cardConfig.googlePlaceId}` : ''),
+        website: cardConfig.website || targetWs?.website || targetWs?.externalApiUrl || user.externalApiUrl || ''
+      },
+      products: Array.isArray(cardConfig.products) ? cardConfig.products : [],
+      customLinks: Array.isArray(cardConfig.customLinks) ? cardConfig.customLinks : [],
+      featuredVideo: cardConfig.featuredVideo || '',
+      isPremium: user.isPremium === true || user.role === 'owner' || user.role === 'superadmin'
+    };
+
+    // 🚀 Auto-Fetch Published Posts & Reels (ZERO manual URL needed)
+    let recentMedia = [];
+    try {
+      const posts = await Post.find({
+        userId: user._id,
+        status: 'published',
+        isDeleted: false
+      })
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(6)
+      .select('caption mediaUrls publishedAt platforms platformPostIds');
+
+      if (posts && posts.length > 0) {
+        recentMedia = posts.map(p => ({
+          id: p._id,
+          caption: p.caption || '',
+          mediaUrl: p.mediaUrls && p.mediaUrls[0] ? p.mediaUrls[0].url : '',
+          mediaType: p.mediaUrls && p.mediaUrls[0] ? p.mediaUrls[0].type : 'image',
+          publishedAt: p.publishedAt || p.createdAt,
+          permalink: p.platformPostIds?.instagram ? `https://instagram.com/p/${p.platformPostIds.instagram}` : ''
+        }));
+      }
+
+      // If no local posts, but Meta Instagram Token is active, query Graph API safely
+      if (recentMedia.length === 0 && user.instagramConfig?.accessToken && user.instagramConfig?.instagramBusinessAccountId) {
+        try {
+          const igRes = await axios.get(
+            `https://graph.facebook.com/v21.0/${user.instagramConfig.instagramBusinessAccountId}/media`,
+            {
+              params: {
+                fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp',
+                limit: 6,
+                access_token: user.instagramConfig.accessToken
+              },
+              timeout: 3000
+            }
+          );
+          if (igRes.data?.data && Array.isArray(igRes.data.data)) {
+            recentMedia = igRes.data.data.map(item => ({
+              id: item.id,
+              caption: item.caption || '',
+              mediaUrl: item.media_url || item.thumbnail_url || '',
+              mediaType: item.media_type === 'VIDEO' ? 'video' : 'image',
+              permalink: item.permalink || '',
+              publishedAt: item.timestamp
+            }));
+          }
+        } catch (metaErr) {
+          // Fallback silently if Meta token expired or rate limited
+        }
+      }
+    } catch (postErr) {
+      console.debug('Recent media auto-fetch skipped:', postErr.message);
+    }
+
+    publicProfile.recentMedia = recentMedia;
+
+    return res.status(200).json({
+      success: true,
+      card: publicProfile
+    });
+  } catch (error) {
+    console.error('getPublicDigitalCard Error:', error);
+    res.status(500).json({ success: false, message: 'Server error loading Digital Card' });
   }
 };

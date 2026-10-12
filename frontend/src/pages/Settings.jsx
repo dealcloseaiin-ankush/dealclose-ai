@@ -38,6 +38,13 @@ export default function Settings() {
     igAccessToken: '',
     igAccountId: '',
     fbPageId: '',
+    // 🎴 Smart Digital Card & NFC Visiting Card state
+    ownerName: '',
+    designation: '',
+    address: '',
+    mapsUrl: '',
+    upiId: '',
+    products: [],
     // 🚀 NEW: Brand Kit state
     brandKit: {
       logoUrl: '',
@@ -192,7 +199,14 @@ export default function Settings() {
           fbPageId: savedData.instagramConfig?.facebookPageId || prevConfig.fbPageId,
           brandKit: savedData.brandKit || prevConfig.brandKit || {},
           businessName: savedData.brandKit?.businessName || savedData.businessName || '',
-          ownerPhone: savedData.brandKit?.phone || savedData.ownerPhone || ''
+          ownerPhone: savedData.brandKit?.phone || savedData.ownerPhone || '',
+          // 🎴 Smart Digital Card & NFC Visiting Card fields
+          ownerName: savedData.digitalCardConfig?.ownerName || savedData.name || '',
+          designation: savedData.digitalCardConfig?.designation || '',
+          address: savedData.digitalCardConfig?.address || savedData.brandKit?.address || '',
+          mapsUrl: savedData.digitalCardConfig?.mapsUrl || '',
+          upiId: savedData.digitalCardConfig?.upiId || '',
+          products: Array.isArray(savedData.digitalCardConfig?.products) ? savedData.digitalCardConfig.products : []
         }));
         if (savedData._id) setUserId(savedData._id);
         if (savedData._id) setDevApiKey(savedData._id);
@@ -218,6 +232,28 @@ export default function Settings() {
   const handleBrandKitChange = (e) => {
     const { name, value } = e.target;
     setConfig(prev => ({ ...prev, brandKit: { ...prev.brandKit, [name]: value } }));
+  };
+
+  // 🎴 Digital Card Product Management Helpers
+  const addProduct = () => {
+    if ((config.products || []).length >= 8) return alert("Maximum 8 products allowed on digital visiting card.");
+    setConfig(prev => ({
+      ...prev,
+      products: [...(prev.products || []), { name: '', price: '', description: '' }]
+    }));
+  };
+
+  const removeProduct = (idx) => {
+    setConfig(prev => ({
+      ...prev,
+      products: (prev.products || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleProductChange = (idx, field, value) => {
+    const updated = [...(config.products || [])];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setConfig(prev => ({ ...prev, products: updated }));
   };
 
   const handleWorkspaceChange = (index, field, value) => {
@@ -338,7 +374,13 @@ export default function Settings() {
           facebook: config.facebookLink,
           youtube: config.youtubeLink,
           googleReview: config.googleReviewLink,
-          website: config.websiteLink
+          website: config.websiteLink,
+          ownerName: config.ownerName || '',
+          designation: config.designation || '',
+          address: config.address || '',
+          mapsUrl: config.mapsUrl || '',
+          upiId: config.upiId || '',
+          products: config.products || []
         },
         discountConfig: {
           percentage: config.discountPercentage,
@@ -727,6 +769,198 @@ export default function Settings() {
                       </div>
                     </div>
                   </div>
+
+                {/* 🎴 SMART DIGITAL VISITING CARD & NFC STUDIO */}
+                <div className="bg-[#111111] p-6 rounded-2xl shadow-xl border border-amber-500/30 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-44 h-44 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 relative z-10 border-b border-gray-800 pb-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-amber-400 flex items-center gap-2">
+                        <span>🎴 Smart Digital Card & NFC Studio</span>
+                        <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">NFC Ready ⚡</span>
+                      </h2>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Tap any NFC physical card on a smartphone to open this profile. 1-Tap contact saving, GPS directions & auto-fetched reels!
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={qrUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                      >
+                        <span>👁️ View Live Card ↗</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(qrUrl);
+                          alert('✅ NFC Visiting Card Link copied! Paste it in the "NFC Tools" app to write to your physical card.');
+                        }}
+                        className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>📋 Copy NFC Link</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 relative z-10">
+                    {/* Owner Name, Designation & UPI ID */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-300 uppercase mb-1.5">Owner / Contact Name</label>
+                        <input
+                          type="text"
+                          name="ownerName"
+                          value={config.ownerName || ''}
+                          onChange={handleChange}
+                          placeholder="e.g. Ramesh Sharma"
+                          className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-amber-500 outline-none"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Saved in customer's phonebook as contact name</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-300 uppercase mb-1.5">Designation / Role</label>
+                        <input
+                          type="text"
+                          name="designation"
+                          value={config.designation || ''}
+                          onChange={handleChange}
+                          placeholder="e.g. Founder & Director / Store Manager"
+                          className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-amber-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-300 uppercase mb-1.5">Direct UPI ID (Instant Payment)</label>
+                        <input
+                          type="text"
+                          name="upiId"
+                          value={config.upiId || ''}
+                          onChange={handleChange}
+                          placeholder="e.g. 9876543210@upi or business@okaxis"
+                          className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-amber-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Shop Physical Address & GPS Google Maps Link */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[#16161e] p-4 rounded-xl border border-gray-800">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-300 uppercase mb-1.5">📍 Shop / Office Physical Address</label>
+                        <textarea
+                          rows="2"
+                          name="address"
+                          value={config.address || ''}
+                          onChange={handleChange}
+                          placeholder="e.g. Shop No. 12, Ring Road Market, Surat, Gujarat - 395002"
+                          className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-amber-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-300 uppercase mb-1.5">🗺️ Google Maps Directions Link</label>
+                        <input
+                          type="url"
+                          name="mapsUrl"
+                          value={config.mapsUrl || ''}
+                          onChange={handleChange}
+                          placeholder="https://maps.app.goo.gl/... (Or leave blank to use Google Review place)"
+                          className="w-full bg-[#0a0a0a] border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:border-amber-500 outline-none"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                          When tapped on card, opens Google Maps navigation directly to your door!
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Products & Services Showcase */}
+                    <div className="space-y-3 bg-[#16161e] p-4 rounded-xl border border-gray-800">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                            <span>🛍️ What We Sell (Products & Services Showcase)</span>
+                            <span className="text-[10px] text-gray-400 font-normal">({(config.products || []).length}/8 items)</span>
+                          </h4>
+                          <p className="text-[11px] text-gray-400">Display your top products or services with 1-tap WhatsApp inquiry</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addProduct}
+                          className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black border border-amber-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        >
+                          + Add Product
+                        </button>
+                      </div>
+
+                      {(config.products || []).length === 0 ? (
+                        <div className="p-4 border border-dashed border-gray-800 rounded-xl text-center text-xs text-gray-500">
+                          No specific products added yet. Click "+ Add Product" to display items you sell on your digital visiting card.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {(config.products || []).map((prod, idx) => (
+                            <div key={idx} className="p-3 bg-[#0a0a0a] border border-gray-800 rounded-xl space-y-2 relative">
+                              <button
+                                type="button"
+                                onClick={() => removeProduct(idx)}
+                                className="absolute top-3 right-3 text-gray-500 hover:text-rose-400 text-xs font-bold cursor-pointer"
+                              >
+                                ✕ Remove
+                              </button>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-16">
+                                <div>
+                                  <input
+                                    type="text"
+                                    placeholder="Product / Service Name *"
+                                    value={prod.name || ''}
+                                    onChange={(e) => handleProductChange(idx, 'name', e.target.value)}
+                                    className="w-full bg-[#161622] border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    placeholder="Price / Offer (e.g. ₹599 or Starting ₹999)"
+                                    value={prod.price || ''}
+                                    onChange={(e) => handleProductChange(idx, 'price', e.target.value)}
+                                    className="w-full bg-[#161622] border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    placeholder="Short description / details"
+                                    value={prod.description || ''}
+                                    onChange={(e) => handleProductChange(idx, 'description', e.target.value)}
+                                    className="w-full bg-[#161622] border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* How to write NFC Card info note */}
+                    <div className="p-3.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200/90 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>💡 How to Link Your Physical NFC Card:</span>
+                      </div>
+                      <p className="text-[11px] text-gray-300 leading-relaxed">
+                        1. Download free app <strong>"NFC Tools"</strong> from Google Play Store or Apple App Store on your smartphone. <br />
+                        2. Click <strong>"Write"</strong> ➔ <strong>"Add a record"</strong> ➔ <strong>"Custom URL / URI"</strong> ➔ Paste your copied NFC link. <br />
+                        3. Touch your physical NFC card to the back of your phone — done in 5 seconds!
+                      </p>
+                    </div>
+
+                  </div>
+                </div>
 
                   {/* WhatsApp Meta Config */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
