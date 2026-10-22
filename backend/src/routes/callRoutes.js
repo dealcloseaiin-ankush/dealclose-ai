@@ -8,7 +8,9 @@ const {
   batchAssignToday,
   logManualCall,
   getVoiceScripts,
-  triggerAiVoiceCampaign
+  triggerAiVoiceCampaign,
+  importAccountingBills,
+  togglePaymentStatus
 } = require('../controllers/callController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -24,5 +26,9 @@ router.get('/buckets', protect, getCallingBuckets);
 router.put('/bucket-move', protect, moveCallingBucket);
 router.post('/batch-assign-today', protect, batchAssignToday);
 router.post('/log-manual', protect, logManualCall);
+
+// 💳 Accounting Dues Sync & 1-Click Settlement (Tally / Busy / Vyapar / Marg)
+router.post('/import-accounting-bills', protect, importAccountingBills);
+router.patch('/toggle-payment-status/:leadId', protect, togglePaymentStatus);
 
 module.exports = router;

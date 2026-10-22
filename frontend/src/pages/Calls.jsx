@@ -5,9 +5,11 @@ import {
   FileText, Clock, Radio, Smartphone, Zap, Calendar, User, CheckCircle2,
   AlertTriangle, RefreshCw, X, ArrowRight, MessageSquare, ChevronRight,
   Plus, Check, Sparkles, Filter, Layers, PhoneCall, Shield, Search,
-  Square, CheckSquare, Settings2, Play, Users, Flame, Send
+  Square, CheckSquare, Settings2, Play, Users, Flame, Send,
+  FileSpreadsheet, CreditCard, Upload, ArrowDownToLine, DollarSign
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import useWorkspaceStore from '../store/workspaceStore';
@@ -24,6 +26,14 @@ const BUCKET_DEFINITIONS = [
 ];
 
 const PREBUILT_SCRIPTS = [
+  {
+    id: 'payment_reminder',
+    title: '💳 Payment & Due Invoice Reminder',
+    agent: 'Neha (Account Manager)',
+    tag: 'Tally / Busy / Vyapar Sync',
+    pitch: 'Namaste! Accounts department se Neha baat kar rahi hoon. Aapka recent invoice payment balance pending hai. Kya main instant UPI link share kar doon?',
+    action: 'Sends direct UPI / Payment link on WhatsApp'
+  },
   {
     id: 'real_estate',
     title: '🏡 Real Estate Site Visit Confirmation',
@@ -49,14 +59,6 @@ const PREBUILT_SCRIPTS = [
     action: 'Sends VIP QR Pass to WhatsApp'
   },
   {
-    id: 'payment_reminder',
-    title: '💳 Payment & Due Invoice Reminder',
-    agent: 'Neha (Account Manager)',
-    tag: 'Accounts & Billing',
-    pitch: 'Namaste! Accounts department se Neha baat kar rahi hoon. Aapka recent invoice payment balance pending hai. Kya main instant UPI link share kar doon?',
-    action: 'Sends direct UPI / Payment link'
-  },
-  {
     id: 'service_feedback',
     title: '⭐ 5-Star Customer Feedback & Review',
     agent: 'Priya (Happiness Lead)',
@@ -74,7 +76,7 @@ const PREBUILT_SCRIPTS = [
   }
 ];
 
-function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onToggleSelect }) {
+function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onToggleSelect, onTogglePayment }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead._id || lead.id });
 
   const style = {
@@ -87,6 +89,9 @@ function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onTog
     if (!lead.followUpDate) return false;
     return new Date(lead.followUpDate).getTime() < new Date().getTime();
   }, [lead.followUpDate]);
+
+  const hasDueInfo = (lead.dueAmount && lead.dueAmount > 0) || lead.invoiceNumber;
+  const isPaid = lead.paymentStatus === 'paid';
 
   return (
     <div
@@ -120,7 +125,11 @@ function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onTog
           </div>
         </div>
 
-        {lead.status === 'hot' || lead.status === 'vip' ? (
+        {isPaid ? (
+          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1">
+            <CheckCircle2 size={10} /> PAID
+          </span>
+        ) : lead.status === 'hot' || lead.status === 'vip' ? (
           <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1">
             <Flame size={10} /> HOT
           </span>
@@ -135,6 +144,45 @@ function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onTog
           <span className="bg-gray-800 text-gray-400 px-2 py-0.5 rounded-md text-[10px] font-medium">Uncalled</span>
         )}
       </div>
+
+      {/* Accounting Dues / Bill Banner */}
+      {hasDueInfo && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`p-2 rounded-xl text-xs flex items-center justify-between gap-1.5 border ${
+            isPaid
+              ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+              : 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+          }`}
+        >
+          <div className="flex flex-col">
+            <span className="font-bold flex items-center gap-1">
+              <CreditCard size={11} className={isPaid ? 'text-emerald-400' : 'text-amber-400'} />
+              ₹{Number(lead.dueAmount || 0).toLocaleString('en-IN')}
+              {lead.invoiceNumber && <span className="text-[10px] text-gray-400 font-mono">({lead.invoiceNumber})</span>}
+            </span>
+            {lead.overdueDays > 0 && !isPaid && (
+              <span className="text-[10px] text-amber-400/90 font-medium">⚠️ {lead.overdueDays}d overdue</span>
+            )}
+            {isPaid && (
+              <span className="text-[10px] text-emerald-400 font-medium">🛡️ Calling Turned OFF</span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => onTogglePayment && onTogglePayment(lead, e)}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shadow-sm ${
+              isPaid
+                ? 'bg-emerald-800/80 hover:bg-emerald-700 text-white border border-emerald-500/40'
+                : 'bg-amber-600 hover:bg-amber-500 text-white'
+            }`}
+            title={isPaid ? 'Payment received! Click to re-open' : 'Click to mark Paid & turn off calling'}
+          >
+            {isPaid ? '✅ Paid (Undo)' : 'Mark Paid'}
+          </button>
+        </div>
+      )}
 
       {lead.followUpDate && (
         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
@@ -155,10 +203,15 @@ function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onTog
       <div className="flex items-center gap-2 pt-1 border-t border-gray-800/60" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => onAiCall(lead)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md"
-          title="Instant AI Voice Agent Call"
+          disabled={isPaid}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md ${
+            isPaid
+              ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
+              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white'
+          }`}
+          title={isPaid ? 'Lead is Paid. AI calls disabled.' : 'Instant AI Voice Agent Call'}
         >
-          <Bot size={13} /> AI Call
+          <Bot size={13} /> {isPaid ? 'Settled' : 'AI Call'}
         </button>
         <button
           onClick={() => onCall(lead)}
@@ -179,7 +232,7 @@ function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onTog
   );
 }
 
-function CallingBucketColumn({ bucketDef, leads, onCall, onLogCall, onAiCall, selectedLeadIds, onToggleSelect }) {
+function CallingBucketColumn({ bucketDef, leads, onCall, onLogCall, onAiCall, selectedLeadIds, onToggleSelect, onTogglePayment }) {
   const { setNodeRef, isOver } = useDroppable({ id: bucketDef.id });
 
   return (
@@ -210,6 +263,7 @@ function CallingBucketColumn({ bucketDef, leads, onCall, onLogCall, onAiCall, se
               onAiCall={onAiCall}
               isSelected={selectedLeadIds.includes(lead._id || lead.id)}
               onToggleSelect={onToggleSelect}
+              onTogglePayment={onTogglePayment}
             />
           ))}
           {leads.length === 0 && (
@@ -246,9 +300,9 @@ export default function Calls() {
   const [leadFilterTab, setLeadFilterTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [selectedScriptId, setSelectedScriptId] = useState('real_estate');
+  const [selectedScriptId, setSelectedScriptId] = useState('payment_reminder');
   const [customPitchText, setCustomPitchText] = useState('');
-  const [selectedVoiceAgent, setSelectedVoiceAgent] = useState('Priya (Indian Female - Natural Hindi)');
+  const [selectedVoiceAgent, setSelectedVoiceAgent] = useState('Neha (Account Manager)');
   const [showScriptStudioModal, setShowScriptStudioModal] = useState(false);
   const [isLaunchingCampaign, setIsLaunchingCampaign] = useState(false);
 
@@ -256,6 +310,13 @@ export default function Calls() {
 
   const [callHistory, setCallHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Accounting Import & Settlement State
+  const [showAccountingModal, setShowAccountingModal] = useState(false);
+  const [accountingSoftware, setAccountingSoftware] = useState('Tally Prime');
+  const [parsedBills, setParsedBills] = useState([]);
+  const [isImportingBills, setIsImportingBills] = useState(false);
+  const [importSummary, setImportSummary] = useState(null);
 
   const [logModalLead, setLogModalLead] = useState(null);
   const [logFormData, setLogFormData] = useState({
@@ -299,16 +360,23 @@ export default function Calls() {
       if (leadFilterTab === 'fresh' && l.callingBucket && l.callingBucket !== 'fresh_pool') return false;
       if (leadFilterTab === 'today' && l.callingBucket !== 'today_queue') return false;
       if (leadFilterTab === 'followup' && l.callingBucket !== 'scheduled_followup') return false;
+      if (leadFilterTab === 'dues' && (!(l.dueAmount > 0 || l.invoiceNumber) || l.paymentStatus === 'paid')) return false;
+      if (leadFilterTab === 'paid' && l.paymentStatus !== 'paid') return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const nameMatch = (l.name || '').toLowerCase().includes(q);
         const phoneMatch = (l.phoneNumber || l.phone || '').includes(q);
-        if (!nameMatch && !phoneMatch) return false;
+        const invMatch = (l.invoiceNumber || '').toLowerCase().includes(q);
+        if (!nameMatch && !phoneMatch && !invMatch) return false;
       }
       return true;
     });
   }, [allLeadsList, leadFilterTab, searchQuery]);
+
+  const currentScriptObj = useMemo(() => {
+    return PREBUILT_SCRIPTS.find(s => s.id === selectedScriptId) || PREBUILT_SCRIPTS[0];
+  }, [selectedScriptId]);
 
   const fetchBuckets = async () => {
     setLoading(true);
@@ -388,19 +456,168 @@ export default function Calls() {
   };
 
   const handleQuickSelectCount = (count) => {
-    const targetIds = filteredLeads.slice(0, count).map(l => l._id || l.id);
+    const targetIds = filteredLeads.filter(l => l.paymentStatus !== 'paid').slice(0, count).map(l => l._id || l.id);
     setSelectedLeadIds(targetIds);
-    toast.success(`Selected top ${targetIds.length} leads! 🎯`);
+    toast.success(`Selected ${targetIds.length} leads for calling! 🎯`);
   };
 
   const handleSelectAllFiltered = () => {
-    const allIds = filteredLeads.map(l => l._id || l.id);
+    const allIds = filteredLeads.filter(l => l.paymentStatus !== 'paid').map(l => l._id || l.id);
     setSelectedLeadIds(allIds);
-    toast.success(`Selected all ${allIds.length} leads in view!`);
+    toast.success(`Selected ${allIds.length} active leads in view!`);
   };
 
   const handleClearSelection = () => {
     setSelectedLeadIds([]);
+  };
+
+  // 1-Click Payment Status Toggle (Settlement)
+  const handleTogglePaymentStatus = async (lead, e) => {
+    if (e) e.stopPropagation();
+    const leadId = lead._id || lead.id;
+    const currentStatus = lead.paymentStatus || 'pending';
+    const targetStatus = currentStatus === 'paid' ? 'pending' : 'paid';
+
+    // Optimistic UI update
+    setBuckets(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(bKey => {
+        updated[bKey] = updated[bKey].map(l => {
+          if ((l._id || l.id) === leadId) {
+            return {
+              ...l,
+              paymentStatus: targetStatus,
+              isCallEnabled: targetStatus !== 'paid'
+            };
+          }
+          return l;
+        });
+      });
+      return updated;
+    });
+
+    // Remove from selected list if marked paid
+    if (targetStatus === 'paid') {
+      setSelectedLeadIds(prev => prev.filter(id => id !== leadId));
+    }
+
+    try {
+      await api.patch(`/calls/toggle-payment-status/${leadId}`, {
+        status: targetStatus,
+        isCallEnabled: targetStatus !== 'paid'
+      });
+
+      if (targetStatus === 'paid') {
+        toast.success(`✅ Bill marked as PAID (पेमेंट जमा)! Calling turned OFF for ${lead.name || 'Party'}.`);
+      } else {
+        toast.success(`🔄 Bill re-opened as PENDING for ${lead.name || 'Party'}.`);
+      }
+    } catch (err) {
+      console.error('Toggle Payment Status Error:', err);
+      toast.error('Failed to update payment status');
+      fetchBuckets();
+    }
+  };
+
+  // Excel Upload Parser for Tally / Busy / Vyapar / Marg
+  const handleAccountingExcelFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!rawRows || rawRows.length === 0) {
+          toast.error('Excel sheet is empty or invalid.');
+          return;
+        }
+
+        const sample = rawRows[0];
+        const keys = Object.keys(sample);
+        const findKey = (reg) => keys.find(k => reg.test(k.trim().toLowerCase())) || '';
+
+        const nameKey = findKey(/party|customer|client|ledger|buyer|account.*name|name/i);
+        const phoneKey = findKey(/mobile|phone|contact|cell|tel/i);
+        const invoiceKey = findKey(/invoice|inv|bill|vch|voucher|ref/i);
+        const amountKey = findKey(/balance|pending|due|amount|net|closing|debit/i);
+        const daysKey = findKey(/overdue|due.*day|days|ageing/i);
+        const dateKey = findKey(/date|dt/i);
+
+        const list = rawRows.map((row, idx) => {
+          const name = (nameKey ? row[nameKey] : '') || row['Name'] || row['Party Name'] || `Party #${idx + 1}`;
+          const phone = (phoneKey ? row[phoneKey] : '') || row['Mobile'] || row['Phone'] || '';
+          const inv = (invoiceKey ? row[invoiceKey] : '') || row['Invoice No'] || row['Bill No'] || '';
+          const rawAmt = (amountKey ? row[amountKey] : '') || row['Amount'] || row['Balance'] || 0;
+          const cleanAmt = typeof rawAmt === 'string' ? parseFloat(rawAmt.replace(/[^0-9.-]+/g, '')) || 0 : Number(rawAmt) || 0;
+          const rawDays = (daysKey ? row[daysKey] : '') || row['Overdue Days'] || 0;
+          const cleanDays = parseInt(String(rawDays).replace(/\D/g, ''), 10) || 0;
+          const dateVal = (dateKey ? row[dateKey] : '') || '';
+          const dateStr = dateVal instanceof Date ? dateVal.toISOString().split('T')[0] : String(dateVal);
+
+          return {
+            name: String(name).trim(),
+            phoneNumber: String(phone).trim(),
+            invoiceNumber: String(inv).trim(),
+            dueAmount: cleanAmt,
+            overdueDays: cleanDays,
+            invoiceDate: dateStr,
+            accountingSoftware
+          };
+        }).filter(item => item.name || item.phoneNumber || item.invoiceNumber);
+
+        if (list.length === 0) {
+          toast.error('Could not detect valid bills in this sheet.');
+          return;
+        }
+
+        setParsedBills(list);
+        toast.success(`Loaded ${list.length} bills from ${accountingSoftware} sheet!`);
+      } catch (err) {
+        console.error('File parsing error:', err);
+        toast.error('Failed to parse file. Make sure it is an .xlsx or .csv format.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Submit Accounting Bills Sync to Backend
+  const handleConfirmAccountingSync = async () => {
+    if (parsedBills.length === 0) {
+      toast.error('No bills loaded to import.');
+      return;
+    }
+
+    setIsImportingBills(true);
+    try {
+      const res = await api.post('/calls/import-accounting-bills', {
+        bills: parsedBills,
+        accountingSoftware,
+        workspaceId: activeWorkspace
+      });
+
+      toast.success(res.data.message || 'Accounting bills synced successfully!', { duration: 6000 });
+      setImportSummary(res.data.summary);
+
+      // Auto switch to Payment Reminder script & Neha voice bot
+      setSelectedScriptId('payment_reminder');
+      setSelectedVoiceAgent('Neha (Professional)');
+      setLeadFilterTab('dues');
+
+      await fetchBuckets();
+      setShowAccountingModal(false);
+      setParsedBills([]);
+    } catch (err) {
+      console.error('Accounting Sync Error:', err);
+      toast.error(err.response?.data?.message || 'Sync failed');
+    } finally {
+      setIsImportingBills(false);
+    }
   };
 
   const handleLaunchAiCampaign = async () => {
@@ -448,105 +665,84 @@ export default function Calls() {
         step: 'All calls completed and logged to CRM!'
       });
 
-      toast.success(res.data?.message || `AI Voice Agent called ${selectedLeadIds.length} leads! 🎙️🚀`, { duration: 5000 });
+      toast.success(res.data.message || `AI Voice calls placed to ${selectedLeadIds.length} leads!`, { duration: 5000 });
       setSelectedLeadIds([]);
       fetchBuckets();
       fetchCallHistory();
     } catch (err) {
-      console.error('Launch AI campaign error:', err);
-      toast.error(err.response?.data?.message || 'Failed to trigger AI voice campaign.');
+      console.error('AI Campaign Error:', err);
+      toast.error(err.response?.data?.message || 'Failed to trigger AI Calling');
       setLiveCallingStatus(null);
     } finally {
       setIsLaunchingCampaign(false);
     }
   };
 
-  const handleSingleLeadAiCall = async (lead) => {
+  const handleSingleLeadAiCall = (lead) => {
     const leadId = lead._id || lead.id;
-    const toastId = toast.loading(`🤖 AI Voice Agent dialing ${lead.name}...`);
-    try {
-      await api.post('/calls/trigger-ai-campaign', {
-        scriptType: selectedScriptId,
-        customPitch: customPitchText,
-        customAgent: selectedVoiceAgent,
-        leadIds: [leadId],
-        workspaceId: activeWorkspace
-      });
-      toast.success(`✅ Call completed with ${lead.name}! Summary recorded in CRM timeline.`, { id: toastId, duration: 4000 });
-      fetchBuckets();
-      fetchCallHistory();
-    } catch (err) {
-      toast.error('Call failed to initiate.', { id: toastId });
+    if (lead.paymentStatus === 'paid') {
+      toast.error('This bill is already settled/PAID. AI calling is disabled.');
+      return;
     }
+    setSelectedLeadIds([leadId]);
+    setShowScriptStudioModal(true);
   };
 
   const handleOpenLogModal = (lead) => {
     setLogModalLead(lead);
     setLogFormData({
-      outcome: lead.lastCallOutcome || 'connected',
-      summary: lead.lastCallSummary || '',
-      followUpDate: lead.followUpDate ? new Date(lead.followUpDate).toISOString().slice(0, 16) : '',
+      outcome: 'connected',
+      summary: '',
+      followUpDate: '',
       targetBucket: lead.callingBucket || 'today_queue',
       callerIdentity: 'staff',
-      customCallerName: '',
-      customCallerPhone: user?.phone || user?.ownerPhone || '',
-      durationMinutes: 2,
-      durationSeconds: 15
+      customCallerName: user?.fullName || 'Staff Member',
+      customCallerPhone: '',
+      durationMinutes: 1,
+      durationSeconds: 45
     });
   };
 
   const handleSaveCallLog = async (e) => {
     e.preventDefault();
     if (!logModalLead) return;
+
     setSubmittingLog(true);
-
     try {
-      let callerLabel = user?.fullName || 'Staff Member';
-      let originPhone = user?.phone || user?.ownerPhone || '';
+      const durSec = (parseInt(logFormData.durationMinutes || 0) * 60) + parseInt(logFormData.durationSeconds || 0);
 
-      if (logFormData.callerIdentity === 'office') {
-        callerLabel = `Office Desk [${user?.businessName || 'HQ'}]`;
-        originPhone = user?.brandKit?.phone || user?.officePhone || '';
-      } else if (logFormData.callerIdentity === 'custom') {
-        callerLabel = logFormData.customCallerName || 'Custom Staff';
-        originPhone = logFormData.customCallerPhone || '';
-      }
-
-      const totalDuration = (Number(logFormData.durationMinutes) || 0) * 60 + (Number(logFormData.durationSeconds) || 0);
-
-      await api.post('/calls/log-manual', {
+      const res = await api.post('/calls/log-manual', {
         leadId: logModalLead._id || logModalLead.id,
         outcome: logFormData.outcome,
         summary: logFormData.summary,
         followUpDate: logFormData.followUpDate || null,
         targetBucket: logFormData.targetBucket,
-        callerType: 'staff',
-        calledFromNumber: originPhone,
-        callerIdentityLabel: callerLabel,
-        durationSeconds: totalDuration
+        callerType: logFormData.callerIdentity,
+        callerIdentityLabel: logFormData.customCallerName,
+        calledFromNumber: logFormData.customCallerPhone,
+        durationSeconds: durSec
       });
 
-      toast.success('Call notes & duration saved! 📝');
+      toast.success('Call notes saved & bucket updated!');
       setLogModalLead(null);
       fetchBuckets();
       fetchCallHistory();
     } catch (err) {
       console.error('Save log error:', err);
-      toast.error(err.response?.data?.message || 'Failed to save call log.');
+      toast.error(err.response?.data?.message || 'Failed to save call log');
     } finally {
       setSubmittingLog(false);
     }
   };
 
-  const currentScriptObj = PREBUILT_SCRIPTS.find(s => s.id === selectedScriptId) || PREBUILT_SCRIPTS[0];
-
   return (
-    <div className="p-3 md:p-8 bg-[#050505] min-h-[calc(100vh-4rem)] text-gray-100 font-sans flex flex-col pb-24 md:pb-12">
+    <div className="space-y-4 md:space-y-6 flex flex-col h-[calc(100vh-80px)]">
       
-      <div className="mb-4 md:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-            <h1 className="text-xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-blue-500 to-indigo-400 flex items-center gap-2">
+      {/* Header Bar */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
               <PhoneCall className="text-emerald-400" size={24} /> AI Calling Hub
             </h1>
             <select
@@ -563,11 +759,21 @@ export default function Calls() {
             </select>
           </div>
           <p className="text-gray-400 text-xs md:text-sm hidden md:block">
-            Select leads, choose AI calling scripts, and launch automated voice outreach with auto-transcription &amp; WhatsApp follow-up.
+            Sync accounting dues (Tally, Busy, Vyapar, Marg) &amp; run automated voice outreach with smart deduplication.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+          
+          {/* Accounting Excel Import Button */}
+          <button
+            onClick={() => setShowAccountingModal(true)}
+            className="px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-950/40"
+            title="Import Excel from Tally Prime, Busy, Vyapar, Marg"
+          >
+            <FileSpreadsheet size={15} /> <span>Import Accounting Excel</span>
+          </button>
+
           <div className="flex bg-[#121216] border border-gray-800 p-1 rounded-xl">
             <button
               onClick={() => setActiveTab('calling')}
@@ -623,6 +829,7 @@ export default function Calls() {
       {activeTab === 'calling' && (
         <div className="space-y-4 flex-1 flex flex-col">
           
+          {/* Active AI Script Banner */}
           <div className="bg-gradient-to-r from-blue-950/70 via-indigo-950/60 to-purple-950/70 border border-blue-500/30 rounded-2xl p-3.5 md:p-4 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
@@ -636,6 +843,11 @@ export default function Calls() {
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">
                     ● Agent: {selectedVoiceAgent.split(' (')[0]}
                   </span>
+                  {selectedScriptId === 'payment_reminder' && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
+                      💳 Dues Recovery Mode
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-300 mt-0.5 line-clamp-1 italic">
                   &ldquo;{selectedScriptId === 'custom' && customPitchText ? customPitchText : currentScriptObj.pitch}&rdquo;
@@ -653,16 +865,18 @@ export default function Calls() {
             </div>
           </div>
 
+          {/* Filter & Search Bar */}
           <div className="bg-[#101014] border border-gray-800/80 p-3 rounded-2xl space-y-3 shadow-md">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
               
               <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 custom-scrollbar">
                 {[
                   { id: 'all', label: `All (${allLeadsList.length})` },
-                  { id: 'hot', label: `🔥 Hot (${allLeadsList.filter(l => l.status === 'hot' || l.status === 'vip').length})` },
-                  { id: 'fresh', label: `🆕 Fresh (${buckets.fresh_pool?.length || 0})` },
-                  { id: 'today', label: `⚡ Today (${buckets.today_queue?.length || 0})` },
-                  { id: 'followup', label: `⏰ Follow-up (${buckets.scheduled_followup?.length || 0})` }
+                  { id: 'dues', label: `💳 Unpaid Dues (${allLeadsList.filter(l => (l.dueAmount > 0 || l.invoiceNumber) && l.paymentStatus !== 'paid').length})` },
+                  { id: 'today', label: `⚡ Today Queue (${buckets.today_queue?.length || 0})` },
+                  { id: 'followup', label: `⏰ Follow-up (${buckets.scheduled_followup?.length || 0})` },
+                  { id: 'fresh', label: `🆕 Fresh Pool (${buckets.fresh_pool?.length || 0})` },
+                  { id: 'paid', label: `✅ Paid (${allLeadsList.filter(l => l.paymentStatus === 'paid').length})` }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -682,7 +896,7 @@ export default function Calls() {
                 <Search size={14} className="absolute left-3 top-3 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search name or phone..."
+                  placeholder="Search name, phone, bill no..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-[#18181f] border border-gray-800 text-white text-xs rounded-xl pl-9 pr-3 py-2 outline-none focus:border-indigo-500"
@@ -698,7 +912,7 @@ export default function Calls() {
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-800/60">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] font-bold text-gray-400 mr-1 flex items-center gap-1">
-                  <Zap size={12} className="text-amber-400" /> Select:
+                  <Zap size={12} className="text-amber-400" /> Select for Call:
                 </span>
                 <button
                   onClick={() => handleQuickSelectCount(5)}
@@ -722,7 +936,7 @@ export default function Calls() {
                   onClick={handleSelectAllFiltered}
                   className="px-2.5 py-1 bg-[#202028] hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition-all"
                 >
-                  Select All
+                  Select Active
                 </button>
                 {selectedLeadIds.length > 0 && (
                   <button
@@ -740,6 +954,7 @@ export default function Calls() {
             </div>
           </div>
 
+          {/* Leads Views: Quick List or Kanban */}
           {viewMode === 'batch_list' ? (
             <div className="space-y-2.5 flex-1 overflow-y-auto">
               {loading ? (
@@ -751,19 +966,23 @@ export default function Calls() {
                 <div className="text-center py-16 bg-[#101014] border border-gray-800 rounded-3xl p-6 space-y-2">
                   <Users size={32} className="mx-auto text-gray-600 mb-2" />
                   <h4 className="text-sm font-bold text-white">No leads found in this view</h4>
-                  <p className="text-xs text-gray-500">Try changing filter tabs or clearing search query.</p>
+                  <p className="text-xs text-gray-500">Try changing filter tabs, importing an Excel sheet, or clearing search query.</p>
                 </div>
               ) : (
                 filteredLeads.map((lead) => {
                   const leadId = lead._id || lead.id;
                   const isSelected = selectedLeadIds.includes(leadId);
+                  const isPaid = lead.paymentStatus === 'paid';
+                  const hasDue = (lead.dueAmount && lead.dueAmount > 0) || lead.invoiceNumber;
 
                   return (
                     <div
                       key={leadId}
-                      onClick={() => handleToggleSelect(leadId)}
+                      onClick={() => !isPaid && handleToggleSelect(leadId)}
                       className={`p-3 md:p-4 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        isSelected
+                        isPaid
+                          ? 'bg-[#0f1412] border-emerald-950/70 opacity-80'
+                          : isSelected
                           ? 'bg-[#141424] border-indigo-500 shadow-md ring-1 ring-indigo-500/40'
                           : 'bg-[#101014] hover:bg-[#15151a] border-gray-800/80 hover:border-gray-700'
                       }`}
@@ -771,11 +990,12 @@ export default function Calls() {
                       <div className="flex items-start gap-3">
                         <button
                           type="button"
+                          disabled={isPaid}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleToggleSelect(leadId);
+                            if (!isPaid) handleToggleSelect(leadId);
                           }}
-                          className="mt-1 text-gray-400 hover:text-indigo-400 transition-colors shrink-0"
+                          className={`mt-1 transition-colors shrink-0 ${isPaid ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-indigo-400'}`}
                         >
                           {isSelected ? (
                             <CheckSquare size={18} className="text-indigo-400 fill-indigo-500/20" />
@@ -784,12 +1004,16 @@ export default function Calls() {
                           )}
                         </button>
                         
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
                             <h4 className="font-bold text-white text-sm">{lead.name || 'Lead'}</h4>
                             <span className="text-xs font-mono text-gray-400">{lead.phoneNumber || lead.phone || 'No Phone'}</span>
                             
-                            {lead.status === 'hot' || lead.status === 'vip' ? (
+                            {isPaid ? (
+                              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1">
+                                <CheckCircle2 size={11} /> PAID (Calling Off)
+                              </span>
+                            ) : lead.status === 'hot' || lead.status === 'vip' ? (
                               <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-0.5">
                                 <Flame size={10} /> HOT
                               </span>
@@ -805,6 +1029,30 @@ export default function Calls() {
                             </span>
                           </div>
 
+                          {/* Accounting Info Row */}
+                          {hasDue && (
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="font-bold text-amber-300 flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+                                <CreditCard size={12} className="text-amber-400" /> ₹{Number(lead.dueAmount || 0).toLocaleString('en-IN')}
+                              </span>
+                              {lead.invoiceNumber && (
+                                <span className="text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded-lg font-mono text-[11px]">
+                                  Inv: {lead.invoiceNumber}
+                                </span>
+                              )}
+                              {lead.overdueDays > 0 && !isPaid && (
+                                <span className="text-rose-400 bg-rose-950/30 border border-rose-500/20 px-2 py-0.5 rounded-lg text-[11px] font-semibold">
+                                  ⚠️ {lead.overdueDays} Days Overdue
+                                </span>
+                              )}
+                              {lead.accountingSoftware && (
+                                <span className="text-gray-500 text-[10px]">
+                                  via {lead.accountingSoftware}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           {lead.lastCallSummary ? (
                             <p className="text-xs text-gray-400 italic line-clamp-1">
                               &ldquo;{lead.lastCallSummary}&rdquo;
@@ -814,19 +1062,40 @@ export default function Calls() {
                               <Clock size={11} /> Next Call: {new Date(lead.followUpDate).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </p>
                           ) : (
-                            <p className="text-[11px] text-gray-500">Uncalled fresh lead ready for AI campaign.</p>
+                            <p className="text-[11px] text-gray-500">Ready for automated voice campaign.</p>
                           )}
                         </div>
                       </div>
 
+                      {/* Action Buttons */}
                       <div className="flex items-center gap-2 self-end sm:self-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {hasDue && (
+                          <button
+                            onClick={(e) => handleTogglePaymentStatus(lead, e)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 ${
+                              isPaid
+                                ? 'bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-amber-600/90 hover:bg-amber-500 text-white'
+                            }`}
+                            title={isPaid ? 'Payment settled! Click to re-open' : 'Click when party pays bill (turns off calling)'}
+                          >
+                            <CheckCircle2 size={13} /> {isPaid ? 'Paid (Undo)' : 'पेमेंट जमा'}
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handleSingleLeadAiCall(lead)}
-                          className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1"
-                          title="Instant AI Call"
+                          disabled={isPaid}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1 ${
+                            isPaid
+                              ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
+                              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white'
+                          }`}
+                          title={isPaid ? 'Settled - Calls disabled' : 'Instant AI Call'}
                         >
                           <Bot size={13} /> AI Call
                         </button>
+
                         <button
                           onClick={() => {
                             const num = lead.phoneNumber || lead.phone;
@@ -838,6 +1107,7 @@ export default function Calls() {
                         >
                           <Phone size={12} /> Direct
                         </button>
+                        
                         <button
                           onClick={() => handleOpenLogModal(lead)}
                           className="p-1.5 bg-[#1e1e24] hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs transition-all border border-gray-700"
@@ -875,6 +1145,7 @@ export default function Calls() {
                         onAiCall={handleSingleLeadAiCall}
                         selectedLeadIds={selectedLeadIds}
                         onToggleSelect={handleToggleSelect}
+                        onTogglePayment={handleTogglePaymentStatus}
                       />
                     ))}
                   </div>
@@ -883,6 +1154,7 @@ export default function Calls() {
             </div>
           )}
 
+          {/* Floating Action Bar */}
           {selectedLeadIds.length > 0 && (
             <div className="fixed bottom-3 left-3 right-3 md:left-64 md:right-8 z-40 bg-[#12121c]/95 backdrop-blur-md border border-indigo-500/50 p-3 rounded-2xl shadow-2xl shadow-indigo-950/60 flex items-center justify-between gap-3 animate-slide-up">
               <div className="flex items-center gap-2.5">
@@ -891,10 +1163,10 @@ export default function Calls() {
                 </div>
                 <div>
                   <h4 className="text-xs md:text-sm font-bold text-white">
-                    {selectedLeadIds.length} Leads Selected for AI Call
+                    {selectedLeadIds.length} Parties Selected for Automated Call
                   </h4>
                   <p className="text-[10px] text-gray-400">
-                    Script: <span className="text-blue-300 font-semibold">{currentScriptObj.title.split(' ')[1] || 'Real Estate'}</span> • {selectedVoiceAgent.split(' (')[0]}
+                    Voice Agent: <span className="text-blue-300 font-semibold">{selectedVoiceAgent.split(' (')[0]}</span> • Script: <span className="text-emerald-300 font-semibold">{currentScriptObj.title.split(' ')[1] || 'Payment'}</span>
                   </p>
                 </div>
               </div>
@@ -904,7 +1176,7 @@ export default function Calls() {
                   onClick={() => setShowScriptStudioModal(true)}
                   className="hidden sm:flex px-3 py-2 bg-[#202030] hover:bg-[#282840] text-gray-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-gray-700"
                 >
-                  <Settings2 size={13} className="mr-1" /> Script
+                  <Settings2 size={13} className="mr-1" /> Change Pitch
                 </button>
 
                 <button
@@ -921,6 +1193,7 @@ export default function Calls() {
         </div>
       )}
 
+      {/* Call History Tab */}
       {activeTab === 'call_logs' && (
         <div className="space-y-3 flex-1 overflow-y-auto">
           <div className="flex justify-between items-center bg-[#101014] border border-gray-800 p-3 rounded-2xl">
@@ -978,7 +1251,7 @@ export default function Calls() {
 
                   <div className="flex items-center gap-2 self-end sm:self-center">
                     <button
-                      onClick={() => toast.success('Playing call audio recording simulation... 🎧')}
+                      onClick={() => toast.success('Playing simulated call audio recording... 🎧')}
                       className="px-3 py-1.5 bg-[#181822] hover:bg-indigo-900/40 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
                     >
                       <PlayCircle size={13} /> Listen Recording
@@ -991,6 +1264,135 @@ export default function Calls() {
         </div>
       )}
 
+      {/* 📥 ACCOUNTING EXCEL IMPORT MODAL (Tally, Busy, Vyapar, Marg) */}
+      {showAccountingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-[#111118] border border-gray-800 rounded-3xl p-5 md:p-7 w-full max-w-2xl shadow-2xl relative my-8 space-y-4">
+            <button
+              onClick={() => { setShowAccountingModal(false); setParsedBills([]); }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white p-1 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center">
+                <FileSpreadsheet size={24} />
+              </div>
+              <div>
+                <h2 className="text-lg md:text-xl font-bold text-white">Import Accounting Dues (Excel / CSV)</h2>
+                <p className="text-xs text-gray-400">Sync pending bills from your accounting software directly into AI Calling queue.</p>
+              </div>
+            </div>
+
+            {/* Software Selection Tabs */}
+            <div>
+              <label className="block text-gray-400 text-xs font-bold mb-2">Select Your Accounting Software:</label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {[
+                  { id: 'Tally Prime', label: '🔵 Tally Prime', hint: 'Receivables Export' },
+                  { id: 'Busy Accounting', label: '🟠 Busy ERP', hint: 'Bill-by-Bill Dues' },
+                  { id: 'Vyapar', label: '🟢 Vyapar App', hint: 'Unpaid Invoices' },
+                  { id: 'Marg ERP', label: '🟣 Marg ERP', hint: 'Party Outstanding' },
+                  { id: 'Custom Excel', label: '⚪ Any Excel/CSV', hint: 'Standard Columns' },
+                ].map(sw => (
+                  <button
+                    key={sw.id}
+                    onClick={() => setAccountingSoftware(sw.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      accountingSoftware === sw.id
+                        ? 'bg-emerald-600/20 border-emerald-500 text-white shadow-sm'
+                        : 'bg-[#161620] border-gray-800 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-white">{sw.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{sw.hint}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Smart Deduplication Explainer Banner */}
+            <div className="bg-[#141824] border border-blue-500/30 rounded-2xl p-3 text-xs text-blue-200 flex items-start gap-2.5">
+              <Shield size={16} className="text-blue-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-white">Smart Deduplication &amp; Protection Active:</p>
+                <p className="text-[11px] text-gray-300 mt-0.5 leading-relaxed">
+                  Agar aap har hafte sheet dubara upload karenge, toh <strong>purana bill duplicate nahi banega</strong> (Ramesh ka wahi pending bill update hoga). Aur jis bill ko aapne <strong>&ldquo;Paid&rdquo;</strong> mark kar diya hai, use galti se bhi dubara call nahi jayegi!
+                </p>
+              </div>
+            </div>
+
+            {/* File Dropzone */}
+            <div className="border-2 border-dashed border-gray-700 hover:border-emerald-500/80 rounded-2xl p-6 text-center transition-all bg-[#0e0e14] relative">
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleAccountingExcelFile}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+              <Upload size={32} className="mx-auto text-emerald-400 mb-2" />
+              <p className="text-sm font-bold text-white">Choose or Drag {accountingSoftware} Excel File Here</p>
+              <p className="text-xs text-gray-400 mt-1">Supports .XLSX, .XLS, or .CSV (Headers: Party Name, Phone, Invoice No, Amount, Overdue Days)</p>
+            </div>
+
+            {/* Parsed Preview Table */}
+            {parsedBills.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-white">
+                    ✅ Detected <span className="text-emerald-400 font-mono font-black">{parsedBills.length}</span> Bills Ready to Sync:
+                  </span>
+                  <span className="text-amber-300 font-bold font-mono">
+                    Total Pending: ₹{parsedBills.reduce((acc, b) => acc + (b.dueAmount || 0), 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto border border-gray-800 rounded-xl overflow-hidden bg-black/40">
+                  <table className="w-full text-[11px] text-left">
+                    <thead className="bg-[#181824] text-gray-400 uppercase font-mono text-[10px] sticky top-0">
+                      <tr>
+                        <th className="p-2">Party Name</th>
+                        <th className="p-2">Phone</th>
+                        <th className="p-2">Invoice #</th>
+                        <th className="p-2">Due Amount</th>
+                        <th className="p-2">Overdue</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800 text-gray-300">
+                      {parsedBills.slice(0, 5).map((b, i) => (
+                        <tr key={i} className="hover:bg-white/5">
+                          <td className="p-2 font-medium text-white">{b.name}</td>
+                          <td className="p-2 font-mono text-gray-400">{b.phoneNumber || '-'}</td>
+                          <td className="p-2 font-mono text-blue-300">{b.invoiceNumber || '-'}</td>
+                          <td className="p-2 font-bold text-amber-300">₹{Number(b.dueAmount || 0).toLocaleString('en-IN')}</td>
+                          <td className="p-2 text-rose-300">{b.overdueDays ? `${b.overdueDays} days` : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsedBills.length > 5 && (
+                    <p className="p-2 text-[10px] text-gray-500 text-center bg-[#121216]">
+                      ...and {parsedBills.length - 5} more bills
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleConfirmAccountingSync}
+                  disabled={isImportingBills}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:opacity-95 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all transform active:scale-95 disabled:opacity-50"
+                >
+                  <ArrowDownToLine size={16} />
+                  <span>{isImportingBills ? 'Syncing & Deduplicating...' : `🚀 Sync & Load ${parsedBills.length} Bills to Calling Queue`}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Script & Voice Studio Modal */}
       {showScriptStudioModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-[#111118] border border-gray-800 rounded-3xl p-5 md:p-7 w-full max-w-2xl shadow-2xl relative my-8">
@@ -1015,9 +1417,9 @@ export default function Calls() {
               <label className="block text-gray-400 text-xs font-bold mb-2">Select Voice Persona &amp; Accent:</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
+                  { id: 'neha', name: 'Neha (Account Manager)', desc: 'Professional Hindi/English • Accounts & Recovery' },
                   { id: 'priya', name: 'Priya (Indian Female)', desc: 'Natural Hindi / Hinglish • Warm & Friendly' },
-                  { id: 'aman', name: 'Aman (Indian Male)', desc: 'Dynamic Hinglish • Retail & Sales' },
-                  { id: 'neha', name: 'Neha (Professional)', desc: 'English & Hindi • Corporate & Accounts' }
+                  { id: 'aman', name: 'Aman (Indian Male)', desc: 'Dynamic Hinglish • Retail & Sales' }
                 ].map(persona => (
                   <div
                     key={persona.id}
@@ -1089,6 +1491,7 @@ export default function Calls() {
         </div>
       )}
 
+      {/* Live AI Calling Simulator Banner Modal */}
       {liveCallingStatus && liveCallingStatus.active && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
           <div className="bg-[#11111a] border border-blue-500/50 rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl text-center space-y-4 animate-scale-up">
@@ -1123,6 +1526,7 @@ export default function Calls() {
         </div>
       )}
 
+      {/* Manual Call Notes Log Modal */}
       {logModalLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#111] border border-gray-800 rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -1168,13 +1572,13 @@ export default function Calls() {
               </div>
 
               <div>
-                <label className="block text-gray-400 text-xs font-semibold mb-1">Call Summary (Niskoor)</label>
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Call Summary</label>
                 <textarea
                   required
                   rows={3}
                   value={logFormData.summary}
                   onChange={(e) => setLogFormData({ ...logFormData, summary: e.target.value })}
-                  placeholder="e.g. Client requested 2BHK brochure on WhatsApp. Ready to visit on Sunday."
+                  placeholder="e.g. Ramesh agreed to transfer balance of ₹25,000 via UPI tomorrow morning."
                   className="w-full bg-[#1a1a1a] border border-gray-700 rounded-xl p-2.5 text-white text-xs outline-none focus:border-indigo-500"
                 />
               </div>
@@ -1201,7 +1605,7 @@ export default function Calls() {
                   onChange={(e) => setLogFormData({ ...logFormData, targetBucket: e.target.value })}
                   className="w-full bg-[#1a1a1a] border border-gray-700 rounded-xl p-2.5 text-white text-xs outline-none focus:border-indigo-500"
                 >
-                  <option value="today_queue">⚡ Today&apos;s Active Queue</option>
+                  <option value="today_queue">⚡ Today's Active Queue</option>
                   <option value="scheduled_followup">⏰ Scheduled Follow-ups</option>
                   <option value="busy_retry">🔄 Busy / No Answer (Re-try)</option>
                   <option value="lost_archive">❌ Lost / Wrong Number</option>

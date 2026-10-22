@@ -76,6 +76,15 @@ const leadSchema = new Schema({
     type: Map,
     of: String,
   },
+  // --- Accounting & Payment Dues Tracking (Tally / Busy / Vyapar / Marg) ---
+  invoiceNumber: { type: String, default: '' },
+  invoiceDate: { type: String, default: '' },
+  dueAmount: { type: Number, default: 0 },
+  overdueDays: { type: Number, default: 0 },
+  paymentStatus: { type: String, enum: ['pending', 'paid', 'partial'], default: 'pending' },
+  isCallEnabled: { type: Boolean, default: true },
+  accountingSoftware: { type: String, default: '' },
+
   // --- Call AI & Telephony 5-Bucket Tracking ---
   callingBucket: {
     type: String,
