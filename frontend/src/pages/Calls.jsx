@@ -31,7 +31,7 @@ const PREBUILT_SCRIPTS = [
     title: '💳 Payment & Due Invoice Reminder',
     agent: 'Neha (Account Manager)',
     tag: 'Tally / Busy / Vyapar Sync',
-    pitch: 'Namaste! Accounts department se Neha baat kar rahi hoon. Aapka recent invoice payment balance pending hai. Kya main instant UPI link share kar doon?',
+    pitch: 'Namaste! Accounts se Neha baat kar rahi hoon. Bill par hamara agreed payment commitment tha, jisko abhi overdue hue time ho chuka hai aur payment pending hai. Kya main instant UPI QR link WhatsApp par drop kar doon?',
     action: 'Sends direct UPI / Payment link on WhatsApp'
   },
   {
@@ -161,9 +161,16 @@ function SortableLeadCard({ lead, onCall, onLogCall, onAiCall, isSelected, onTog
               ₹{Number(lead.dueAmount || 0).toLocaleString('en-IN')}
               {lead.invoiceNumber && <span className="text-[10px] text-gray-400 font-mono">({lead.invoiceNumber})</span>}
             </span>
-            {lead.overdueDays > 0 && !isPaid && (
-              <span className="text-[10px] text-amber-400/90 font-medium">⚠️ {lead.overdueDays}d overdue</span>
-            )}
+            <div className="flex items-center gap-1 text-[10px] mt-0.5">
+              <span className="text-gray-400 bg-black/40 px-1.5 py-0.2 rounded border border-gray-800">
+                🤝 {lead.commitmentDays || 7}d Term
+              </span>
+              {lead.overdueDays > 0 && !isPaid && (
+                <span className="text-rose-400 font-bold">
+                  ⚠️ {lead.overdueDays >= 30 ? (lead.overdueDays >= 60 ? `${Math.floor(lead.overdueDays / 30)} Months` : '1 Month') : `${lead.overdueDays}d`} Overdue
+                </span>
+              )}
+            </div>
             {isPaid && (
               <span className="text-[10px] text-emerald-400 font-medium">🛡️ Calling Turned OFF</span>
             )}
@@ -314,6 +321,7 @@ export default function Calls() {
   // Accounting Import & Settlement State
   const [showAccountingModal, setShowAccountingModal] = useState(false);
   const [accountingSoftware, setAccountingSoftware] = useState('Tally Prime');
+  const [defaultCommitmentDays, setDefaultCommitmentDays] = useState(7);
   const [parsedBills, setParsedBills] = useState([]);
   const [isImportingBills, setIsImportingBills] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
@@ -546,7 +554,8 @@ export default function Calls() {
         const phoneKey = findKey(/mobile|phone|contact|cell|tel/i);
         const invoiceKey = findKey(/invoice|inv|bill|vch|voucher|ref/i);
         const amountKey = findKey(/balance|pending|due|amount|net|closing|debit/i);
-        const daysKey = findKey(/overdue|due.*day|days|ageing/i);
+        const daysKey = findKey(/overdue|ageing/i);
+        const commitKey = findKey(/commitment|credit.*day|credit.*period|terms|due.*day/i);
         const dateKey = findKey(/date|dt/i);
 
         const list = rawRows.map((row, idx) => {
@@ -555,10 +564,29 @@ export default function Calls() {
           const inv = (invoiceKey ? row[invoiceKey] : '') || row['Invoice No'] || row['Bill No'] || '';
           const rawAmt = (amountKey ? row[amountKey] : '') || row['Amount'] || row['Balance'] || 0;
           const cleanAmt = typeof rawAmt === 'string' ? parseFloat(rawAmt.replace(/[^0-9.-]+/g, '')) || 0 : Number(rawAmt) || 0;
-          const rawDays = (daysKey ? row[daysKey] : '') || row['Overdue Days'] || 0;
-          const cleanDays = parseInt(String(rawDays).replace(/\D/g, ''), 10) || 0;
+          
+          // 🤝 Shopkeeper-Customer Commitment Days (Default 7 Days if not specified)
+          const rawCommit = (commitKey ? row[commitKey] : '') || row['Commitment Days'] || row['Credit Days'] || defaultCommitmentDays || 7;
+          const cleanCommit = parseInt(String(rawCommit).replace(/\D/g, ''), 10) || defaultCommitmentDays || 7;
+          
+          let cleanDays = parseInt(String((daysKey ? row[daysKey] : '') || row['Overdue Days'] || 0).replace(/\D/g, ''), 10) || 0;
           const dateVal = (dateKey ? row[dateKey] : '') || '';
           const dateStr = dateVal instanceof Date ? dateVal.toISOString().split('T')[0] : String(dateVal);
+
+          let dueDateStr = '';
+          if (dateStr) {
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+              d.setDate(d.getDate() + cleanCommit);
+              dueDateStr = d.toISOString().split('T')[0];
+
+              if (!cleanDays) {
+                const diffTime = Date.now() - d.getTime();
+                const diff = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                if (diff > 0) cleanDays = diff;
+              }
+            }
+          }
 
           return {
             name: String(name).trim(),
@@ -566,6 +594,8 @@ export default function Calls() {
             invoiceNumber: String(inv).trim(),
             dueAmount: cleanAmt,
             overdueDays: cleanDays,
+            commitmentDays: cleanCommit,
+            dueDate: dueDateStr,
             invoiceDate: dateStr,
             accountingSoftware
           };
@@ -1040,9 +1070,12 @@ export default function Calls() {
                                   Inv: {lead.invoiceNumber}
                                 </span>
                               )}
+                              <span className="text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded-lg text-[11px] font-medium">
+                                🤝 {lead.commitmentDays || 7}d Commitment
+                              </span>
                               {lead.overdueDays > 0 && !isPaid && (
-                                <span className="text-rose-400 bg-rose-950/30 border border-rose-500/20 px-2 py-0.5 rounded-lg text-[11px] font-semibold">
-                                  ⚠️ {lead.overdueDays} Days Overdue
+                                <span className="text-rose-400 bg-rose-950/30 border border-rose-500/20 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+                                  ⚠️ {lead.overdueDays >= 30 ? (lead.overdueDays >= 60 ? `${Math.floor(lead.overdueDays / 30)} Months Overdue` : '1 Month Overdue') : `${lead.overdueDays} Days Overdue`}
                                 </span>
                               )}
                               {lead.accountingSoftware && (
@@ -1323,6 +1356,35 @@ export default function Calls() {
               </div>
             </div>
 
+            {/* Agreed Payment Commitment (Credit Period) Setting */}
+            <div className="bg-[#14141e] border border-gray-800 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                  🤝 Default Payment Commitment (Credit Window):
+                </label>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Agar Excel sheet me credit terms nahi likha hai, toh kitne din ka commitment maanna hai? (Default: 7 Din)
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {[7, 15, 30, 45].map(days => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setDefaultCommitmentDays(days)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      defaultCommitmentDays === days
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-[#1b1b26] text-gray-400 hover:text-white border border-gray-700'
+                    }`}
+                  >
+                    {days} Days {days === 7 && '(Standard)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* File Dropzone */}
             <div className="border-2 border-dashed border-gray-700 hover:border-emerald-500/80 rounded-2xl p-6 text-center transition-all bg-[#0e0e14] relative">
               <input
@@ -1356,7 +1418,8 @@ export default function Calls() {
                         <th className="p-2">Phone</th>
                         <th className="p-2">Invoice #</th>
                         <th className="p-2">Due Amount</th>
-                        <th className="p-2">Overdue</th>
+                        <th className="p-2">Commitment</th>
+                        <th className="p-2">Delay Beyond Commitment</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800 text-gray-300">
@@ -1366,7 +1429,12 @@ export default function Calls() {
                           <td className="p-2 font-mono text-gray-400">{b.phoneNumber || '-'}</td>
                           <td className="p-2 font-mono text-blue-300">{b.invoiceNumber || '-'}</td>
                           <td className="p-2 font-bold text-amber-300">₹{Number(b.dueAmount || 0).toLocaleString('en-IN')}</td>
-                          <td className="p-2 text-rose-300">{b.overdueDays ? `${b.overdueDays} days` : '-'}</td>
+                          <td className="p-2 text-emerald-300 font-semibold">{b.commitmentDays || 7} Days</td>
+                          <td className="p-2 text-rose-300 font-bold">
+                            {b.overdueDays >= 30
+                              ? (b.overdueDays >= 60 ? `${Math.floor(b.overdueDays / 30)} Months Overdue` : '1 Month Overdue')
+                              : (b.overdueDays > 0 ? `${b.overdueDays} Days Overdue` : 'Within Commitment')}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

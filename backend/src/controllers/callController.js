@@ -403,7 +403,18 @@ exports.triggerAiVoiceCampaign = async (req, res) => {
     for (const lead of leads) {
       try {
         const custName = lead.name ? lead.name.split(' (')[0] : 'Customer';
-        const simulatedSummary = `AI Voice Bot (${script.audioAgent || customAgent}) connected with ${custName}. Script: [${script.title}]. Customer showed positive interest and agreed to follow-up.`;
+        let simulatedSummary = `AI Voice Bot (${script.audioAgent || customAgent}) connected with ${custName}. Script: [${script.title}]. Customer showed positive interest and agreed to follow-up.`;
+
+        if (scriptType === 'payment_reminder' || lead.dueAmount > 0) {
+          const commitDays = lead.commitmentDays || 7;
+          const overdue = lead.overdueDays || 0;
+          let delayText = `${overdue} din`;
+          if (overdue >= 60) delayText = `${Math.floor(overdue / 30)} mahine (${Math.floor(overdue / 30)} months)`;
+          else if (overdue >= 30) delayText = '1 mahina (1 month)';
+          else if (overdue >= 14) delayText = `${Math.floor(overdue / 7)} hafte (${Math.floor(overdue / 7)} weeks)`;
+
+          simulatedSummary = `AI Voice Bot (${script.audioAgent || customAgent}) connected with ${custName} regarding pending Bill #${lead.invoiceNumber || 'N/A'} of ₹${Number(lead.dueAmount || 0).toLocaleString('en-IN')}. Reminded of ${commitDays}-day commitment agreed on ${lead.invoiceDate || 'bill date'}. Commitment exceeded by ${delayText}. Party acknowledged and promised settlement.`;
+        }
 
         lead.callAttempts = (lead.callAttempts || 0) + 1;
         lead.lastCallDate = new Date();
@@ -466,6 +477,51 @@ exports.importAccountingBills = async (req, res) => {
     let skippedPaidCount = 0;
 
     for (const bill of bills) {
+      const rawPhone = String(bill.phoneNumber || bill.phone || '').trim();
+      const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+      const rawInvoice = String(bill.invoiceNumber || bill.billNo || '').trim();
+      const partyName = String(bill.name || bill.partyName || 'Customer').trim();
+      const dueAmount = parseFloat(bill.dueAmount || bill.amount || bill.balance || 0) || 0;
+      let overdueDays = parseInt(bill.overdueDays || bill.days || 0, 10) || 0;
+      const invoiceDate = String(bill.invoiceDate || bill.date || '').trim();
+
+      // 🤝 Commitment / Credit Days (Shop Owner & Customer agreement, default 7 days)
+      const commitmentDays = parseInt(bill.commitmentDays || bill.creditDays || bill.creditPeriod || bill.terms || 7, 10) || 7;
+      let dueDate = String(bill.dueDate || '').trim();
+
+      // If dueDate is not explicitly provided, calculate it from invoiceDate + commitmentDays
+      if (!dueDate && invoiceDate) {
+        const invD = new Date(invoiceDate);
+        if (!isNaN(invD.getTime())) {
+          invD.setDate(invD.getDate() + commitmentDays);
+          dueDate = invD.toISOString().split('T')[0];
+
+          // If overdueDays was not provided or 0, calculate delay beyond commitment due date
+          if (!overdueDays) {
+            const today = new Date();
+            const diffTime = today.getTime() - invD.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays > 0) overdueDays = diffDays;
+          }
+        }
+      }
+
+      // Calculate readable overdue text (e.g. 1 month, 2 months, or N days)
+      let delayText = overdueDays > 0 ? `${overdueDays} din` : 'On time';
+      if (overdueDays >= 60) {
+        delayText = `${Math.floor(overdueDays / 30)} mahine (${Math.floor(overdueDays / 30)} months)`;
+      } else if (overdueDays >= 30) {
+        delayText = '1 mahina (1 month)';
+      } else if (overdueDays >= 14) {
+        delayText = `${Math.floor(overdueDays / 7)} hafte (${Math.floor(overdueDays / 7)} weeks)`;
+      }
+
+      if (!partyName && !cleanPhone && !rawInvoice) continue;
+
+      // Smart Deduplication Query:
+      let query = { userId };
+      if (rawInvoice) {
+        query.invoiceNumber = { $regex: new RegExp('^' + rawInvoice.replace(/[-\/\^$*+?.()|[\]{}]/g, '\\    for (const bill of bills) {
       const rawPhone = String(bill.phoneNumber || bill.phone || '').trim();
       const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
       const rawInvoice = String(bill.invoiceNumber || bill.billNo || '').trim();
@@ -535,6 +591,256 @@ exports.importAccountingBills = async (req, res) => {
           timeline: [{
             eventType: 'Accounting Bill Imported',
             description: '📥 Imported from ' + accountingSoftware + ': Bill #' + (rawInvoice || 'N/A') + ' of ₹' + dueAmount.toLocaleString('en-IN') + ' (' + overdueDays + ' days overdue).',
+            timestamp: new Date()
+          }]
+        });
+
+        await newLead.save();
+        createdCount++;
+      }
+    }') + '
+
+    res.status(200).json({
+      success: true,
+      message: 'Sync Complete: ' + createdCount + ' new bills imported, ' + updatedCount + ' existing bills updated, ' + skippedPaidCount + ' already-settled bills protected from calls.',
+      summary: { createdCount, updatedCount, skippedPaidCount, totalProcessed: bills.length }
+    });
+  } catch (error) {
+    console.error('Import Accounting Bills Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    1-Click Mark as Paid or Reopen Payment Dues
+// @route   PATCH /api/calls/toggle-payment-status/:leadId
+exports.togglePaymentStatus = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { leadId } = req.params;
+    const { status, isCallEnabled } = req.body;
+
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const lead = await Lead.findOne({ _id: leadId, userId });
+    if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+    const targetStatus = status || (lead.paymentStatus === 'paid' ? 'pending' : 'paid');
+    lead.paymentStatus = targetStatus;
+    lead.isCallEnabled = targetStatus === 'paid' ? false : (isCallEnabled !== undefined ? isCallEnabled : true);
+
+    const logDesc = targetStatus === 'paid'
+      ? '💰 Payment Settled: Marked as PAID (पेमेंट जमा). AI Calling turned OFF.'
+      : '🔄 Payment Re-opened: Marked as PENDING. AI Calling re-enabled.';
+
+    lead.timeline.push({
+      eventType: 'Payment Status Changed',
+      description: logDesc,
+      timestamp: new Date()
+    });
+
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: targetStatus === 'paid' ? 'Payment marked as Paid! AI calling disabled.' : 'Payment re-opened as Pending.',
+      lead
+    });
+  } catch (error) {
+    console.error('Toggle Payment Status Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+, 'i') };
+      } else if (cleanPhone) {
+        query.phoneNumber = { $regex: cleanPhone };
+      } else {
+        query.name = { $regex: new RegExp('^' + partyName.replace(/[-\/\^$*+?.()|[\]{}]/g, '\\    for (const bill of bills) {
+      const rawPhone = String(bill.phoneNumber || bill.phone || '').trim();
+      const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+      const rawInvoice = String(bill.invoiceNumber || bill.billNo || '').trim();
+      const partyName = String(bill.name || bill.partyName || 'Customer').trim();
+      const dueAmount = parseFloat(bill.dueAmount || bill.amount || bill.balance || 0) || 0;
+      const overdueDays = parseInt(bill.overdueDays || bill.days || 0, 10) || 0;
+      const invoiceDate = String(bill.invoiceDate || bill.date || '').trim();
+
+      if (!partyName && !cleanPhone && !rawInvoice) continue;
+
+      // Smart Deduplication Query:
+      let query = { userId };
+      if (rawInvoice) {
+        query.invoiceNumber = { $regex: new RegExp('^' + rawInvoice.replace(/[-\/\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') };
+      } else if (cleanPhone) {
+        query.phoneNumber = { $regex: cleanPhone };
+      } else {
+        query.name = { $regex: new RegExp('^' + partyName.replace(/[-\/\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') };
+      }
+
+      const existingLead = await Lead.findOne(query);
+
+      if (existingLead) {
+        // SAFETY GUARD: Check if merchant already settled this payment or turned off calling
+        if (existingLead.paymentStatus === 'paid' || existingLead.isCallEnabled === false) {
+          // Do NOT reset to pending. Merchant already collected payment!
+          skippedPaidCount++;
+          continue;
+        }
+
+        // Existing bill is still pending: update balance / overdue days without creating duplicate cards
+        existingLead.dueAmount = dueAmount;
+        existingLead.overdueDays = overdueDays;
+        if (invoiceDate) existingLead.invoiceDate = invoiceDate;
+        if (accountingSoftware) existingLead.accountingSoftware = accountingSoftware;
+        if (rawInvoice && !existingLead.invoiceNumber) existingLead.invoiceNumber = rawInvoice;
+        if (cleanPhone && !existingLead.phoneNumber) existingLead.phoneNumber = cleanPhone;
+
+        existingLead.notes = '[' + accountingSoftware + '] Pending dues: ₹' + dueAmount.toLocaleString('en-IN') + ', Overdue: ' + overdueDays + ' days (Invoice #' + (existingLead.invoiceNumber || 'N/A') + ').';
+
+        existingLead.timeline.push({
+          eventType: 'Accounting Sync',
+          description: '🔄 Sheet Re-upload: Synced dues ₹' + dueAmount.toLocaleString('en-IN') + ' (' + overdueDays + ' days overdue). Preserved existing queue & call history.',
+          timestamp: new Date()
+        });
+
+        await existingLead.save();
+        updatedCount++;
+      } else {
+        // Fresh new overdue bill
+        const newLead = new Lead({
+          userId,
+          lastSelectedWorkspaceId: workspaceId || 'main',
+          name: partyName,
+          phoneNumber: cleanPhone || rawPhone,
+          invoiceNumber: rawInvoice,
+          invoiceDate: invoiceDate,
+          dueAmount: dueAmount,
+          overdueDays: overdueDays,
+          paymentStatus: 'pending',
+          isCallEnabled: true,
+          accountingSoftware: accountingSoftware || 'Accounting Excel',
+          callingBucket: 'today_queue',
+          status: dueAmount > 25000 || overdueDays > 30 ? 'hot' : 'new',
+          tags: ['Payment Dues', accountingSoftware || 'Accounting'],
+          notes: '[' + accountingSoftware + '] Pending dues ₹' + dueAmount.toLocaleString('en-IN') + ' for Invoice #' + (rawInvoice || 'N/A') + '. Overdue by ' + overdueDays + ' days.',
+          timeline: [{
+            eventType: 'Accounting Bill Imported',
+            description: '📥 Imported from ' + accountingSoftware + ': Bill #' + (rawInvoice || 'N/A') + ' of ₹' + dueAmount.toLocaleString('en-IN') + ' (' + overdueDays + ' days overdue).',
+            timestamp: new Date()
+          }]
+        });
+
+        await newLead.save();
+        createdCount++;
+      }
+    }') + '
+
+    res.status(200).json({
+      success: true,
+      message: 'Sync Complete: ' + createdCount + ' new bills imported, ' + updatedCount + ' existing bills updated, ' + skippedPaidCount + ' already-settled bills protected from calls.',
+      summary: { createdCount, updatedCount, skippedPaidCount, totalProcessed: bills.length }
+    });
+  } catch (error) {
+    console.error('Import Accounting Bills Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    1-Click Mark as Paid or Reopen Payment Dues
+// @route   PATCH /api/calls/toggle-payment-status/:leadId
+exports.togglePaymentStatus = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { leadId } = req.params;
+    const { status, isCallEnabled } = req.body;
+
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const lead = await Lead.findOne({ _id: leadId, userId });
+    if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+    const targetStatus = status || (lead.paymentStatus === 'paid' ? 'pending' : 'paid');
+    lead.paymentStatus = targetStatus;
+    lead.isCallEnabled = targetStatus === 'paid' ? false : (isCallEnabled !== undefined ? isCallEnabled : true);
+
+    const logDesc = targetStatus === 'paid'
+      ? '💰 Payment Settled: Marked as PAID (पेमेंट जमा). AI Calling turned OFF.'
+      : '🔄 Payment Re-opened: Marked as PENDING. AI Calling re-enabled.';
+
+    lead.timeline.push({
+      eventType: 'Payment Status Changed',
+      description: logDesc,
+      timestamp: new Date()
+    });
+
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: targetStatus === 'paid' ? 'Payment marked as Paid! AI calling disabled.' : 'Payment re-opened as Pending.',
+      lead
+    });
+  } catch (error) {
+    console.error('Toggle Payment Status Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+, 'i') };
+      }
+
+      const existingLead = await Lead.findOne(query);
+
+      if (existingLead) {
+        // SAFETY GUARD: Check if merchant already settled this payment or turned off calling
+        if (existingLead.paymentStatus === 'paid' || existingLead.isCallEnabled === false) {
+          // Do NOT reset to pending. Merchant already collected payment!
+          skippedPaidCount++;
+          continue;
+        }
+
+        // Existing bill is still pending: update balance / overdue days & commitment without creating duplicate cards
+        existingLead.dueAmount = dueAmount;
+        existingLead.overdueDays = overdueDays;
+        existingLead.commitmentDays = commitmentDays;
+        if (dueDate) existingLead.dueDate = dueDate;
+        if (invoiceDate) existingLead.invoiceDate = invoiceDate;
+        if (accountingSoftware) existingLead.accountingSoftware = accountingSoftware;
+        if (rawInvoice && !existingLead.invoiceNumber) existingLead.invoiceNumber = rawInvoice;
+        if (cleanPhone && !existingLead.phoneNumber) existingLead.phoneNumber = cleanPhone;
+
+        existingLead.notes = '[' + accountingSoftware + '] Pending dues: ₹' + dueAmount.toLocaleString('en-IN') + ', Overdue: ' + delayText + ' (Agreed Commitment: ' + commitmentDays + ' days, Invoice #' + (existingLead.invoiceNumber || 'N/A') + ').';
+
+        existingLead.timeline.push({
+          eventType: 'Accounting Sync',
+          description: '🔄 Sheet Re-upload: Synced dues ₹' + dueAmount.toLocaleString('en-IN') + ' (' + delayText + ' overdue beyond ' + commitmentDays + '-day commitment). Preserved existing queue & call history.',
+          timestamp: new Date()
+        });
+
+        await existingLead.save();
+        updatedCount++;
+      } else {
+        // Fresh new overdue bill
+        const newLead = new Lead({
+          userId,
+          lastSelectedWorkspaceId: workspaceId || 'main',
+          name: partyName,
+          phoneNumber: cleanPhone || rawPhone,
+          invoiceNumber: rawInvoice,
+          invoiceDate: invoiceDate,
+          commitmentDays: commitmentDays,
+          dueDate: dueDate,
+          dueAmount: dueAmount,
+          overdueDays: overdueDays,
+          paymentStatus: 'pending',
+          isCallEnabled: true,
+          accountingSoftware: accountingSoftware || 'Accounting Excel',
+          callingBucket: 'today_queue',
+          status: dueAmount > 25000 || overdueDays > 30 ? 'hot' : 'new',
+          tags: ['Payment Dues', accountingSoftware || 'Accounting'],
+          notes: '[' + accountingSoftware + '] Pending dues ₹' + dueAmount.toLocaleString('en-IN') + ' for Invoice #' + (rawInvoice || 'N/A') + '. Overdue by ' + delayText + ' (Agreed Commitment: ' + commitmentDays + ' days).',
+          timeline: [{
+            eventType: 'Accounting Bill Imported',
+            description: '📥 Imported from ' + accountingSoftware + ': Bill #' + (rawInvoice || 'N/A') + ' of ₹' + dueAmount.toLocaleString('en-IN') + ' (' + delayText + ' overdue beyond ' + commitmentDays + '-day commitment).',
             timestamp: new Date()
           }]
         });

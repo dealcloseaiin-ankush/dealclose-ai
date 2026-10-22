@@ -79,6 +79,8 @@ const leadSchema = new Schema({
   // --- Accounting & Payment Dues Tracking (Tally / Busy / Vyapar / Marg) ---
   invoiceNumber: { type: String, default: '' },
   invoiceDate: { type: String, default: '' },
+  commitmentDays: { type: Number, default: 7 }, // Agreed payment commitment window (default 7 days)
+  dueDate: { type: String, default: '' }, // Calculated or explicit due date
   dueAmount: { type: Number, default: 0 },
   overdueDays: { type: Number, default: 0 },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'partial'], default: 'pending' },
