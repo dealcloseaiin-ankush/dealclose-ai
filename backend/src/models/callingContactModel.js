@@ -31,6 +31,18 @@ const callingContactSchema = new mongoose.Schema({
   attempts: { type: Number, default: 0 },
   do_not_call: { type: Boolean, default: false }, // Mana kiya -> true
   notes: { type: String, default: '' },
+  natureNote: { type: String, default: '' }, // 🧠 Fixed profile / Nature & Temperament (bargaining, morning busy, quality lover)
+  tatkalNote: { type: String, default: '' }, // ⚡ Tatkal / Instant Note (offer, 5% extra discount, scheme complete, gift pack)
+  purchases: [
+    {
+      date: { type: Date, default: Date.now },
+      amount: { type: Number, default: 0 },
+      items: { type: String, default: '' },
+      invoiceNo: { type: String, default: '' },
+      notes: { type: String, default: '' }
+    }
+  ],
+  totalPurchases: { type: Number, default: 0 },
   lastCallSummary: { type: String, default: '' },
   
   metadata: {

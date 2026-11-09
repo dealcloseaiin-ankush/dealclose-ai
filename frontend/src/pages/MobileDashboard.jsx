@@ -3018,6 +3018,25 @@ export default function MobileDashboard() {
                     </div>
                   </button>
 
+                  {/* Tool 4.4: 📱 Home SIM & Role Brain CRM */}
+                  <a 
+                    href="/calls?tab=sim_gateway"
+                    className="col-span-2 bg-gradient-to-r from-emerald-950/80 via-[#101815] to-[#141420] border border-emerald-500/50 p-3.5 rounded-2xl text-left space-y-2 hover:border-emerald-400 transition-all shadow-md block"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
+                        <Smartphone size={16} />
+                      </div>
+                      <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                        ● Home SIM Gateway &amp; Notes
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-white font-black">📱 Home SIM &amp; Role Brain CRM</div>
+                      <div className="text-[10px] text-emerald-300/80 font-normal">Remote SIM calls, 2 Notes (Nature + Tatkal), Bill entries &amp; AI auto-calling</div>
+                    </div>
+                  </a>
+
                   {/* Tool 4.5: AI Voice Calling Agent */}
                   <button 
                     onClick={() => setMenuSubScreen('ai_calling')}

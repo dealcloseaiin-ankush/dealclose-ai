@@ -302,7 +302,21 @@ export default function Calls() {
   });
 
   const [viewMode, setViewMode] = useState('batch_list');
-  const [activeTab, setActiveTab] = useState('calling');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam) return tabParam;
+      const savedTab = localStorage.getItem('dealclose_calls_initial_tab');
+      if (savedTab) {
+        localStorage.removeItem('dealclose_calls_initial_tab');
+        return savedTab;
+      }
+      return 'calling';
+    } catch (e) {
+      return 'calling';
+    }
+  });
 
   const [selectedLeadIds, setSelectedLeadIds] = useState([]);
   const [leadFilterTab, setLeadFilterTab] = useState('all');
@@ -353,6 +367,30 @@ export default function Calls() {
     upiId: '',
     whatsappNumber: ''
   });
+
+  // 👥 Gateway Contacts, Notes & Purchase Billing States
+  const [gatewayContacts, setGatewayContacts] = useState([]);
+  const [gatewayAnalytics, setGatewayAnalytics] = useState(null);
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactSubSegFilter, setContactSubSegFilter] = useState('all');
+  const [selectedContactForNote, setSelectedContactForNote] = useState(null);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteForm, setNoteForm] = useState({
+    natureNote: '',
+    tatkalNote: '',
+    pendingBalance: 0,
+    subSegment: 'regular'
+  });
+  const [selectedContactForBill, setSelectedContactForBill] = useState(null);
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [billForm, setBillForm] = useState({
+    amount: '',
+    items: '',
+    invoiceNo: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [isSavingBill, setIsSavingBill] = useState(false);
 
   const [logModalLead, setLogModalLead] = useState(null);
   const [logFormData, setLogFormData] = useState({
@@ -454,16 +492,123 @@ export default function Calls() {
 
   const fetchGatewayData = async () => {
     try {
-      const [devRes, roleRes, queueRes] = await Promise.all([
+      const [devRes, roleRes, queueRes, contactsRes, analyticsRes] = await Promise.all([
         api.get('/gateway/devices'),
         api.get('/gateway/roles'),
-        api.post('/gateway/evaluate-queue')
+        api.post('/gateway/evaluate-queue'),
+        api.get('/gateway/contacts'),
+        api.get('/gateway/analytics')
       ]);
       if (devRes.data?.devices) setGatewayDevices(devRes.data.devices);
       if (roleRes.data?.roles) setCallingRoles(roleRes.data.roles);
       if (queueRes.data?.queuedCalls) setDueQueue(queueRes.data.queuedCalls);
+      if (contactsRes.data?.contacts) setGatewayContacts(contactsRes.data.contacts);
+      if (analyticsRes.data?.analytics) setGatewayAnalytics(analyticsRes.data.analytics);
     } catch (err) {
       console.warn('Gateway data fetch:', err.message);
+    }
+  };
+
+  // Device Pause/Resume Toggle
+  const handleToggleDevice = async (deviceId) => {
+    try {
+      const res = await api.post(`/gateway/devices/${deviceId}/toggle`);
+      toast.success(res.data?.message || 'Device status updated');
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to toggle device');
+    }
+  };
+
+  // Device Disconnect & Permission Revoke
+  const handleDisconnectDevice = async (deviceId) => {
+    if (!window.confirm('Kya aap is mobile device ko disconnect karna chahte hain? Remote calling permissions revoke ho jayengi.')) return;
+    try {
+      const res = await api.delete(`/gateway/devices/${deviceId}`);
+      toast.success(res.data?.message || 'Device disconnected');
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to disconnect');
+    }
+  };
+
+  // Open Contact Notes Modal
+  const handleOpenNoteModal = (contact) => {
+    setSelectedContactForNote(contact);
+    setNoteForm({
+      natureNote: contact.natureNote || '',
+      tatkalNote: contact.tatkalNote || '',
+      pendingBalance: contact.pendingBalance || 0,
+      subSegment: contact.subSegment || 'regular'
+    });
+    setShowNoteModal(true);
+  };
+
+  // Save Contact Notes
+  const handleSaveContactNotes = async () => {
+    if (!selectedContactForNote) return;
+    setIsSavingNotes(true);
+    try {
+      await api.put(`/gateway/contacts/${selectedContactForNote.contact_id}`, noteForm);
+      toast.success('Notes & Profile updated! AI will now use this on next call.');
+      setShowNoteModal(false);
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save notes');
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  // Open Record Bill Modal
+  const handleOpenBillModal = (contact) => {
+    setSelectedContactForBill(contact);
+    setBillForm({
+      amount: '',
+      items: '',
+      invoiceNo: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+    setShowBillModal(true);
+  };
+
+  // Save Record Bill
+  const handleSaveBill = async () => {
+    if (!selectedContactForBill || !billForm.amount) {
+      toast.error('Please enter purchase bill amount');
+      return;
+    }
+    setIsSavingBill(true);
+    try {
+      const res = await api.post(`/gateway/contacts/${selectedContactForBill.contact_id}/purchase`, billForm);
+      toast.success(res.data?.message || 'Purchase recorded successfully!');
+      setShowBillModal(false);
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to record bill');
+    } finally {
+      setIsSavingBill(false);
+    }
+  };
+
+  // Direct 1-Tap SIM Call
+  const handleDirectSIMCall = async (contact) => {
+    if (!contact.phone) return;
+    const toastId = toast.loading(`Triggering Home SIM to dial ${contact.name} (${contact.phone})...`);
+    try {
+      const res = await api.post('/gateway/remote-dial', {
+        phoneNumber: contact.phone,
+        roleId: contact.role_id || 'plumber',
+        contactId: contact.contact_id
+      });
+      if (res.data?.success) {
+        toast.success(`📞 ${res.data.message}`, { id: toastId });
+      } else {
+        toast.error(res.data?.message || 'Failed to place call', { id: toastId });
+      }
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not connect to Home Phone', { id: toastId });
     }
   };
 
@@ -1367,28 +1512,28 @@ export default function Calls() {
       {activeTab === 'sim_gateway' && (
         <div className="space-y-4 flex-1 overflow-y-auto">
           {/* Header Card: Live Status of Home Mobile */}
-          <div className="bg-gradient-to-r from-emerald-950/70 via-[#101815] to-[#141420] border border-emerald-500/30 p-4 md:p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="bg-gradient-to-r from-emerald-950/70 via-[#101815] to-[#141420] border border-emerald-500/40 rounded-3xl p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
             <div className="flex items-start gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xl shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
                 <Smartphone size={26} />
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2">
-                    Home SIM Auto-Dialer Gateway
+                    Home SIM Auto-Dialer &amp; Role Brain
                   </h2>
                   {gatewayDevices.some(d => d.isOnline) ? (
-                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 font-mono animate-pulse">
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold">
                       ● ONLINE (Ghar Ka Phone Connected)
                     </span>
                   ) : (
-                    <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 font-mono">
+                    <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold">
                       ○ OFFLINE (Phone App Waiting)
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed">
-                  Aapka purana mobile ghar par Jio WiFi / Mobile Net se connected rahega. Office/Shop se cron scheduler bina screen chhue SIM se direct autonomous calling lagwayega.
+                  Aapka purana mobile ghar par Jio WiFi / Mobile Net se connected rahega. Office/Shop se aap AI Neha ko instruct karenge aur call ghar ke SIM se live connect hogi!
                 </p>
               </div>
             </div>
@@ -1396,27 +1541,72 @@ export default function Calls() {
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <button
                 onClick={() => setShowDiaryModal(true)}
-                className="px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
+                className="px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-1.5 transition-all"
               >
                 <FileText size={14} /> <span>📝 Paste / Scan Diary Notes</span>
               </button>
               <button
                 onClick={() => setShowShopProfileModal(true)}
-                className="px-3 py-2 bg-[#1b1b26] hover:bg-[#252535] text-gray-300 hover:text-white border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                className="px-3 py-2 bg-[#1b1b26] hover:bg-[#252535] text-gray-300 hover:text-white border border-gray-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
               >
                 <Settings2 size={14} /> <span>🏪 Shop Address / Info</span>
               </button>
               <button
                 onClick={handleGeneratePairingCode}
                 disabled={loadingGateway}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
               >
                 <QrCode size={14} /> <span>Pair Home Phone</span>
               </button>
             </div>
           </div>
 
-          {/* Connected Device Health Cards */}
+          {/* 📊 BUSINESS IMPACT & ROI STATS BAR */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="bg-[#101016] border border-gray-800 p-3.5 rounded-2xl">
+              <div className="text-[11px] text-gray-400 font-medium">Calls Placed</div>
+              <div className="text-lg md:text-xl font-black text-white mt-1">
+                {gatewayAnalytics?.totalCalls || 0}
+              </div>
+              <div className="text-[10px] text-emerald-400 mt-0.5">
+                ● {gatewayAnalytics?.successfulCalls || 0} Connected
+              </div>
+            </div>
+
+            <div className="bg-[#101016] border border-gray-800 p-3.5 rounded-2xl">
+              <div className="text-[11px] text-gray-400 font-medium">SIM Calling Cost</div>
+              <div className="text-lg md:text-xl font-black text-emerald-400 mt-1">
+                ₹0 <span className="text-xs font-normal text-gray-400">(Free SIM)</span>
+              </div>
+              <div className="text-[10px] text-gray-400 mt-0.5">Jio/Airtel Unlimited</div>
+            </div>
+
+            <div className="bg-[#101016] border border-emerald-900/40 bg-emerald-950/20 p-3.5 rounded-2xl">
+              <div className="text-[11px] text-emerald-300 font-medium">Money Saved vs Cloud</div>
+              <div className="text-lg md:text-xl font-black text-emerald-300 mt-1">
+                ₹{(gatewayAnalytics?.moneySavedVsCloud || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="text-[10px] text-emerald-400/80 mt-0.5">₹0.80/min Cloud Saved</div>
+            </div>
+
+            <div className="bg-[#101016] border border-indigo-900/40 bg-indigo-950/20 p-3.5 rounded-2xl">
+              <div className="text-[11px] text-indigo-300 font-medium">New Business Generated</div>
+              <div className="text-lg md:text-xl font-black text-indigo-300 mt-1">
+                ₹{(gatewayAnalytics?.totalRevenueGenerated || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="text-[10px] text-indigo-400/80 mt-0.5">From Post-Call Orders</div>
+            </div>
+
+            <div className="bg-[#101016] border border-amber-900/40 bg-amber-950/20 p-3.5 rounded-2xl col-span-2 md:col-span-1">
+              <div className="text-[11px] text-amber-300 font-medium">Pending Udhar / Dues</div>
+              <div className="text-lg md:text-xl font-black text-amber-300 mt-1">
+                ₹{(gatewayAnalytics?.totalPendingDue || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="text-[10px] text-amber-400/80 mt-0.5">Follow-up reminders set</div>
+            </div>
+          </div>
+
+          {/* Connected Device Health Cards & Permission Toggle */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {gatewayDevices.length === 0 ? (
               <div className="md:col-span-3 bg-[#111118] border border-dashed border-gray-800 p-6 rounded-2xl text-center space-y-2">
@@ -1429,13 +1619,18 @@ export default function Calls() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-bold text-white text-sm">{d.deviceName || 'Home Android Phone'}</h4>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">{d.simCarrier} • {d.simPhoneNumber || 'Jio SIM'}</p>
+                      <p className="text-xs text-gray-400 font-mono mt-0.5">{d.simCarrier} • {d.simPhoneNumber || 'SIM Number'}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                      d.isOnline ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-500'
-                    }`}>
-                      {d.isOnline ? '🟢 Live' : 'Offline'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                        d.isOnline ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-500'
+                      }`}>
+                        {d.isOnline ? '🟢 Live' : 'Offline'}
+                      </span>
+                      <span className={`text-[9px] font-bold ${d.isActive !== false ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {d.isActive !== false ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-800 text-gray-400 font-mono">
@@ -1444,12 +1639,31 @@ export default function Calls() {
                       {d.batteryLevel}% {d.isCharging ? '⚡' : ''}
                     </span>
                     <span className="flex items-center gap-1 text-[11px] text-blue-300">
-                      <Shield size={12} /> {d.isDefaultDialer ? 'Default Phone App: Active' : 'Mic: Protected'}
+                      <Shield size={12} /> {d.isDefaultDialer ? 'Default Phone App: OK' : 'Mic: Protected'}
                     </span>
                   </div>
 
-                  <div className="text-[10px] text-gray-500">
-                    Last Heartbeat: {new Date(d.lastPingAt).toLocaleTimeString()}
+                  {/* Device Control Actions */}
+                  <div className="flex items-center justify-between pt-1 gap-2 border-t border-gray-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleDevice(d.deviceId)}
+                      className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition-all border ${
+                        d.isActive !== false 
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20' 
+                          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                      }`}
+                    >
+                      {d.isActive !== false ? '⏸️ Pause Calling' : '▶️ Resume Calling'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDisconnectDevice(d.deviceId)}
+                      className="py-1 px-2 rounded-lg text-[10px] font-bold bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 transition-all"
+                      title="Revoke Permission & Disconnect"
+                    >
+                      Disconnect
+                    </button>
                   </div>
                 </div>
               ))
@@ -1488,6 +1702,177 @@ export default function Calls() {
               >
                 <Phone size={13} /> {dispatchingCall ? 'Triggering SIM...' : 'Remote Dial Now 🚀'}
               </button>
+            </div>
+          </div>
+
+          {/* 👥 ROLE-BASED CONTACTS, 2 NOTES & PURCHASE BILLING CRM */}
+          <div className="bg-[#111118] border border-gray-800 rounded-3xl p-4 md:p-5 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
+                  <Users size={16} className="text-blue-400" /> Contacts &amp; Trade Profiles ({gatewayContacts.length})
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Fixed Nature Note + Tatkal Offer Note + Billing Tracking ke saath har mistri ka live record.
+                </p>
+              </div>
+
+              {/* Subsegment Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'all', label: 'All Contacts' },
+                  { id: 'regular', label: '🟢 Regular Repeat' },
+                  { id: 'inactive', label: '🟡 Inactive (Chhode hue)' },
+                  { id: 'new_cold', label: '🔵 New Cold' },
+                  { id: 'payment_due', label: '🔴 Payment Due' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setContactSubSegFilter(tab.id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                      contactSubSegFilter === tab.id
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-[#181824] text-gray-400 hover:text-white border border-gray-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name, phone, or trade role..."
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+                className="w-full bg-[#161622] border border-gray-700 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500 pl-8"
+              />
+              <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
+            </div>
+
+            {/* Contacts Table / Cards */}
+            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+              {gatewayContacts
+                .filter(c => contactSubSegFilter === 'all' || c.subSegment === contactSubSegFilter)
+                .filter(c => !contactSearch || 
+                  c.name?.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                  c.phone?.includes(contactSearch) ||
+                  c.role_id?.toLowerCase().includes(contactSearch.toLowerCase())
+                )
+                .map(c => {
+                  const subBadge = {
+                    regular: { label: 'Regular Repeat', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+                    inactive: { label: 'Inactive / Dormant', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+                    new_cold: { label: 'New Cold Mistri', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+                    payment_due: { label: 'Payment Due', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' }
+                  }[c.subSegment || 'regular'];
+
+                  const latestPurchase = c.purchases && c.purchases.length > 0
+                    ? c.purchases[c.purchases.length - 1]
+                    : null;
+
+                  return (
+                    <div key={c._id} className="bg-[#151520] border border-gray-800/80 hover:border-blue-500/40 p-3.5 rounded-2xl space-y-2 transition-all">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center text-xs">
+                            {c.name ? c.name[0]?.toUpperCase() : 'C'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-xs">{c.name}</span>
+                              <span className="text-[11px] text-gray-400 font-mono">{c.phone}</span>
+                              <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30 capitalize">
+                                {c.role_id}
+                              </span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded border ${subBadge.color}`}>
+                                {subBadge.label}
+                              </span>
+                            </div>
+                            {c.pendingBalance > 0 && (
+                              <div className="text-[11px] text-rose-400 font-bold mt-0.5">
+                                Pending Balance: ₹{c.pendingBalance.toLocaleString('en-IN')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Direct Action Buttons on That Line */}
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenBillModal(c)}
+                            className="px-2.5 py-1.5 bg-[#1f1f2e] hover:bg-[#28283d] text-gray-300 hover:text-white rounded-xl text-[11px] font-bold border border-gray-700 flex items-center gap-1 transition-all"
+                            title="Record purchase billing"
+                          >
+                            <ShoppingBag size={12} className="text-emerald-400" /> + Bill
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenNoteModal(c)}
+                            className="px-2.5 py-1.5 bg-[#1f1f2e] hover:bg-[#28283d] text-gray-300 hover:text-white rounded-xl text-[11px] font-bold border border-gray-700 flex items-center gap-1 transition-all"
+                            title="Edit Nature & Tatkal Notes"
+                          >
+                            <Edit3 size={12} className="text-indigo-400" /> Notes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDirectSIMCall(c)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white rounded-xl text-[11px] font-bold shadow flex items-center gap-1 transition-all"
+                            title="Direct 1-tap call from Home SIM"
+                          >
+                            <Phone size={12} /> Call Now
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 2 Notes Preview & Billing History */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 border-t border-gray-800/60 text-[11px]">
+                        {/* Nature Note */}
+                        <div className="bg-black/30 p-2 rounded-xl border border-gray-800/50">
+                          <span className="text-indigo-400 font-bold block text-[10px]">🧠 Fixed Nature Profile:</span>
+                          <span className="text-gray-300 italic">
+                            {c.natureNote ? c.natureNote : <span className="text-gray-500">No nature note yet</span>}
+                          </span>
+                        </div>
+
+                        {/* Tatkal Note */}
+                        <div className="bg-black/30 p-2 rounded-xl border border-gray-800/50">
+                          <span className="text-amber-400 font-bold block text-[10px]">⚡ Tatkal Note (AI Hidayat):</span>
+                          <span className="text-gray-300 italic">
+                            {c.tatkalNote ? c.tatkalNote : <span className="text-gray-500">No instant offer set</span>}
+                          </span>
+                        </div>
+
+                        {/* Recent Purchase History */}
+                        <div className="bg-black/30 p-2 rounded-xl border border-gray-800/50">
+                          <span className="text-emerald-400 font-bold block text-[10px]">🛍️ Recent Billing / Kharidari:</span>
+                          <span className="text-gray-300">
+                            {latestPurchase ? (
+                              `${new Date(latestPurchase.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'short' })}: ₹${latestPurchase.amount} (${latestPurchase.items})`
+                            ) : (
+                              <span className="text-gray-500">No bills recorded</span>
+                            )}
+                            {c.totalPurchases > 0 && (
+                              <span className="block text-[10px] text-gray-400 font-mono mt-0.5">
+                                Total Purchases: ₹{c.totalPurchases.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {gatewayContacts.length === 0 && (
+                <div className="text-center py-8 text-gray-500 text-xs">
+                  No contacts found. Click &ldquo;📝 Paste / Scan Diary Notes&rdquo; above to import your mistri and customer list!
+                </div>
+              )}
             </div>
           </div>
 

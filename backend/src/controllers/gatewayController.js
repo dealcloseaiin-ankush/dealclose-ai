@@ -533,3 +533,163 @@ exports.updateShopCallingProfile = async (req, res) => {
   }
 };
 
+
+// ✏️ 13. UPDATE CONTACT NOTES & DETAILS (Nature Note, Tatkal Note, Balance, SubSegment)
+exports.updateCallingContact = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { contactId } = req.params;
+    const { name, phone, role_id, subSegment, natureNote, tatkalNote, pendingBalance, notes, do_not_call } = req.body;
+
+    const contact = await CallingContact.findOne({ userId, contact_id: contactId });
+    if (!contact) return res.status(404).json({ success: false, message: 'Contact not found' });
+
+    if (name) contact.name = name;
+    if (phone) contact.phone = phone;
+    if (role_id) contact.role_id = role_id;
+    if (subSegment) contact.subSegment = subSegment;
+    if (natureNote !== undefined) contact.natureNote = natureNote;
+    if (tatkalNote !== undefined) contact.tatkalNote = tatkalNote;
+    if (pendingBalance !== undefined) contact.pendingBalance = Number(pendingBalance);
+    if (notes !== undefined) contact.notes = notes;
+    if (do_not_call !== undefined) contact.do_not_call = Boolean(do_not_call);
+
+    await contact.save();
+    res.status(200).json({ success: true, message: 'Contact updated successfully', contact });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 🛍️ 14. RECORD PURCHASE / BILLING EVENT FOR A CONTACT
+exports.recordContactPurchase = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { contactId } = req.params;
+    const { amount, items, invoiceNo, notes, date } = req.body;
+
+    const contact = await CallingContact.findOne({ userId, contact_id: contactId });
+    if (!contact) return res.status(404).json({ success: false, message: 'Contact not found' });
+
+    const purchaseAmount = Number(amount) || 0;
+    const newPurchase = {
+      date: date ? new Date(date) : new Date(),
+      amount: purchaseAmount,
+      items: items || 'Material / Samaan',
+      invoiceNo: invoiceNo || '',
+      notes: notes || ''
+    };
+
+    contact.purchases = contact.purchases || [];
+    contact.purchases.push(newPurchase);
+    contact.totalPurchases = (Number(contact.totalPurchases) || 0) + purchaseAmount;
+
+    // Reset status to regular repeat customer if inactive
+    if (contact.subSegment === 'inactive' || contact.subSegment === 'new_cold') {
+      contact.subSegment = 'regular';
+    }
+
+    await contact.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Purchase of ₹${purchaseAmount} recorded! AI will reference this on next call.`,
+      contact
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 📊 15. CALLING & BUSINESS GROWTH ROI ANALYTICS
+exports.getCallingAnalytics = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+
+    // 1. Total contacts & role counts
+    const totalContacts = await CallingContact.countDocuments({ userId });
+    const subSegments = await CallingContact.aggregate([
+      { $match: { userId } },
+      { $group: { _id: '$subSegment', count: { $sum: 1 }, totalRevenue: { $sum: '$totalPurchases' }, totalDue: { $sum: '$pendingBalance' } } }
+    ]);
+
+    // 2. Call Logs stats
+    const totalCalls = await CallingLog.countDocuments({ userId });
+    const successfulCalls = await CallingLog.countDocuments({ userId, 'result_json.interest': { $in: ['haan', 'interested', 'order'] } });
+    const totalOrders = await CallingLog.countDocuments({ userId, 'result_json.interest': 'order' });
+
+    // 3. Revenue from recorded purchases
+    const purchaseAgg = await CallingContact.aggregate([
+      { $match: { userId } },
+      { $group: { _id: null, totalRevenue: { $sum: '$totalPurchases' }, totalPendingDue: { $sum: '$pendingBalance' } } }
+    ]);
+
+    const totalRevenue = purchaseAgg[0]?.totalRevenue || 0;
+    const totalPendingDue = purchaseAgg[0]?.totalPendingDue || 0;
+
+    // 4. Cost comparison:
+    // With Home SIM: 0 ₹ (unlimited voice call recharge)
+    // Cloud Telephony would have cost ~ ₹0.80/min
+    const estimatedMinutes = totalCalls * 1.5; // ~1.5 min avg call
+    const cloudTelephonyCost = Math.round(estimatedMinutes * 0.80);
+    const simGatewayCost = 0; // Free unlimited SIM
+    const savings = cloudTelephonyCost;
+
+    res.status(200).json({
+      success: true,
+      analytics: {
+        totalContacts,
+        totalCalls,
+        successfulCalls,
+        totalOrders,
+        totalRevenueGenerated: totalRevenue,
+        totalPendingDue,
+        simCost: simGatewayCost,
+        moneySavedVsCloud: savings,
+        subSegments
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ⏸️ 16. TOGGLE DEVICE ACTIVE / PAUSE CALLING
+exports.toggleDeviceActive = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { deviceId } = req.params;
+
+    const device = await GatewayDevice.findOne({ userId, deviceId });
+    if (!device) return res.status(404).json({ success: false, message: 'Device not found' });
+
+    device.isActive = !device.isActive;
+    await device.save();
+
+    res.status(200).json({
+      success: true,
+      message: device.isActive ? '🟢 Remote Calling RESUMED for this device.' : '⏸️ Remote Calling PAUSED for this device.',
+      isActive: device.isActive
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 🗑️ 17. DISCONNECT / REVOKE GATEWAY DEVICE
+exports.disconnectGatewayDevice = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { deviceId } = req.params;
+
+    const result = await GatewayDevice.findOneAndDelete({ userId, deviceId });
+    if (!result) return res.status(404).json({ success: false, message: 'Device not found' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Device disconnected and permissions revoked successfully.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

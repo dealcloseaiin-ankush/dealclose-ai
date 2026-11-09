@@ -9,6 +9,7 @@ const gatewayDeviceSchema = new mongoose.Schema({
   batteryLevel: { type: Number, default: 100 },
   isCharging: { type: Boolean, default: false },
   isOnline: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: true }, // User can pause/resume remote calling anytime
   isDefaultDialer: { type: Boolean, default: false }, // Has user set it as Default Phone App?
   lastPingAt: { type: Date, default: Date.now },
   pairingCode: { type: String, default: '' },

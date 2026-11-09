@@ -126,6 +126,34 @@ async function assembleCallPrompt(role, contact, userId) {
     segmentInstruction = `[TARGET: REGULAR REPEAT BUYER]\nYe hamare regular ${role.role_name} hain. Aajkal kahan site chal rahi hai poohein, pipe/fitting/material ka requirement lein, aur scheme batayein.`;
   }
 
+  // 🧠 Customer Nature / Fixed Profile Note (Categorisation & Temperament)
+  let natureClause = '';
+  if (contact.natureNote && contact.natureNote.trim()) {
+    natureClause = `[GRAHAK KA NATURE / TEMPERAMENT]: "${contact.natureNote.trim()}". Inke nature aur aadat ke mutabiq tameez aur samajhdaari se baat karein.`;
+  }
+
+  // ⚡ Tatkal / Instant Note (Special scheme, gift, discount, or payment urgency)
+  let tatkalClause = '';
+  if (contact.tatkalNote && contact.tatkalNote.trim()) {
+    tatkalClause = `[TATKAL NOTE / AAJ KI KHAS HIDAYAT]: "${contact.tatkalNote.trim()}". AI Neha: Is baat ko call me zaroor shaamil karein!`;
+  }
+
+  // 🛍️ Recent Billing / Purchase History
+  let billingClause = '';
+  if (contact.purchases && contact.purchases.length > 0) {
+    const sortedPurchases = [...contact.purchases].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const recentPurchases = sortedPurchases.slice(0, 3);
+    const purchaseList = recentPurchases.map(p => {
+      const pDate = new Date(p.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'short' });
+      return `${pDate}: ₹${p.amount} ka ${p.items || 'samaan'}`;
+    }).join(' | ');
+
+    const latestP = recentPurchases[0];
+    const latestDateStr = new Date(latestP.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'short' });
+
+    billingClause = `[HAL HI KI KHARIDARI / BILLING DETAILS]: ${purchaseList}.\nAI Neha: Agar pichhle kuch dino me samaan le gaye hain toh bolein: "Bhaiya ${latestDateStr} ko jo ₹${latestP.amount} ka ${latestP.items || 'samaan'} le gaye the, kaam badhiya chal raha hai na? Site par aur zaroorat toh nahi?"`;
+  }
+
   // Mandatory Introduction Clause:
   const identityClause = `Aap ${shopName} ke virtual business assistant (Neha) hain. Saaf aur polite Hindi/Hinglish me baat karein. Dukan ka address: ${shopAddress}${shopLandmark ? ' (' + shopLandmark + ')' : ''}.`;
 
@@ -139,6 +167,8 @@ async function assembleCallPrompt(role, contact, userId) {
     .replace(/{offer}/g, role.offer)
     .replace(/{call_history}/g, historyText)
     .replace(/{today_date}/g, todayStr);
+
+  const extraContextBlocks = [natureClause, tatkalClause, billingClause].filter(Boolean).join('\n\n');
 
   return {
     contactId: contact.contact_id,
@@ -155,7 +185,9 @@ async function assembleCallPrompt(role, contact, userId) {
     offer: role.offer,
     todayDate: todayStr,
     historySummary: historyText,
-    fullSystemPrompt: `${identityClause}\n\n${segmentInstruction}\n\n${compiledPrompt}\n\n[Aaj Ki Tareekh]: ${todayStr}\n[Purani History]: ${historyText}`
+    natureNote: contact.natureNote || '',
+    tatkalNote: contact.tatkalNote || '',
+    fullSystemPrompt: `${identityClause}\n\n${segmentInstruction}\n\n${extraContextBlocks ? extraContextBlocks + '\n\n' : ''}${compiledPrompt}\n\n[Aaj Ki Tareekh]: ${todayStr}\n[Purani History]: ${historyText}`
   };
 }
 
