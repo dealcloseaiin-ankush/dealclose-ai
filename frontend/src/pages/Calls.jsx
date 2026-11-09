@@ -6,7 +6,8 @@ import {
   AlertTriangle, RefreshCw, X, ArrowRight, MessageSquare, ChevronRight,
   Plus, Check, Sparkles, Filter, Layers, PhoneCall, Shield, Search,
   Square, CheckSquare, Settings2, Play, Users, Flame, Send,
-  FileSpreadsheet, CreditCard, Upload, ArrowDownToLine, DollarSign
+  FileSpreadsheet, CreditCard, Upload, ArrowDownToLine, DollarSign,
+  Signal, Wifi, Battery, QrCode, Wrench, Briefcase, SlidersHorizontal, CheckCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -326,6 +327,17 @@ export default function Calls() {
   const [isImportingBills, setIsImportingBills] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
 
+  // 📱 SIM Gateway & Role Brain States
+  const [gatewayDevices, setGatewayDevices] = useState([]);
+  const [callingRoles, setCallingRoles] = useState([]);
+  const [dueQueue, setDueQueue] = useState([]);
+  const [loadingGateway, setLoadingGateway] = useState(false);
+  const [pairingModalData, setPairingModalData] = useState(null);
+  const [showPairingModal, setShowPairingModal] = useState(false);
+  const [testDialPhone, setTestDialPhone] = useState('');
+  const [testDialRole, setTestDialRole] = useState('plumber');
+  const [dispatchingCall, setDispatchingCall] = useState(false);
+
   const [logModalLead, setLogModalLead] = useState(null);
   const [logFormData, setLogFormData] = useState({
     outcome: 'connected',
@@ -421,7 +433,57 @@ export default function Calls() {
 
     fetchBuckets();
     fetchCallHistory();
+    fetchGatewayData();
   }, [activeWorkspace]);
+
+  const fetchGatewayData = async () => {
+    try {
+      const [devRes, roleRes, queueRes] = await Promise.all([
+        api.get('/gateway/devices'),
+        api.get('/gateway/roles'),
+        api.post('/gateway/evaluate-queue')
+      ]);
+      if (devRes.data?.devices) setGatewayDevices(devRes.data.devices);
+      if (roleRes.data?.roles) setCallingRoles(roleRes.data.roles);
+      if (queueRes.data?.queuedCalls) setDueQueue(queueRes.data.queuedCalls);
+    } catch (err) {
+      console.warn('Gateway data fetch:', err.message);
+    }
+  };
+
+  const handleGeneratePairingCode = async () => {
+    setLoadingGateway(true);
+    try {
+      const res = await api.post('/gateway/generate-code');
+      setPairingModalData(res.data);
+      setShowPairingModal(true);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to generate code');
+    } finally {
+      setLoadingGateway(false);
+    }
+  };
+
+  const handleRemoteTestDial = async (targetPhone = '', roleId = '') => {
+    const phone = targetPhone || testDialPhone;
+    if (!phone) {
+      toast.error('Please enter a phone number to test call');
+      return;
+    }
+    setDispatchingCall(true);
+    try {
+      const res = await api.post('/gateway/remote-dial', {
+        phone,
+        roleId: roleId || testDialRole
+      });
+      toast.success(res.data.message || 'Remote SIM call triggered at home!');
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Remote call failed. Check if phone is online at home.');
+    } finally {
+      setDispatchingCall(false);
+    }
+  };
 
   const handleDragEnd = async (event) => {
     const { active, over } = event;
@@ -820,6 +882,14 @@ export default function Calls() {
               }`}
             >
               <History size={13} /> Call Logs ({callHistory.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('sim_gateway')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'sim_gateway' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Smartphone size={13} className="text-emerald-400" /> Home SIM &amp; Role Brain
             </button>
           </div>
 
@@ -1223,6 +1293,204 @@ export default function Calls() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 📱 HOME SIM GATEWAY & ROLE BRAIN TAB */}
+      {activeTab === 'sim_gateway' && (
+        <div className="space-y-4 flex-1 overflow-y-auto">
+          {/* Header Card: Live Status of Home Mobile */}
+          <div className="bg-gradient-to-r from-emerald-950/70 via-[#101815] to-[#141420] border border-emerald-500/30 p-4 md:p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-xl shrink-0">
+                <Smartphone size={26} />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2">
+                    Home SIM Auto-Dialer Gateway
+                  </h2>
+                  {gatewayDevices.some(d => d.isOnline) ? (
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 font-mono animate-pulse">
+                      ● ONLINE (Ghar Ka Phone Connected)
+                    </span>
+                  ) : (
+                    <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 font-mono">
+                      ○ OFFLINE (Phone App Waiting)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed">
+                  Aapka purana mobile ghar par Jio WiFi / Mobile Net se connected rahega. Office/Shop se cron scheduler bina screen chhue SIM se direct autonomous calling lagwayega.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <button
+                onClick={handleGeneratePairingCode}
+                disabled={loadingGateway}
+                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-2"
+              >
+                <QrCode size={14} /> <span>Pair Home Phone (QR / Code)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Connected Device Health Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {gatewayDevices.length === 0 ? (
+              <div className="md:col-span-3 bg-[#111118] border border-dashed border-gray-800 p-6 rounded-2xl text-center space-y-2">
+                <p className="text-sm font-bold text-white">No Phone Paired Yet</p>
+                <p className="text-xs text-gray-400">Click &ldquo;Pair Home Phone&rdquo; above to connect your old Android mobile in 30 seconds.</p>
+              </div>
+            ) : (
+              gatewayDevices.map(d => (
+                <div key={d._id} className="bg-[#111118] border border-gray-800 p-4 rounded-2xl space-y-2.5">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{d.deviceName || 'Home Android Phone'}</h4>
+                      <p className="text-xs text-gray-400 font-mono mt-0.5">{d.simCarrier} • {d.simPhoneNumber || 'Jio SIM'}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                      d.isOnline ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-800 text-gray-500'
+                    }`}>
+                      {d.isOnline ? '🟢 Live' : 'Offline'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-800 text-gray-400 font-mono">
+                    <span className="flex items-center gap-1">
+                      <Battery size={13} className={d.batteryLevel > 30 ? 'text-emerald-400' : 'text-rose-400'} />
+                      {d.batteryLevel}% {d.isCharging ? '⚡' : ''}
+                    </span>
+                    <span className="flex items-center gap-1 text-[11px] text-blue-300">
+                      <Shield size={12} /> {d.isDefaultDialer ? 'Default Phone App: Active' : 'Mic: Protected'}
+                    </span>
+                  </div>
+
+                  <div className="text-[10px] text-gray-500">
+                    Last Heartbeat: {new Date(d.lastPingAt).toLocaleTimeString()}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Quick Remote Dial Tester */}
+          <div className="bg-[#111118] border border-gray-800 p-4 rounded-2xl space-y-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <PhoneCall size={15} className="text-emerald-400" /> Remote SIM Calling Tester (Office to Home)
+            </h3>
+            <p className="text-xs text-gray-400">
+              Yahan se koi bhi number daal kar test karein. Command turant ghar ke phone par jayegi aur aapke Jio SIM se call connect hogi.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <input
+                type="text"
+                placeholder="Enter 10-digit mobile number (e.g. 9876543210)"
+                value={testDialPhone}
+                onChange={(e) => setTestDialPhone(e.target.value)}
+                className="flex-1 bg-[#181822] border border-gray-700 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-emerald-500 font-mono"
+              />
+              <select
+                value={testDialRole}
+                onChange={(e) => setTestDialRole(e.target.value)}
+                className="bg-[#181822] border border-gray-700 text-white rounded-xl px-3 py-2 text-xs outline-none"
+              >
+                {callingRoles.map(r => (
+                  <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => handleRemoteTestDial()}
+                disabled={dispatchingCall}
+                className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <Phone size={13} /> {dispatchingCall ? 'Triggering SIM...' : 'Remote Dial Now 🚀'}
+              </button>
+            </div>
+          </div>
+
+          {/* Role Brain Architecture Cards */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Wrench size={15} className="text-indigo-400" /> Role-Based Calling Brain Prompts &amp; Windows
+                </h3>
+                <p className="text-xs text-gray-400">Har role ke alag-alag business goals, offers, frequency aur allowed calling time.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {callingRoles.map(r => (
+                <div key={r.role_id} className="bg-[#12121a] border border-gray-800 p-4 rounded-2xl space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{r.role_name}</h4>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Firm: {r.firm_name}</p>
+                    </div>
+                    <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-md text-[10px] font-mono">
+                      Cycle: Har {r.default_frequency_days} Din
+                    </span>
+                  </div>
+
+                  <div className="bg-black/50 p-2.5 rounded-xl border border-gray-800/80 space-y-1 text-xs">
+                    <p className="text-gray-300"><strong className="text-emerald-400">🎯 Goal:</strong> {r.goal}</p>
+                    <p className="text-gray-300"><strong className="text-amber-400">🎁 Offer:</strong> {r.offer}</p>
+                    <p className="text-gray-400 text-[11px]">
+                      ⏰ <strong>Call Window:</strong> {r.call_window?.start || '10:00'} to {r.call_window?.end || '19:00'} (Max {r.max_attempts} retries)
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAIRING MODAL */}
+      {showPairingModal && pairingModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="bg-[#111118] border border-gray-800 rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative text-center space-y-4">
+            <button
+              onClick={() => setShowPairingModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white p-1 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="w-14 h-14 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto">
+              <QrCode size={28} />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-white">Pair Home Mobile SIM Gateway</h3>
+              <p className="text-xs text-gray-400 mt-1">Open DealClose Companion APK on your phone and enter this code:</p>
+            </div>
+
+            <div className="bg-black/60 border border-emerald-500/40 p-4 rounded-2xl">
+              <p className="text-3xl font-black text-emerald-400 font-mono tracking-widest">
+                {pairingModalData.pairingCode}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-1">Valid for 15 minutes</p>
+            </div>
+
+            <div className="text-left bg-[#161622] p-3 rounded-xl border border-gray-800 text-[11px] text-gray-300 space-y-1">
+              <p className="font-bold text-white">Phone Setup Instructions:</p>
+              <p>1. Phone me <strong>DealClose SIM Gateway APK</strong> kholiye.</p>
+              <p>2. <strong>&ldquo;Set as Default Phone App&rdquo;</strong> button daba kar Allow karein.</p>
+              <p>3. Upar ka 6-digit code daal kar <strong>Activate</strong> dabayein.</p>
+            </div>
+
+            <button
+              onClick={() => { setShowPairingModal(false); fetchGatewayData(); }}
+              className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl text-xs"
+            >
+              Done &amp; Check Connection
+            </button>
+          </div>
         </div>
       )}
 

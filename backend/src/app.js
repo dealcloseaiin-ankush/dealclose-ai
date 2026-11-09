@@ -42,7 +42,8 @@ const backupRoutes = require('./routes/backupRoutes'); // 🚀 NEW: Google Drive
 const billingRoutes = require('./routes/billingRoutes'); // 🚀 NEW: Billing & Costing
 // 📦 MODULAR FEATURES
 const scaniqRoutes = require('./routes/scaniqRoutes');
-const creditMandateRoutes = require('./routes/creditMandateRoutes'); // 🛡️ MSME Credit Mandate & Udhar Protection
+const creditMandateRoutes = require('./routes/creditMandateRoutes');
+const gatewayRoutes = require('./routes/gatewayRoutes'); // 📱 Android SIM Gateway & Role Calling Brain // 🛡️ MSME Credit Mandate & Udhar Protection
 
 // Initialize Background Workers Safely
 if (process.env.DISABLE_REDIS_WORKER !== 'true') {
@@ -130,7 +131,8 @@ app.get('/api/pixel.js', trackingController.servePixel);
 
 // Mount Modular Features
 app.use('/api/scaniq', scaniqRoutes);
-app.use('/api/credit-mandate', creditMandateRoutes); // 🛡️ MSME Credit Limit & Daily Udhar Protection
+app.use('/api/credit-mandate', creditMandateRoutes);
+app.use('/api/gateway', gatewayRoutes); // 📱 Android SIM Gateway & Role Calling Brain // 🛡️ MSME Credit Limit & Daily Udhar Protection
 
 // FAKE META DATA DELETION CALLBACK (To bypass Meta Dashboard Bug)
 app.post('/api/webhooks/data-deletion', (req, res) => {
