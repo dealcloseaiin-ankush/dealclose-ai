@@ -338,6 +338,22 @@ export default function Calls() {
   const [testDialRole, setTestDialRole] = useState('plumber');
   const [dispatchingCall, setDispatchingCall] = useState(false);
 
+  // 📝 Diary Notes Parser & Shop Profile States
+  const [showDiaryModal, setShowDiaryModal] = useState(false);
+  const [diaryRawText, setDiaryRawText] = useState('');
+  const [isParsingDiary, setIsParsingDiary] = useState(false);
+  const [parsedDiaryContacts, setParsedDiaryContacts] = useState([]);
+  const [isSavingParsed, setIsSavingParsed] = useState(false);
+  const [showShopProfileModal, setShowShopProfileModal] = useState(false);
+  const [shopProfileForm, setShopProfileForm] = useState({
+    businessName: '',
+    address: '',
+    landmark: '',
+    googleMapsUrl: '',
+    upiId: '',
+    whatsappNumber: ''
+  });
+
   const [logModalLead, setLogModalLead] = useState(null);
   const [logFormData, setLogFormData] = useState({
     outcome: 'connected',
@@ -461,6 +477,57 @@ export default function Calls() {
       toast.error(err.response?.data?.message || 'Failed to generate code');
     } finally {
       setLoadingGateway(false);
+    }
+  };
+
+  const handleParseDiaryNotes = async () => {
+    if (!diaryRawText.trim()) {
+      toast.error('Please paste or write some rough notes first!');
+      return;
+    }
+    setIsParsingDiary(true);
+    try {
+      const res = await api.post('/gateway/parse-diary', { rawText: diaryRawText });
+      if (res.data?.contacts && res.data.contacts.length > 0) {
+        setParsedDiaryContacts(res.data.contacts);
+        toast.success(`AI detected ${res.data.contacts.length} contacts! Review & verify below.`);
+      } else {
+        toast.error('Could not detect any phone numbers or contacts.');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Parsing failed');
+    } finally {
+      setIsParsingDiary(false);
+    }
+  };
+
+  const handleSaveVerifiedContacts = async () => {
+    if (parsedDiaryContacts.length === 0) return;
+    setIsSavingParsed(true);
+    try {
+      const res = await api.post('/gateway/contacts/import', {
+        contacts: parsedDiaryContacts
+      });
+      toast.success(res.data.message || 'Contacts verified and saved to CRM!');
+      setShowDiaryModal(false);
+      setDiaryRawText('');
+      setParsedDiaryContacts([]);
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save contacts');
+    } finally {
+      setIsSavingParsed(false);
+    }
+  };
+
+  const handleSaveShopProfile = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/gateway/shop-profile', shopProfileForm);
+      toast.success(res.data.message || 'Shop Profile updated for AI Neha!');
+      setShowShopProfileModal(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update profile');
     }
   };
 
@@ -1328,11 +1395,23 @@ export default function Calls() {
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <button
+                onClick={() => setShowDiaryModal(true)}
+                className="px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
+              >
+                <FileText size={14} /> <span>📝 Paste / Scan Diary Notes</span>
+              </button>
+              <button
+                onClick={() => setShowShopProfileModal(true)}
+                className="px-3 py-2 bg-[#1b1b26] hover:bg-[#252535] text-gray-300 hover:text-white border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              >
+                <Settings2 size={14} /> <span>🏪 Shop Address / Info</span>
+              </button>
+              <button
                 onClick={handleGeneratePairingCode}
                 disabled={loadingGateway}
-                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-2"
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
               >
-                <QrCode size={14} /> <span>Pair Home Phone (QR / Code)</span>
+                <QrCode size={14} /> <span>Pair Home Phone</span>
               </button>
             </div>
           </div>
@@ -1446,6 +1525,247 @@ export default function Calls() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📝 AI DIARY / NOTES PARSER & VERIFICATION MODAL */}
+      {showDiaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="bg-[#111118] border border-gray-800 rounded-3xl p-5 md:p-7 w-full max-w-3xl shadow-2xl relative my-8 space-y-4">
+            <button
+              onClick={() => { setShowDiaryModal(false); setParsedDiaryContacts([]); }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white p-1 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center">
+                <FileText size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Smart AI Notes &amp; Diary Page Extractor</h3>
+                <p className="text-xs text-gray-400">Copy-paste diary notes, WhatsApp lists, or rough mistri numbers. AI will auto-classify them!</p>
+              </div>
+            </div>
+
+            {/* Input Textarea */}
+            <div>
+              <label className="block text-gray-300 text-xs font-bold mb-1.5">
+                Paste rough text, WhatsApp chat, or diary copy here:
+              </label>
+              <textarea
+                rows={4}
+                value={diaryRawText}
+                onChange={(e) => setDiaryRawText(e.target.value)}
+                placeholder={`e.g.\nRamesh plumber 9826112345 1 inch pipe bilaspur site\nSuresh thekedar 9827098765 25000 baaki\nSonu painter 8819012345 naya hai dukan nahi janta\nMohan mistri 7000123456 pehle leta tha ab nahi aa raha`}
+                className="w-full bg-[#161622] border border-gray-700 text-white rounded-xl p-3 text-xs outline-none focus:border-blue-500 leading-relaxed font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleParseDiaryNotes}
+                disabled={isParsingDiary}
+                className="mt-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Sparkles size={13} /> {isParsingDiary ? 'AI Extracting & Classifying...' : '🤖 AI Auto-Extract & Classify Contacts'}
+              </button>
+            </div>
+
+            {/* Verification & Edit Table */}
+            {parsedDiaryContacts.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-gray-800">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <CheckCircle size={14} className="text-emerald-400" />
+                    Verify Detected Contacts ({parsedDiaryContacts.length}):
+                  </span>
+                  <span className="text-[11px] text-gray-400">Review/Edit fields before saving to CRM</span>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto border border-gray-800 rounded-xl overflow-hidden bg-black/40">
+                  <table className="w-full text-[11px] text-left">
+                    <thead className="bg-[#181826] text-gray-400 uppercase font-mono text-[10px] sticky top-0">
+                      <tr>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Phone</th>
+                        <th className="p-2">Trade Role</th>
+                        <th className="p-2">Relationship Stage</th>
+                        <th className="p-2">Balance/Site</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800 text-gray-300">
+                      {parsedDiaryContacts.map((c, idx) => (
+                        <tr key={idx} className="hover:bg-white/5">
+                          <td className="p-1.5">
+                            <input
+                              type="text"
+                              value={c.name}
+                              onChange={(e) => {
+                                const updated = [...parsedDiaryContacts];
+                                updated[idx].name = e.target.value;
+                                setParsedDiaryContacts(updated);
+                              }}
+                              className="bg-[#1a1a24] border border-gray-700 text-white rounded px-2 py-1 text-xs w-28"
+                            />
+                          </td>
+                          <td className="p-1.5 font-mono text-blue-300">
+                            <input
+                              type="text"
+                              value={c.phone}
+                              onChange={(e) => {
+                                const updated = [...parsedDiaryContacts];
+                                updated[idx].phone = e.target.value;
+                                setParsedDiaryContacts(updated);
+                              }}
+                              className="bg-[#1a1a24] border border-gray-700 text-white rounded px-2 py-1 text-xs font-mono w-28"
+                            />
+                          </td>
+                          <td className="p-1.5">
+                            <select
+                              value={c.role_id}
+                              onChange={(e) => {
+                                const updated = [...parsedDiaryContacts];
+                                updated[idx].role_id = e.target.value;
+                                setParsedDiaryContacts(updated);
+                              }}
+                              className="bg-[#1a1a24] border border-gray-700 text-white rounded px-2 py-1 text-xs"
+                            >
+                              <option value="plumber">Plumber (प्लंबर)</option>
+                              <option value="thekedar">Thekedar (ठेकेदार)</option>
+                              <option value="painter">Painter (पेंटर)</option>
+                              <option value="electrician">Electrician</option>
+                              <option value="wholesale">Wholesale</option>
+                            </select>
+                          </td>
+                          <td className="p-1.5">
+                            <select
+                              value={c.subSegment}
+                              onChange={(e) => {
+                                const updated = [...parsedDiaryContacts];
+                                updated[idx].subSegment = e.target.value;
+                                setParsedDiaryContacts(updated);
+                              }}
+                              className="bg-[#1a1a24] border border-gray-700 text-white rounded px-2 py-1 text-xs"
+                            >
+                              <option value="regular">🟢 Regular (Site Check)</option>
+                              <option value="inactive">🟠 Inactive (Comeback Offer)</option>
+                              <option value="new_cold">🔵 Naya (Shop Address/Intro)</option>
+                              <option value="payment_due">🔴 Payment Dues (Hisaab)</option>
+                            </select>
+                          </td>
+                          <td className="p-1.5 text-gray-400">
+                            {c.pendingBalance > 0 ? (
+                              <span className="text-amber-300 font-bold">₹{c.pendingBalance}</span>
+                            ) : (
+                              <span>{c.siteLocation || c.notes?.slice(0, 20) || '-'}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveVerifiedContacts}
+                  disabled={isSavingParsed}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:opacity-95 text-white font-black text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <CheckCircle size={16} />
+                  <span>{isSavingParsed ? 'Saving to Calling Queues...' : `✅ Confirm & Save ${parsedDiaryContacts.length} Contacts to CRM`}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 🏪 SHOP PROFILE MODAL (Address, Landmark, Google Maps Link for AI) */}
+      {showShopProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="bg-[#111118] border border-gray-800 rounded-3xl p-5 md:p-7 w-full max-w-lg shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setShowShopProfileModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white p-1 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center">
+                <Settings2 size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Shop Profile Knowledge Base</h3>
+                <p className="text-xs text-gray-400">Jab AI naye plumbers/painters se baat karega toh ye address aur location link dega.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveShopProfile} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-gray-300 font-semibold mb-1">Dukan Ka Naam (Shop Name):</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Gupta Sanitary &amp; Hardware Store"
+                  value={shopProfileForm.businessName}
+                  onChange={(e) => setShopProfileForm({ ...shopProfileForm, businessName: e.target.value })}
+                  className="w-full bg-[#181822] border border-gray-700 text-white rounded-xl p-2.5 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-1">Dukan Ka Pura Address:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Shop #12, Near Overbridge, Main Road, Bilaspur"
+                  value={shopProfileForm.address}
+                  onChange={(e) => setShopProfileForm({ ...shopProfileForm, address: e.target.value })}
+                  className="w-full bg-[#181822] border border-gray-700 text-white rounded-xl p-2.5 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-1">Pehchan / Landmark (Nikat):</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bank of Baroda ke samne"
+                  value={shopProfileForm.landmark}
+                  onChange={(e) => setShopProfileForm({ ...shopProfileForm, landmark: e.target.value })}
+                  className="w-full bg-[#181822] border border-gray-700 text-white rounded-xl p-2.5 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-1">Google Maps Location Link:</label>
+                <input
+                  type="text"
+                  placeholder="https://maps.app.goo.gl/..."
+                  value={shopProfileForm.googleMapsUrl}
+                  onChange={(e) => setShopProfileForm({ ...shopProfileForm, googleMapsUrl: e.target.value })}
+                  className="w-full bg-[#181822] border border-gray-700 text-white rounded-xl p-2.5 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-1">UPI ID (QR Payment ke liye):</label>
+                <input
+                  type="text"
+                  placeholder="e.g. merchant@upi"
+                  value={shopProfileForm.upiId}
+                  onChange={(e) => setShopProfileForm({ ...shopProfileForm, upiId: e.target.value })}
+                  className="w-full bg-[#181822] border border-gray-700 text-white rounded-xl p-2.5 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold rounded-xl text-xs shadow-md mt-2"
+              >
+                Save Shop Profile
+              </button>
+            </form>
           </div>
         </div>
       )}

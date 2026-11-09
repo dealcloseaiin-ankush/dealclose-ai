@@ -11,7 +11,9 @@ const {
   getCallingContacts,
   importCallingContacts,
   triggerSchedulerEvaluation,
-  submitCallResult
+  submitCallResult,
+  parseDiaryNotes,
+  updateShopCallingProfile
 } = require('../controllers/gatewayController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -31,5 +33,9 @@ router.get('/contacts', protect, getCallingContacts);
 router.post('/contacts/import', protect, importCallingContacts);
 router.post('/evaluate-queue', protect, triggerSchedulerEvaluation);
 router.post('/submit-result', protect, submitCallResult);
+
+// 📝 Smart AI Diary / WhatsApp Note Parser & Shop Profile
+router.post('/parse-diary', protect, parseDiaryNotes);
+router.post('/shop-profile', protect, updateShopCallingProfile);
 
 module.exports = router;

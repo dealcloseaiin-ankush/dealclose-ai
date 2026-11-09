@@ -406,3 +406,130 @@ exports.submitCallResult = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// 🧠 11. SMART AI DIARY / NOTES EXTRACTOR
+// Takes rough handwritten OCR text, WhatsApp chat, or messy notes -> Extracts structured contacts
+exports.parseDiaryNotes = async (req, res) => {
+  try {
+    const { rawText } = req.body;
+    if (!rawText || !rawText.trim()) {
+      return res.status(400).json({ success: false, message: 'Please provide notes text to extract.' });
+    }
+
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
+    const systemPrompt = `You are an expert Indian Hardware, Sanitary & Building Materials CRM AI assistant.
+Extract contact entries from rough, messy merchant diary notes, WhatsApp messages, or spoken Hindi/Hinglish text.
+
+For each contact detected, extract:
+1. "name": Person's name (or "Mistri" / "Customer" if unknown)
+2. "phone": 10-digit Indian mobile number (clean, no +91, no spaces)
+3. "role_id": One of ["plumber", "painter", "electrician", "thekedar", "wholesale", "customer"]
+4. "subSegment": Classify accurately into one of:
+   - "regular": Takes material regularly / weekly / current sites.
+   - "inactive": Used to buy earlier, stopped coming / dormant / comeback needed.
+   - "new_cold": Completely new / doesn't know shop / needs address & intro.
+   - "payment_due": Has pending balance / udhari / dues mention.
+5. "pendingBalance": Number if any dues mentioned, else 0.
+6. "siteLocation": Location / area / site name if mentioned (e.g. "Bilaspur", "Station Road"), else "".
+7. "notes": Brief Hindi/English note about what they work on.
+
+Return ONLY a valid JSON array of objects. No markdown backticks, no markdown codeblocks, no extra explanation text.
+Example format:
+[
+  { "name": "Ramesh", "phone": "9826112345", "role_id": "plumber", "subSegment": "regular", "pendingBalance": 0, "siteLocation": "Bilaspur", "notes": "pipe fittings" },
+  { "name": "Suresh", "phone": "9827098765", "role_id": "thekedar", "subSegment": "payment_due", "pendingBalance": 15000, "siteLocation": "Sector 4", "notes": "15k balance" }
+]`;
+
+    let parsedList = [];
+    if (genAI) {
+      try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+        const result = await model.generateContent(`${systemPrompt}\n\nHere is the merchant's rough notes:\n${rawText}`);
+        let textResp = result.response.text().trim();
+        // Clean markdown backticks if any
+        textResp = textResp.replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
+        parsedList = JSON.parse(textResp);
+      } catch (geminiErr) {
+        console.warn('Gemini diary parsing failed, using regex fallback:', geminiErr.message);
+      }
+    }
+
+    // Fallback parser if Gemini failed or missing
+    if (!Array.isArray(parsedList) || parsedList.length === 0) {
+      const lines = rawText.split('\n');
+      parsedList = lines.map(line => {
+        const phoneMatch = line.match(/(?:\+91|91)?[6-9]\d{9}/);
+        if (!phoneMatch) return null;
+        const cleanPhone = phoneMatch[0].replace(/^\+?91/, '').slice(-10);
+        const isThekedar = /thekedar|contractor|theka/i.test(line);
+        const isPainter = /painter|rang|paint|putty/i.test(line);
+        const isPlumber = /plumber|nal|pipe|fitting/i.test(line);
+        const isElectrician = /electric|wire|bijli/i.test(line);
+        const isDue = /baaki|due|udhar|hisaab|rupaye|rs|₹/i.test(line);
+        const isNew = /naya|new|cold|pata nahi/i.test(line);
+        const isInactive = /pehle|chhod|nahi aa/i.test(line);
+
+        return {
+          name: line.replace(phoneMatch[0], '').replace(/[^a-zA-Z\s]/g, '').trim().split(' ')[0] || 'Customer',
+          phone: cleanPhone,
+          role_id: isThekedar ? 'thekedar' : isPainter ? 'painter' : isPlumber ? 'plumber' : isElectrician ? 'electrician' : 'plumber',
+          subSegment: isDue ? 'payment_due' : isNew ? 'new_cold' : isInactive ? 'inactive' : 'regular',
+          pendingBalance: 0,
+          siteLocation: '',
+          notes: line.trim()
+        };
+      }).filter(Boolean);
+    }
+
+    res.status(200).json({
+      success: true,
+      extractedCount: parsedList.length,
+      contacts: parsedList
+    });
+  } catch (err) {
+    console.error('Parse Diary Notes Error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 🏪 12. UPDATE SHOP CALLING PROFILE (Address, Landmark, Google Map URL for AI Answers)
+exports.updateShopCallingProfile = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { businessName, address, landmark, googleMapsUrl, upiId, whatsappNumber } = req.body;
+
+    const User = require('../models/userModel');
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.brandKit = user.brandKit || {};
+    if (businessName) user.brandKit.businessName = businessName;
+    if (address) user.brandKit.address = address;
+    if (whatsappNumber) user.brandKit.whatsapp = whatsappNumber;
+
+    // Save extended metadata in user custom map
+    user.brandKit.landmark = landmark || user.brandKit.landmark || '';
+    user.brandKit.googleMapsUrl = googleMapsUrl || user.brandKit.googleMapsUrl || '';
+    user.brandKit.upiId = upiId || user.brandKit.upiId || '';
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Shop Calling Profile updated! AI Neha will now use your real address & Google Maps link.',
+      profile: {
+        businessName: user.brandKit.businessName,
+        address: user.brandKit.address,
+        landmark: user.brandKit.landmark,
+        googleMapsUrl: user.brandKit.googleMapsUrl,
+        upiId: user.brandKit.upiId,
+        whatsappNumber: user.brandKit.whatsapp
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
