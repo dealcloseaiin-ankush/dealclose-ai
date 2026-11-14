@@ -7,7 +7,8 @@ import {
   Plus, Check, Sparkles, Filter, Layers, PhoneCall, Shield, Search,
   Square, CheckSquare, Settings2, Play, Users, Flame, Send,
   FileSpreadsheet, CreditCard, Upload, ArrowDownToLine, DollarSign,
-  Signal, Wifi, Battery, QrCode, Wrench, Briefcase, SlidersHorizontal, CheckCircle
+  Signal, Wifi, Battery, QrCode, Wrench, Briefcase, SlidersHorizontal, CheckCircle,
+  ShoppingBag, Edit3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
