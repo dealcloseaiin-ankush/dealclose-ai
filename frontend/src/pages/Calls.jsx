@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import {
   Phone, PhoneOff, Mic, PlayCircle, History, Bot, Volume2, Database,
   FileText, Clock, Radio, Smartphone, Zap, Calendar, User, CheckCircle2,
-  AlertTriangle, RefreshCw, X, ArrowRight, MessageSquare, ChevronRight,
+  AlertTriangle, RefreshCw, X, ArrowRight, ArrowLeft, MessageSquare, ChevronRight,
   Plus, Check, Sparkles, Filter, Layers, PhoneCall, Shield, Search,
   Square, CheckSquare, Settings2, Play, Users, Flame, Send,
   FileSpreadsheet, CreditCard, Upload, ArrowDownToLine, DollarSign,
@@ -1047,6 +1047,9 @@ export default function Calls() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
+            <Link to="/mobile" className="md:hidden p-1.5 rounded-xl bg-gray-800 text-gray-300 hover:text-white" title="Back to Mobile Home">
+              <ArrowLeft size={16} />
+            </Link>
             <h1 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
               <PhoneCall className="text-emerald-400" size={24} /> AI Calling Hub
             </h1>
