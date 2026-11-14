@@ -8,7 +8,7 @@ import {
   Square, CheckSquare, Settings2, Play, Users, Flame, Send,
   FileSpreadsheet, CreditCard, Upload, ArrowDownToLine, DollarSign,
   Signal, Wifi, Battery, QrCode, Wrench, Briefcase, SlidersHorizontal, CheckCircle,
-  ShoppingBag, Edit3
+  ShoppingBag, Edit3, Download
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -1552,6 +1552,15 @@ export default function Calls() {
               >
                 <Settings2 size={14} /> <span>🏪 Shop Address / Info</span>
               </button>
+              <a
+                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/actions"
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-2 bg-[#201c12] hover:bg-[#2c2616] text-amber-300 hover:text-amber-200 border border-amber-500/40 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                title="Download Companion APK for your old Android phone"
+              >
+                <Download size={14} /> <span>📥 Download Old Phone APK</span>
+              </a>
               <button
                 onClick={handleGeneratePairingCode}
                 disabled={loadingGateway}
@@ -2185,17 +2194,28 @@ export default function Calls() {
 
             <div className="text-left bg-[#161622] p-3 rounded-xl border border-gray-800 text-[11px] text-gray-300 space-y-1">
               <p className="font-bold text-white">Phone Setup Instructions:</p>
-              <p>1. Phone me <strong>DealClose SIM Gateway APK</strong> kholiye.</p>
+              <p>1. Purane phone me <strong>DealClose SIM Gateway APK</strong> install karein.</p>
               <p>2. <strong>&ldquo;Set as Default Phone App&rdquo;</strong> button daba kar Allow karein.</p>
               <p>3. Upar ka 6-digit code daal kar <strong>Activate</strong> dabayein.</p>
             </div>
 
-            <button
-              onClick={() => { setShowPairingModal(false); fetchGatewayData(); }}
-              className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl text-xs"
-            >
-              Done &amp; Check Connection
-            </button>
+            <div className="space-y-2">
+              <a
+                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/actions"
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 hover:bg-amber-500/20"
+              >
+                <Download size={13} /> Download APK (Purane Phone Me Kholein)
+              </a>
+
+              <button
+                onClick={() => { setShowPairingModal(false); fetchGatewayData(); }}
+                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl text-xs"
+              >
+                Done &amp; Check Connection
+              </button>
+            </div>
           </div>
         </div>
       )}
