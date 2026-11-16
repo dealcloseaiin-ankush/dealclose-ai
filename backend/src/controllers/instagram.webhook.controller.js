@@ -15,6 +15,24 @@ const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new I
 redis.on && redis.on('error', (e) => console.error('⚠️ [Redis] Connection error in IG webhook controller:', e.message));
 const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
 
+// 🚀 IN-MEMORY DEDUPLICATION CACHE & SENDER MUTEX LOCKS
+// Prevents duplicate DM replies when Meta retries or fires parallel webhooks (Page ID + IG ID)
+const processedIgMsgIds = new Map();
+const cleanupOldIgMsgIds = () => {
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+  for (const [id, time] of processedIgMsgIds.entries()) {
+    if (time < tenMinutesAgo) processedIgMsgIds.delete(id);
+  }
+};
+
+const activeIgSenderLocks = new Map();
+const cleanupOldIgLocks = () => {
+  const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+  for (const [key, time] of activeIgSenderLocks.entries()) {
+    if (time < fiveMinutesAgo) activeIgSenderLocks.delete(key);
+  }
+};
+
 // ✅ HELPER: Central place to check if a loginType is the "Instagram-native" flow
 // (Business Login for Instagram, using graph.instagram.com endpoints).
 // Anything else falls back to the Facebook-linked flow (graph.facebook.com).
@@ -197,6 +215,32 @@ exports.handleInstagramWebhook = async (req, res) => {
         // ==========================================
         if (entry.messaging && entry.messaging.length > 0) {
           for (let event of entry.messaging) {
+            const mid = event.message?.mid;
+            
+            // 🚀 STEP 1: IMMEDIATE SYNCHRONOUS IN-MEMORY DEDUPLICATION (MID)
+            if (mid) {
+              cleanupOldIgMsgIds();
+              if (processedIgMsgIds.has(mid)) {
+                console.log(`⚠️ [IG Webhook Deduplication] Message ID ${mid} already processed (memory cache). Skipping duplicate hit.`);
+                continue;
+              }
+              // Synchronously record in cache BEFORE any async operation to prevent race conditions!
+              processedIgMsgIds.set(mid, Date.now());
+            }
+
+            // 🚀 STEP 2: SENDER-LEVEL MUTEX LOCK (Debounce concurrent webhook hits within 3.5s)
+            const rawSenderId = event.sender?.id;
+            const isEchoEvent = Boolean(event.message && event.message.is_echo);
+            if (rawSenderId && !isEchoEvent) {
+              cleanupOldIgLocks();
+              const lockKey = `${igAccountId}_${rawSenderId}`;
+              const lastLock = activeIgSenderLocks.get(lockKey);
+              if (lastLock && (Date.now() - lastLock < 3500)) {
+                console.log(`⚠️ [IG Webhook Concurrency Lock] Active processing in flight for sender ${rawSenderId}. Skipping parallel duplicate.`);
+                continue;
+              }
+              activeIgSenderLocks.set(lockKey, Date.now());
+            }
             // 🐛 FIX: Add a safety check to handle non-text events like 'read' receipts.
             // The server was crashing because it tried to access `event.message.text`
             // on events that don't have a `message` object (e.g., read receipts).
@@ -284,6 +328,15 @@ exports.handleInstagramWebhook = async (req, res) => {
               console.log(`\n✅ [IG Webhook - DMs] STRICT MATCH SUCCESS!`);
               console.log(`- Webhook IG Account ID:`, igAccountId);
               console.log(`- Matched User Email:`, user?.email);
+
+              // 🚀 STEP 3: DATABASE DEDUPLICATION FOR TEXT MESSAGES
+              if (mid) {
+                const isDuplicate = await Message.findOne({ wamid: mid, userId: user._id });
+                if (isDuplicate) {
+                  console.log(`⚠️ [IG Webhook DB Deduplication] Message ID ${mid} already saved in DB. Skipping duplicate execution.`);
+                  continue;
+                }
+              }
 
               let igToken = null;
               let igPageId = null;
@@ -445,6 +498,33 @@ exports.handleInstagramWebhook = async (req, res) => {
 
               const incomingTextLower = incomingText.toLowerCase();
               let flowReplyHandled = false;
+
+              // 🚀 TURN-TAKING & DEDUPLICATION GUARDS
+              const recordBotReply = async (replyMid = mid) => {
+                if (currentLeadCheck) {
+                  await Lead.updateOne({ _id: currentLeadCheck._id }, {
+                    $set: {
+                      lastRepliedMsgId: replyMid || mid,
+                      lastBotReplyAt: new Date()
+                    },
+                    $inc: { consecutiveBotReplies: 1 }
+                  });
+                  currentLeadCheck.consecutiveBotReplies = (currentLeadCheck.consecutiveBotReplies || 0) + 1;
+                  currentLeadCheck.lastRepliedMsgId = replyMid || mid;
+                }
+              };
+
+              const shouldSkipBotReply = () => {
+                if (mid && currentLeadCheck && currentLeadCheck.lastRepliedMsgId === mid) {
+                  console.log(`🛑 [IG Turn-Taking] Bot has already replied to incoming message ${mid}. Suppressing duplicate.`);
+                  return true;
+                }
+                if (currentLeadCheck && (currentLeadCheck.consecutiveBotReplies || 0) >= 3) {
+                  console.log(`🛑 [IG Turn-Taking] Consecutive bot replies limit reached (${currentLeadCheck.consecutiveBotReplies}) for ${senderId}. Waiting for customer input.`);
+                  return true;
+                }
+                return false;
+              };
               
               const formatFlowMsg = (text) => {
                 if (!text) return "";
@@ -458,6 +538,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 try {
                     if (!igToken) throw new Error("IG Token is missing or invalid");
                     await metaAdsService.sendInstagramDM(igToken, senderId, text, loginTypeParam || loginType);
+                    await recordBotReply();
                 } catch (e) {
                     console.error("❌ [IG Flow DM Error]:", e.message);
                     deliveryStatus = 'failed';
@@ -653,6 +734,9 @@ exports.handleInstagramWebhook = async (req, res) => {
 
               const dmAutomationSource = incomingWorkspaceId !== 'main' ? (activeWorkspace?.postAutomations || []) : (user.postAutomations || []);
               if (!flowReplyHandled && dmAutomationSource.length > 0) {
+                if (shouldSkipBotReply()) {
+                  continue;
+                }
                 const matchedAuto = dmAutomationSource.find(rule => incomingTextLower.includes((rule.triggerWord || '').toLowerCase()));
                 if (matchedAuto && matchedAuto.fileUrl) {
                   try {
@@ -706,6 +790,7 @@ exports.handleInstagramWebhook = async (req, res) => {
                 : (user.aiAgentEnabled !== false && user.instagramDmAiEnabled !== false);
 
               if (!isAiEnabled && ['hi', 'hello', 'hey', 'menu', 'collab'].includes(incomingTextLower)) {
+                if (shouldSkipBotReply()) continue;
                 const menuMessage = isCreator 
                   ? `Hi! 👋 I am the automated manager for ${user.fullName || 'this creator'}.\n\nPlease tell me why you're reaching out (Type a number):\n1️⃣ Brand Promotion / Collaboration\n2️⃣ Just a Fan saying Hi! ❤️\n3️⃣ General Query`
                   : `Hi! 👋 Welcome to ${user.businessName || user.fullName}.\n\nHow can I help you today? (Type a number):\n1️⃣ Order / Buy a Product 🛒\n2️⃣ Customer Support 🎧\n3️⃣ Talk to our Team 👤`;
@@ -713,7 +798,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = menuMessage;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, menuMessage, loginType);
+                  if (igToken) {
+                  await metaAdsService.sendInstagramDM(igToken, senderId, menuMessage, loginType);
+                  await recordBotReply();
+                }
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -739,7 +827,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = collabMsg;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, collabMsg, loginType);
+                  if (igToken) {
+                  await metaAdsService.sendInstagramDM(igToken, senderId, collabMsg, loginType);
+                  await recordBotReply();
+                }
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -765,7 +856,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = fanMsg;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, fanMsg, loginType);
+                  if (igToken) {
+                  await metaAdsService.sendInstagramDM(igToken, senderId, fanMsg, loginType);
+                  await recordBotReply();
+                }
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;
@@ -791,7 +885,10 @@ exports.handleInstagramWebhook = async (req, res) => {
                 let deliveryStatus = 'sent';
                 let displayMsg = generalMessage;
                 try {
-                  if (igToken) await metaAdsService.sendInstagramDM(igToken, senderId, generalMessage, loginType);
+                  if (igToken) {
+                  await metaAdsService.sendInstagramDM(igToken, senderId, generalMessage, loginType);
+                  await recordBotReply();
+                }
                 } catch (apiErr) {
                   deliveryStatus = 'failed';
                   displayMsg += `\n\n[⚠️ Failed to Send IG DM: ${apiErr.message}]`;

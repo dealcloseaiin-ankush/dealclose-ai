@@ -15,12 +15,21 @@ const GeneratedPost = require('../models/GeneratedPostModel'); // 🚀 NEW: Auto
 const instagramService = require('../services/instagramService'); // 🚀 NEW: IG Publisher
 const { automationQueue } = require('../workers/automationWorker'); // 🚀 FIX: Import Queue to prevent ReferenceError crash
 
-// 🚀 IN-MEMORY DEDUPLICATION CACHE: Prevents duplicate webhook execution when Meta retries
+// 🚀 IN-MEMORY DEDUPLICATION CACHE & PHONE MUTEX LOCKS
+// Prevents duplicate webhook execution when Meta retries or fires parallel webhooks
 const processedWebhookMsgIds = new Map();
 const cleanupOldMsgIds = () => {
   const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
   for (const [id, time] of processedWebhookMsgIds.entries()) {
     if (time < tenMinutesAgo) processedWebhookMsgIds.delete(id);
+  }
+};
+
+const activeWaPhoneLocks = new Map();
+const cleanupOldPhoneLocks = () => {
+  const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+  for (const [phone, time] of activeWaPhoneLocks.entries()) {
+    if (time < fiveMinutesAgo) activeWaPhoneLocks.delete(phone);
   }
 };
 
@@ -208,21 +217,33 @@ exports.handleWhatsApp = async (req, res) => {
               console.log(`⚠️ [Webhook Deduplication] Message ID ${msgId} already processed (memory cache). Skipping duplicate execution.`);
               continue;
             }
+            // CRITICAL: Synchronously mark IMMEDIATELY before any await to prevent race conditions!
+            processedWebhookMsgIds.set(msgId, Date.now());
+
             const isDuplicate = await Message.findOne({ wamid: msgId, userId: user._id });
             if (isDuplicate) {
               console.log(`⚠️ [Webhook Deduplication] Message ID ${msgId} already processed (database). Skipping duplicate execution.`);
-              processedWebhookMsgIds.set(msgId, Date.now());
               continue;
             }
-            // Mark as processed immediately so subsequent fast retries are blocked
-            processedWebhookMsgIds.set(msgId, Date.now());
+          }
+
+          const fromNumber = msg.from;
+          if (fromNumber) {
+            cleanupOldPhoneLocks();
+            const phoneLockKey = `${phoneNumberId}_${fromNumber}`;
+            const lastPhoneLock = activeWaPhoneLocks.get(phoneLockKey);
+            // If another webhook for this exact phone number is currently in flight within the last 3.5 seconds:
+            if (lastPhoneLock && (Date.now() - lastPhoneLock < 3500)) {
+              console.log(`⚠️ [WA Concurrency Lock] Parallel request in progress for ${fromNumber}. Skipping concurrent duplicate.`);
+              continue;
+            }
+            activeWaPhoneLocks.set(phoneLockKey, Date.now());
           }
 
           // 🚀 DEBUG LOG: Check what ID Meta is sending for Instagram
           if (changes.field === 'instagram') {
             console.log(`[DEBUG INSTAGRAM ID] Meta sent PSID: ${msg.from} for entry ID: ${entry.id}`);
           }
-          const fromNumber = msg.from;
           console.log(`➡️ [Webhook] New message from: ${fromNumber}, Type: ${msg.type}`);
           console.log(`✅ [24-HOUR WINDOW OPENED] Customer ${fromNumber} just sent a message. You can now send free-form replies via dashboard for the next 24 hours!`);
           
@@ -245,6 +266,8 @@ exports.handleWhatsApp = async (req, res) => {
                 userId: user._id, workspaceId, phoneNumber: fromNumber, name: `User #${seqId}`,
                 source: leadSource, status: 'new', createdBy: user._id,
                 lastInteractionAt: new Date(),
+                consecutiveBotReplies: 0,
+                lastCustomerMessageAt: new Date(),
                 customFields: adReferral ? {
                   adId: String(adReferral.source_id || ''),
                   adHeadline: String(adReferral.headline || ''),
@@ -265,6 +288,8 @@ exports.handleWhatsApp = async (req, res) => {
                    $set: { 
                      lastInteractionAt: new Date(),
                      source: newSource,
+                     consecutiveBotReplies: 0,
+                     lastCustomerMessageAt: new Date(),
                      ...(adReferral ? { 
                        "customFields.adId": String(adReferral.source_id || ''), 
                        "customFields.adHeadline": String(adReferral.headline || ''), 
@@ -789,7 +814,7 @@ Your Role:
             const effectiveWorkspaceId = currentLeadCheck?.lastSelectedWorkspaceId || currentLeadCheck?.workspaceId || workspaceId;
 
             console.log(`💾 [DEBUG] Saving incoming message to database (Workspace: ${effectiveWorkspaceId})...`);
-            const incomingMsg = await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', expiresAt: getMessageExpiry(user, 'whatsapp') });
+            const incomingMsg = await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: incomingText, direction: 'incoming', status: 'received', sentBy: 'customer', wamid: msgId || undefined, expiresAt: getMessageExpiry(user, 'whatsapp') });
             console.log(`✅ [DEBUG] Message saved with ID: ${incomingMsg._id}`);
 
             // 🚀 Broadcast the incoming message to all connected chat dashboards
@@ -803,6 +828,34 @@ Your Role:
             }
             
             const incomingTextLower = incomingText.toLowerCase();
+
+            // 🚀 TURN-TAKING & DEDUPLICATION GUARDS
+            const recordWaBotReply = async (replyMsgId = msgId) => {
+              if (currentLeadCheck) {
+                await Lead.updateOne({ _id: currentLeadCheck._id }, {
+                  $set: {
+                    lastRepliedMsgId: replyMsgId || msgId,
+                    lastBotReplyAt: new Date()
+                  },
+                  $inc: { consecutiveBotReplies: 1 }
+                });
+                currentLeadCheck.consecutiveBotReplies = (currentLeadCheck.consecutiveBotReplies || 0) + 1;
+                currentLeadCheck.lastRepliedMsgId = replyMsgId || msgId;
+              }
+            };
+
+            const shouldSkipWaBotReply = () => {
+              if (isOwnerOrStaff) return false;
+              if (msgId && currentLeadCheck && currentLeadCheck.lastRepliedMsgId === msgId) {
+                console.log(`🛑 [WA Turn-Taking] Bot has already replied to incoming message ${msgId}. Suppressing duplicate.`);
+                return true;
+              }
+              if (currentLeadCheck && (currentLeadCheck.consecutiveBotReplies || 0) >= 3) {
+                console.log(`🛑 [WA Turn-Taking] Consecutive bot replies limit reached (${currentLeadCheck.consecutiveBotReplies}) for ${fromNumber}. Waiting for customer input.`);
+                return true;
+              }
+              return false;
+            };
 
             // 🚀 CHECK IF HUMAN HAS TAKEN OVER THIS CHAT (AI PAUSED) WITH AUTO-UNPAUSE ON TRIGGER
             const isTriggerWord = ['hi', 'hello', 'hey', 'start', 'menu', 'reset', 'restart', '0', '1', '2', 'property', 'collab', 'offer', 'price'].includes(incomingTextLower) || (user.autoReplies && user.autoReplies.some(r => r.triggerWord && incomingTextLower.includes(r.triggerWord.toLowerCase())));
@@ -868,7 +921,9 @@ Your Role:
 
               const switchConfirmMsg = `Welcome${displayName ? ' back' : ''} to *${wsDetails.name}*! 🏢\n\nHow can we assist you today?\n\n1️⃣ *Buy Property*\n2️⃣ *List / Sell Property*\n3️⃣ *Rent Property*\n4️⃣ *Book Site Visit*\n\nFeel free to ask about our properties, catalog, pricing, or services.${formatSocialLinksText(wsDetails)}`;
               
+              if (shouldSkipWaBotReply()) continue;
               await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, switchConfirmMsg);
+              await recordWaBotReply();
               await Message.create({ userId: user._id, workspaceId: directSwitchTarget, customerPhone: fromNumber, channel: 'whatsapp', messageText: switchConfirmMsg, direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue;
             }
@@ -1196,6 +1251,7 @@ Your Role:
             // 🚀 UNIVERSAL SWITCH & BUSINESS DIVISION SELECTOR (Keywords: menu, switch, 0, change, options, etc.)
             if (['menu', 'switch', '0', 'change', 'options', 'divisions', 'home', 'stores'].includes(incomingTextLower) || 
                 ((['hi', 'hello', 'hey', 'start'].includes(incomingTextLower)) && user.workspaces && user.workspaces.length > 0 && !currentLeadCheck?.lastSelectedWorkspaceId)) {
+              if (shouldSkipWaBotReply()) continue;
               let menuRows = [
                 { 
                   id: `workspace_default`, 
@@ -1242,6 +1298,7 @@ Your Role:
                 action: { button: "Select Business", sections: [{ title: "Our Divisions", rows: menuRows }] }
               };
               await whatsappService.sendInteractiveMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, interactiveObj);
+              await recordWaBotReply();
               await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: "[Sent Interactive Main Menu]", direction: 'outgoing', status: 'sent', sentBy: 'auto-reply', expiresAt: getMessageExpiry(user, 'whatsapp') });
               continue; 
             }
@@ -1743,7 +1800,12 @@ If you don't know the answer, use the 'escalate_to_staff' tool.`;
                   responseMessage = `🤖 ` + responseMessage;
                 }
 
+                if (shouldSkipWaBotReply()) {
+                  console.log("🛑 [WA Turn-Taking] Suppressing duplicate reply to", fromNumber);
+                  continue;
+                }
                 await whatsappService.sendTextMessage(user.whatsappConfig.accessToken, user.whatsappConfig.phoneNumberId, fromNumber, responseMessage);
+                await recordWaBotReply();
                 await Message.create({ userId: user._id, workspaceId: effectiveWorkspaceId || workspaceId, customerPhone: fromNumber, channel: 'whatsapp', messageText: responseMessage, direction: 'outgoing', status: 'sent', sentBy: repliedBy, expiresAt: getMessageExpiry(user, 'whatsapp') });
                 
                 // 🚀 SMART DELAYED FEEDBACK: Only trigger if AI actually replied!

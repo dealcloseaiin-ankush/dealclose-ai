@@ -72,6 +72,11 @@ const leadSchema = new Schema({
     type: String,
     default: 'main'
   },
+  // --- Message Turn-Taking and Anti-Loop Deduplication ---
+  lastRepliedMsgId: { type: String, default: null },
+  consecutiveBotReplies: { type: Number, default: 0 },
+  lastBotReplyAt: { type: Date, default: null },
+  lastCustomerMessageAt: { type: Date, default: null },
   customFields: {
     type: Map,
     of: String,
