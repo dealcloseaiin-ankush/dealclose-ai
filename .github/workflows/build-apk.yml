@@ -2,10 +2,15 @@ name: Build DealClose SIM Gateway APK
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'android-sim-gateway/**'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -25,18 +30,38 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Gradle Wrapper Validation
-        uses: gradle/actions/wrapper-validation@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
 
       - name: Build Debug APK with Gradle
         working-directory: ./android-sim-gateway
         run: |
-          gradle wrapper
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
+          mkdir -p ../dist-apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-sim-gateway.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: dealclose-sim-gateway-apk
-          path: android-sim-gateway/app/build/outputs/apk/debug/*.apk
+          path: dist-apk/dealclose-sim-gateway.apk
           retention-days: 30
+
+      - name: Create or Update GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-apk
+          name: "DealClose SIM Gateway v1.0.0 APK"
+          body: |
+            ### 📱 DealClose SIM Gateway Companion APK
+            Download `dealclose-sim-gateway.apk` below directly on your Android phone!
+            
+            1. Install APK on your Android phone (Android 8.0+).
+            2. Tap **Set as Default Phone App** and Allow.
+            3. Tap **Ignore Battery Optimizations** and Allow.
+            4. Enter the 6-digit code from DealClose AI Calls Hub and tap **Activate**.
+          files: dist-apk/dealclose-sim-gateway.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

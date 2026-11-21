@@ -1556,7 +1556,7 @@ export default function Calls() {
                 <Settings2 size={14} /> <span>🏪 Shop Address / Info</span>
               </button>
               <a
-                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/actions"
+                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases/tag/v1.0.0-apk"
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-2 bg-[#201c12] hover:bg-[#2c2616] text-amber-300 hover:text-amber-200 border border-amber-500/40 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
@@ -2204,7 +2204,7 @@ export default function Calls() {
 
             <div className="space-y-2">
               <a
-                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/actions"
+                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases/tag/v1.0.0-apk"
                 target="_blank"
                 rel="noreferrer"
                 className="w-full py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 hover:bg-amber-500/20"
