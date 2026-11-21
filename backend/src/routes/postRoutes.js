@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { getPosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics, getPostInsights, publishPostNow, getReadymadeTemplates, publishInstantCreative } = require('../controllers/postController');
+const { getPosts, bulkSchedulePosts, getPostById, createPost, deletePost, importInstagramPosts, getPostAnalytics, getPostInsights, publishPostNow, getReadymadeTemplates, publishInstantCreative } = require('../controllers/postController');
 const multer = require('multer');
 
 // ✅ FIX: The designJson field can exceed the default 1MB limit for multipart form fields.
@@ -13,6 +13,7 @@ const upload = multer({
 // 🎨 Readymade & Instant Social Publisher Routes
 router.route('/readymade-templates').get(protect, getReadymadeTemplates);
 router.route('/publish-instant').post(protect, publishInstantCreative);
+router.route('/bulk-schedule').post(protect, upload.any(), bulkSchedulePosts);
 
 router.route('/')
   .get(protect, getPosts)

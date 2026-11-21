@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles, MessageSquare, Send, X, RefreshCw, Heart, Eye, Share2, Bookmark } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, Edit, Plus, BarChart2, Trash2, Download, Sparkles, MessageSquare, Send, X, RefreshCw, Heart, Eye, Share2, Bookmark, Zap, UploadCloud, Film, Layers } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth'; // 🚀 NEW: Import useAuth to get user and workspaces
@@ -33,6 +33,22 @@ export default function Publisher() {
   const [comments, setComments] = useState([]);
   // 🚀 FIX: 'fileInputRef' was not defined. Added useRef to create the reference.
   const fileInputRef = useRef(null);
+  // 🚀 BULK AUTO-SCHEDULER STATE
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkFiles, setBulkFiles] = useState([]);
+  const [bulkStartDate, setBulkStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [bulkPostingTime, setBulkPostingTime] = useState('19:00');
+  const [bulkIntervalDays, setBulkIntervalDays] = useState(1);
+  const [bulkTheme, setBulkTheme] = useState('');
+  const [bulkPlatforms, setBulkPlatforms] = useState(['instagram', 'facebook']);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkLoadingStep, setBulkLoadingStep] = useState('');
+  const bulkFileInputRef = useRef(null);
+
 
   const [replyTexts, setReplyTexts] = useState({}); // ✅ FIX: State to hold reply text for each comment individually
 
@@ -253,6 +269,63 @@ export default function Publisher() {
     if (file) {
       // Use state to pass the file to the editor component
       navigate('/publish-post', { state: { newPostFile: file } });
+    }
+  };
+
+
+  // 🚀 NEW: Handle Bulk Upload & AI Auto-Schedule
+  const handleBulkFilesSelect = (e) => {
+    const selected = Array.from(e.target.files || []);
+    if (selected.length > 0) {
+      setBulkFiles(prev => [...prev, ...selected]);
+    }
+  };
+
+  const handleRemoveBulkFile = (indexToRemove) => {
+    setBulkFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleBulkScheduleSubmit = async () => {
+    if (!bulkFiles || bulkFiles.length === 0) {
+      toast.error('Please select at least 1 video or image file.');
+      return;
+    }
+
+    setBulkLoading(true);
+    setBulkLoadingStep(`Uploading ${bulkFiles.length} files & crafting AI captions...`);
+    const toastId = toast.loading(`Auto-scheduling ${bulkFiles.length} posts with AI...`);
+
+    try {
+      const formData = new FormData();
+      bulkFiles.forEach(file => {
+        formData.append('media', file);
+      });
+      formData.append('startDate', bulkStartDate);
+      formData.append('postingTime', bulkPostingTime);
+      formData.append('intervalDays', bulkIntervalDays);
+      formData.append('platforms', JSON.stringify(bulkPlatforms));
+      formData.append('workspaceId', activeWorkspace);
+      formData.append('theme', bulkTheme);
+
+      const { data } = await api.post('/posts/bulk-schedule', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (data.success) {
+        toast.success(data.message || `Successfully scheduled ${data.count} posts! 🚀`, { id: toastId });
+        setIsBulkModalOpen(false);
+        setBulkFiles([]);
+        setBulkTheme('');
+        fetchPosts();
+      } else {
+        throw new Error(data.message || 'Bulk scheduling failed.');
+      }
+    } catch (error) {
+      console.error('Bulk Schedule Error:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to auto-schedule posts.', { id: toastId });
+    } finally {
+      setBulkLoading(false);
+      setBulkLoadingStep('');
     }
   };
 
@@ -479,6 +552,12 @@ export default function Publisher() {
           <div className="flex flex-col sm:flex-row gap-3">
             <button onClick={handleImportPosts} className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-700 transition-all">
               <Download size={16} /> Import Posts
+            </button>
+                        <button
+              onClick={() => setIsBulkModalOpen(true)}
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all border border-purple-500/30"
+            >
+              <Zap size={18} className="text-yellow-300 fill-yellow-300 animate-pulse" /> Bulk Auto-Scheduler (AI)
             </button>
             {/* 🚀 FIX: Changed Link to a button that triggers file input */}
             <button

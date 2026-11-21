@@ -3,7 +3,8 @@ const SocialPost = require('../models/SocialPostModel');
 const User = require('../models/userModel');
 const instagramService = require('../services/instagramService');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
-const { automationQueue } = require('../workers/automationWorker'); // 🚀 NEW: Import BullMQ queue
+const { automationQueue } = require('../workers/automationWorker');
+const aiService = require('../services/aiService'); // 🚀 NEW: Import BullMQ queue
 
 const normalizeWorkspaceId = (workspaceId) => (workspaceId === 'main_business' ? 'main' : workspaceId);
 const isMainWorkspaceId = (workspaceId) => !workspaceId || workspaceId === 'main' || workspaceId === 'main_business';
@@ -900,5 +901,179 @@ exports.publishInstantCreative = async (req, res) => {
   } catch (error) {
     console.error('Publish Instant Creative Error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Bulk upload media, generate AI captions based on business profile, and auto-schedule daily posts
+// @route   POST /api/posts/bulk-schedule
+exports.bulkSchedulePosts = async (req, res) => {
+  console.log("\n================== [BULK SCHEDULE START] ==================");
+  try {
+    const userId = req.user?._id;
+    const { startDate, postingTime, intervalDays = 1, platforms, workspaceId, theme, customCaptionMode, masterCaption } = req.body;
+
+    const files = req.files || [];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please upload at least one video or image to schedule.' });
+    }
+
+    let requestedPlatforms = ['instagram'];
+    try {
+      if (platforms) {
+        requestedPlatforms = typeof platforms === 'string' ? JSON.parse(platforms) : platforms;
+      }
+    } catch (e) {
+      requestedPlatforms = ['instagram'];
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const businessName = user.businessName || user.businessProfile?.businessName || 'Our Business';
+    const businessDesc = user.businessDescription || user.businessProfile?.tagline || '';
+    const catalogSummary = (user.businessProfile?.catalog || [])
+      .slice(0, 5)
+      .map(item => `${item.itemName} (${item.brand || ''})`)
+      .join(', ');
+
+    console.log(`🚀 [BULK] Uploading ${files.length} media files for ${businessName}...`);
+
+    // 1. Upload all files to Cloudinary
+    const uploadedMediaList = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileBuffer = file.buffer || (file.path ? fs.readFileSync(file.path) : null);
+      if (!fileBuffer) continue;
+
+      const uploadRes = await uploadToCloudinary(fileBuffer, 'posts');
+      const mime = file.mimetype || 'image/jpeg';
+      uploadedMediaList.push({
+        url: uploadRes.secure_url,
+        type: mime.startsWith('video') ? 'video' : 'image',
+        filename: file.originalname || `media_${i + 1}`,
+      });
+    }
+
+    if (uploadedMediaList.length === 0) {
+      return res.status(400).json({ success: false, message: 'Failed to process media files.' });
+    }
+
+    // 2. Generate Captions (Either Master Template or AI Generated)
+    let captions = [];
+    if (customCaptionMode === 'master' && masterCaption && masterCaption.trim()) {
+      captions = uploadedMediaList.map((_, idx) => {
+        return masterCaption
+          .replace(/{day}/gi, `Day ${idx + 1}`)
+          .replace(/{number}/gi, `${idx + 1}`);
+      });
+    } else {
+      const aiPrompt = `You are an elite Instagram Reels & Social Media marketing copywriter for the business "${businessName}".
+Business Information:
+- About: ${businessDesc || 'High quality products and services'}
+- Products/Catalog: ${catalogSummary || 'Exclusive deals and offers'}
+- Target Audience Focus: ${theme || 'Viral UGC Reels, educational tips, and customer problem-solving with high conversion'}
+
+You must create exactly ${uploadedMediaList.length} unique, viral, and engaging Instagram captions (one for each post from Day 1 to Day ${uploadedMediaList.length}).
+Requirements for EACH caption:
+1. Hook: Catchy, curiosity-inducing opening line with 1-2 relevant emojis (first 3 seconds attention grabber).
+2. Body: Engaging, clear value explanation (2-3 short lines in natural Hindi/Hinglish or crisp English).
+3. CTA: Direct Call To Action (e.g., "Comment 'INFO' for price", "Save this Reel for later", "DM us to order").
+4. Hashtags: 8-12 hyper-relevant hashtags (#reels #business etc.).
+
+Strictly output ONLY a raw JSON array of strings, where each string is the complete ready-to-post caption.
+Example format:
+[
+  "Catchy hook here 🚀\\n\\nBody description here...\\n\\nDM us today!\\n\\n#hashtags",
+  "..."
+]
+Do not include any conversational filler, markdown code fences, or text outside the JSON array.`;
+
+      try {
+        const aiResponse = await aiService.generateAIResponse(
+          aiPrompt,
+          "You are an expert social media copywriter. Output strictly a JSON array of strings.",
+          "instagram",
+          userId
+        );
+
+        const cleanedJson = aiResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanedJson);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          captions = parsed.map(c => typeof c === 'string' ? c : (c.caption || c.body || JSON.stringify(c)));
+        }
+      } catch (aiErr) {
+        console.warn("[Bulk AI Caption Generation] Fallback to default captions:", aiErr.message);
+      }
+    }
+
+    // Fallback if AI or parsing didn't produce enough captions
+    while (captions.length < uploadedMediaList.length) {
+      const idx = captions.length + 1;
+      captions.push(
+        `✨ Check out our latest update from ${businessName}! 🚀\n\nDouble tap if you love this, and share your thoughts in the comments below! 👇\n\n#${businessName.replace(/\s+/g, '')} #viral #trending #reels #explore`
+      );
+    }
+
+    // 3. Compute Dates and Schedule each post in BullMQ
+    let baseDate = startDate ? new Date(startDate) : new Date();
+    if (!startDate) {
+      baseDate.setDate(baseDate.getDate() + 1); // Defaults to tomorrow
+    }
+    const [hours, minutes] = (postingTime || '19:00').split(':').map(Number);
+    baseDate.setHours(hours || 19, minutes || 0, 0, 0);
+
+    if (baseDate.getTime() <= Date.now()) {
+      baseDate.setDate(baseDate.getDate() + 1);
+    }
+
+    const stepInterval = Math.max(1, parseInt(intervalDays, 10) || 1);
+    const createdPosts = [];
+
+    for (let i = 0; i < uploadedMediaList.length; i++) {
+      const media = uploadedMediaList[i];
+      const scheduledAt = new Date(baseDate.getTime() + (i * stepInterval * 24 * 60 * 60 * 1000));
+
+      const post = new Post({
+        userId,
+        workspaceId: workspaceId || 'main',
+        caption: captions[i] || `${businessName} Daily Post`,
+        mediaUrls: [{ url: media.url, type: media.type }],
+        status: 'scheduled',
+        scheduledAt,
+        platforms: requestedPlatforms,
+        designedBy: 'ai-bulk-scheduler',
+      });
+
+      await post.save();
+
+      const delay = Math.max(0, scheduledAt.getTime() - Date.now());
+      await automationQueue.add(
+        'publish_scheduled_post',
+        { postId: post._id },
+        { delay }
+      );
+
+      createdPosts.push({
+        _id: post._id,
+        scheduledAt: post.scheduledAt,
+        captionSnippet: post.caption.slice(0, 60) + '...',
+        mediaType: media.type,
+        mediaUrl: media.url,
+      });
+    }
+
+    console.log(`✅ [BULK] Successfully scheduled ${createdPosts.length} posts.`);
+
+    return res.status(201).json({
+      success: true,
+      count: createdPosts.length,
+      message: `Successfully scheduled ${createdPosts.length} posts with AI captions!`,
+      posts: createdPosts,
+    });
+  } catch (error) {
+    console.error('Bulk Schedule Posts Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to bulk schedule posts.', error: error.message });
   }
 };
