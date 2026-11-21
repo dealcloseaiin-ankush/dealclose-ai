@@ -27,6 +27,16 @@ export default function PublishPost() {
   const [drafts, setDrafts] = useState([]);
   // 🚀 NEW: State to hold the file passed from the Publisher page
   const [initialFile] = useState(location.state?.newPostFile || null);
+  const isVideo = Boolean(initialFile && initialFile.type && initialFile.type.startsWith('video/'));
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (initialFile && initialFile.type?.startsWith('video/')) {
+      const url = URL.createObjectURL(initialFile);
+      setVideoPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [initialFile]);
 
   const [editingDraft, setEditingDraft] = useState(null);
 
@@ -198,7 +208,7 @@ export default function PublishPost() {
 
   // 🚀 NEW: Effect to load the initial file onto the canvas
   useEffect(() => {
-    if (initialFile && fabricCanvas) {
+    if (initialFile && fabricCanvas && !initialFile.type?.startsWith('video/')) {
       const toastId = toast.loading('Loading your media...');
       const reader = new FileReader();
       reader.onload = (f) => {
@@ -956,9 +966,21 @@ export default function PublishPost() {
         <main className="flex-1 flex flex-col bg-[#050505] relative overflow-hidden">
           {/* Clean Canvas Display Area (Zero visual clutter!) */}
           <div ref={canvasContainerRef} className="flex-1 w-full h-full flex items-center justify-center p-6 overflow-auto custom-scrollbar" id="canvas-wrapper">
-            <div className="shadow-2xl shadow-black/90 rounded-xl border border-gray-800/80 overflow-hidden">
-              <CanvasRenderer ref={canvasRef} />
-            </div>
+            {isVideo ? (
+              <div className="flex flex-col items-center justify-center p-6 bg-black/80 rounded-2xl border border-gray-800 max-w-lg w-full shadow-2xl">
+                <video src={videoPreviewUrl} controls autoPlay loop className="max-h-[520px] max-w-full rounded-xl shadow-2xl border border-gray-700 object-contain" />
+                <div className="mt-4 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-xs text-purple-300 font-bold bg-purple-900/30 px-3 py-1.5 rounded-full border border-purple-500/30">
+                    🎬 Video / Reel Ready for Scheduling & Publishing
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="shadow-2xl shadow-black/90 rounded-xl border border-gray-800/80 overflow-hidden">
+                <CanvasRenderer ref={canvasRef} />
+              </div>
+            )}
           </div>
         </main>
 
@@ -971,8 +993,12 @@ export default function PublishPost() {
                 <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500"></div>
                 <p className="text-xs font-bold">{user?.brandKit?.businessName?.toLowerCase().replace(/\s/g, '') || 'your_handle'}</p>
               </div>
-              {/* ✅ FIX: Use state for live preview image source */}
-              <img src={previewImageUrl} alt="Live Preview" className="w-full aspect-square object-cover" />
+              {/* ✅ FIX: Use state for live preview image / video source */}
+              {isVideo ? (
+                <video src={videoPreviewUrl} controls autoPlay loop muted className="w-full aspect-square object-cover" />
+              ) : (
+                <img src={previewImageUrl} alt="Live Preview" className="w-full aspect-square object-cover" />
+              )}
               <div className="p-3 text-white">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-4">

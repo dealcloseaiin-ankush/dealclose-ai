@@ -45,7 +45,7 @@ automationQueue.on('error', (err) => {
 // Create the Worker that processes jobs
 const automationWorker = new Worker('automationQueue', async job => {
 
-  if (job.name === 'publish_scheduled_post') {
+  if (job.name === 'publish_scheduled_post' || job.name === 'publish-post') {
     console.log("\n================== [WORKER: PUBLISH POST START] ==================");
     console.log(`🚀 [WORKER DEBUG] 1. Processing job 'publish_scheduled_post' for Post ID: ${job.data.postId}`);
     // Publisher writes to the canonical Post collection. Looking in the legacy
@@ -71,27 +71,32 @@ const automationWorker = new Worker('automationQueue', async job => {
         || user.instagramConfig
         || user.workspaces?.find(w => w.instagramConfig?.accessToken)?.instagramConfig;
         
-      const imageUrl = post.mediaUrls?.find(media => media.type === 'image')?.url;
-      console.log(`🚀 [WORKER DEBUG] 3. Found User: ${user.email}, Image URL: ${imageUrl ? 'Yes' : 'No'}`);
-      if (!imageUrl) throw new Error('A publishable image is required.');
+      // 🚀 SUPPORT BOTH IMAGES AND VIDEOS / REELS
+      const primaryMedia = post.mediaUrls?.[0];
+      const mediaUrl = primaryMedia?.url || post.mediaUrls?.find(m => m.url)?.url;
+      const isVideo = primaryMedia?.type === 'video' || (mediaUrl && (/\.(mp4|mov|webm|m4v)/i.test(mediaUrl) || mediaUrl.includes('/video/upload/')));
+      
+      console.log(`🚀 [WORKER DEBUG] 3. Found User: ${user.email}, Media URL: ${mediaUrl ? 'Yes' : 'No'}, Type: ${isVideo ? 'VIDEO/REEL' : 'IMAGE'}`);
+      if (!mediaUrl) throw new Error('A publishable media file (image or video) is required.');
       if (!config?.accessToken) throw new Error('Instagram/Facebook connection is missing for this workspace.');
       const platformPostIds = {};
+      
       if (post.platforms.includes('instagram')) {
-        console.log(`🚀 [WORKER DEBUG] 4a. Publishing to Instagram...`);
-        // ✅ FIX: Check for both 'instagramAccountId' (Flow 1) and 'instagramBusinessAccountId' (Flow 2)
+        console.log(`🚀 [WORKER DEBUG] 4a. Publishing to Instagram (${isVideo ? 'REELS' : 'IMAGE'})...`);
         const igAccountId = config.instagramAccountId || config.instagramBusinessAccountId;
         if (!igAccountId) throw new Error('Instagram account is not connected for this workspace.');
         
-        // ✅ FIX: The service function is named `publishInstagramMedia`, not `publishImagePost`.
-        // This was causing the worker to crash with a TypeError.
-        const result = await instagramService.publishInstagramMedia(igAccountId, config.accessToken, imageUrl, 'IMAGE', post.caption, config.loginType);
+        const mediaTypeParam = isVideo ? 'video' : 'IMAGE';
+        const result = await instagramService.publishInstagramMedia(igAccountId, config.accessToken, mediaUrl, mediaTypeParam, post.caption, config.loginType);
         platformPostIds.instagram = result.postId;
         console.log(`✅ [WORKER DEBUG] 4b. Instagram publish success. Post ID: ${result.postId}`);
       }
       if (post.platforms.includes('facebook')) {
-        console.log(`🚀 [WORKER DEBUG] 5a. Publishing to Facebook...`);
+        console.log(`🚀 [WORKER DEBUG] 5a. Publishing to Facebook (${isVideo ? 'VIDEO' : 'PHOTO'})...`);
         if (!config.facebookPageId) throw new Error('Facebook Page is not connected for this workspace.');
-        const result = await instagramService.publishFacebookPhoto(config.facebookPageId, config.accessToken, imageUrl, post.caption);
+        const result = isVideo && instagramService.publishFacebookVideo
+          ? await instagramService.publishFacebookVideo(config.facebookPageId, config.accessToken, mediaUrl, post.caption)
+          : await instagramService.publishFacebookPhoto(config.facebookPageId, config.accessToken, mediaUrl, post.caption);
         platformPostIds.facebook = result.postId;
         console.log(`✅ [WORKER DEBUG] 5b. Facebook publish success. Post ID: ${result.postId}`);
       }

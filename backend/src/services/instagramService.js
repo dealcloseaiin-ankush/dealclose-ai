@@ -378,6 +378,22 @@ exports.publishFacebookPhoto = async (pageId, accessToken, imageUrl, caption) =>
   }
 };
 
+/** Publishes a video/reel to the connected Facebook Page using its Page access token. */
+exports.publishFacebookVideo = async (pageId, accessToken, videoUrl, description) => {
+  try {
+    const response = await axios.post(`https://graph.facebook.com/v19.0/${pageId}/videos`, {
+      file_url: videoUrl,
+      description,
+      access_token: accessToken,
+    });
+    const postId = response.data?.id;
+    if (!postId) throw new Error('Facebook did not return a video ID.');
+    return { success: true, postId };
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || error.message);
+  }
+};
+
 /**
  * 🚀 NEW: Fetches performance insights for a specific Instagram post/reel.
  * @param {string} mediaId - The ID of the Instagram post or reel.
