@@ -2,191 +2,439 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F0F14"
+    android:background="#0A0A10"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="20dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="DealClose SIM Gateway"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:layout_marginTop="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Turn this mobile into your 24/7 AI Voice Calling &amp; Payment Recovery Gateway"
-            android:textColor="#9CA3AF"
-            android:textSize="13sp"
-            android:layout_marginTop="4dp" />
-
-        <TextView
-            android:id="@+id/tvStatus"
+        <!-- ========================================== -->
+        <!-- SCREEN 1: ACTIVE GATEWAY DASHBOARD         -->
+        <!-- (Visible when device is Paired & Active)  -->
+        <!-- ========================================== -->
+        <LinearLayout
+            android:id="@+id/layoutActiveGateway"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚪ STATUS: NOT PAIRED"
-            android:textColor="#F59E0B"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:background="#1F1F2E"
-            android:padding="12dp"
-            android:layout_marginTop="20dp" />
+            android:orientation="vertical"
+            android:visibility="gone">
 
-        <!-- Dual SIM Management Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Dedicated AI Calling SIM"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+            <!-- Top Header & Live Status Badge -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Select which SIM is for AI Calling. Other SIM stays 100% Personal &amp; Untouched."
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
 
-        <RadioGroup
-            android:id="@+id/rgSimSelection"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="DealClose AI Gateway"
+                        android:textColor="#FFFFFF"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="24/7 Cellular Voice Bridge"
+                        android:textColor="#9CA3AF"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Online Pill Badge -->
+                <TextView
+                    android:id="@+id/tvActiveOnlineBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="● ONLINE"
+                    android:textColor="#10B981"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:background="#064E3B"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp" />
+            </LinearLayout>
+
+            <!-- Dedicated SIM Routing Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#161928"
+                android:padding="16dp"
+                android:layout_marginTop="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📡 DUAL-SIM INTELLIGENT ROUTING"
+                    android:textColor="#60A5FA"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvActiveSimSummary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🟢 SIM 2: Dedicated AI Calling Line"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="6dp" />
+
+                <TextView
+                    android:id="@+id/tvActivePersonalSummary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🛡️ SIM 1: 100% Personal &amp; Private (AI Bypassed)"
+                    android:textColor="#34D399"
+                    android:textSize="13sp"
+                    android:layout_marginTop="4dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#27273A"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Switch Dedicated AI Line:"
+                    android:textColor="#9CA3AF"
+                    android:textSize="12sp" />
+
+                <RadioGroup
+                    android:id="@+id/rgActiveSimSelection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="6dp">
+
+                    <RadioButton
+                        android:id="@+id/rbActiveSim2"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="SIM 2 (AI Active)"
+                        android:textColor="#10B981"
+                        android:checked="true"
+                        android:buttonTint="#10B981" />
+
+                    <RadioButton
+                        android:id="@+id/rbActiveSim1"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="SIM 1 (AI Active)"
+                        android:textColor="#9CA3AF"
+                        android:buttonTint="#6366F1" />
+                </RadioGroup>
+            </LinearLayout>
+
+            <!-- Health & Permissions Diagnostics Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#161928"
+                android:padding="16dp"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚡ SYSTEM HEALTH &amp; DIAGNOSTICS"
+                    android:textColor="#A78BFA"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvActiveDialerStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✅ In-Call Audio Stream: ACTIVE (Default Dialer)"
+                    android:textColor="#E5E7EB"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/tvActiveBatteryStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔋 24/7 Locked Background Worker: ENABLED"
+                    android:textColor="#E5E7EB"
+                    android:textSize="13sp"
+                    android:layout_marginTop="6dp" />
+
+                <TextView
+                    android:id="@+id/tvActiveCloudStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌐 Cloud Sync: DealClose Engine Live"
+                    android:textColor="#E5E7EB"
+                    android:textSize="13sp"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <!-- Live Calling Activity Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#161928"
+                android:padding="16dp"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📞 CALLING ACTIVITY"
+                    android:textColor="#F59E0B"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Status: Standing by for incoming / outgoing customer calls. When customer calls SIM 2, AI answers automatically."
+                    android:textColor="#D1D5DB"
+                    android:textSize="13sp"
+                    android:layout_marginTop="6dp" />
+
+                <Button
+                    android:id="@+id/btnActiveTestCall"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🧪 Run Gateway Self-Test"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#4F46E5"
+                    android:layout_marginTop="12dp" />
+            </LinearLayout>
+
+            <!-- Disconnect / Reconfigure -->
+            <Button
+                android:id="@+id/btnDisconnectGateway"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Disconnect / Re-pair Gateway"
+                android:textAllCaps="false"
+                android:textColor="#EF4444"
+                android:backgroundTint="#1F2937"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="24dp" />
+
+        </LinearLayout>
+
+
+        <!-- ========================================== -->
+        <!-- SCREEN 2: INITIAL SETUP & PAIRING SCREEN   -->
+        <!-- (Visible when device is NOT paired yet)    -->
+        <!-- ========================================== -->
+        <LinearLayout
+            android:id="@+id/layoutSetup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="#1F1F2E"
-            android:padding="8dp"
-            android:layout_marginTop="8dp">
+            android:orientation="vertical"
+            android:visibility="visible">
 
-            <RadioButton
-                android:id="@+id/rbSim2"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SIM 2 (AI Dedicated)"
-                android:textColor="#10B981"
-                android:checked="true"
-                android:buttonTint="#10B981" />
+                android:text="DealClose SIM Gateway"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginTop="8dp" />
 
-            <RadioButton
-                android:id="@+id/rbSim1"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SIM 1 (AI)"
+                android:text="Turn this mobile into your 24/7 AI Voice Calling &amp; Payment Recovery Gateway"
                 android:textColor="#9CA3AF"
-                android:buttonTint="#6366F1" />
-        </RadioGroup>
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
 
-        <!-- Step 1 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Step 1: Set Default Phone App"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⚪ STATUS: NOT PAIRED"
+                android:textColor="#F59E0B"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:background="#1F1F2E"
+                android:padding="12dp"
+                android:layout_marginTop="16dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Required to access cellular in-call audio for AI voice conversation"
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
+            <!-- Dual SIM Management Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dedicated AI Calling SIM"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="20dp" />
 
-        <Button
-            android:id="@+id/btnSetDefaultDialer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Set as Default Phone App"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#4F46E5"
-            android:layout_marginTop="8dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select which SIM is for AI Calling. Other SIM stays 100% Personal &amp; Untouched."
+                android:textColor="#9CA3AF"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
 
-        <!-- Step 2 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Step 2: Disable Battery Saver"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+            <RadioGroup
+                android:id="@+id/rgSimSelection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="#1F1F2E"
+                android:padding="8dp"
+                android:layout_marginTop="8dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Keeps SIM gateway active 24/7 when phone is locked on table"
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
+                <RadioButton
+                    android:id="@+id/rbSim2"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="SIM 2 (AI Dedicated)"
+                    android:textColor="#10B981"
+                    android:checked="true"
+                    android:buttonTint="#10B981" />
 
-        <Button
-            android:id="@+id/btnBatteryOptimization"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Ignore Battery Optimizations"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#374151"
-            android:layout_marginTop="8dp" />
+                <RadioButton
+                    android:id="@+id/rbSim1"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="SIM 1 (AI)"
+                    android:textColor="#9CA3AF"
+                    android:buttonTint="#6366F1" />
+            </RadioGroup>
 
-        <!-- Step 3 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Step 3: Pair Device"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+            <!-- Step 1 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Step 1: Set Default Phone App"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="20dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Enter 6-digit code shown on your DealClose AI Calling Hub"
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
-            android:layout_marginTop="2dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Required to access cellular in-call audio for AI voice conversation"
+                android:textColor="#9CA3AF"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
 
-        <EditText
-            android:id="@+id/etPairingCode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="e.g. 748291"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#6B7280"
-            android:inputType="number"
-            android:gravity="center"
-            android:letterSpacing="0.2"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:background="#1F1F2E"
-            android:padding="12dp"
-            android:layout_marginTop="8dp" />
+            <Button
+                android:id="@+id/btnSetDefaultDialer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Set as Default Phone App"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#4F46E5"
+                android:layout_marginTop="8dp" />
 
-        <Button
-            android:id="@+id/btnPairDevice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Activate SIM Gateway 🚀"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:backgroundTint="#10B981"
-            android:layout_marginTop="12dp" />
+            <!-- Step 2 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Step 2: Disable Battery Saver"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="20dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Keeps SIM gateway active 24/7 when phone is locked on table"
+                android:textColor="#9CA3AF"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+
+            <Button
+                android:id="@+id/btnBatteryOptimization"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ignore Battery Optimizations"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#374151"
+                android:layout_marginTop="8dp" />
+
+            <!-- Step 3 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Step 3: Pair Device"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="20dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Enter 6-digit code shown on your DealClose AI Calling Hub"
+                android:textColor="#9CA3AF"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+
+            <EditText
+                android:id="@+id/etPairingCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 884219"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#6B7280"
+                android:inputType="number"
+                android:gravity="center"
+                android:letterSpacing="0.2"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:background="#1F1F2E"
+                android:padding="12dp"
+                android:layout_marginTop="8dp" />
+
+            <Button
+                android:id="@+id/btnPairDevice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Activate SIM Gateway 🚀"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:backgroundTint="#10B981"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="24dp" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>

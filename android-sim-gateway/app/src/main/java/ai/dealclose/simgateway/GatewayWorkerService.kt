@@ -33,14 +33,14 @@ import java.util.concurrent.TimeUnit
 class GatewayWorkerService : Service() {
 
     private val CHANNEL_ID = "DealCloseSIMChannel"
-    private val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).build()
+    private val client = OkHttpClient.Builder().connectTimeout(6, TimeUnit.SECONDS).build()
     private var heartbeatTimer: Timer? = null
 
     // Multiple Candidate Server URLs for automatic network discovery
     private val candidateHosts = listOf(
+        "https://poser-sassy-subsidy.ngrok-free.dev",
         "http://10.135.96.215:5000",
-        "https://dealcloseai.in",
-        "https://poser-sassy-subsidy.ngrok-free.dev"
+        "https://dealcloseai.in"
     )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
