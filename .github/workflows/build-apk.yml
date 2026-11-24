@@ -35,7 +35,7 @@ jobs:
       - name: Build Debug APK with Gradle
         working-directory: ./android-sim-gateway
         run: |
-          gradle assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace --info
           mkdir -p ../dist-apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-sim-gateway.apk
 
