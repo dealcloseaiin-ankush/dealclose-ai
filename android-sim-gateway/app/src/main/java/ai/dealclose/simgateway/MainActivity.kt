@@ -323,7 +323,7 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.parse("package:$packageName")
                 }
-                startActivity(appSettingsIntent)
+                startActivity(intent)
             } catch (e2: Exception) {
                 Toast.makeText(this, "Open Phone Settings > Apps > Default Apps > Phone App", Toast.LENGTH_LONG).show()
             }
