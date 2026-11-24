@@ -4,10 +4,9 @@ const aiUsageTracker = require('./aiUsageTracker');
 
 // 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE MODELS FOR VISION / OCR
 const VISION_MODELS = {
-  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Vision Flash-Lite
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Vision Flash-Lite
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Vision Flash-Lite
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Vision Fallback
+  GEMINI_PRIMARY: 'gemini-1.5-flash',       // Priority 1: Primary Vision Flash
+  GEMINI_FALLBACK: 'gemini-2.0-flash',      // Priority 2: Secondary Vision Flash
+  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3: OpenAI Vision Fallback
 };
 
 /**
@@ -43,9 +42,8 @@ exports.extractTextFromImage = async (imageBuffer, mimeType, userId = null) => {
     if (hasGemini) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
       const visionChain = [
-        VISION_MODELS.GEMINI_3_5_LITE,
-        VISION_MODELS.GEMINI_3_1_LITE,
-        VISION_MODELS.GEMINI_2_5_LITE,
+        VISION_MODELS.GEMINI_PRIMARY,
+        VISION_MODELS.GEMINI_FALLBACK,
       ];
 
       for (const modelName of visionChain) {

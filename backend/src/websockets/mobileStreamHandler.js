@@ -7,12 +7,11 @@ const Lead = require('../models/leadModel');
 // 🚀 GLOBAL CACHE: Cache fallback audio to save resources
 let cachedMobileFallbackAudio = null;
 
-// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE CALLING MODELS CONFIGURATION
+// 🌊 DEALCLOSE AI COST-EFFECTIVE CALLING MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Mobile Calling Model
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Calling Model
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Calling Model
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Fallback Layer
+  GEMINI_PRIMARY: 'gemini-1.5-flash',       // Priority 1: Primary Ultra-fast Calling Model
+  GEMINI_FALLBACK: 'gemini-2.0-flash',      // Priority 2: Next-gen Gemini 2.0 Flash
+  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3: OpenAI Fallback Layer
 };
 
 module.exports = function (ws) {
@@ -96,9 +95,8 @@ module.exports = function (ws) {
       // 🚀 MULTI-MODEL DYNAMIC CHAIN (Gemini 3.5 / 3.1 Pipeline)
       if (genAI) {
         const geminiOrder = [
-          MODELS.GEMINI_3_5_LITE,
-          MODELS.GEMINI_3_1_LITE,
-          MODELS.GEMINI_2_5_LITE,
+          MODELS.GEMINI_PRIMARY,
+          MODELS.GEMINI_FALLBACK,
         ];
 
         for (const modelName of geminiOrder) {

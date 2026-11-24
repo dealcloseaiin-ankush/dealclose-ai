@@ -8,12 +8,11 @@ const WebSocket = require('ws'); // 🚀 NEW: Bulletproof Raw Connection
 // 🚀 GLOBAL CACHE: Twilio calls (mulaw) ke liye alag cache
 let cachedTwilioFallbackAudio = null;
 
-// 🌊 DEALCLOSE AI ULTRA COST-EFFECTIVE CALLING MODELS CONFIGURATION
+// 🌊 DEALCLOSE AI COST-EFFECTIVE CALLING MODELS CONFIGURATION
 const MODELS = {
-  GEMINI_3_5_LITE: 'gemini-3.5-flash-lite',  // Priority 1: Primary Calling Model
-  GEMINI_3_1_LITE: 'gemini-3.1-flash-lite',  // Priority 2: Secondary Calling Model
-  GEMINI_2_5_LITE: 'gemini-2.5-flash-lite',  // Priority 3: Backup Calling Model
-  OPENAI_MINI: 'gpt-4o-mini',                // Priority 4: OpenAI Calling & Function Calling Fallback
+  GEMINI_PRIMARY: 'gemini-1.5-flash',       // Priority 1: Primary Calling Model
+  GEMINI_FALLBACK: 'gemini-2.0-flash',      // Priority 2: Secondary Calling Model
+  OPENAI_MINI: 'gpt-4o-mini',               // Priority 3: OpenAI Calling & Function Calling Fallback
 };
 
 module.exports = function (ws) {
