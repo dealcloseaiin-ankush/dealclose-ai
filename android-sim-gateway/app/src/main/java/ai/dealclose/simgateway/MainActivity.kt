@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -131,10 +133,10 @@ class MainActivity : AppCompatActivity() {
     private fun updateDefaultDialerButtonState() {
         if (isDefaultDialerHeld()) {
             btnSetDefault.text = "✅ Default Phone App: ACTIVATED"
-            btnSetDefault.backgroundTintList = getColorStateList(android.R.color.holo_green_dark)
+            btnSetDefault.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#10B981"))
         } else {
             btnSetDefault.text = "Set as Default Phone App"
-            btnSetDefault.backgroundTintList = getColorStateList(android.R.color.holo_blue_dark)
+            btnSetDefault.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#4F46E5"))
         }
     }
 
@@ -167,7 +169,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openDefaultAppsSettings() {
         try {
-            val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            val intent = Intent("android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
             startActivity(intent)
         } catch (e: Exception) {
             try {
