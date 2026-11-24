@@ -28,15 +28,18 @@ class MainActivity : AppCompatActivity() {
 
     private val REQUEST_CODE_SET_DEFAULT_DIALER = 1001
 
+    private lateinit var btnSetDefault: Button
+    private lateinit var tvStatus: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val btnSetDefault = findViewById<Button>(R.id.btnSetDefaultDialer)
+        btnSetDefault = findViewById(R.id.btnSetDefaultDialer)
         val btnBattery = findViewById<Button>(R.id.btnBatteryOptimization)
         val btnPair = findViewById<Button>(R.id.btnPairDevice)
         val etPairingCode = findViewById<EditText>(R.id.etPairingCode)
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
+        tvStatus = findViewById(R.id.tvStatus)
 
         // Dual SIM Selection
         val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
@@ -51,6 +54,13 @@ class MainActivity : AppCompatActivity() {
         } else {
             rbSim2.isChecked = true
         }
+
+        // Check if already paired
+        if (prefs.getBoolean("is_paired", false)) {
+            tvStatus.text = "🟢 STATUS: ACTIVE & CONNECTED TO DEALCLOSE CLOUD"
+        }
+
+        updateDefaultDialerButtonState()
 
         rgSim.setOnCheckedChangeListener { _, checkedId ->
             val slot = if (checkedId == R.id.rbSim1) 0 else 1
@@ -70,7 +80,14 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                 data = Uri.parse("package:$packageName")
             }
-            startActivity(intent)
+            try {
+                startActivity(intent)
+            } catch (e: Exception) {
+                val appSettingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(appSettingsIntent)
+            }
         }
 
         // 3. PAIR WITH DEALCLOSE WEB DASHBOARD
@@ -92,16 +109,48 @@ class MainActivity : AppCompatActivity() {
             }
 
             tvStatus.text = "🟢 STATUS: ACTIVE & CONNECTED TO DEALCLOSE CLOUD"
-            Toast.makeText(this, "SIM Gateway Activated! SIM 2 is now your AI agent.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Connecting with code $code...", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateDefaultDialerButtonState()
+    }
+
+    private fun isDefaultDialerHeld(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
+        } else {
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+            telecomManager.defaultDialerPackage == packageName
+        }
+    }
+
+    private fun updateDefaultDialerButtonState() {
+        if (isDefaultDialerHeld()) {
+            btnSetDefault.text = "✅ Default Phone App: ACTIVATED"
+            btnSetDefault.backgroundTintList = getColorStateList(android.R.color.holo_green_dark)
+        } else {
+            btnSetDefault.text = "Set as Default Phone App"
+            btnSetDefault.backgroundTintList = getColorStateList(android.R.color.holo_blue_dark)
         }
     }
 
     private fun requestDefaultDialerRole() {
+        if (isDefaultDialerHeld()) {
+            Toast.makeText(this, "✅ DealClose is ALREADY Default Phone App!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val roleManager = getSystemService(RoleManager::class.java)
             if (roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
                 val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
                 startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_DIALER)
+            } else {
+                openDefaultAppsSettings()
             }
         } else {
             val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
@@ -116,10 +165,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun openDefaultAppsSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            } catch (e2: Exception) {
+                Toast.makeText(this, "Open Phone Settings > Apps > Default Apps > Phone App", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_SET_DEFAULT_DIALER) {
-            if (resultCode == Activity.RESULT_OK) {
+            updateDefaultDialerButtonState()
+            if (resultCode == Activity.RESULT_OK || isDefaultDialerHeld()) {
                 Toast.makeText(this, "✅ Default Phone App Activated! Microphone Restriction Bypassed.", Toast.LENGTH_LONG).show()
             }
         }

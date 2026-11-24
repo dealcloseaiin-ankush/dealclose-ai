@@ -27,13 +27,20 @@ import java.util.concurrent.TimeUnit
  * ====================================================================
  * Runs 24/7 in background even when phone is locked.
  * Sends battery & signal heartbeat to server every 45s.
- * Listens for remote calling commands triggered by cron at office.
+ * Listens for remote calling commands triggered by DealClose Cloud / Local server.
  */
 class GatewayWorkerService : Service() {
 
     private val CHANNEL_ID = "DealCloseSIMChannel"
-    private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).build()
+    private val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).build()
     private var heartbeatTimer: Timer? = null
+
+    // Multiple Candidate Server URLs for automatic network discovery
+    private val candidateHosts = listOf(
+        "http://10.135.96.215:5000",
+        "https://dealcloseai.in",
+        "https://poser-sassy-subsidy.ngrok-free.dev"
+    )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
@@ -51,36 +58,58 @@ class GatewayWorkerService : Service() {
 
     private fun registerWithServer(code: String) {
         Thread {
-            try {
-                val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
 
-                val body = JSONObject().apply {
-                    put("pairingCode", code)
-                    put("deviceId", Build.MODEL + "_" + SettingsSecureId(this@GatewayWorkerService))
-                    put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL} (SIM Gateway)")
-                    put("batteryLevel", batteryLevel)
-                    put("isDefaultDialer", isDefaultDialer())
+            val body = JSONObject().apply {
+                put("pairingCode", code)
+                put("deviceId", Build.MODEL + "_" + SettingsSecureId(this@GatewayWorkerService))
+                put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL} (SIM Gateway)")
+                put("batteryLevel", batteryLevel)
+                put("isDefaultDialer", isDefaultDialer())
+            }
+
+            val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+
+            // Try each candidate URL until registration succeeds
+            for (host in candidateHosts) {
+                try {
+                    val url = "$host/api/gateway/register"
+                    Log.d("GatewayWorker", "Trying to register with server at: $url")
+
+                    val req = Request.Builder()
+                        .url(url)
+                        .post(body.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+
+                    val resp = client.newCall(req).execute()
+                    val respBody = resp.body?.string() ?: ""
+                    Log.d("GatewayWorker", "Server Response ($url): HTTP ${resp.code} => $respBody")
+
+                    if (resp.isSuccessful) {
+                        prefs.edit()
+                            .putString("active_server_url", host)
+                            .putBoolean("is_paired", true)
+                            .apply()
+                        Log.d("GatewayWorker", "✅ Successfully Registered with $host!")
+                        break
+                    }
+                } catch (e: Exception) {
+                    Log.w("GatewayWorker", "Failed to connect to $host: ${e.message}")
                 }
-
-                val req = Request.Builder()
-                    .url("https://dealcloseai.in/api/gateway/register")
-                    .post(body.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                val resp = client.newCall(req).execute()
-                Log.d("GatewayWorker", "Device Registered: ${resp.body?.string()}")
-            } catch (e: Exception) {
-                Log.e("GatewayWorker", "Registration Error", e)
             }
         }.start()
     }
 
     private fun startHeartbeatLoop() {
+        heartbeatTimer?.cancel()
         heartbeatTimer = Timer()
         heartbeatTimer?.scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
                 try {
+                    val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                    val host = prefs.getString("active_server_url", candidateHosts[0]) ?: candidateHosts[0]
+
                     val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
                     val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
 
@@ -91,7 +120,7 @@ class GatewayWorkerService : Service() {
                     }
 
                     val req = Request.Builder()
-                        .url("https://dealcloseai.in/api/gateway/heartbeat")
+                        .url("$host/api/gateway/heartbeat")
                         .post(body.toString().toRequestBody("application/json".toMediaType()))
                         .build()
 
@@ -102,12 +131,17 @@ class GatewayWorkerService : Service() {
                     Log.w("GatewayWorker", "Heartbeat Ping Failed: ${e.message}")
                 }
             }
-        }, 10000, 45000) // Every 45 seconds
+        }, 8000, 45000) // Every 45 seconds
     }
 
     private fun isDefaultDialer(): Boolean {
-        val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-        return telecomManager.defaultDialerPackage == packageName
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
+        } else {
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+            telecomManager.defaultDialerPackage == packageName
+        }
     }
 
     private fun SettingsSecureId(context: Context): String {
