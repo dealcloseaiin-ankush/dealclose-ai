@@ -11,9 +11,8 @@ exports.generatePairingCode = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    // Generate readable 6-character code e.g. "DC-8921"
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const code = `DC-${randomDigits}`;
+    // Generate 6-digit numeric code e.g. "784921"
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Clean existing temp code for this user
     await GatewayDevice.deleteMany({ userId, isOnline: false, deviceId: /^PENDING_/ });
@@ -48,7 +47,14 @@ exports.registerDevice = async (req, res) => {
       return res.status(400).json({ success: false, message: 'pairingCode and deviceId are required' });
     }
 
-    const pending = await GatewayDevice.findOne({ pairingCode });
+    const cleanCode = (pairingCode || '').toString().trim().replace(/^DC-?/i, '');
+    const pending = await GatewayDevice.findOne({
+      $or: [
+        { pairingCode: (pairingCode || '').toString().trim() },
+        { pairingCode: `DC-${cleanCode}` },
+        { pairingCode: cleanCode }
+      ]
+    });
     if (!pending) {
       return res.status(404).json({ success: false, message: 'Invalid or expired Pairing Code' });
     }
