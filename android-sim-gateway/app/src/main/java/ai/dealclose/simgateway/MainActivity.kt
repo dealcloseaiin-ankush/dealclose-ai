@@ -229,11 +229,12 @@ class MainActivity : AppCompatActivity() {
         val simName = if (slot == 0) "SIM 1" else "SIM 2"
         val personalName = if (slot == 0) "SIM 2" else "SIM 1"
 
+        val dialerStatusText = if (isDialer) "✅ OK" else "⚠️ Action Required"
         val msg = """
             📱 Gateway Diagnostics:
             • Dedicated AI SIM: $simName (Ready)
             • Protected Personal SIM: $personalName (Safe)
-            • Default Phone App: ${if (isDialer) "✅ OK" else "⚠️ Action Required"}
+            • Default Phone App: $dialerStatusText
             • Background Service: 🟢 RUNNING (24/7)
             
             Whenever an incoming call arrives on $simName, DealClose AI will automatically answer and speak with the caller!
