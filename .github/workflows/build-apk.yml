@@ -36,10 +36,10 @@ jobs:
         working-directory: ./android-sim-gateway
         run: |
           set -o pipefail
-          gradle assembleDebug --stacktrace 2>&1 | tee ../gradle-build.log || true
+          gradle assembleDebug 2>&1 | tee ../gradle-build.log || true
           if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            echo "::error title=Gradle Compilation Failure::$(tail -n 35 ../gradle-build.log | tr '\n' ' ')"
-            tail -n 60 ../gradle-build.log
+            echo "::error title=Kotlin Compilation Errors::$(grep -E '^e: ' ../gradle-build.log | tr '\n' ' ')"
+            grep -E "^e: " ../gradle-build.log || tail -n 60 ../gradle-build.log
             exit 1
           fi
           mkdir -p ../dist-apk
