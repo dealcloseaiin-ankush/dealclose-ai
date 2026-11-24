@@ -40,6 +40,53 @@
             android:padding="12dp"
             android:layout_marginTop="20dp" />
 
+        <!-- Dual SIM Management Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dedicated AI Calling SIM"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="20dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select which SIM is for AI Calling. Other SIM stays 100% Personal &amp; Untouched."
+            android:textColor="#9CA3AF"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp" />
+
+        <RadioGroup
+            android:id="@+id/rgSimSelection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#1F1F2E"
+            android:padding="8dp"
+            android:layout_marginTop="8dp">
+
+            <RadioButton
+                android:id="@+id/rbSim2"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="SIM 2 (AI Dedicated)"
+                android:textColor="#10B981"
+                android:checked="true"
+                android:buttonTint="#10B981" />
+
+            <RadioButton
+                android:id="@+id/rbSim1"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="SIM 1 (AI)"
+                android:textColor="#9CA3AF"
+                android:buttonTint="#6366F1" />
+        </RadioGroup>
+
         <!-- Step 1 -->
         <TextView
             android:layout_width="wrap_content"
@@ -48,7 +95,7 @@
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:layout_marginTop="24dp" />
+            android:layout_marginTop="20dp" />
 
         <TextView
             android:layout_width="wrap_content"

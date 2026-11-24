@@ -7,22 +7,22 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
 import android.telecom.TelecomManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * 📱 DEALCLOSE SIM GATEWAY - MAIN SETUP SCREEN
+ * 📱 DEALCLOSE SIM GATEWAY - MAIN SETUP SCREEN (DUAL SIM MANAGED)
  * ====================================================================
- * Step 1: Click "Set as Default Phone App" (Bypasses Mic Restriction)
- * Step 2: Click "Ignore Battery Optimizations" (Keeps active while locked)
- * Step 3: Enter Pairing Code from DealClose Web Dashboard
- * Step 4: Click "Activate SIM Gateway"
+ * Dedicated AI SIM:
+ * - SIM 2 (Default / Recommended): Handled 100% by AI for business calling.
+ * - SIM 1: Stays 100% Personal. AI bypasses personal calls completely.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -37,6 +37,28 @@ class MainActivity : AppCompatActivity() {
         val btnPair = findViewById<Button>(R.id.btnPairDevice)
         val etPairingCode = findViewById<EditText>(R.id.etPairingCode)
         val tvStatus = findViewById<TextView>(R.id.tvStatus)
+
+        // Dual SIM Selection
+        val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+        val rgSim = findViewById<RadioGroup>(R.id.rgSimSelection)
+        val rbSim1 = findViewById<RadioButton>(R.id.rbSim1)
+        val rbSim2 = findViewById<RadioButton>(R.id.rbSim2)
+
+        // Load saved slot (Default is 1 = SIM 2)
+        val savedSlot = prefs.getInt("ai_sim_slot", 1)
+        if (savedSlot == 0) {
+            rbSim1.isChecked = true
+        } else {
+            rbSim2.isChecked = true
+        }
+
+        rgSim.setOnCheckedChangeListener { _, checkedId ->
+            val slot = if (checkedId == R.id.rbSim1) 0 else 1
+            prefs.edit().putInt("ai_sim_slot", slot).apply()
+            val simLabel = if (slot == 0) "SIM 1" else "SIM 2"
+            val personalLabel = if (slot == 0) "SIM 2" else "SIM 1"
+            Toast.makeText(this, "AI Dedicated to $simLabel! ($personalLabel stays 100% Personal)", Toast.LENGTH_SHORT).show()
+        }
 
         // 1. SET AS DEFAULT PHONE APP (Bypass Android Mic Restriction)
         btnSetDefault.setOnClickListener {
@@ -70,7 +92,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             tvStatus.text = "🟢 STATUS: ACTIVE & CONNECTED TO DEALCLOSE CLOUD"
-            Toast.makeText(this, "SIM Gateway Activated! You can now leave phone at home.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "SIM Gateway Activated! SIM 2 is now your AI agent.", Toast.LENGTH_LONG).show()
         }
     }
 

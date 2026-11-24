@@ -50,15 +50,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0-apk
-          name: "DealClose SIM Gateway v1.0.0 APK"
+          name: "DealClose SIM Gateway v1.1.0 APK (Dual-SIM Support)"
           body: |
-            ### 📱 DealClose SIM Gateway Companion APK
+            ### 📱 DealClose SIM Gateway Companion APK (v1.1.0)
             Download `dealclose-sim-gateway.apk` below directly on your Android phone!
-            
+
+            ✨ **What's New in v1.1.0:**
+            - **Smart Dual-SIM Management**: Dedicated AI calling on SIM 2.
+            - **Personal SIM 1 Protection**: AI automatically bypassed on SIM 1 personal calls.
+            - **Incoming Auto-Answer on Business SIM**: AI receives and answers incoming customer calls on SIM 2.
+
             1. Install APK on your Android phone (Android 8.0+).
-            2. Tap **Set as Default Phone App** and Allow.
-            3. Tap **Ignore Battery Optimizations** and Allow.
-            4. Enter the 6-digit code from DealClose AI Calls Hub and tap **Activate**.
+            2. Select **SIM 2 (AI Dedicated)**.
+            3. Tap **Set as Default Phone App** and Allow.
+            4. Tap **Ignore Battery Optimizations** and Allow.
+            5. Enter the 6-digit code from DealClose AI Calls Hub and tap **Activate**.
           files: dist-apk/dealclose-sim-gateway.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
