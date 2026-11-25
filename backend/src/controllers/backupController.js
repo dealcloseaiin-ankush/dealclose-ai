@@ -1,4 +1,4 @@
-const { google } = require('googleapis');
+// const { google } = require('googleapis'); (Lazy loaded in getAuthenticatedDriveClient for fast startup)
 const User = require('../models/userModel');
 const Lead = require('../models/leadModel');
 const Flow = require('../models/flowModel');
@@ -16,6 +16,7 @@ const encrypt = (text) => {
 };
 
 const getAuthenticatedDriveClient = async (userId) => {
+  const { google } = require('googleapis');
   const user = await User.findById(userId);
   if (!user || !user.googleSheetsConfig?.refreshToken) {
     throw new Error('Google Drive not connected or refresh token is missing.');

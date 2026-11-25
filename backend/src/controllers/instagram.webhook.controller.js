@@ -11,7 +11,12 @@ const { getMessageExpiry } = require('../utils/retentionPolicy'); // 🚀 URGENT
 const IORedis = require('ioredis');
 
 // Lightweight Redis client for deduplication and rate-limits (falls back to local)
-const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
+const redis = process.env.REDIS_URL 
+  ? new IORedis(process.env.REDIS_URL, { lazyConnect: true, enableOfflineQueue: false }) 
+  : new IORedis({ host: '127.0.0.1', port: 6379, lazyConnect: true, enableOfflineQueue: false, maxRetriesPerRequest: 0 });
+if (redis && typeof redis.on === 'function') {
+  redis.on('error', () => {}); // Silently ignore local redis error
+}
 redis.on && redis.on('error', (e) => console.error('⚠️ [Redis] Connection error in IG webhook controller:', e.message));
 const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
 

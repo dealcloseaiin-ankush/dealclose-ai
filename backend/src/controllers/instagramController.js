@@ -16,7 +16,12 @@ const fs = require('fs');
 // Configure Cloudinary directly here
 cloudinary.config({ cloud_name: process.env.CLOUDINARY_CLOUD_NAME, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET });
 
-const redis = process.env.REDIS_URL ? new IORedis(process.env.REDIS_URL) : new IORedis({ host: '127.0.0.1', port: 6379 });
+const redis = process.env.REDIS_URL 
+  ? new IORedis(process.env.REDIS_URL, { lazyConnect: true, enableOfflineQueue: false }) 
+  : new IORedis({ host: '127.0.0.1', port: 6379, lazyConnect: true, enableOfflineQueue: false, maxRetriesPerRequest: 0 });
+if (redis && typeof redis.on === 'function') {
+  redis.on('error', () => {}); // Silently ignore local redis error
+}
 const THREAD_STATE_TTL = 30 * 24 * 60 * 60; // 30 days
 
 const loadThreadState = async (threadKey) => {

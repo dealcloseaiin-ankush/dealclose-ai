@@ -24,6 +24,7 @@ module.exports = function (ws) {
   let activeUserId = null;
   let activeWorkspaceId = 'main';
   let activeCallGoal = null;
+  let currentLead = null;
   
   // 1. Initialize APIs Safely
   console.log(`\n================== [AI CALLING DEBUG] ==================`);
@@ -90,10 +91,54 @@ module.exports = function (ws) {
       let aiText = "";
       let aiSuccess = false;
 
-      const systemPromptText = "You are a friendly DealClose AI calling assistant. Keep answers short (1 sentence). Speak in conversational Hinglish. CRITICAL RULE: DO NOT use complex Hindi words. Use simple words so an American AI voice can pronounce them naturally. Do NOT use Devanagari script.";
+      // 🎯 GRADUATED RECOVERY TONE DIRECTIVE
+      let toneDirective = "";
+      const attempts = currentLead?.callAttempts || 0;
+      if (attempts <= 2) {
+        toneDirective = "CALL TONE: Extremely soft, polite and gentle. This is Call #1 or #2. The customer is valued and respected. Speak pleasantly without any harshness or pressure. Never sound rude. Simply ask gently how they are doing and politely inquire about the bill.";
+      } else if (attempts <= 4) {
+        toneDirective = "CALL TONE: Professional, firm and clear, but always respectful. Remind them that previous reminders were shared, and politely request a specific commitment or date to clear the payment.";
+      } else {
+        toneDirective = "CALL TONE: Formal, serious and urgent. Emphasize that accounts are pending and need clearance to continue smooth supply/orders. ABSOLUTE CRITICAL RULE: Never be abusive, sarcastic, or disrespectful.";
+      }
 
-      // 🚀 MULTI-MODEL DYNAMIC CHAIN (Gemini 3.5 / 3.1 Pipeline)
-      if (genAI) {
+      let customerContext = "";
+      if (currentLead) {
+        customerContext = `Customer Name: ${currentLead.name || 'Grahak'}. `;
+        if (currentLead.dueAmount > 0) {
+          customerContext += `Pending Balance: ₹${currentLead.dueAmount}. Invoice Number: ${currentLead.invoiceNumber || 'N/A'}. Purchase Date: ${currentLead.invoiceDate || 'N/A'}. Overdue: ${currentLead.overdueDays || 0} days. `;
+        }
+        if (currentLead.notes) {
+          customerContext += `Customer Context: ${currentLead.notes}. `;
+        }
+      }
+
+      const systemPromptText = `You are a professional, polite AI calling assistant for our business.
+Keep your answers brief (1-2 sentences maximum). Speak in natural, everyday conversational Hinglish.
+${customerContext}
+${toneDirective}
+CRITICAL RULES:
+1. Always maintain respect and dignity. Never abuse or shout.
+2. If the customer asks for bill, quotation or payment link (e.g. "Mujhe WhatsApp par bill/quotation bhej do"): confirm immediately: "Ji bilkul, main abhi aapke isi number par WhatsApp par details bhej raha hoon."
+3. Do NOT use complex Sanskritized Hindi words or Devanagari script. Use simple, natural Hinglish.`;
+
+      // 🚀 Level 1: Primary Ultra-fast OpenAI engine (gpt-4o-mini)
+      if (openai) {
+        try {
+          console.log(`🧠 [AI] Processing via OpenAI engine: ${MODELS.OPENAI_MINI}...`);
+          const chatCompletion = await openai.chat.completions.create({
+            model: MODELS.OPENAI_MINI,
+            messages: [{ role: "system", content: systemPromptText }, ...conversationHistory]
+          });
+          aiText = chatCompletion.choices[0].message.content;
+          aiSuccess = true;
+        } catch (openaiErr) {
+          console.warn(`⚠️ [AI Voice] OpenAI error: ${openaiErr.message}. Trying Gemini fallback...`);
+        }
+      }
+
+      // 🚀 Level 2: Gemini Fallback Chain
+      if (!aiSuccess && genAI) {
         const geminiOrder = [
           MODELS.GEMINI_PRIMARY,
           MODELS.GEMINI_FALLBACK,
@@ -102,7 +147,7 @@ module.exports = function (ws) {
         for (const modelName of geminiOrder) {
           if (aiSuccess) break;
           try {
-            console.log(`🧠 [AI] Requesting model: ${modelName}...`);
+            console.log(`🧠 [AI] Requesting Gemini model: ${modelName}...`);
             const model = genAI.getGenerativeModel({ model: modelName });
             let promptStr = systemPromptText + "\n\nConversation History:\n";
             conversationHistory.forEach(msg => { promptStr += `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}\n`; });
@@ -112,20 +157,9 @@ module.exports = function (ws) {
             aiText = result.response.text();
             aiSuccess = true;
           } catch (geminiErr) {
-            console.warn(`⚠️ [AI Voice] ${modelName} hit error: ${geminiErr.message}. Trying next fallback...`);
+            console.warn(`⚠️ [AI Voice] ${modelName} error: ${geminiErr.message}`);
           }
         }
-      }
-
-      // 🚀 Level 3: Final Fallback or Manual Bypass to OpenAI gpt-4o-mini
-      if (!aiSuccess && openai) {
-        console.log(`🧠 [AI] Processing via OpenAI engine: ${MODELS.OPENAI_MINI}...`);
-        const chatCompletion = await openai.chat.completions.create({
-          model: MODELS.OPENAI_MINI,
-          messages: [{ role: "system", content: systemPromptText }, ...conversationHistory]
-        });
-        aiText = chatCompletion.choices[0].message.content;
-        aiSuccess = true;
       }
 
       if (!aiSuccess) {
@@ -201,10 +235,21 @@ module.exports = function (ws) {
         if (activeLeadId || activePhone) {
           const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
           Lead.findOneAndUpdate(query, {
+            $inc: { callAttempts: 1 },
             $push: { timeline: { eventType: 'Call Received', description: 'Voice Call session started via Mobile App.', timestamp: new Date() } }
-          }).exec().catch(() => {});
+          }, { new: true }).then(foundLead => {
+            if (foundLead) {
+              currentLead = foundLead;
+              console.log(`👤 [Customer Context Loaded]: ${foundLead.name || 'Unknown'} | Attempts: ${foundLead.callAttempts} | Dues: ₹${foundLead.dueAmount || 0}`);
+            }
+            processAIResponse(); // First greeting trigger
+          }).catch(err => {
+            console.warn('Lead lookup non-fatal error:', err.message);
+            processAIResponse();
+          });
+        } else {
+          processAIResponse(); // First greeting trigger
         }
-        processAIResponse(); // First greeting trigger
 
       } else if (msg.event === 'audio') {
         audioChunkCount++;
