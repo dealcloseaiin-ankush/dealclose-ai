@@ -74,8 +74,8 @@ export default function Register() {
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-white p-1 mx-auto shadow-lg flex items-center justify-center">
-            <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 p-1 mx-auto shadow-xl shadow-purple-500/20 flex items-center justify-center overflow-hidden">
+            <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-xl" />
           </div>
           <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300">
             Create DealClose AI Account

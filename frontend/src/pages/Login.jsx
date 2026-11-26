@@ -77,8 +77,8 @@ export default function Login() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#050505] p-4">
       <div className="p-8 md:p-10 bg-[#111] rounded-2xl shadow-2xl border border-gray-800 w-full max-w-md">
-        <div className="w-14 h-14 rounded-2xl bg-white p-1 mx-auto mb-4 shadow-lg flex items-center justify-center">
-          <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 p-1 mx-auto mb-4 shadow-xl shadow-purple-500/20 flex items-center justify-center overflow-hidden">
+          <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-xl" />
         </div>
         <h1 className="text-3xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 text-center">
           {isResetMode ? 'Set New Password' : 'Welcome Back'}

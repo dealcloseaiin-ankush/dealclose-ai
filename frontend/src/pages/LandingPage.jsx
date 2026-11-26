@@ -196,8 +196,8 @@ export default function LandingPage() {
       <nav className="border-b border-gray-900/80 bg-black/70 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white p-0.5 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
-              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 p-0.5 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0 overflow-hidden">
+              <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain rounded-lg" />
             </div>
             <span className="font-extrabold text-xl tracking-tight text-white">DealClose<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400"> AI</span></span>
           </Link>

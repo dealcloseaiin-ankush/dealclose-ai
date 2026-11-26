@@ -101,9 +101,14 @@ export default function Sidebar() {
       </button>
 
       <div className={`pt-6 pb-4 ${isCollapsed ? 'px-4' : 'px-6'} border-b border-gray-800`}>
-        <Link to="/dashboard" className={`text-xl font-bold text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'} mb-6`}>
-          <div className="w-8 h-8 rounded-lg bg-white p-0.5 flex items-center justify-center shrink-0 shadow-md">
-            <img src="/logo.png" alt="DealClose AI Logo" className="w-full h-full object-contain" />
+        <Link to="/dashboard" className={`text-xl font-bold text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'} mb-6 group`}>
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-900 to-indigo-900 border border-purple-500/40 p-0.5 flex items-center justify-center shrink-0 shadow-md overflow-hidden group-hover:border-purple-400 transition-all">
+            <img 
+              src={user?.brandKit?.logoUrl || user?.logoUrl || "/logo.png"} 
+              alt="DealClose AI Logo" 
+              className="w-full h-full object-contain rounded-lg" 
+              onError={(e) => { e.currentTarget.src = '/logo.png'; }}
+            />
           </div>
           {!isCollapsed && <span className="tracking-tight font-black">DealClose AI</span>}
         </Link>
