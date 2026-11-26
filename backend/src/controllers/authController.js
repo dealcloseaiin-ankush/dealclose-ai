@@ -1308,6 +1308,12 @@ exports.updateProfile = async (req, res) => {
       updateData['brandKit.logoUrl'] = req.body.logoUrl;
     }
     if (req.body.brandKit !== undefined) updateData.brandKit = req.body.brandKit;
+    if (req.body.pincode !== undefined) updateData.pincode = req.body.pincode;
+    if (req.body.city !== undefined) updateData.city = req.body.city;
+    if (req.body.category !== undefined) {
+      updateData.category = req.body.category;
+      updateData['brandKit.category'] = req.body.category;
+    }
 
     // 🐛 FIX for "MulterError: Field value too long"
     if (designJson !== undefined) {

@@ -37,14 +37,29 @@ const instagramConfigSchema = new Schema({
 const userSchema = new Schema({
   email: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true,
     trim: true,
     lowercase: true,
   },
+  phoneNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+  },
+  pincode: {
+    type: String,
+    default: '',
+  },
+  city: {
+    type: String,
+    default: '',
+  },
   password: {
     type: String,
-    required: true,
+    required: false,
   },
   supabaseId: {
     type: String,
