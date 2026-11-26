@@ -79,8 +79,9 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '25mb' })); // Increased limit for heavy flow data & design JSON
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
-// Make uploads folder publicly accessible to see images
+// Make uploads folder publicly accessible to see images and videos
 app.use('/uploads', express.static('public/uploads'));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use(helmet()); // NEW: Apply helmet middleware for security headers
 // API Routes

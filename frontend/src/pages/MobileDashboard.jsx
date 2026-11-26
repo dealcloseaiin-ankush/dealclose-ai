@@ -9,7 +9,8 @@ import {
   Workflow, Bot, HelpCircle, Edit3, Save, MessageCircle, RefreshCw, ArrowRightLeft,
   Link, Eye, EyeOff, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
   Star, Globe, DollarSign, ChevronDown, LogIn, LogOut, User, BookOpen, Search, Webhook,
-  Heart, MessageCircle as CommentIcon, ExternalLink
+  Heart, MessageCircle as CommentIcon, ExternalLink,
+  Smartphone
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -3025,7 +3026,7 @@ export default function MobileDashboard() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
-                        <Smartphone size={16} />
+                        <PhoneCall size={16} />
                       </div>
                       <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40">
                         ● Home SIM Gateway &amp; Notes
