@@ -56,15 +56,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0-apk
-          name: "DealClose SIM Gateway v1.3.0 APK (Active Gateway Dashboard & Dual-SIM)"
+          name: "DealClose AI v1.4.0 APK (Official Brand Logo & Dual-SIM)"
           body: |
-            ### 📱 DealClose SIM Gateway Companion APK (v1.3.0)
+            ### 📱 DealClose AI Official Android App (v1.4.0)
             Download `dealclose-sim-gateway.apk` below directly on your Android phone!
 
-            ✨ **What's New in v1.3.0:**
-            - **Active Gateway Dashboard UI**: Transforms automatically into a live 24/7 active dashboard once paired!
-            - **Live Health & Status**: Shows Dedicated SIM 2 status, Protected SIM 1 status, Default Dialer state, and Battery worker state.
-            - **Gateway Self-Test & Diagnostic**: Test connection and dialer status with one tap.
+            ✨ **What's New in v1.4.0:**
+            - **Official DealClose Brand Logo & Clean App Name**: Replaces generic icon with the official DealClose AI app icon on your phone's home screen.
+            - **Active Gateway Dashboard UI**: Live 24/7 cellular voice bridge and telephony engine.
+            - **Dual-SIM Smart Routing**: Switch between SIM 1 (Personal/Trial) and SIM 2 (Business AI) with 1 tap.
             - **Instant Ngrok / Cloud Tunneling**: Automatically discovers live backend over cellular/Wi-Fi.
 
             1. Install APK on your Android phone (Android 8.0+).
