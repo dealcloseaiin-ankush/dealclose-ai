@@ -258,7 +258,7 @@ function FlowBuilder() {
     } else {
       // Auto-load latest saved flow for active workspace
       api.get('/whatsapp/flows', {
-        params: { workspaceId: wsParam || 'main', platform: platformParam || 'whatsapp' }
+        params: { workspaceId: wsParam || 'all', platform: platformParam || 'all' }
       })
         .then(res => {
           const flows = res.data?.data || [];
@@ -269,6 +269,7 @@ function FlowBuilder() {
                 const full = fRes.data?.data?.[0];
                 if (full && full.flowData && full.flowData.nodes && full.flowData.nodes.length > 0) {
                   const flowPlatform = full.platform || 'whatsapp';
+                  setPlatform(flowPlatform);
                   const normalizedNodes = (full.flowData.nodes || []).map((node) => ({
                     ...node,
                     data: { ...(node.data || {}), platform: flowPlatform },

@@ -80,6 +80,7 @@ const CustomerPassView = lazyWithRetry(() => import('./modules/loyalty-offers/Cu
 const CustomerRegisterLoyalty = lazyWithRetry(() => import('./modules/loyalty-offers/CustomerRegisterLoyalty'));
 const BillingUdharHub = lazyWithRetry(() => import('./modules/msme-billing-udhar/BillingUdharHub'));
 const CreditMandateHub = lazyWithRetry(() => import('./modules/msme-credit-mandate/CreditMandateHub'));
+const InfluencerCRM = lazyWithRetry(() => import('./pages/InfluencerCRM'));
 
 
 // Smart Redirects for Logged In Users
@@ -338,6 +339,8 @@ export default function App() {
               <Route path="billing-udhar" element={<BillingUdharHub />} />
               <Route path="credit-mandate" element={<BillingUdharHub />} />
               <Route path="udhar" element={<BillingUdharHub />} />
+              <Route path="influencer-crm" element={<InfluencerCRM />} />
+              <Route path="collabs" element={<InfluencerCRM />} />
             </Route>
           </Route>
         </Routes>

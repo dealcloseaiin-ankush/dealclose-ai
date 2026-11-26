@@ -791,12 +791,12 @@ export default function MobileDashboard() {
       }
 
       // 7. Fetch Live Visual Flow Builder Flows from MongoDB (Desktop & Mobile Unified)
-      const { data: flowsRes } = await api.get(`/whatsapp/flows?workspaceId=${currentWsId}`).catch(() => ({ data: [] }));
+      const { data: flowsRes } = await api.get(`/whatsapp/flows?platform=all&workspaceId=${currentWsId}`).catch(() => ({ data: [] }));
       let liveFlows = Array.isArray(flowsRes?.data) ? flowsRes.data : (Array.isArray(flowsRes) ? flowsRes : []);
       
       // If no flows in this sub-workspace, also try main workspace or provide starter template flows
       if ((!liveFlows || liveFlows.length === 0) && currentWsId !== 'main') {
-        const { data: mainFlowsRes } = await api.get('/whatsapp/flows?workspaceId=main').catch(() => ({ data: [] }));
+        const { data: mainFlowsRes } = await api.get('/whatsapp/flows?platform=all&workspaceId=main').catch(() => ({ data: [] }));
         const mainFlows = Array.isArray(mainFlowsRes?.data) ? mainFlowsRes.data : (Array.isArray(mainFlowsRes) ? mainFlowsRes : []);
         if (mainFlows && mainFlows.length > 0) {
           liveFlows = mainFlows;
@@ -2810,6 +2810,30 @@ export default function MobileDashboard() {
                 <div className="text-[8px] text-teal-400 font-bold truncate">Social Marketing</div>
               </button>
             </div>
+
+            {/* 💬 Talk to AI Copilot - 1-Tap Direct Conversational Assistant */}
+            <div 
+              onClick={() => {
+                try { triggerHaptic(); } catch (e) {}
+                setActiveTab('menu');
+                setMenuSubScreen('ai_assistant');
+              }}
+              className="bg-gradient-to-r from-teal-950/70 via-[#0d161a] to-emerald-950/70 border border-teal-500/40 hover:border-teal-400 p-3 rounded-2xl flex items-center justify-between shadow-lg cursor-pointer transition-all active:scale-98"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 border border-teal-500/30">
+                  <Sparkles size={18} className="animate-pulse" />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-white flex items-center gap-1.5">
+                    <span>💬 Chat with AI Assistant &amp; Ask to do Work</span>
+                    <span className="text-[9px] bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded-full border border-teal-500/40 font-mono">● 24/7 Live</span>
+                  </div>
+                  <div className="text-[10px] text-teal-300/80 font-normal">Tap to ask queries, instruct AI, manage customer replies &amp; control kill switches</div>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-teal-400 shrink-0" />
+            </div>
             
             {/* Live CRM Pipeline Cards */}
             <div className="space-y-1.5">
@@ -3545,9 +3569,28 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-white">Flow Automation</div>
-                      <div className="text-[10px] text-gray-400 font-normal">Property auto-sync</div>
+                      <div className="text-[10px] text-gray-400 font-normal">{(flowRules || []).length} Live Flows</div>
                     </div>
                   </button>
+
+                  {/* Tool 4.1: 📸 Creator Collabs & Brand Deals CRM */}
+                  <a 
+                    href="/influencer-crm"
+                    className="bg-gradient-to-br from-amber-950/40 to-[#0e0e14] border border-amber-500/40 p-3.5 rounded-2xl text-left space-y-2 hover:border-amber-400 transition-all shadow-md block col-span-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
+                        <Sparkles size={16} />
+                      </div>
+                      <span className="text-[10px] font-mono bg-amber-950 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/40">
+                        ● Collabs &amp; Ads Flow Ready
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-white font-black">📸 Creator Collabs &amp; Brand Deals CRM</div>
+                      <div className="text-[10px] text-amber-300 font-normal">Manage Instagram PR inquiries, barter deals, sponsor budgets, deliverables &amp; rate negotiations</div>
+                    </div>
+                  </a>
 
                   {/* Tool 4.5: ⚡ Funnel & Stage Sequences */}
                   <button 
