@@ -324,6 +324,87 @@ export default function MobileDashboard() {
     }
   };
 
+  // 📱 SIM Gateway Devices & Pairing States
+  const [gatewayDevices, setGatewayDevices] = useState([]);
+  const [loadingGateway, setLoadingGateway] = useState(false);
+  const [generatedPairingCode, setGeneratedPairingCode] = useState('');
+  const [inputPairingCode, setInputPairingCode] = useState('');
+  const [isPairingDevice, setIsPairingDevice] = useState(false);
+
+  const fetchGatewayDevices = async () => {
+    try {
+      const res = await api.get('/gateway/devices');
+      if (res.data?.devices) setGatewayDevices(res.data.devices);
+    } catch (err) {
+      console.warn('Fetch gateway devices:', err.message);
+    }
+  };
+
+  const handleGenerateMobilePairingCode = async () => {
+    setLoadingGateway(true);
+    try {
+      const res = await api.post('/gateway/generate-code');
+      if (res.data?.pairingCode) {
+        setGeneratedPairingCode(res.data.pairingCode);
+        setInputPairingCode(res.data.pairingCode);
+        toast.success(`Pairing Code: ${res.data.pairingCode} generated!`);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to generate code');
+    } finally {
+      setLoadingGateway(false);
+    }
+  };
+
+  const handleRegisterDeviceWithCode = async (codeToUse) => {
+    const code = (codeToUse || inputPairingCode || '').trim();
+    if (!code) {
+      toast.error('Kripya 6-digit Pairing Code dalein');
+      return;
+    }
+    setIsPairingDevice(true);
+    try {
+      const isNative = typeof window !== 'undefined' && Boolean(window.AndroidBridge);
+      const deviceId = isNative
+        ? `AndroidPhone_${Date.now()}`
+        : `WebBrowser_${Date.now()}`;
+      
+      const res = await api.post('/gateway/register', {
+        pairingCode: code,
+        deviceId,
+        deviceName: isNative ? 'Android Mobile (SIM Gateway)' : 'Web Client (SIM Gateway)',
+        simCarrier: 'Jio / Airtel 4G',
+        batteryLevel: 95,
+        isDefaultDialer: nativeDefaultDialer
+      });
+
+      // Also notify native Android Bridge if running in APK
+      if (typeof window !== 'undefined' && window.AndroidBridge?.setPairingCode) {
+        window.AndroidBridge.setPairingCode(code);
+      }
+
+      toast.success(res.data?.message || '🎉 Phone SIM Gateway Connected Successfully!');
+      setGeneratedPairingCode('');
+      setInputPairingCode('');
+      fetchGatewayDevices();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Invalid or expired Pairing Code');
+    } finally {
+      setIsPairingDevice(false);
+    }
+  };
+
+  const handleDisconnectMobileDevice = async (deviceId) => {
+    if (!window.confirm('Kya aap is SIM Gateway device ko disconnect karna chahte hain?')) return;
+    try {
+      await api.delete(`/gateway/devices/${deviceId}`);
+      toast.success('Device disconnected');
+      fetchGatewayDevices();
+    } catch (err) {
+      toast.error('Failed to disconnect device');
+    }
+  };
+
   // 1. Live Instagram Posts with Real Media Thumbnails
   const [liveIgPosts, setLiveIgPosts] = useState([]);
   const [selectedPostForRule, setSelectedPostForRule] = useState(null);
@@ -610,6 +691,9 @@ export default function MobileDashboard() {
         localStorage.setItem('dealclose_mobile_menu_subscreen', menuSubScreen);
       }
     } catch(e) {}
+    if (menuSubScreen === 'sim_gateway') {
+      fetchGatewayDevices();
+    }
   }, [menuSubScreen]);
 
   useEffect(() => {
@@ -5638,7 +5722,141 @@ export default function MobileDashboard() {
                   <ArrowLeft size={14} /> <span>Back to All Tools</span>
                 </button>
 
-                {/* 1. Android Default Phone App / Dialer Permission Card */}
+                {/* 🌟 1. DYNAMIC CONNECTION STATUS & PAIRING CODE CONTROLS */}
+                {gatewayDevices.some(d => d.isOnline) ? (
+                  /* 🟢 STATE A: PHONE SUCCESSFULLY CONNECTED & LIVE */
+                  <div className="bg-gradient-to-r from-emerald-950/90 via-[#0c2417] to-[#11231a] border-2 border-emerald-500 rounded-3xl p-4.5 space-y-3 shadow-2xl relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center animate-pulse">
+                          <Smartphone size={26} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-white">SIM GATEWAY LIVE &amp; CONNECTED</span>
+                            <span className="bg-emerald-500 text-black px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider animate-pulse">
+                              ● ONLINE
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-300 font-semibold mt-0.5">
+                            {gatewayDevices[0]?.deviceName || 'Android Mobile'} • {gatewayDevices[0]?.simCarrier || 'Jio 4G'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-black/50 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 text-emerald-300 font-mono text-[11px]">
+                        <Battery size={14} className="text-emerald-400" />
+                        <span>{gatewayDevices[0]?.batteryLevel || 95}%</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-black/40 border border-emerald-500/30 p-2.5 rounded-xl flex items-center justify-between text-[11px] text-gray-200">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        <span>AI Incoming Auto-Answer: <strong>Active (1.2s)</strong></span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-mono">Heartbeat: Live</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => fetchGatewayDevices()}
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600/30 border border-emerald-500 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-600/50 transition-all"
+                      >
+                        <RefreshCw size={12} /> <span>Refresh Status</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDisconnectMobileDevice(gatewayDevices[0]?.deviceId)}
+                        className="py-2 px-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold text-xs hover:bg-rose-500/30 transition-all"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* 🔴 STATE B: NO PHONE PAIRED - CODE GENERATOR & INPUT */
+                  <div className="bg-gradient-to-r from-amber-950/70 via-[#18140c] to-[#1a1215] border border-amber-500/50 rounded-3xl p-4 space-y-3.5 shadow-xl">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                          <QrCode size={22} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-white text-xs">Pair Phone SIM Gateway</h3>
+                            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded text-[9px] font-mono">
+                              ○ NOT PAIRED
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-300 mt-0.5">
+                            Apne mobile ko AI Calling Gateway se jodne ke liye 6-digit code generate ya enter karein:
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 1: Generate Code */}
+                    <div className="bg-black/50 border border-gray-800 p-3 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-gray-300">Option 1: New Pairing Code Banayein</span>
+                        <button
+                          type="button"
+                          disabled={loadingGateway}
+                          onClick={handleGenerateMobilePairingCode}
+                          className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Sparkles size={12} />
+                          <span>{loadingGateway ? 'Generating...' : '⚡ Generate Code'}</span>
+                        </button>
+                      </div>
+
+                      {generatedPairingCode && (
+                        <div className="bg-[#0b1610] border border-emerald-500/60 p-3.5 rounded-xl text-center space-y-2 animate-fade-in">
+                          <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Aapka 6-Digit Pairing Code:</p>
+                          <div className="text-3xl font-black text-emerald-300 font-mono tracking-[0.25em] py-1 bg-black/60 rounded-xl border border-emerald-500/40">
+                            {generatedPairingCode}
+                          </div>
+                          <p className="text-[10px] text-gray-400">Valid for 15 minutes. Niche diye button se is phone ko turant connect karein:</p>
+                          <button
+                            type="button"
+                            disabled={isPairingDevice}
+                            onClick={() => handleRegisterDeviceWithCode(generatedPairingCode)}
+                            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Check size={14} /> <span>🔗 Link &amp; Connect This Phone Now</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 2: Enter Existing Code */}
+                    <div className="bg-black/50 border border-gray-800 p-3 rounded-2xl space-y-2">
+                      <span className="text-[11px] font-bold text-gray-300">Option 2: Laptop / Dusre Screen ka Code Dalein</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="Enter 6-digit Code (e.g. 849201)"
+                          value={inputPairingCode}
+                          onChange={(e) => setInputPairingCode(e.target.value)}
+                          className="flex-1 bg-black/80 border border-gray-700 rounded-xl px-3 py-2 text-sm text-center font-mono font-bold tracking-widest text-emerald-400 outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={isPairingDevice || !inputPairingCode.trim()}
+                          onClick={() => handleRegisterDeviceWithCode(inputPairingCode)}
+                          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-40"
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>{isPairingDevice ? 'Pairing...' : 'Submit 🚀'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Android Default Phone App / Dialer Permission Card */}
                 <div className={`p-4 rounded-2xl border space-y-3 shadow-lg ${
                   nativeDefaultDialer
                     ? 'bg-gradient-to-r from-emerald-950/60 via-[#0e1814] to-[#121422] border-emerald-500/50'
@@ -5690,7 +5908,7 @@ export default function MobileDashboard() {
                   </div>
                 </div>
 
-                {/* 2. AI Dedicated Calling SIM Slot Selector */}
+                {/* 3. AI Dedicated Calling SIM Slot Selector */}
                 <div className="bg-[#101016] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 shadow-md">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -5725,7 +5943,7 @@ export default function MobileDashboard() {
                   </div>
                 </div>
 
-                {/* 3. Multi-Workspace AI Persona Card */}
+                {/* 4. Multi-Workspace AI Persona Card */}
                 <div className="bg-[#101016] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 shadow-md">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -5766,7 +5984,7 @@ export default function MobileDashboard() {
                   </div>
                 </div>
 
-                {/* 4. Instant Live SIM Calling Test Dial */}
+                {/* 5. Instant Live SIM Calling Test Dial */}
                 <div className="bg-gradient-to-r from-emerald-950/40 via-[#101614] to-[#12131d] border border-emerald-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-md">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -5813,7 +6031,7 @@ export default function MobileDashboard() {
                   </div>
                 </div>
 
-                {/* 5. Full Web Calls CRM & Spare Phone Pairing Link */}
+                {/* 6. Full Web Calls CRM & Spare Phone Pairing Link */}
                 <div className="flex items-center justify-between pt-1">
                   <a
                     href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases"
@@ -5821,7 +6039,7 @@ export default function MobileDashboard() {
                     rel="noreferrer"
                     className="text-[11px] text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
                   >
-                    <Download size={12} /> <span>Download Companion APK v1.7.1</span>
+                    <Download size={12} /> <span>Download Companion APK v1.7.2</span>
                   </a>
                   <a
                     href="/calls?tab=sim_gateway"

@@ -256,7 +256,7 @@ class MainActivity : AppCompatActivity() {
         fun isNativeApp(): Boolean = true
 
         @JavascriptInterface
-        fun getAppVersion(): String = "1.7.1"
+        fun getAppVersion(): String = "1.7.2"
 
         @JavascriptInterface
         fun requestDefaultDialerRole() {
@@ -320,6 +320,20 @@ class MainActivity : AppCompatActivity() {
         fun getAiSimSlot(): Int {
             val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
             return prefs.getInt("ai_sim_slot", -1)
+        }
+
+        @JavascriptInterface
+        fun setPairingCode(code: String) {
+            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("pairing_code", code).apply()
+            autoStartGatewayWorker()
+            showToast("Pairing Code: $code linked! Connecting to AI Gateway...")
+        }
+
+        @JavascriptInterface
+        fun getPairingCode(): String {
+            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+            return prefs.getString("pairing_code", "") ?: ""
         }
     }
 }
