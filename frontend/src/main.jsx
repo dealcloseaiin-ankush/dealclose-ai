@@ -29,6 +29,11 @@ class GlobalErrorBoundary extends React.Component {
           <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '6px', maxWidth: '350px' }}>
             A temporary screen refresh is needed. Tap below to reload seamlessly.
           </p>
+          {this.state.error && (
+            <div style={{ background: '#1c1917', border: '1px solid #dc2626', borderRadius: '8px', padding: '8px 12px', marginTop: '10px', fontSize: '11px', color: '#f87171', maxWidth: '350px', textAlign: 'left', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+              {this.state.error?.message || String(this.state.error)}
+            </div>
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginTop: '20px' }}>
             <button
               onClick={() => {

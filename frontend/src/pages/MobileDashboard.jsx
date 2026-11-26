@@ -284,11 +284,11 @@ export default function MobileDashboard() {
 
   // 3.5 Dynamic Stage-Wise Funnel Pipelines & Message Sequences (Calculated from Real MongoDB Contacts & Chats)
   const funnelStats = useMemo(() => {
-    const totalLeads = contacts.length;
-    const stageNew = contacts.filter(c => !c.stage || c.stage.toLowerCase().includes('new') || c.stage.toLowerCase().includes('lead')).length;
-    const stageWarm = contacts.filter(c => c.stage && (c.stage.toLowerCase().includes('interested') || c.stage.toLowerCase().includes('contacted'))).length;
-    const stageHot = contacts.filter(c => c.stage && (c.stage.toLowerCase().includes('visit') || c.stage.toLowerCase().includes('hot') || c.stage.toLowerCase().includes('negotiat'))).length;
-    const stageConverted = contacts.filter(c => c.stage && (c.stage.toLowerCase().includes('convert') || c.stage.toLowerCase().includes('won') || c.stage.toLowerCase().includes('closed'))).length;
+    const totalLeads = (contacts || []).length;
+    const stageNew = (contacts || []).filter(c => !c.stage || c.stage.toLowerCase().includes('new') || c.stage.toLowerCase().includes('lead')).length;
+    const stageWarm = (contacts || []).filter(c => c.stage && (c.stage.toLowerCase().includes('interested') || c.stage.toLowerCase().includes('contacted'))).length;
+    const stageHot = (contacts || []).filter(c => c.stage && (c.stage.toLowerCase().includes('visit') || c.stage.toLowerCase().includes('hot') || c.stage.toLowerCase().includes('negotiat'))).length;
+    const stageConverted = (contacts || []).filter(c => c.stage && (c.stage.toLowerCase().includes('convert') || c.stage.toLowerCase().includes('won') || c.stage.toLowerCase().includes('closed'))).length;
 
     // Real Outgoing & Incoming Messages from Chats
     let totalSent = 0;
@@ -403,7 +403,7 @@ export default function MobileDashboard() {
 
   // 6. Dynamic AI Brain Knowledge Base
   const [aiKnowledgeList, setAiKnowledgeList] = useState([
-    { id: 'k1', title: 'Store / Business Name', content: profileData.businessName },
+    { id: 'k1', title: 'Store / Business Name', content: (profileData?.businessName || 'DealClose AI') },
     { id: 'k2', title: 'Products & Offerings', content: 'Products, services, customer inquiries, and customized support.' },
     { id: 'k3', title: 'Pricing & Discount Policy', content: 'Standard pricing with seasonal discounts. Flat 10% off with coupon SAVE10.' },
     { id: 'k4', title: 'Delivery & Shipping Policy', content: 'Free delivery across India on prepaid orders. COD available. Delivery takes 2-4 days.' },
@@ -695,7 +695,7 @@ export default function MobileDashboard() {
         })));
       } else {
         // Ready-made Starter Flow for the business type
-        const isPropertyWorkspace = /property|estate|hub|flat|plot/i.test(profileData.businessName || '') || /property|estate|hub/i.test(currentWsId || '');
+        const isPropertyWorkspace = /property|estate|hub|flat|plot/i.test((profileData?.businessName || 'DealClose AI') || '') || /property|estate|hub/i.test(currentWsId || '');
         if (isPropertyWorkspace) {
           setFlowRules([
             {
@@ -1129,7 +1129,7 @@ export default function MobileDashboard() {
 
   // 🛡️ 1-Click Toggle for AI Channels (Comments, IG DMs, WhatsApp, Master)
   const handleToggleAiChannel = async (channel) => {
-    const currentVal = channelToggles[channel];
+    const currentVal = channelToggles?.[channel];
     const nextVal = !currentVal;
 
     // Optimistic UI update
@@ -1233,7 +1233,7 @@ export default function MobileDashboard() {
   const handleTransferContactStage = async (stage) => {
     if (!selectedContactForTransfer) return;
     const contact = selectedContactForTransfer;
-    setContacts(contacts.map(c => c.id === contact.id ? { ...c, stage } : c));
+    setContacts((contacts || []).map(c => c.id === contact.id ? { ...c, stage } : c));
     setChats(chats.map(c => c.customerPhone === contact.phone ? { ...c, stage } : c));
     
     // 🔥 Live Sync: Update Lead status in MongoDB so Desktop CRM updates in real-time
@@ -1305,7 +1305,7 @@ export default function MobileDashboard() {
         workspaceId: activeWorkspaceId
       });
 
-      setLiveIgPosts(liveIgPosts.map(p => p.id === selectedPostForRule.id ? selectedPostForRule : p));
+      setLiveIgPosts((liveIgPosts || []).map(p => p.id === selectedPostForRule.id ? selectedPostForRule : p));
       setShowIgPostRuleModal(false);
       alert(`Instagram Comment-DM rule updated for: "${selectedPostForRule.title}"! ✅`);
     } catch (err) {
@@ -1339,11 +1339,11 @@ export default function MobileDashboard() {
         if (activeWorkspaceId === 'main') {
           await api.put('/users/profile', {
             logoUrl: uploadedUrl,
-            brandKit: { ...(rawDbUser?.brandKit || {}), logoUrl: uploadedUrl, businessName: profileData.businessName }
+            brandKit: { ...(rawDbUser?.brandKit || {}), logoUrl: uploadedUrl, businessName: (profileData?.businessName || 'DealClose AI') }
           });
         } else {
           const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
-            if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+            if (w._id?.toString() === activeWorkspaceId || w.name === (profileData?.businessName || 'DealClose AI')) {
               return { ...w, logoUrl: uploadedUrl };
             }
             return w;
@@ -1365,12 +1365,12 @@ export default function MobileDashboard() {
     try {
       if (activeWorkspaceId === 'main') {
         await api.put('/users/profile', {
-          businessName: profileData.businessName,
+          businessName: (profileData?.businessName || 'DealClose AI'),
           logoUrl: profileData.logoUrl,
           brandKit: {
             ...(rawDbUser?.brandKit || {}),
             logoUrl: profileData.logoUrl,
-            businessName: profileData.businessName,
+            businessName: (profileData?.businessName || 'DealClose AI'),
             phone: profileData.ownerPhone
           },
           phone: profileData.ownerPhone,
@@ -1400,10 +1400,10 @@ export default function MobileDashboard() {
         });
       } else {
         const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
-          if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+          if (w._id?.toString() === activeWorkspaceId || w.name === (profileData?.businessName || 'DealClose AI')) {
             return {
               ...w,
-              name: profileData.businessName,
+              name: (profileData?.businessName || 'DealClose AI'),
               aiName: profileData.aiName,
               logoUrl: profileData.logoUrl,
               phone: profileData.ownerPhone,
@@ -1438,9 +1438,9 @@ export default function MobileDashboard() {
       }
 
       await fetchLiveBackendData(activeWorkspaceId);
-      alert(`Profile & Phone Numbers for "${profileData.businessName}" Saved to Database! ✅`);
+      alert(`Profile & Phone Numbers for "${(profileData?.businessName || 'DealClose AI')}" Saved to Database! ✅`);
     } catch (err) {
-      alert(`Settings for "${profileData.businessName}" Saved Successfully! ✅`);
+      alert(`Settings for "${(profileData?.businessName || 'DealClose AI')}" Saved Successfully! ✅`);
     }
   };
 
@@ -1458,7 +1458,7 @@ export default function MobileDashboard() {
         });
       } else {
         const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
-          if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+          if (w._id?.toString() === activeWorkspaceId || w.name === (profileData?.businessName || 'DealClose AI')) {
             return {
               ...w,
               whatsappConfig: {
@@ -1486,7 +1486,7 @@ export default function MobileDashboard() {
   };
 
   const handleDisconnectWhatsApp = async () => {
-    if (!window.confirm(`Disconnect WhatsApp for "${profileData.businessName}"?`)) return;
+    if (!window.confirm(`Disconnect WhatsApp for "${(profileData?.businessName || 'DealClose AI')}"?`)) return;
     try {
       if (activeWorkspaceId === 'main') {
         await api.put('/users/profile', {
@@ -1494,7 +1494,7 @@ export default function MobileDashboard() {
         });
       } else {
         const updatedWorkspaces = (rawDbUser?.workspaces || []).map(w => {
-          if (w._id?.toString() === activeWorkspaceId || w.name === profileData.businessName) {
+          if (w._id?.toString() === activeWorkspaceId || w.name === (profileData?.businessName || 'DealClose AI')) {
             return {
               ...w,
               whatsappConfig: { accessToken: '', phoneNumberId: '', wabaId: '', displayPhoneNumber: '' }
@@ -1517,7 +1517,7 @@ export default function MobileDashboard() {
   };
 
   const handleDisconnectInstagram = async () => {
-    if (!window.confirm(`Disconnect Instagram for "${profileData.businessName}"?`)) return;
+    if (!window.confirm(`Disconnect Instagram for "${(profileData?.businessName || 'DealClose AI')}"?`)) return;
     try {
       await api.post('/settings/instagram-disconnect', {
         workspaceId: activeWorkspaceId
@@ -1847,7 +1847,7 @@ export default function MobileDashboard() {
     const wsId = wsItem.id || wsItem._id?.toString();
     const wsName = wsItem.name || 'This Firm';
 
-    if (wsId === 'main' || wsName === profileData.businessName) {
+    if (wsId === 'main' || wsName === (profileData?.businessName || 'DealClose AI')) {
       alert('⚠️ Main Primary Business ko delete nahi kiya ja sakta.');
       return;
     }
@@ -1880,7 +1880,7 @@ export default function MobileDashboard() {
   };
 
   const handleSearchGooglePlaces = async (customQuery) => {
-    const q = (customQuery || googleSearchQuery || profileData.businessName || '').trim();
+    const q = (customQuery || googleSearchQuery || (profileData?.businessName || 'DealClose AI') || '').trim();
     if (!q) return;
     setIsSearchingGoogle(true);
     try {
@@ -1954,7 +1954,7 @@ export default function MobileDashboard() {
       if (data.webhookWarning) {
         alert(`Instagram connected, but webhook setup needs Meta permissions: ${data.webhookWarning}`);
       } else {
-        alert(`🎉 Instagram @${account.pageName} successfully connected to ${profileData.businessName}! 🚀`);
+        alert(`🎉 Instagram @${account.pageName} successfully connected to ${(profileData?.businessName || 'DealClose AI')}! 🚀`);
       }
     } catch (error) {
       alert(error.response?.data?.message || 'Could not save the selected Instagram account.');
@@ -1964,7 +1964,7 @@ export default function MobileDashboard() {
   };
 
   const disconnectInstagram = async () => {
-    if (!window.confirm(`🚨 Are you sure you want to disconnect Instagram from "${profileData.businessName}"?`)) return;
+    if (!window.confirm(`🚨 Are you sure you want to disconnect Instagram from "${(profileData?.businessName || 'DealClose AI')}"?`)) return;
     try {
       const payload = activeWorkspaceId && activeWorkspaceId !== 'main' ? { workspaceId: activeWorkspaceId } : {};
       const res = await api.post('/settings/instagram-disconnect', payload);
@@ -2024,7 +2024,7 @@ export default function MobileDashboard() {
         ...prev,
         {
           role: 'ai',
-          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Offer at ${profileData.businessName}! Flat 20% Discount. Reply YES to connect with our team."`,
+          text: `Namaste! ✨ "${promptText}" ke liye ye raha ready template:\n\n"Special Offer at ${(profileData?.businessName || 'DealClose AI')}! Flat 20% Discount. Reply YES to connect with our team."`,
           action: { type: 'template', text: 'Save as Auto-Reply Template' }
         }
       ]);
@@ -2121,7 +2121,7 @@ export default function MobileDashboard() {
                 onChange={(e) => handleWorkspaceChange(e.target.value)}
                 className="bg-black/60 border border-gray-800 rounded-lg px-1.5 py-0.5 text-[10px] text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[140px] truncate"
               >
-                {workspaces.map(ws => (
+                {(workspaces || []).map(ws => (
                   <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
                     🏢 {ws.name}
                   </option>
@@ -2138,7 +2138,7 @@ export default function MobileDashboard() {
                 title="Manage & Delete Businesses"
               >
                 <Building size={10} />
-                <span>Firms ({workspaces.length})</span>
+                <span>Firms ({(workspaces || []).length})</span>
               </button>
             </div>
           </div>
@@ -2280,7 +2280,7 @@ export default function MobileDashboard() {
                     <MessageSquare size={18} />
                   </div>
                   <div className="text-xs font-bold text-gray-300">No {chatChannel === 'whatsapp' ? 'WhatsApp' : 'Instagram'} messages in this store</div>
-                  <p className="text-[10px] text-gray-500">Live incoming customer messages for {profileData.businessName} will appear here.</p>
+                  <p className="text-[10px] text-gray-500">Live incoming customer messages for {(profileData?.businessName || 'DealClose AI')} will appear here.</p>
                 </div>
               ) : (
                 chats.filter(c => c.channel === chatChannel).map(chat => (
@@ -2457,12 +2457,12 @@ export default function MobileDashboard() {
             {/* Live CRM Pipeline Cards */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs font-bold text-gray-400">
-                <span>CRM Stage Pipeline ({profileData.businessName})</span>
-                <span className="text-[10px] text-emerald-400">● {contacts.length} Total Leads</span>
+                <span>CRM Stage Pipeline ({(profileData?.businessName || 'DealClose AI')})</span>
+                <span className="text-[10px] text-emerald-400">● {(contacts || []).length} Total Leads</span>
               </div>
               <div className="flex gap-2.5 overflow-x-auto pb-1 custom-scrollbar">
                 {crmStages.map(stage => {
-                  const count = contacts.filter(c => c.stage === stage).length;
+                  const count = (contacts || []).filter(c => c.stage === stage).length;
                   return (
                     <div 
                       key={stage} 
@@ -2517,25 +2517,25 @@ export default function MobileDashboard() {
               <div className="grid grid-cols-4 gap-1.5 text-center font-mono">
                 <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
                   <div className="text-xs font-bold text-gray-300">
-                    {broadcastFilter === 'whatsapp' ? contacts.filter(c => c.source === 'whatsapp').length || contacts.length :
+                    {broadcastFilter === 'whatsapp' ? (contacts || []).filter(c => c.source === 'whatsapp').length || (contacts || []).length :
                      broadcastFilter === 'instagram' ? liveStats.totalDMsReceived || 0 :
-                     (contacts.length + (liveStats.totalDMsReceived || 0))}
+                     ((contacts || []).length + (liveStats.totalDMsReceived || 0))}
                   </div>
                   <div className="text-[9px] text-gray-500 uppercase">Target</div>
                 </div>
                 <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
                   <div className="text-xs font-bold text-blue-400">
-                    {broadcastFilter === 'whatsapp' ? Math.max(0, contacts.length - 1) :
+                    {broadcastFilter === 'whatsapp' ? Math.max(0, (contacts || []).length - 1) :
                      broadcastFilter === 'instagram' ? liveStats.dmsSent || 0 :
-                     Math.max(0, contacts.length + (liveStats.dmsSent || 0) - 1)}
+                     Math.max(0, (contacts || []).length + (liveStats.dmsSent || 0) - 1)}
                   </div>
                   <div className="text-[9px] text-gray-500 uppercase">Deliv.</div>
                 </div>
                 <div className="bg-black/50 p-2 rounded-xl border border-gray-800">
                   <div className="text-xs font-bold text-emerald-400">
-                    {broadcastFilter === 'whatsapp' ? Math.max(0, contacts.length - 2) :
+                    {broadcastFilter === 'whatsapp' ? Math.max(0, (contacts || []).length - 2) :
                      broadcastFilter === 'instagram' ? Math.max(0, (liveStats.dmsSent || 0) - 1) :
-                     Math.max(0, contacts.length - 2)}
+                     Math.max(0, (contacts || []).length - 2)}
                   </div>
                   <div className="text-[9px] text-gray-500 uppercase">Read</div>
                 </div>
@@ -2579,7 +2579,7 @@ export default function MobileDashboard() {
           <div className="space-y-4 animate-fade-in">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-black text-white">Product Catalog ({profileData.businessName})</h2>
+                <h2 className="text-sm font-black text-white">Product Catalog ({(profileData?.businessName || 'DealClose AI')})</h2>
                 <p className="text-[10px] text-gray-400">Synced with Meta Cloud API</p>
               </div>
               <button 
@@ -2611,7 +2611,7 @@ export default function MobileDashboard() {
               {catalogItems.length === 0 ? (
                 <div className="bg-[#0e0e14] border border-gray-800 p-6 rounded-2xl text-center space-y-2.5 shadow-sm">
                   <div className="text-3xl">🛍️</div>
-                  <div className="font-bold text-xs text-white">No Catalog Items in {profileData.businessName}</div>
+                  <div className="font-bold text-xs text-white">No Catalog Items in {(profileData?.businessName || 'DealClose AI')}</div>
                   <p className="text-[10px] text-gray-400 max-w-xs mx-auto">
                     Add products or property units for this specific store to display in WhatsApp catalogs & AI auto-replies.
                   </p>
@@ -2697,7 +2697,7 @@ export default function MobileDashboard() {
                     id: 'pb_' + Date.now(),
                     title: '⚡ 1-Click Festive Creative (AI Batch)',
                     image: '✨',
-                    caption: `🔥 Special Promotion at ${profileData.businessName}! Flat 20% Discount. Reply or DM "OFFER" to claim.`,
+                    caption: `🔥 Special Promotion at ${(profileData?.businessName || 'DealClose AI')}! Flat 20% Discount. Reply or DM "OFFER" to claim.`,
                     scheduledTime: 'Today 6:00 PM'
                   };
                   setCustomAiPostBatches([newBatchItem, ...customAiPostBatches]);
@@ -2738,21 +2738,21 @@ export default function MobileDashboard() {
                       <Sparkles size={22} />
                     </div>
                     <div>
-                      <h3 className="text-xs font-black text-white">Generate AI Post Creatives for {profileData.businessName}</h3>
+                      <h3 className="text-xs font-black text-white">Generate AI Post Creatives for {(profileData?.businessName || 'DealClose AI')}</h3>
                       <p className="text-[10px] text-gray-400 max-w-xs mx-auto mt-1">
                         Tap below to generate 3 tailored social media creatives with captions & hashtags for this business.
                       </p>
                     </div>
                     <button
                       onClick={() => {
-                        const isRealEstate = (profileData.businessName || '').toLowerCase().includes('property') || (profileData.businessName || '').toLowerCase().includes('estate') || (profileData.businessName || '').toLowerCase().includes('realty');
+                        const isRealEstate = ((profileData?.businessName || 'DealClose AI') || '').toLowerCase().includes('property') || ((profileData?.businessName || 'DealClose AI') || '').toLowerCase().includes('estate') || ((profileData?.businessName || 'DealClose AI') || '').toLowerCase().includes('realty');
                         const generated = isRealEstate ? [
                           { id: 'pb_' + Date.now() + '_1', title: '🏡 Luxury 2 & 3 BHK Launch Teaser', image: '🏙️', caption: `✨ New Launch in Prime Location!\nPremium 2 & 3 BHK Apartments with 25+ Luxury Amenities.\n\n📍 Prime Location with 0% Brokerage.\n👉 Comment "VISIT" to get exclusive brochure & pricing on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
                           { id: 'pb_' + Date.now() + '_2', title: '🎯 Weekend Free Site Visit Drive', image: '🚗', caption: `Weekend Special Site Visit Tour!\nFree Cab Pickup & Drop facility available for family visits.\n\n📅 Saturday & Sunday 11:00 AM onwards.\n👉 Comment "PASS" to get your VIP site visit pass.`, scheduledTime: 'Every Saturday 11:00 AM' },
                           { id: 'pb_' + Date.now() + '_3', title: '💰 Ready-to-Move Plots & Villa Offers', image: '🏡', caption: `Limited Time Investment Opportunity!\nGated township plots with bank loan approval up to 80%.\n\n👉 Comment "PRICE" or tap link in bio for instant rate chart.`, scheduledTime: 'Mon & Thu 5:00 PM' }
                         ] : [
-                          { id: 'pb_' + Date.now() + '_1', title: `✨ Special Offer - ${profileData.businessName}`, image: '🛍️', caption: `✨ Exclusive Launch at ${profileData.businessName}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
-                          { id: 'pb_' + Date.now() + '_2', title: `🎉 Weekend Mega Showcase`, image: '🎉', caption: `Sunday Mega Showcase at ${profileData.businessName}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' }
+                          { id: 'pb_' + Date.now() + '_1', title: `✨ Special Offer - ${(profileData?.businessName || 'DealClose AI')}`, image: '🛍️', caption: `✨ Exclusive Launch at ${(profileData?.businessName || 'DealClose AI')}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
+                          { id: 'pb_' + Date.now() + '_2', title: `🎉 Weekend Mega Showcase`, image: '🎉', caption: `Sunday Mega Showcase at ${(profileData?.businessName || 'DealClose AI')}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' }
                         ];
                         setCustomAiPostBatches(generated);
                       }}
@@ -2765,7 +2765,7 @@ export default function MobileDashboard() {
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-gray-400">AI Creatives for <strong>{profileData.businessName}</strong>:</p>
+                      <p className="text-[10px] text-gray-400">AI Creatives for <strong>{(profileData?.businessName || 'DealClose AI')}</strong>:</p>
                       <button
                         onClick={() => setCustomAiPostBatches([])}
                         className="text-[10px] text-gray-400 hover:text-red-400"
@@ -2986,7 +2986,7 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-white">IG Comment-to-DM</div>
-                      <div className="text-[10px] text-pink-400 font-normal">● {liveIgPosts.length} Real Posts Ready</div>
+                      <div className="text-[10px] text-pink-400 font-normal">● {(liveIgPosts || []).length} Real Posts Ready</div>
                     </div>
                   </button>
 
@@ -3071,7 +3071,7 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-white">Contacts & CRM</div>
-                      <div className="text-[10px] text-gray-400 font-normal">● {contacts.length} Leads in Store</div>
+                      <div className="text-[10px] text-gray-400 font-normal">● {(contacts || []).length} Leads in Store</div>
                     </div>
                   </button>
 
@@ -3113,9 +3113,9 @@ export default function MobileDashboard() {
                         <Sparkles size={16} />
                       </div>
                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${
-                        channelToggles.comment ? 'bg-amber-950/80 text-amber-300 border border-amber-500/40' : 'bg-purple-950/80 text-purple-300 border border-purple-500/40'
+                        channelToggles?.comment ? 'bg-amber-950/80 text-amber-300 border border-amber-500/40' : 'bg-purple-950/80 text-purple-300 border border-purple-500/40'
                       }`}>
-                        {channelToggles.comment ? 'Cmt: ON' : 'Cmt: OFF'}
+                        {channelToggles?.comment ? 'Cmt: ON' : 'Cmt: OFF'}
                       </span>
                     </div>
                     <div>
@@ -3181,7 +3181,7 @@ export default function MobileDashboard() {
                       <Webhook size={15} />
                       <span>🔗 Custom Webhooks & API Integrations</span>
                     </h3>
-                    <p className="text-[10px] text-gray-400">Active Business: <strong className="text-white">{profileData.businessName}</strong></p>
+                    <p className="text-[10px] text-gray-400">Active Business: <strong className="text-white">{(profileData?.businessName || 'DealClose AI')}</strong></p>
                   </div>
                 </div>
 
@@ -3193,7 +3193,7 @@ export default function MobileDashboard() {
                       onChange={(e) => handleWorkspaceChange(e.target.value)}
                       className="w-full bg-black border border-gray-800 rounded-xl p-2.5 text-emerald-400 font-bold focus:outline-none text-xs"
                     >
-                      {workspaces.map(ws => (
+                      {(workspaces || []).map(ws => (
                         <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
                           🏢 {ws.name} ({ws.id === 'main' ? 'dealcloseai.in' : ws.name.toLowerCase().replace(/\s+/g, '') + '.in'})
                         </option>
@@ -3233,7 +3233,7 @@ export default function MobileDashboard() {
                   </div>
 
                   <div className="pt-2 border-t border-gray-800/80 space-y-2">
-                    <span className="text-[11px] font-bold text-teal-400">Specific Custom API Endpoints for {profileData.businessName}:</span>
+                    <span className="text-[11px] font-bold text-teal-400">Specific Custom API Endpoints for {(profileData?.businessName || 'DealClose AI')}:</span>
                     
                     <div>
                       <label className="block text-[10px] text-gray-400">Quick Post Endpoint URL (POST):</label>
@@ -3284,7 +3284,7 @@ export default function MobileDashboard() {
                     type="submit"
                     className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black text-xs rounded-xl shadow-lg mt-2"
                   >
-                    Save & Test Webhooks for {profileData.businessName} 🚀
+                    Save & Test Webhooks for {(profileData?.businessName || 'DealClose AI')} 🚀
                   </button>
                 </form>
               </div>
@@ -3294,7 +3294,7 @@ export default function MobileDashboard() {
             {menuSubScreen === 'contacts_crm' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400">Saved Contacts ({contacts.length})</span>
+                  <span className="text-xs font-bold text-gray-400">Saved Contacts ({(contacts || []).length})</span>
                   <button 
                     onClick={() => setShowAddContactModal(true)}
                     className="px-3 py-1.5 bg-emerald-500 text-black font-black text-xs rounded-xl flex items-center gap-1 shadow-md"
@@ -3318,12 +3318,12 @@ export default function MobileDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  {contacts.filter(c => crmFilter === 'All' || c.stage === crmFilter).length === 0 ? (
+                  {(contacts || []).filter(c => crmFilter === 'All' || c.stage === crmFilter).length === 0 ? (
                     <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl text-xs text-gray-400">
-                      No contacts in this stage yet for {profileData.businessName}.
+                      No contacts in this stage yet for {(profileData?.businessName || 'DealClose AI')}.
                     </div>
                   ) : (
-                    contacts.filter(c => crmFilter === 'All' || c.stage === crmFilter).map(c => (
+                    (contacts || []).filter(c => crmFilter === 'All' || c.stage === crmFilter).map(c => (
                       <div key={c.id} className="bg-[#0e0e14] border border-gray-800 p-3 rounded-2xl flex items-center justify-between">
                         <div>
                           <div className="font-bold text-xs text-white">{c.name}</div>
@@ -3362,7 +3362,7 @@ export default function MobileDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-white">Google SEO & Blog Engine</span>
-                    <p className="text-[10px] text-gray-400">Publish high-ranking articles for {profileData.businessName}</p>
+                    <p className="text-[10px] text-gray-400">Publish high-ranking articles for {(profileData?.businessName || 'DealClose AI')}</p>
                   </div>
                   <button
                     onClick={() => setShowCreateBlogModal(true)}
@@ -3377,7 +3377,7 @@ export default function MobileDashboard() {
                     <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
                       <FileText size={24} className="text-amber-400 mx-auto" />
                       <div className="text-xs font-bold text-white">No Blog Articles Published Yet</div>
-                      <p className="text-[10px] text-gray-400">Write your first SEO article for <strong>{profileData.businessName}</strong> to rank on Google search and generate organic leads!</p>
+                      <p className="text-[10px] text-gray-400">Write your first SEO article for <strong>{(profileData?.businessName || 'DealClose AI')}</strong> to rank on Google search and generate organic leads!</p>
                       <button 
                         onClick={() => setShowCreateBlogModal(true)} 
                         className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black text-xs rounded-xl shadow-md"
@@ -3417,7 +3417,7 @@ export default function MobileDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-white">Live Instagram Posts & Reels</span>
-                    <p className="text-[10px] text-gray-400">Real Meta Feed for: <strong>{profileData.businessName}</strong></p>
+                    <p className="text-[10px] text-gray-400">Real Meta Feed for: <strong>{(profileData?.businessName || 'DealClose AI')}</strong></p>
                   </div>
                   <button 
                     onClick={() => fetchLiveBackendData(activeWorkspaceId)}
@@ -3428,7 +3428,7 @@ export default function MobileDashboard() {
                 </div>
 
                 <div className="space-y-3">
-                  {liveIgPosts.length === 0 ? (
+                  {(liveIgPosts || []).length === 0 ? (
                     <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
                       <InstagramIcon size={24} className="text-pink-400 mx-auto" />
                       <div className="text-xs font-bold text-white">No Instagram Posts Found</div>
@@ -3441,7 +3441,7 @@ export default function MobileDashboard() {
                       </button>
                     </div>
                   ) : (
-                    liveIgPosts.map(post => (
+                    (liveIgPosts || []).map(post => (
                       <div 
                         key={post.id} 
                         onClick={() => {
@@ -3698,7 +3698,7 @@ export default function MobileDashboard() {
                           <span>Smart Handover: Pauses AI when customer replies</span>
                         </span>
                         <button
-                          onClick={() => alert(`Customizing Funnel Step ${sIdx + 1} for ${stageItem.stage} (${profileData.businessName})!`)}
+                          onClick={() => alert(`Customizing Funnel Step ${sIdx + 1} for ${stageItem.stage} (${(profileData?.businessName || 'DealClose AI')})!`)}
                           className="px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-purple-300 font-bold rounded"
                         >
                           Edit ⚙️
@@ -3907,7 +3907,7 @@ export default function MobileDashboard() {
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-bold text-gray-400">3. Select CRM Leads to Call:</p>
                     <span className="text-[10px] font-bold text-blue-300">
-                      {selectedCallingLeadIds.length} of {contacts.length} Selected
+                      {selectedCallingLeadIds.length} of {(contacts || []).length} Selected
                     </span>
                   </div>
 
@@ -3916,7 +3916,7 @@ export default function MobileDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const ids = contacts.slice(0, 5).map(c => c._id || c.id);
+                        const ids = (contacts || []).slice(0, 5).map(c => c._id || c.id);
                         setSelectedCallingLeadIds(ids);
                       }}
                       className="px-2 py-1 bg-[#181824] hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold"
@@ -3926,7 +3926,7 @@ export default function MobileDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const ids = contacts.slice(0, 10).map(c => c._id || c.id);
+                        const ids = (contacts || []).slice(0, 10).map(c => c._id || c.id);
                         setSelectedCallingLeadIds(ids);
                       }}
                       className="px-2 py-1 bg-[#181824] hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold"
@@ -3936,7 +3936,7 @@ export default function MobileDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const ids = contacts.slice(0, 25).map(c => c._id || c.id);
+                        const ids = (contacts || []).slice(0, 25).map(c => c._id || c.id);
                         setSelectedCallingLeadIds(ids);
                       }}
                       className="px-2 py-1 bg-[#181824] hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold"
@@ -3946,12 +3946,12 @@ export default function MobileDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const ids = contacts.map(c => c._id || c.id);
+                        const ids = (contacts || []).map(c => c._id || c.id);
                         setSelectedCallingLeadIds(ids);
                       }}
                       className="px-2 py-1 bg-[#20202a] text-gray-300 rounded-lg text-[10px] font-semibold"
                     >
-                      All ({contacts.length})
+                      All ({(contacts || []).length})
                     </button>
                     {selectedCallingLeadIds.length > 0 && (
                       <button
@@ -3966,10 +3966,10 @@ export default function MobileDashboard() {
 
                   {/* Scrollable Contacts List with Checkboxes */}
                   <div className="space-y-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-1">
-                    {contacts.length === 0 ? (
+                    {(contacts || []).length === 0 ? (
                       <div className="text-center py-6 text-gray-500 text-[11px]">No contacts found in CRM.</div>
                     ) : (
-                      contacts.map((contact) => {
+                      (contacts || []).map((contact) => {
                         const cId = contact._id || contact.id;
                         const isSelected = selectedCallingLeadIds.includes(cId);
 
@@ -4077,7 +4077,7 @@ export default function MobileDashboard() {
                 <div className="bg-[#0e0e14] border border-teal-500/30 rounded-2xl p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-teal-400" />
-                    <span className="text-xs font-bold text-white">AI Smart Assistant ({profileData.businessName})</span>
+                    <span className="text-xs font-bold text-white">AI Smart Assistant ({(profileData?.businessName || 'DealClose AI')})</span>
                   </div>
                   <button
                     onClick={() => setMenuSubScreen('settings_ai_training')}
@@ -4101,13 +4101,13 @@ export default function MobileDashboard() {
                         onClick={() => handleToggleAiChannel('master')}
                         disabled={isUpdatingToggle}
                         className={`px-1.5 py-0.5 rounded text-[9px] font-black flex items-center gap-1 transition-all ${
-                          channelToggles.master
+                          channelToggles?.master
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                             : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
                         }`}
                       >
                         <Power size={9} />
-                        {channelToggles.master ? 'ON' : 'OFF'}
+                        {channelToggles?.master ? 'ON' : 'OFF'}
                       </button>
                     </div>
                   </div>
@@ -4115,91 +4115,91 @@ export default function MobileDashboard() {
                   <div className="grid grid-cols-3 gap-1.5">
                     {/* Instagram Comments */}
                     <div className={`p-2 rounded-xl border flex flex-col justify-between transition-all ${
-                      channelToggles.comment ? 'bg-purple-950/20 border-purple-500/40' : 'bg-black/60 border-gray-800/80'
+                      channelToggles?.comment ? 'bg-purple-950/20 border-purple-500/40' : 'bg-black/60 border-gray-800/80'
                     }`}>
                       <div className="flex items-center justify-between mb-1">
                         <CommentIcon size={12} className="text-pink-400" />
                         <span className={`text-[7px] font-black px-1 py-0.5 rounded uppercase ${
-                          channelToggles.comment ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                          channelToggles?.comment ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
                         }`}>
-                          {channelToggles.comment ? 'ACTIVE' : 'BLOCKED'}
+                          {channelToggles?.comment ? 'ACTIVE' : 'BLOCKED'}
                         </span>
                       </div>
                       <div className="text-[10px] font-bold text-white truncate">Comments</div>
                       <div className="text-[8px] text-gray-400 mb-2 truncate">
-                        {channelToggles.comment ? 'AI Replies' : 'Strictly Off'}
+                        {channelToggles?.comment ? 'AI Replies' : 'Strictly Off'}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleToggleAiChannel('comment')}
                         disabled={isUpdatingToggle}
                         className={`w-full py-1 rounded-lg text-[9px] font-black transition-all ${
-                          channelToggles.comment
+                          channelToggles?.comment
                             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
                             : 'bg-purple-600 text-white shadow hover:bg-purple-500'
                         }`}
                       >
-                        {channelToggles.comment ? 'Turn OFF' : 'Turn ON'}
+                        {channelToggles?.comment ? 'Turn OFF' : 'Turn ON'}
                       </button>
                     </div>
 
                     {/* Instagram DMs */}
                     <div className={`p-2 rounded-xl border flex flex-col justify-between transition-all ${
-                      channelToggles.instagram_dm ? 'bg-blue-950/20 border-blue-500/40' : 'bg-black/60 border-gray-800/80'
+                      channelToggles?.instagram_dm ? 'bg-blue-950/20 border-blue-500/40' : 'bg-black/60 border-gray-800/80'
                     }`}>
                       <div className="flex items-center justify-between mb-1">
                         <InstagramIcon size={12} className="text-purple-400" />
                         <span className={`text-[7px] font-black px-1 py-0.5 rounded uppercase ${
-                          channelToggles.instagram_dm ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                          channelToggles?.instagram_dm ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
                         }`}>
-                          {channelToggles.instagram_dm ? 'ON' : 'OFF'}
+                          {channelToggles?.instagram_dm ? 'ON' : 'OFF'}
                         </span>
                       </div>
                       <div className="text-[10px] font-bold text-white truncate">Instagram DM</div>
                       <div className="text-[8px] text-gray-400 mb-2 truncate">
-                        {channelToggles.instagram_dm ? 'AI Replies' : 'Kill Switch'}
+                        {channelToggles?.instagram_dm ? 'AI Replies' : 'Kill Switch'}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleToggleAiChannel('instagram_dm')}
                         disabled={isUpdatingToggle}
                         className={`w-full py-1 rounded-lg text-[9px] font-black transition-all ${
-                          channelToggles.instagram_dm
+                          channelToggles?.instagram_dm
                             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
                             : 'bg-blue-600 text-white shadow hover:bg-blue-500'
                         }`}
                       >
-                        {channelToggles.instagram_dm ? 'Turn OFF' : 'Turn ON'}
+                        {channelToggles?.instagram_dm ? 'Turn OFF' : 'Turn ON'}
                       </button>
                     </div>
 
                     {/* WhatsApp */}
                     <div className={`p-2 rounded-xl border flex flex-col justify-between transition-all ${
-                      channelToggles.whatsapp ? 'bg-emerald-950/20 border-emerald-500/40' : 'bg-black/60 border-gray-800/80'
+                      channelToggles?.whatsapp ? 'bg-emerald-950/20 border-emerald-500/40' : 'bg-black/60 border-gray-800/80'
                     }`}>
                       <div className="flex items-center justify-between mb-1">
                         <MessageCircle size={12} className="text-emerald-400" />
                         <span className={`text-[7px] font-black px-1 py-0.5 rounded uppercase ${
-                          channelToggles.whatsapp ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                          channelToggles?.whatsapp ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
                         }`}>
-                          {channelToggles.whatsapp ? 'ON' : 'OFF'}
+                          {channelToggles?.whatsapp ? 'ON' : 'OFF'}
                         </span>
                       </div>
                       <div className="text-[10px] font-bold text-white truncate">WhatsApp</div>
                       <div className="text-[8px] text-gray-400 mb-2 truncate">
-                        {channelToggles.whatsapp ? 'AI Replies' : 'Kill Switch'}
+                        {channelToggles?.whatsapp ? 'AI Replies' : 'Kill Switch'}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleToggleAiChannel('whatsapp')}
                         disabled={isUpdatingToggle}
                         className={`w-full py-1 rounded-lg text-[9px] font-black transition-all ${
-                          channelToggles.whatsapp
+                          channelToggles?.whatsapp
                             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
                             : 'bg-emerald-600 text-white shadow hover:bg-emerald-500'
                         }`}
                       >
-                        {channelToggles.whatsapp ? 'Turn OFF' : 'Turn ON'}
+                        {channelToggles?.whatsapp ? 'Turn OFF' : 'Turn ON'}
                       </button>
                     </div>
                   </div>
@@ -4231,7 +4231,7 @@ export default function MobileDashboard() {
                   ))}
                   {isAiTyping && (
                     <div className="text-gray-500 text-[11px] animate-pulse flex items-center gap-1">
-                      <span>AI is thinking with {profileData.businessName} store knowledge...</span>
+                      <span>AI is thinking with {(profileData?.businessName || 'DealClose AI')} store knowledge...</span>
                     </div>
                   )}
                 </div>
@@ -4248,7 +4248,7 @@ export default function MobileDashboard() {
                     type="text"
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
-                    placeholder={`Ask: '${profileData.businessName} ke offers...'`}
+                    placeholder={`Ask: '${(profileData?.businessName || 'DealClose AI')} ke offers...'`}
                     className="flex-1 bg-black border border-gray-800 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
                   />
                   <button type="submit" className="p-2.5 bg-teal-600 text-white rounded-xl font-bold shadow-md">
@@ -4290,21 +4290,21 @@ export default function MobileDashboard() {
                           <Sparkles size={22} />
                         </div>
                         <div>
-                          <h3 className="text-xs font-black text-white">Generate AI Post Creatives for {profileData.businessName}</h3>
+                          <h3 className="text-xs font-black text-white">Generate AI Post Creatives for {(profileData?.businessName || 'DealClose AI')}</h3>
                           <p className="text-[10px] text-gray-400 max-w-xs mx-auto mt-1">
                             Tap below to generate 3 tailored social media creatives with captions & hashtags for this business.
                           </p>
                         </div>
                         <button
                           onClick={() => {
-                            const isRealEstate = (profileData.businessName || '').toLowerCase().includes('property') || (profileData.businessName || '').toLowerCase().includes('estate') || (profileData.businessName || '').toLowerCase().includes('realty');
+                            const isRealEstate = ((profileData?.businessName || 'DealClose AI') || '').toLowerCase().includes('property') || ((profileData?.businessName || 'DealClose AI') || '').toLowerCase().includes('estate') || ((profileData?.businessName || 'DealClose AI') || '').toLowerCase().includes('realty');
                             const generated = isRealEstate ? [
                               { id: 'pb_' + Date.now() + '_1', title: '🏡 Luxury 2 & 3 BHK Launch Teaser', image: '🏙️', caption: `✨ New Launch in Prime Location!\nPremium 2 & 3 BHK Apartments with 25+ Luxury Amenities.\n\n📍 Prime Location with 0% Brokerage.\n👉 Comment "VISIT" to get exclusive brochure & pricing on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
                               { id: 'pb_' + Date.now() + '_2', title: '🎯 Weekend Free Site Visit Drive', image: '🚗', caption: `Weekend Special Site Visit Tour!\nFree Cab Pickup & Drop facility available for family visits.\n\n📅 Saturday & Sunday 11:00 AM onwards.\n👉 Comment "PASS" to get your VIP site visit pass.`, scheduledTime: 'Every Saturday 11:00 AM' },
                               { id: 'pb_' + Date.now() + '_3', title: '💰 Ready-to-Move Plots & Villa Offers', image: '🏡', caption: `Limited Time Investment Opportunity!\nGated township plots with bank loan approval up to 80%.\n\n👉 Comment "PRICE" or tap link in bio for instant rate chart.`, scheduledTime: 'Mon & Thu 5:00 PM' }
                             ] : [
-                              { id: 'pb_' + Date.now() + '_1', title: `✨ Special Offer - ${profileData.businessName}`, image: '🛍️', caption: `✨ Exclusive Launch at ${profileData.businessName}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
-                              { id: 'pb_' + Date.now() + '_2', title: `🎉 Weekend Mega Showcase`, image: '🎉', caption: `Sunday Mega Showcase at ${profileData.businessName}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' }
+                              { id: 'pb_' + Date.now() + '_1', title: `✨ Special Offer - ${(profileData?.businessName || 'DealClose AI')}`, image: '🛍️', caption: `✨ Exclusive Launch at ${(profileData?.businessName || 'DealClose AI')}!\nFlat 20% OFF on all new arrivals this week.\n\n👉 Comment "PRICE" to get instant DM & catalog on WhatsApp!`, scheduledTime: 'Daily 6:00 PM' },
+                              { id: 'pb_' + Date.now() + '_2', title: `🎉 Weekend Mega Showcase`, image: '🎉', caption: `Sunday Mega Showcase at ${(profileData?.businessName || 'DealClose AI')}!\nVisit store or order online with free doorstep delivery.\n\n👉 Comment "OFFER" to claim your voucher.`, scheduledTime: 'Every Saturday 11:00 AM' }
                             ];
                             setCustomAiPostBatches(generated);
                           }}
@@ -4317,7 +4317,7 @@ export default function MobileDashboard() {
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <p className="text-[10px] text-gray-400">AI Creatives for <strong>{profileData.businessName}</strong>:</p>
+                          <p className="text-[10px] text-gray-400">AI Creatives for <strong>{(profileData?.businessName || 'DealClose AI')}</strong>:</p>
                           <button
                             onClick={() => setCustomAiPostBatches([])}
                             className="text-[10px] text-gray-400 hover:text-red-400"
@@ -4457,7 +4457,7 @@ export default function MobileDashboard() {
                       onChange={(e) => handleWorkspaceChange(e.target.value)}
                       className="w-full bg-black border border-gray-800 rounded-xl p-2 text-emerald-400 font-bold focus:outline-none"
                     >
-                      {workspaces.map(ws => (
+                      {(workspaces || []).map(ws => (
                         <option key={ws.id} value={ws.id} className="bg-[#0e0e14] text-white">
                           🏢 {ws.name}
                         </option>
@@ -4493,7 +4493,7 @@ export default function MobileDashboard() {
                     <label className="text-[10px] font-bold text-gray-400">Business Name:</label>
                     <input
                       type="text"
-                      value={profileData.businessName}
+                      value={(profileData?.businessName || 'DealClose AI')}
                       onChange={(e) => setProfileData({ ...profileData, businessName: e.target.value })}
                       className="w-full bg-black border border-gray-800 rounded-xl p-2 text-white focus:outline-none"
                     />
@@ -4531,13 +4531,13 @@ export default function MobileDashboard() {
                           onClick={() => handleToggleAiChannel('master')}
                           disabled={isUpdatingToggle}
                           className={`px-1.5 py-0.5 rounded text-[8px] font-black flex items-center gap-0.5 transition-all ${
-                            channelToggles.master
+                            channelToggles?.master
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                               : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
                           }`}
                         >
                           <Power size={8} />
-                          {channelToggles.master ? 'ON' : 'OFF'}
+                          {channelToggles?.master ? 'ON' : 'OFF'}
                         </button>
                       </div>
                     </div>
@@ -4545,14 +4545,14 @@ export default function MobileDashboard() {
                     <div className="grid grid-cols-3 gap-1.5">
                       {/* Comments */}
                       <div className={`p-1.5 rounded-lg border flex flex-col justify-between transition-all ${
-                        channelToggles.comment ? 'bg-purple-950/20 border-purple-500/40' : 'bg-black/50 border-gray-800/80'
+                        channelToggles?.comment ? 'bg-purple-950/20 border-purple-500/40' : 'bg-black/50 border-gray-800/80'
                       }`}>
                         <div className="flex items-center justify-between mb-1">
                           <CommentIcon size={11} className="text-pink-400" />
                           <span className={`text-[7px] font-black px-1 rounded uppercase ${
-                            channelToggles.comment ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                            channelToggles?.comment ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
                           }`}>
-                            {channelToggles.comment ? 'ACTIVE' : 'BLOCKED'}
+                            {channelToggles?.comment ? 'ACTIVE' : 'BLOCKED'}
                           </span>
                         </div>
                         <div className="text-[9px] font-bold text-white truncate">Comments</div>
@@ -4561,25 +4561,25 @@ export default function MobileDashboard() {
                           onClick={() => handleToggleAiChannel('comment')}
                           disabled={isUpdatingToggle}
                           className={`w-full mt-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
-                            channelToggles.comment
+                            channelToggles?.comment
                               ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
                               : 'bg-purple-600 text-white shadow hover:bg-purple-500'
                           }`}
                         >
-                          {channelToggles.comment ? 'Turn OFF' : 'Turn ON'}
+                          {channelToggles?.comment ? 'Turn OFF' : 'Turn ON'}
                         </button>
                       </div>
 
                       {/* Instagram DMs */}
                       <div className={`p-1.5 rounded-lg border flex flex-col justify-between transition-all ${
-                        channelToggles.instagram_dm ? 'bg-blue-950/20 border-blue-500/40' : 'bg-black/50 border-gray-800/80'
+                        channelToggles?.instagram_dm ? 'bg-blue-950/20 border-blue-500/40' : 'bg-black/50 border-gray-800/80'
                       }`}>
                         <div className="flex items-center justify-between mb-1">
                           <InstagramIcon size={11} className="text-purple-400" />
                           <span className={`text-[7px] font-black px-1 rounded uppercase ${
-                            channelToggles.instagram_dm ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                            channelToggles?.instagram_dm ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
                           }`}>
-                            {channelToggles.instagram_dm ? 'ON' : 'OFF'}
+                            {channelToggles?.instagram_dm ? 'ON' : 'OFF'}
                           </span>
                         </div>
                         <div className="text-[9px] font-bold text-white truncate">Instagram DM</div>
@@ -4588,25 +4588,25 @@ export default function MobileDashboard() {
                           onClick={() => handleToggleAiChannel('instagram_dm')}
                           disabled={isUpdatingToggle}
                           className={`w-full mt-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
-                            channelToggles.instagram_dm
+                            channelToggles?.instagram_dm
                               ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
                               : 'bg-blue-600 text-white shadow hover:bg-blue-500'
                           }`}
                         >
-                          {channelToggles.instagram_dm ? 'Turn OFF' : 'Turn ON'}
+                          {channelToggles?.instagram_dm ? 'Turn OFF' : 'Turn ON'}
                         </button>
                       </div>
 
                       {/* WhatsApp */}
                       <div className={`p-1.5 rounded-lg border flex flex-col justify-between transition-all ${
-                        channelToggles.whatsapp ? 'bg-emerald-950/20 border-emerald-500/40' : 'bg-black/50 border-gray-800/80'
+                        channelToggles?.whatsapp ? 'bg-emerald-950/20 border-emerald-500/40' : 'bg-black/50 border-gray-800/80'
                       }`}>
                         <div className="flex items-center justify-between mb-1">
                           <MessageCircle size={11} className="text-emerald-400" />
                           <span className={`text-[7px] font-black px-1 rounded uppercase ${
-                            channelToggles.whatsapp ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
+                            channelToggles?.whatsapp ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-rose-950/90 text-rose-300 border border-rose-500/30'
                           }`}>
-                            {channelToggles.whatsapp ? 'ON' : 'OFF'}
+                            {channelToggles?.whatsapp ? 'ON' : 'OFF'}
                           </span>
                         </div>
                         <div className="text-[9px] font-bold text-white truncate">WhatsApp</div>
@@ -4615,12 +4615,12 @@ export default function MobileDashboard() {
                           onClick={() => handleToggleAiChannel('whatsapp')}
                           disabled={isUpdatingToggle}
                           className={`w-full mt-1.5 py-0.5 rounded text-[8px] font-black transition-all ${
-                            channelToggles.whatsapp
+                            channelToggles?.whatsapp
                               ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
                               : 'bg-emerald-600 text-white shadow hover:bg-emerald-500'
                           }`}
                         >
-                          {channelToggles.whatsapp ? 'Turn OFF' : 'Turn ON'}
+                          {channelToggles?.whatsapp ? 'Turn OFF' : 'Turn ON'}
                         </button>
                       </div>
                     </div>
@@ -4699,10 +4699,10 @@ export default function MobileDashboard() {
                         <button
                           type="button"
                           onClick={() => {
-                            setGoogleSearchQuery(profileData.businessName || '');
+                            setGoogleSearchQuery((profileData?.businessName || 'DealClose AI') || '');
                             setShowGoogleSearchModal(true);
-                            if (profileData.businessName) {
-                              handleSearchGooglePlaces(profileData.businessName);
+                            if ((profileData?.businessName || 'DealClose AI')) {
+                              handleSearchGooglePlaces((profileData?.businessName || 'DealClose AI'));
                             }
                           }}
                           className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black rounded-lg text-[9px] font-bold flex items-center gap-1 transition-all shadow-sm"
@@ -4742,7 +4742,7 @@ export default function MobileDashboard() {
                       <Link2 size={15} className="text-emerald-400" />
                       <span>WhatsApp & Instagram Connection</span>
                     </span>
-                    <span className="text-[10px] text-gray-400">{profileData.businessName}</span>
+                    <span className="text-[10px] text-gray-400">{(profileData?.businessName || 'DealClose AI')}</span>
                   </div>
 
                   <div className="space-y-2 pt-1">
@@ -4821,7 +4821,7 @@ export default function MobileDashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1">
                       <Sparkles size={14} className="text-purple-400" />
-                      <span>AI Store Brain ({profileData.businessName})</span>
+                      <span>AI Store Brain ({(profileData?.businessName || 'DealClose AI')})</span>
                     </span>
                     <button 
                       onClick={() => setShowAddAiBoxModal(true)}
@@ -4864,7 +4864,7 @@ export default function MobileDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-white">Keyword Auto-Replies ({autoReplies.length})</span>
-                    <p className="text-[10px] text-gray-400">For: <strong>{profileData.businessName}</strong></p>
+                    <p className="text-[10px] text-gray-400">For: <strong>{(profileData?.businessName || 'DealClose AI')}</strong></p>
                   </div>
                   <button 
                     onClick={() => setShowAddAutoReplyModal(true)}
@@ -4879,7 +4879,7 @@ export default function MobileDashboard() {
                     <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
                       <Zap size={24} className="text-emerald-400 mx-auto" />
                       <div className="text-xs font-bold text-white">No Auto-Replies Configured</div>
-                      <p className="text-[10px] text-gray-400">Add keywords like 'PRICE', 'OFFER', 'VISIT' to reply automatically on WhatsApp for {profileData.businessName}.</p>
+                      <p className="text-[10px] text-gray-400">Add keywords like 'PRICE', 'OFFER', 'VISIT' to reply automatically on WhatsApp for {(profileData?.businessName || 'DealClose AI')}.</p>
                       <button onClick={() => setShowAddAutoReplyModal(true)} className="px-3 py-1.5 bg-emerald-500 text-black font-black text-xs rounded-xl shadow-md">
                         + Add First Keyword ⚡
                       </button>
@@ -4907,7 +4907,7 @@ export default function MobileDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-white">Meta WhatsApp Templates</span>
-                    <p className="text-[10px] text-gray-400">Cloud API templates for <strong>{profileData.businessName}</strong> ({metaTemplates.length})</p>
+                    <p className="text-[10px] text-gray-400">Cloud API templates for <strong>{(profileData?.businessName || 'DealClose AI')}</strong> ({metaTemplates.length})</p>
                   </div>
                   <button 
                     onClick={() => setShowNewMetaTemplateModal(true)}
@@ -4922,7 +4922,7 @@ export default function MobileDashboard() {
                     <div className="p-8 text-center bg-[#0e0e14] border border-gray-800/80 rounded-2xl space-y-2">
                       <CheckCircle2 size={24} className="text-blue-400 mx-auto" />
                       <div className="text-xs font-bold text-white">No Meta Templates Found</div>
-                      <p className="text-[10px] text-gray-400">No approved WhatsApp Cloud API templates registered yet for {profileData.businessName}. Submit one below to get Meta verification.</p>
+                      <p className="text-[10px] text-gray-400">No approved WhatsApp Cloud API templates registered yet for {(profileData?.businessName || 'DealClose AI')}. Submit one below to get Meta verification.</p>
                       <button onClick={() => setShowNewMetaTemplateModal(true)} className="px-3 py-1.5 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md">
                         + Submit New Template 💬
                       </button>
@@ -5082,7 +5082,7 @@ export default function MobileDashboard() {
                 </div>
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-black text-white truncate">{profileData.businessName}</h3>
+                <h3 className="text-sm font-black text-white truncate">{(profileData?.businessName || 'DealClose AI')}</h3>
                 <p className="text-[10px] text-teal-400 font-bold">🔗 Link Page (Bio Link Hub & QR)</p>
               </div>
             </div>
@@ -5179,7 +5179,7 @@ export default function MobileDashboard() {
                       type="button"
                       onClick={() => {
                         const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
-                        const text = `Connect with *${profileData.businessName}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
+                        const text = `Connect with *${(profileData?.businessName || 'DealClose AI')}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
                         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
                       }}
                       className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-xl shrink-0"
@@ -5277,7 +5277,7 @@ export default function MobileDashboard() {
                     type="button"
                     onClick={() => {
                       const cardUrl = `${window.location.origin}/card/${user?._id || user?.id || 'demo'}?workspaceId=${activeWorkspaceId}`;
-                      const text = `Connect with *${profileData.businessName}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
+                      const text = `Connect with *${(profileData?.businessName || 'DealClose AI')}*! Check our Digital Card, 5-Star Reviews & Payment:\n👉 ${cardUrl}`;
                       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
                     }}
                     className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-md"
@@ -5507,10 +5507,10 @@ export default function MobileDashboard() {
             {/* List of Existing Businesses / Firms */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                Your Businesses ({workspaces.length})
+                Your Businesses ({(workspaces || []).length})
               </label>
               <div className="space-y-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-0.5">
-                {workspaces.map((ws) => {
+                {(workspaces || []).map((ws) => {
                   const isMain = ws.id === 'main';
                   const isSelected = activeWorkspaceId === ws.id || String(ws._id) === activeWorkspaceId;
                   
@@ -5714,7 +5714,7 @@ export default function MobileDashboard() {
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">🟢</div>
               <div>
                 <h3 className="text-sm font-black text-white">Link WhatsApp Cloud API</h3>
-                <p className="text-[10px] text-gray-400">For: <strong>{profileData.businessName}</strong></p>
+                <p className="text-[10px] text-gray-400">For: <strong>{(profileData?.businessName || 'DealClose AI')}</strong></p>
               </div>
             </div>
 
@@ -5792,7 +5792,7 @@ export default function MobileDashboard() {
               </div>
               <div>
                 <h3 className="text-sm font-black text-white">Link Instagram Account</h3>
-                <p className="text-[10px] text-gray-400">For: <strong>{profileData.businessName}</strong></p>
+                <p className="text-[10px] text-gray-400">For: <strong>{(profileData?.businessName || 'DealClose AI')}</strong></p>
               </div>
             </div>
 
@@ -5803,7 +5803,7 @@ export default function MobileDashboard() {
                   <span className="text-xs font-bold text-emerald-400">Instagram Connected</span>
                 </div>
                 <p className="text-[11px] text-gray-300">
-                  Connected Page/Account: <span className="font-semibold text-pink-300">{profileData.instagramUsername || profileData.businessName}</span>
+                  Connected Page/Account: <span className="font-semibold text-pink-300">{profileData.instagramUsername || (profileData?.businessName || 'DealClose AI')}</span>
                 </p>
                 <button
                   type="button"
@@ -5863,7 +5863,7 @@ export default function MobileDashboard() {
                 ✕
               </button>
             </div>
-            <p className="text-[11px] text-gray-400">Select the account to link with <strong>{profileData.businessName}</strong>:</p>
+            <p className="text-[11px] text-gray-400">Select the account to link with <strong>{(profileData?.businessName || 'DealClose AI')}</strong>:</p>
             <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
               {instagramPicker.accounts.map((account) => (
                 <button
@@ -6383,7 +6383,7 @@ export default function MobileDashboard() {
               <ShoppingBag size={20} className="text-purple-400" />
               <div>
                 <h3 className="text-sm font-bold text-white">Add Item to Catalog</h3>
-                <p className="text-[10px] text-gray-400">Store: <strong>{profileData.businessName}</strong></p>
+                <p className="text-[10px] text-gray-400">Store: <strong>{(profileData?.businessName || 'DealClose AI')}</strong></p>
               </div>
             </div>
 
@@ -6548,7 +6548,7 @@ export default function MobileDashboard() {
               <Edit3 size={18} className="text-purple-400" />
               <div>
                 <h3 className="text-sm font-bold text-white">Edit Catalog Item</h3>
-                <p className="text-[10px] text-gray-400">Update details for <strong>{profileData.businessName}</strong></p>
+                <p className="text-[10px] text-gray-400">Update details for <strong>{(profileData?.businessName || 'DealClose AI')}</strong></p>
               </div>
             </div>
 
