@@ -56,16 +56,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0-apk
-          name: "DealClose AI v1.4.0 APK (Official Brand Logo & Dual-SIM)"
+          name: "DealClose AI v1.5.0 APK (Unified Mobile Business Suite & SIM Gateway)"
           body: |
-            ### 📱 DealClose AI Official Android App (v1.4.0)
+            ### 📱 DealClose AI Official Android App (v1.5.0)
             Download `dealclose-sim-gateway.apk` below directly on your Android phone!
 
-            ✨ **What's New in v1.4.0:**
-            - **Official DealClose Brand Logo & Clean App Name**: Replaces generic icon with the official DealClose AI app icon on your phone's home screen.
-            - **Active Gateway Dashboard UI**: Live 24/7 cellular voice bridge and telephony engine.
+            ✨ **What's New in v1.5.0:**
+            - **Complete Unified Mobile App UI**: Full MSME Business Suite (CRM, AI Video Studio, Khata/Ledger, WhatsApp & IG Automations, Loyalty passes, Google Reviews) directly in the app!
+            - **Seamless Background Cellular Calling**: SIM calling service runs silently in the background without blocking the user.
+            - **Official DealClose Brand Logo & Clean App Name**: Beautiful dark mode edge-to-edge UI.
             - **Dual-SIM Smart Routing**: Switch between SIM 1 (Personal/Trial) and SIM 2 (Business AI) with 1 tap.
-            - **Instant Ngrok / Cloud Tunneling**: Automatically discovers live backend over cellular/Wi-Fi.
 
             1. Install APK on your Android phone (Android 8.0+).
             2. Select **SIM 2 (AI Dedicated)**.
