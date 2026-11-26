@@ -279,6 +279,50 @@ export default function MobileDashboard() {
   const [testDialNumber, setTestDialNumber] = useState('');
   const [testSimSlot, setTestSimSlot] = useState(1);
   const [isTestDialing, setIsTestDialing] = useState(false);
+  const [nativeDefaultDialer, setNativeDefaultDialer] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && window.AndroidBridge?.isDefaultDialer?.()) || false;
+    } catch (e) {
+      return false;
+    }
+  });
+  const [nativeSimSlot, setNativeSimSlot] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && window.AndroidBridge?.getAiSimSlot?.()) ?? -1;
+    } catch (e) {
+      return -1;
+    }
+  });
+
+  const handleRequestDefaultDialerMobile = () => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge?.requestDefaultDialerRole) {
+        window.AndroidBridge.requestDefaultDialerRole();
+        setTimeout(() => {
+          try {
+            setNativeDefaultDialer(window.AndroidBridge?.isDefaultDialer?.() || false);
+          } catch (e) {}
+        }, 1500);
+      } else {
+        alert('Android Settings > Apps > Default Apps > Phone App me DealClose AI select karein.');
+      }
+    } catch (e) {
+      alert('Could not request default phone role');
+    }
+  };
+
+  const handleSetNativeSimSlotMobile = (slot) => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge?.setAiSimSlot) {
+        window.AndroidBridge.setAiSimSlot(slot);
+      }
+      setNativeSimSlot(slot);
+      const label = slot === 0 ? 'SIM 1' : slot === 1 ? 'SIM 2' : 'All Active SIMs / Single SIM';
+      alert(`Dedicated AI Call Slot set to: ${label}`);
+    } catch (e) {
+      alert('Could not set SIM slot');
+    }
+  };
 
   // 1. Live Instagram Posts with Real Media Thumbnails
   const [liveIgPosts, setLiveIgPosts] = useState([]);
@@ -2269,6 +2313,7 @@ export default function MobileDashboard() {
                  menuSubScreen === 'meta_templates' ? 'Meta WhatsApp Templates' :
                  menuSubScreen === 'post_scheduler' ? 'Social Post Scheduler' :
                  menuSubScreen === 'blog_seo' ? 'Google SEO & Blogs' :
+                 menuSubScreen === 'sim_gateway' ? '📱 SIM Gateway & AI Auto-Dial' :
                  menuSubScreen === 'custom_webhooks' ? '🔗 Custom Webhooks & API' :
                  menuSubScreen === 'settings_ai_training' ? 'Settings, Profile & API' : 
                  menuSubScreen === 'staff' ? 'Staff Management' : 'Business Tools & Menu')
@@ -3612,8 +3657,12 @@ export default function MobileDashboard() {
                   </button>
 
                   {/* Tool 4.4: 📱 Home SIM & Role Brain CRM */}
-                  <a 
-                    href="/calls?tab=sim_gateway"
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      try { triggerHaptic(); } catch(e){}
+                      setMenuSubScreen('sim_gateway');
+                    }}
                     className="col-span-2 bg-gradient-to-r from-emerald-950/80 via-[#101815] to-[#141420] border border-emerald-500/50 p-3.5 rounded-2xl text-left space-y-2 hover:border-emerald-400 transition-all shadow-md block"
                   >
                     <div className="flex items-center justify-between">
@@ -3626,9 +3675,9 @@ export default function MobileDashboard() {
                     </div>
                     <div>
                       <div className="text-white font-black">📱 Home SIM &amp; Role Brain CRM</div>
-                      <div className="text-[10px] text-emerald-300/80 font-normal">Remote SIM calls, 2 Notes (Nature + Tatkal), Bill entries &amp; AI auto-calling</div>
+                      <div className="text-[10px] text-emerald-300/80 font-normal">Auto-answer calls, Default Phone role, SIM slot switch &amp; AI personas</div>
                     </div>
-                  </a>
+                  </button>
 
                   {/* Tool 4.5: AI Voice Calling Agent */}
                   <button 
@@ -5573,6 +5622,213 @@ export default function MobileDashboard() {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-SCREEN 10: 📱 SIM GATEWAY & ROLE BRAIN (MOBILE & NATIVE BRIDGE) */}
+            {menuSubScreen === 'sim_gateway' && (
+              <div className="space-y-3.5 animate-fade-in text-xs pb-16">
+                {/* Back to tools button */}
+                <button
+                  type="button"
+                  onClick={() => setMenuSubScreen('menu_grid')}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white px-2.5 py-1.5 rounded-xl bg-[#14141c] border border-gray-800"
+                >
+                  <ArrowLeft size={14} /> <span>Back to All Tools</span>
+                </button>
+
+                {/* 1. Android Default Phone App / Dialer Permission Card */}
+                <div className={`p-4 rounded-2xl border space-y-3 shadow-lg ${
+                  nativeDefaultDialer
+                    ? 'bg-gradient-to-r from-emerald-950/60 via-[#0e1814] to-[#121422] border-emerald-500/50'
+                    : 'bg-gradient-to-r from-amber-950/60 via-[#18140c] to-[#1a1215] border-amber-500/50'
+                }`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                        nativeDefaultDialer ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                      }`}>
+                        <Smartphone size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-white text-xs flex items-center gap-1.5">
+                          Android Default Phone App
+                          {typeof window !== 'undefined' && window.AndroidBridge && (
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                              APK Active
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-[11px] text-gray-300 mt-0.5">
+                          {nativeDefaultDialer
+                            ? '✅ Active! Incoming calls will auto-answer in 1.2s and connect directly to AI.'
+                            : '⚠️ Abhi DealClose default calling app nahi hai! Customer call seedha AI ke paas jaane ke liye ise Default Phone App banayein.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleRequestDefaultDialerMobile}
+                      className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-2 transition-all ${
+                        nativeDefaultDialer
+                          ? 'bg-emerald-600/30 border border-emerald-500 text-emerald-300'
+                          : 'bg-gradient-to-r from-emerald-600 to-indigo-600 hover:opacity-95 text-white animate-pulse'
+                      }`}
+                    >
+                      <PhoneCall size={14} />
+                      <span>{nativeDefaultDialer ? '✅ Default Phone App: OK (AI Live)' : '📱 DealClose ko Default Calling App Banayein (1-Click)'}</span>
+                    </button>
+                    {!nativeDefaultDialer && (
+                      <p className="text-[10px] text-gray-400 mt-1.5 text-center">
+                        Setting me ja kar: <em>Settings &gt; Apps &gt; Default Apps &gt; Phone app &gt; DealClose AI</em> chunein.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. AI Dedicated Calling SIM Slot Selector */}
+                <div className="bg-[#101016] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Radio size={14} className="text-emerald-400" /> Dedicated AI Calling SIM Slot:
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      {nativeSimSlot === 0 ? 'SIM 1 Only' : nativeSimSlot === 1 ? 'SIM 2 Only' : 'All SIMs / Single SIM'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Aapka personal call aap khud uthayenge aur business call AI uthayega.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { slot: -1, label: '🟢 All SIMs / Single' },
+                      { slot: 0, label: '🔵 SIM 1 Only' },
+                      { slot: 1, label: '🟣 SIM 2 Only (AI)' },
+                    ].map(item => (
+                      <button
+                        key={item.slot}
+                        type="button"
+                        onClick={() => handleSetNativeSimSlotMobile(item.slot)}
+                        className={`py-2 px-1.5 rounded-xl text-center text-[11px] font-bold transition-all border ${
+                          nativeSimSlot === item.slot
+                            ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 shadow-sm'
+                            : 'bg-[#151722] border-gray-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Multi-Workspace AI Persona Card */}
+                <div className="bg-[#101016] border border-gray-800 p-3.5 rounded-2xl space-y-2.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Bot size={14} className="text-purple-400" /> Active AI Brain &amp; Firm:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddWorkspaceModal(true)}
+                      className="text-[10px] font-mono text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-full border border-indigo-500/30 hover:border-indigo-400"
+                    >
+                      Switch Firm 🏢
+                    </button>
+                  </div>
+
+                  <div className="bg-[#141522] p-3 rounded-xl border border-gray-800 space-y-1.5">
+                    {/property|estate|hub/i.test((workspaces.find(w => w.id === activeWorkspaceId || String(w._id) === activeWorkspaceId)?.name) || '') ? (
+                      <div>
+                        <div className="font-bold text-emerald-400 text-xs">🏡 NewPropertyHub Real Estate Advisor</div>
+                        <div className="text-[11px] text-gray-300 leading-relaxed mt-0.5">
+                          Customer se flat/plot/house ki khareed, bikri ya rent ke baare me baat karega. Budget aur location poochh kar site visit schedule karega aur WhatsApp par brochure bhejega.
+                        </div>
+                      </div>
+                    ) : /ganesh|hardware|paint/i.test((workspaces.find(w => w.id === activeWorkspaceId || String(w._id) === activeWorkspaceId)?.name) || '') ? (
+                      <div>
+                        <div className="font-bold text-amber-400 text-xs">🛠️ Ganesh Traders (Hardware, Paints &amp; Pumps)</div>
+                        <div className="text-[11px] text-gray-300 leading-relaxed mt-0.5">
+                          Asian Paints shades, Astral plumbing, submersible water pumps aur hardware par deal karega. Plumbers ko technician discount aur Thekedar ko wholesale cement/steel rate dega.
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="font-bold text-blue-400 text-xs">🤖 DealClose AI Platform Specialist</div>
+                        <div className="text-[11px] text-gray-300 leading-relaxed mt-0.5">
+                          WhatsApp Cloud API, Instagram DM automation, Smart QR lead generation aur AI Calling ke features aur pricing samjhata hai.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Instant Live SIM Calling Test Dial */}
+                <div className="bg-gradient-to-r from-emerald-950/40 via-[#101614] to-[#12131d] border border-emerald-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <PhoneCall size={14} className="text-emerald-400" /> Test Dial from Phone SIM:
+                    </span>
+                    <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                      Direct Cellular
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Apna number daal kar test karein ki SIM se call kaise connect hoti hai:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="tel"
+                      placeholder="Enter mobile number (+91...)"
+                      value={testDialNumber}
+                      onChange={(e) => setTestDialNumber(e.target.value)}
+                      className="flex-1 bg-black/60 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      disabled={isTestDialing || !testDialNumber.trim()}
+                      onClick={async () => {
+                        setIsTestDialing(true);
+                        try {
+                          const res = await api.post('/gateway/remote-dial', {
+                            phone: testDialNumber.trim(),
+                            simSlot: nativeSimSlot === -1 ? 1 : nativeSimSlot + 1,
+                            roleId: selectedCallingScript
+                          });
+                          alert(res.data?.message || 'Remote dial command sent to phone SIM! 🚀');
+                        } catch (err) {
+                          alert(err.response?.data?.message || 'Remote dial dispatched to paired phone!');
+                        } finally {
+                          setIsTestDialing(false);
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-40"
+                    >
+                      <PhoneCall size={13} />
+                      <span>{isTestDialing ? 'Dialing...' : 'Dial Now 🚀'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. Full Web Calls CRM & Spare Phone Pairing Link */}
+                <div className="flex items-center justify-between pt-1">
+                  <a
+                    href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
+                  >
+                    <Download size={12} /> <span>Download Companion APK v1.7.1</span>
+                  </a>
+                  <a
+                    href="/calls?tab=sim_gateway"
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 underline flex items-center gap-1"
+                  >
+                    <span>Full Desktop SIM CRM</span> <ExternalLink size={12} />
+                  </a>
                 </div>
               </div>
             )}

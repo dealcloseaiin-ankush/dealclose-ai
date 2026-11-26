@@ -1,6 +1,7 @@
 package ai.dealclose.simgateway
 
 import android.app.Activity
+import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -10,6 +11,7 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.telecom.TelecomManager
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.WindowManager
@@ -254,6 +256,70 @@ class MainActivity : AppCompatActivity() {
         fun isNativeApp(): Boolean = true
 
         @JavascriptInterface
-        fun getAppVersion(): String = "1.7.0"
+        fun getAppVersion(): String = "1.7.1"
+
+        @JavascriptInterface
+        fun requestDefaultDialerRole() {
+            runOnUiThread {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val roleManager = context.getSystemService(RoleManager::class.java)
+                        if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                            if (!roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+                                (context as? Activity)?.startActivityForResult(intent, 1003)
+                            } else {
+                                Toast.makeText(context, "DealClose is already your Default Calling App! ✅", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+                        if (telecomManager != null && telecomManager.defaultDialerPackage != context.packageName) {
+                            val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
+                                putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, context.packageName)
+                            }
+                            (context as? Activity)?.startActivity(intent)
+                        } else {
+                            Toast.makeText(context, "DealClose is already your Default Calling App! ✅", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Please set DealClose as Default Phone App in Android Settings", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun isDefaultDialer(): Boolean {
+            return try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val roleManager = context.getSystemService(RoleManager::class.java)
+                    roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) ?: false
+                } else {
+                    val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+                    telecomManager?.defaultDialerPackage == context.packageName
+                }
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun setAiSimSlot(slot: Int) {
+            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+            prefs.edit().putInt("ai_sim_slot", slot).apply()
+            val label = when(slot) {
+                0 -> "SIM 1"
+                1 -> "SIM 2"
+                else -> "All Active SIMs / Single SIM"
+            }
+            showToast("AI Dedicated Calling Slot set to: $label")
+        }
+
+        @JavascriptInterface
+        fun getAiSimSlot(): Int {
+            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+            return prefs.getInt("ai_sim_slot", -1)
+        }
     }
 }

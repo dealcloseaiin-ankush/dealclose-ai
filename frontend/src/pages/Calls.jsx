@@ -352,6 +352,20 @@ export default function Calls() {
   const [testDialPhone, setTestDialPhone] = useState('');
   const [testDialRole, setTestDialRole] = useState('plumber');
   const [dispatchingCall, setDispatchingCall] = useState(false);
+  const [nativeDefaultDialer, setNativeDefaultDialer] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && window.AndroidBridge?.isDefaultDialer?.()) || false;
+    } catch (e) {
+      return false;
+    }
+  });
+  const [nativeSimSlot, setNativeSimSlot] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && window.AndroidBridge?.getAiSimSlot?.()) ?? -1;
+    } catch (e) {
+      return -1;
+    }
+  });
 
   // 📝 Diary Notes Parser & Shop Profile States
   const [showDiaryModal, setShowDiaryModal] = useState(false);
@@ -411,6 +425,36 @@ export default function Calls() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor)
   );
+
+  const handleRequestDefaultDialer = () => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge?.requestDefaultDialerRole) {
+        window.AndroidBridge.requestDefaultDialerRole();
+        setTimeout(() => {
+          try {
+            setNativeDefaultDialer(window.AndroidBridge?.isDefaultDialer?.() || false);
+          } catch (e) {}
+        }, 1500);
+      } else {
+        toast('Android Settings > Apps > Default Apps > Phone App me DealClose AI select karein.');
+      }
+    } catch (e) {
+      toast.error('Could not request default phone role');
+    }
+  };
+
+  const handleSetNativeSimSlot = (slot) => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge?.setAiSimSlot) {
+        window.AndroidBridge.setAiSimSlot(slot);
+      }
+      setNativeSimSlot(slot);
+      const label = slot === 0 ? 'SIM 1' : slot === 1 ? 'SIM 2' : 'All Active SIMs / Single SIM';
+      toast.success(`Dedicated AI Call Slot set to: ${label}`);
+    } catch (e) {
+      toast.error('Could not set SIM slot');
+    }
+  };
 
   const allLeadsList = useMemo(() => {
     const list = [
@@ -1571,6 +1615,117 @@ export default function Calls() {
               >
                 <QrCode size={14} /> <span>Pair Home Phone</span>
               </button>
+            </div>
+          </div>
+
+          {/* 📱 NATIVE ANDROID CALLING & INCOMING AI AUTO-ANSWER SETUP */}
+          <div className="bg-[#12141c] border border-blue-500/40 rounded-3xl p-5 space-y-4 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">
+                  <Smartphone size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm md:text-base font-black text-white flex items-center gap-2">
+                    Android SIM Auto-Answer &amp; Default Phone App
+                    {typeof window !== 'undefined' && window.AndroidBridge ? (
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+                        Native APK Live
+                      </span>
+                    ) : (
+                      <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+                        Webview / Gateway Mode
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-gray-300 mt-0.5">
+                    Android security rule: Customer call phone par bajne ke bajaye AI dwara auto-answer hone ke liye DealClose AI ko <strong>Default Phone App</strong> set hona anivarya hai.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRequestDefaultDialer}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-2 transition-all ${
+                    nativeDefaultDialer
+                      ? 'bg-emerald-600/30 border border-emerald-500 text-emerald-300'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white animate-pulse'
+                  }`}
+                >
+                  <PhoneCall size={14} />
+                  <span>{nativeDefaultDialer ? '✅ Default Phone App: Active' : '📱 Make DealClose Default Phone App'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* AI SIM Slot Selector & Multi-Workspace Brain Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-gray-800">
+              {/* Dedicated Slot Selector */}
+              <div className="bg-[#0b0c12] border border-gray-800/80 p-3.5 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Radio size={14} className="text-emerald-400" /> Dedicated AI Calling SIM Slot:
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    {nativeSimSlot === 0 ? 'SIM 1 Only' : nativeSimSlot === 1 ? 'SIM 2 Only' : 'All SIMs / Single SIM'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  Single SIM phone me &quot;All SIMs&quot; rakhein. Dual SIM me personal calls SIM 1 aur business calls SIM 2 par rakh sakte hain.
+                </p>
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {[
+                    { slot: -1, label: '🟢 All SIMs / Single SIM' },
+                    { slot: 0, label: '🔵 SIM 1 Only' },
+                    { slot: 1, label: '🟣 SIM 2 Only (AI)' },
+                  ].map(item => (
+                    <button
+                      key={item.slot}
+                      type="button"
+                      onClick={() => handleSetNativeSimSlot(item.slot)}
+                      className={`py-2 px-2 rounded-xl text-center text-xs font-bold transition-all border ${
+                        nativeSimSlot === item.slot
+                          ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 shadow-sm'
+                          : 'bg-[#151722] border-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Active Workspace Persona Info */}
+              <div className="bg-[#0b0c12] border border-gray-800/80 p-3.5 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Bot size={14} className="text-purple-400" /> Incoming AI Persona (Active Workspace):
+                  </span>
+                  <span className="text-[10px] font-mono text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-500/30">
+                    {workspaces.find(w => w._id === activeWorkspace)?.name || 'DealClose AI'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-300 bg-[#141522] p-2.5 rounded-xl border border-gray-800 space-y-1">
+                  {/property|estate|hub/i.test(workspaces.find(w => w._id === activeWorkspace)?.name || '') ? (
+                    <div>
+                      <div className="font-bold text-emerald-400">🏡 NewPropertyHub Advisor</div>
+                      <div className="text-gray-400">Flats, plots, buy/sell/rent queries, sample flat visits, WhatsApp brochure sharing.</div>
+                    </div>
+                  ) : /ganesh|hardware|paint/i.test(workspaces.find(w => w._id === activeWorkspace)?.name || '') ? (
+                    <div>
+                      <div className="font-bold text-amber-400">🛠️ Ganesh Traders (Hardware, Paints &amp; Pumps)</div>
+                      <div className="text-gray-400">Asian Paints, plumbing, submersible pumps, mistri discounts &amp; thekedar wholesale rates.</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="font-bold text-blue-400">🤖 DealClose AI Platform Specialist</div>
+                      <div className="text-gray-400">WhatsApp Cloud API, Instagram DM automation, AI calling &amp; QR lead generation plans.</div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

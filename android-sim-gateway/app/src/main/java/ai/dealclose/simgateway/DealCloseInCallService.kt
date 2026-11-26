@@ -35,24 +35,26 @@ class DealCloseInCallService : InCallService() {
         Log.d(TAG, "📞 [InCallService] Call Added: $handleStr ($callDirection)")
 
         val prefs = applicationContext.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-        val dedicatedSlot = prefs.getInt("ai_sim_slot", 1) // Default to 1 (SIM 2)
+        val dedicatedSlot = prefs.getInt("ai_sim_slot", -1) // -1 = All SIMs / Single SIM (Default), 0 = SIM 1, 1 = SIM 2
         val simSlot = detectCallSimSlot(call)
 
         Log.d(TAG, "📶 Call SIM Slot detected: $simSlot (Dedicated AI Slot: $dedicatedSlot)")
 
         // 🛡️ PERSONAL CALL FILTER:
-        // If detected on a different slot than the dedicated AI slot, bypass AI completely!
-        if (simSlot != -1 && simSlot != dedicatedSlot) {
-            Log.d(TAG, "👤 [PERSONAL CALL on SIM ${simSlot + 1}] Bypassing AI completely. No AI audio will be streamed.")
+        // Only bypass if user explicitly configured a dedicated slot (0 or 1) and this call is on the other slot.
+        // If dedicatedSlot is -1 (default), handle incoming business calls on all active SIMs.
+        if (dedicatedSlot != -1 && simSlot != -1 && simSlot != dedicatedSlot) {
+            Log.d(TAG, "👤 [PERSONAL CALL on SIM ${simSlot + 1}] Bypassing AI. (Designated AI slot is SIM ${dedicatedSlot + 1})")
             return
         }
 
-        // 🤖 DEDICATED AI CALL (SIM 2)
+        // 🤖 DEDICATED AI CALL
         activeCall = call
 
         // If incoming call on AI SIM, auto-answer after 1.2s ring
         if (call.state == Call.STATE_RINGING) {
-            Log.d(TAG, "🔔 [AI INCOMING] Customer calling business number (SIM ${dedicatedSlot + 1}). Auto-answering in 1.2s...")
+            val simLabel = if (dedicatedSlot == -1) "Active SIM" else "SIM ${dedicatedSlot + 1}"
+            Log.d(TAG, "🔔 [AI INCOMING] Customer calling business number ($simLabel). Auto-answering in 1.2s...")
             Handler(Looper.getMainLooper()).postDelayed({
                 if (call.state == Call.STATE_RINGING) {
                     call.answer(0)
