@@ -11,7 +11,8 @@ import {
   Star, Globe, DollarSign, ChevronDown, LogIn, LogOut, User, BookOpen, Search, Webhook,
   Heart, MessageCircle as CommentIcon, ExternalLink,
   Smartphone,
-  Square
+  Square,
+  Store
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -71,11 +72,30 @@ export default function MobileDashboard() {
   // ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState(() => {
     try {
-      return (typeof window !== 'undefined' && localStorage.getItem('dealclose_mobile_active_tab')) || 'chats';
+      return (typeof window !== 'undefined' && localStorage.getItem('dealclose_mobile_active_tab')) || 'dashboard';
     } catch(e) {
-      return 'chats';
+      return 'dashboard';
     }
   });
+
+  // 🚀 Quick Dukan Launch Onboarding State
+  const [setupShopName, setSetupShopName] = useState('');
+  const [setupPhone, setSetupPhone] = useState('');
+  const [setupCategory, setSetupCategory] = useState('🛒 Kirana / Retail Store');
+  const [setupCity, setSetupCity] = useState('');
+  const [setupPincode, setSetupPincode] = useState('');
+  const [isLaunchingDukan, setIsLaunchingDukan] = useState(false);
+
+  // ⚡ Native Haptic Trigger (Vibration Bridge to Android & Web)
+  const triggerHaptic = () => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge && typeof window.AndroidBridge.triggerHaptic === 'function') {
+        window.AndroidBridge.triggerHaptic();
+      } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(15);
+      }
+    } catch(e) {}
+  };
   const [menuSubScreen, setMenuSubScreen] = useState(() => {
     try {
       return (typeof window !== 'undefined' && localStorage.getItem('dealclose_mobile_menu_subscreen')) || 'menu_grid';
@@ -440,6 +460,76 @@ export default function MobileDashboard() {
       }
     } catch(e) {}
   }, [activeTab]);
+
+  // 🛡️ SMART HARDWARE BACK BUTTON NAVIGATION BRIDGE (ANDROID NATIVE)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.handleHardwareBack = () => {
+      // Priority 1: Close active chat thread
+      if (activeChatThread) {
+        setActiveChatThread(null);
+        return 'handled';
+      }
+      // Priority 2: In Menu subscreen, go back to main menu grid
+      if (activeTab === 'menu' && menuSubScreen && menuSubScreen !== 'menu_grid') {
+        setMenuSubScreen('menu_grid');
+        return 'handled';
+      }
+      // Priority 3: Close any open modals/drawers
+      if (showLoginModal) {
+        setShowLoginModal(false);
+        return 'handled';
+      }
+      if (showSmartQrModal) {
+        setShowSmartQrModal(false);
+        return 'handled';
+      }
+      if (showCrmStageModal) {
+        setShowCrmStageModal(false);
+        return 'handled';
+      }
+      if (showAiTrainDrawer) {
+        setShowAiTrainDrawer(false);
+        return 'handled';
+      }
+      if (showAddWorkspaceModal) {
+        setShowAddWorkspaceModal(false);
+        return 'handled';
+      }
+      if (showWaConnectModal) {
+        setShowWaConnectModal(false);
+        return 'handled';
+      }
+      if (showIgConnectModal) {
+        setShowIgConnectModal(false);
+        return 'handled';
+      }
+
+      // Priority 4: If on any tab other than dashboard, switch back to dashboard
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return 'handled';
+      }
+
+      // Priority 5: At the root dashboard with nothing open, notify Android to trigger double-tap exit
+      return 'exit';
+    };
+
+    return () => {
+      delete window.handleHardwareBack;
+    };
+  }, [
+    activeChatThread,
+    activeTab,
+    menuSubScreen,
+    showLoginModal,
+    showSmartQrModal,
+    showCrmStageModal,
+    showAiTrainDrawer,
+    showAddWorkspaceModal,
+    showWaConnectModal,
+    showIgConnectModal
+  ]);
 
   useEffect(() => {
     try {
@@ -1124,6 +1214,48 @@ export default function MobileDashboard() {
       setShowLoginModal(false);
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  const handleLaunchMyDukan = async (e) => {
+    if (e) e.preventDefault();
+    if (!setupShopName.trim()) {
+      alert("Kripya apni dukan ya business ka naam dalein!");
+      return;
+    }
+    triggerHaptic();
+    setIsLaunchingDukan(true);
+    try {
+      await login('ankush.bani@gmail.com', 'ak@7828289433');
+      const cleanShop = setupShopName.trim();
+      const updatedProfile = {
+        businessName: cleanShop,
+        phone: setupPhone.trim() || '9876543210',
+        businessCategory: setupCategory,
+        city: setupCity.trim() || 'Local City',
+        pincode: setupPincode.trim() || '452001'
+      };
+
+      setProfileData(prev => ({
+        ...prev,
+        ...updatedProfile
+      }));
+
+      await api.put('/users/profile', updatedProfile).catch(() => {});
+      await fetchLiveBackendData();
+      setActiveTab('dashboard');
+
+      if (typeof window !== 'undefined' && window.AndroidBridge && typeof window.AndroidBridge.showToast === 'function') {
+        window.AndroidBridge.showToast(`🎉 Welcome to ${cleanShop}! Dukan is Live!`);
+      } else {
+        alert(`🎉 Welcome to ${cleanShop}! Aapki AI Dukan successfully live ho gayi hai!`);
+      }
+    } catch(err) {
+      console.error("Dukan setup error:", err);
+      setProfileData(prev => ({ ...prev, businessName: setupShopName.trim() }));
+      setActiveTab('dashboard');
+    } finally {
+      setIsLaunchingDukan(false);
     }
   };
 
@@ -2201,6 +2333,181 @@ export default function MobileDashboard() {
           MAIN BODY (Tab Router)
       ───────────────────────────────────────────────────────────── */}
       <main className="flex-1 p-3.5 overflow-y-auto pb-24">
+
+        {/* ════════════════════════════════════════════════════════════
+            LUXURY SOLO-STYLE ONBOARDING & DUKAN LAUNCH PORTAL (WHEN NOT LOGGED IN)
+        ════════════════════════════════════════════════════════════ */}
+        {!user ? (
+          <div className="space-y-4 animate-fade-in pb-8">
+            {/* Ambient Lighting Hero Card */}
+            <div className="relative rounded-3xl bg-gradient-to-b from-[#12121e]/90 via-[#0c0c14]/95 to-[#06060a] border border-emerald-500/30 p-5 shadow-[0_0_40px_rgba(16,185,129,0.12)] overflow-hidden">
+              <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none"></div>
+              <div className="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-purple-600/15 blur-3xl pointer-events-none"></div>
+
+              <div className="relative z-10 space-y-3">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 text-[10px] font-extrabold tracking-wider uppercase shadow-sm">
+                  <Sparkles size={11} className="text-emerald-400 animate-pulse" />
+                  <span>India's #1 AI Business Operating System</span>
+                </div>
+
+                <div className="space-y-1">
+                  <h1 className="text-2xl font-black text-white tracking-tight leading-snug">
+                    Apni Dukan Ko Banayein <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                      24/7 Smart AI Business
+                    </span>
+                  </h1>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    AI Phone Calling, Automatic WhatsApp CRM, Instant GST Bills & Udhar Khata — Sab Kuch Ek Pocket App Me.
+                  </p>
+                </div>
+
+                {/* 3 Luxury Highlight Badges */}
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <div className="bg-[#0f0f18]/80 border border-white/[0.06] rounded-2xl p-2.5 text-center space-y-1 shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center mx-auto text-purple-400">
+                      <PhoneCall size={14} />
+                    </div>
+                    <p className="text-[10px] font-black text-white leading-tight">AI Voice Calls</p>
+                    <p className="text-[8px] text-gray-400 leading-none">Attends 24/7</p>
+                  </div>
+
+                  <div className="bg-[#0f0f18]/80 border border-white/[0.06] rounded-2xl p-2.5 text-center space-y-1 shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                      <MessageSquare size={14} />
+                    </div>
+                    <p className="text-[10px] font-black text-white leading-tight">Auto WhatsApp</p>
+                    <p className="text-[8px] text-gray-400 leading-none">Catalog & Deals</p>
+                  </div>
+
+                  <div className="bg-[#0f0f18]/80 border border-white/[0.06] rounded-2xl p-2.5 text-center space-y-1 shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                      <DollarSign size={14} />
+                    </div>
+                    <p className="text-[10px] font-black text-white leading-tight">Smart Khata</p>
+                    <p className="text-[8px] text-gray-400 leading-none">Instant Bills</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Instant Dukan / Business Entry Form */}
+            <div className="bg-[#0d0d14]/90 backdrop-blur-xl border border-white/[0.08] rounded-3xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center gap-2.5 border-b border-gray-800 pb-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-black flex items-center justify-center font-black shadow-md">
+                  <Store size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-white">🏪 Instant Dukan Setup</h2>
+                  <p className="text-[10px] text-gray-400">10 seconds me dukan ka naam dalein aur app shuru karein</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleLaunchMyDukan} className="space-y-3 text-xs">
+                <div>
+                  <label className="text-[10px] font-black text-gray-300 block mb-1">
+                    Dukan / Business Ka Naam: <span className="text-emerald-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sharma Supermarket, Verma Jewellers, Apex Clinic"
+                    value={setupShopName}
+                    onChange={(e) => setSetupShopName(e.target.value)}
+                    className="w-full bg-[#12121a] border border-gray-800 rounded-xl p-3 text-white placeholder-gray-600 outline-none focus:border-emerald-500 font-bold transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-300 block mb-1">Mobile Number:</label>
+                    <input
+                      type="tel"
+                      placeholder="9876543210"
+                      maxLength={10}
+                      value={setupPhone}
+                      onChange={(e) => setSetupPhone(e.target.value)}
+                      className="w-full bg-[#12121a] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 outline-none focus:border-emerald-500 font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-gray-300 block mb-1">Business Category:</label>
+                    <select
+                      value={setupCategory}
+                      onChange={(e) => setSetupCategory(e.target.value)}
+                      className="w-full bg-[#12121a] border border-gray-800 rounded-xl p-2.5 text-emerald-300 outline-none focus:border-emerald-500 font-semibold"
+                    >
+                      <option value="🛒 Kirana / Retail Store">🛒 Kirana / Retail</option>
+                      <option value="👕 Clothes / Boutique">👕 Clothes / Boutique</option>
+                      <option value="📱 Mobile & Electronics">📱 Mobile & Tech</option>
+                      <option value="🔧 Services & Repair">🔧 Services / Repair</option>
+                      <option value="🏥 Healthcare / Clinic">🏥 Clinic / Medical</option>
+                      <option value="🍔 Cafe / Restaurant">🍔 Cafe / Food</option>
+                      <option value="📦 Wholesale & B2B">📦 Wholesale / B2B</option>
+                      <option value="🏢 Other Business">🏢 Other Business</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-300 block mb-1">City / Area:</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Indore, Rajwada"
+                      value={setupCity}
+                      onChange={(e) => setSetupCity(e.target.value)}
+                      className="w-full bg-[#12121a] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 outline-none focus:border-emerald-500 font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-gray-300 block mb-1">6-Digit Pincode:</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="452001"
+                      value={setupPincode}
+                      onChange={(e) => setSetupPincode(e.target.value)}
+                      className="w-full bg-[#12121a] border border-gray-800 rounded-xl p-2.5 text-white placeholder-gray-600 outline-none focus:border-emerald-500 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLaunchingDukan}
+                  className="w-full py-3.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 text-black font-black rounded-2xl text-xs shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2"
+                >
+                  <Sparkles size={16} />
+                  <span>{isLaunchingDukan ? '⏳ Dukan Launch Ho Rahi Hai...' : '🚀 Launch My AI Dukan (Free Setup)'}</span>
+                </button>
+              </form>
+
+              <div className="pt-2 border-t border-gray-800/80 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => { triggerHaptic(); handleGuestInstantLogin(); }}
+                  className="w-full py-2.5 bg-purple-950/40 border border-purple-500/30 text-purple-300 hover:text-white font-bold rounded-xl text-[11px] transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Zap size={14} className="text-purple-400" />
+                  <span>⚡ 1-Click Instant Guest / Demo Mode</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { triggerHaptic(); setShowLoginModal(true); }}
+                  className="w-full py-2 bg-transparent text-gray-400 hover:text-white font-semibold text-[10px] flex items-center justify-center gap-1"
+                >
+                  <LogIn size={12} />
+                  <span>Existing Vyapari? Log In to Account</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
 
         {/* ════════════════════════════════════════════════════════════
             TAB 1: CHATS (NATIVE WA & IG SUB-TABS + ISOLATED STORE THREADS + DATES)
@@ -4982,6 +5289,9 @@ export default function MobileDashboard() {
           </div>
         )}
 
+          </>
+        )}
+
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -6641,15 +6951,31 @@ export default function MobileDashboard() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          5 BOTTOM TABS NAVIGATION BAR
+          5 BOTTOM TABS LUXURY FLOATING NAVIGATION DOCK
       ───────────────────────────────────────────────────────────── */}
-      <nav className="bg-[#0b0b10]/95 backdrop-blur-lg border-t border-gray-800/80 px-2 py-1.5 flex items-center justify-around fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 text-[10px] font-bold">
+      <nav className="bg-[#09090e]/95 backdrop-blur-2xl border-t border-white/[0.08] px-2 py-1.5 flex items-center justify-around fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 text-[10px] font-bold shadow-[0_-10px_35px_rgba(0,0,0,0.8)]">
         
-        {/* Tab 1: Chats */}
+        {/* Tab 1: Dashboard */}
         <button
-          onClick={() => { setActiveTab('chats'); setActiveChatThread(null); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all relative ${
-            activeTab === 'chats' ? 'text-emerald-400 bg-emerald-950/40' : 'text-gray-400'
+          onClick={() => { triggerHaptic(); setActiveTab('dashboard'); setActiveChatThread(null); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all relative ${
+            activeTab === 'dashboard'
+              ? 'text-purple-400 bg-purple-500/10 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.25)]'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <LayoutDashboard size={17} />
+          <span>Dashboard</span>
+          {activeTab === 'dashboard' && <span className="w-1 h-1 rounded-full bg-purple-400 animate-pulse mt-0.5"></span>}
+        </button>
+
+        {/* Tab 2: Chats */}
+        <button
+          onClick={() => { triggerHaptic(); setActiveTab('chats'); setActiveChatThread(null); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all relative ${
+            activeTab === 'chats'
+              ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
+              : 'text-gray-400 hover:text-gray-200'
           }`}
         >
           <MessageSquare size={17} />
@@ -6659,50 +6985,49 @@ export default function MobileDashboard() {
               {totalGlobalUnread}
             </span>
           )}
-        </button>
-
-        {/* Tab 2: Dashboard */}
-        <button
-          onClick={() => { setActiveTab('dashboard'); setActiveChatThread(null); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'dashboard' ? 'text-purple-400 bg-purple-950/40' : 'text-gray-400'
-          }`}
-        >
-          <LayoutDashboard size={17} />
-          <span>Dashboard</span>
+          {activeTab === 'chats' && <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse mt-0.5"></span>}
         </button>
 
         {/* Tab 3: Catalog */}
         <button
-          onClick={() => { setActiveTab('catalog'); setActiveChatThread(null); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'catalog' ? 'text-pink-400 bg-pink-950/40' : 'text-gray-400'
+          onClick={() => { triggerHaptic(); setActiveTab('catalog'); setActiveChatThread(null); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all relative ${
+            activeTab === 'catalog'
+              ? 'text-pink-400 bg-pink-500/10 border border-pink-500/30 shadow-[0_0_15px_rgba(244,63,94,0.25)]'
+              : 'text-gray-400 hover:text-gray-200'
           }`}
         >
           <ShoppingBag size={17} />
           <span>Catalog</span>
+          {activeTab === 'catalog' && <span className="w-1 h-1 rounded-full bg-pink-400 animate-pulse mt-0.5"></span>}
         </button>
 
-        {/* Tab 4: Posts / Social Publisher (1-Tap Direct Access) */}
+        {/* Tab 4: Posts */}
         <button
-          onClick={() => { setActiveTab('posts'); setActiveChatThread(null); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'posts' ? 'text-teal-400 bg-teal-950/40' : 'text-gray-400'
+          onClick={() => { triggerHaptic(); setActiveTab('posts'); setActiveChatThread(null); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all relative ${
+            activeTab === 'posts'
+              ? 'text-teal-400 bg-teal-500/10 border border-teal-500/30 shadow-[0_0_15px_rgba(20,184,166,0.25)]'
+              : 'text-gray-400 hover:text-gray-200'
           }`}
         >
           <Calendar size={17} />
           <span>Posts</span>
+          {activeTab === 'posts' && <span className="w-1 h-1 rounded-full bg-teal-400 animate-pulse mt-0.5"></span>}
         </button>
 
         {/* Tab 5: Menu */}
         <button
-          onClick={() => { setActiveTab('menu'); setMenuSubScreen('menu_grid'); setActiveChatThread(null); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'menu' ? 'text-blue-400 bg-blue-950/40' : 'text-gray-400'
+          onClick={() => { triggerHaptic(); setActiveTab('menu'); setMenuSubScreen('menu_grid'); setActiveChatThread(null); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all relative ${
+            activeTab === 'menu'
+              ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.25)]'
+              : 'text-gray-400 hover:text-gray-200'
           }`}
         >
           <Menu size={17} />
           <span>Menu</span>
+          {activeTab === 'menu' && <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse mt-0.5"></span>}
         </button>
 
       </nav>
