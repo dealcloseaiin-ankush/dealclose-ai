@@ -10,7 +10,8 @@ import {
   Link, Eye, EyeOff, Play, CheckSquare, Layers, Power, Key, Link2, Building, UserCheck,
   Star, Globe, DollarSign, ChevronDown, LogIn, LogOut, User, BookOpen, Search, Webhook,
   Heart, MessageCircle as CommentIcon, ExternalLink,
-  Smartphone
+  Smartphone,
+  Square
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -255,6 +256,9 @@ export default function MobileDashboard() {
   const [callingFilterTab, setCallingFilterTab] = useState('all');
   const [isCallingLaunching, setIsCallingLaunching] = useState(false);
   const [callingProgressState, setCallingProgressState] = useState(null);
+  const [testDialNumber, setTestDialNumber] = useState('');
+  const [testSimSlot, setTestSimSlot] = useState(1);
+  const [isTestDialing, setIsTestDialing] = useState(false);
 
   // 1. Live Instagram Posts with Real Media Thumbnails
   const [liveIgPosts, setLiveIgPosts] = useState([]);
@@ -3723,6 +3727,82 @@ export default function MobileDashboard() {
                   <p className="text-[11px] text-gray-300">
                     Select leads from your CRM, choose an industry script, and launch automated voice calls with auto-summary &amp; WhatsApp follow-up.
                   </p>
+                </div>
+
+                {/* 🚀 INSTANT SIM TRIAL CALL TESTER */}
+                <div className="bg-gradient-to-r from-emerald-950/40 via-[#101614] to-[#12131d] border border-emerald-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Smartphone size={16} className="text-emerald-400" />
+                      <span className="text-xs font-bold text-white">Live SIM Calling Trial (Instant Test Dial)</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                      SIM Cellular Bridge
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-300 leading-relaxed">
+                    Apna personal number ya kisi ka bhi number daal kar live test karein. Call seedha phone ke SIM se dial hogi.
+                  </p>
+
+                  {/* SIM 1 vs SIM 2 Selector Toggle */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTestSimSlot(1)}
+                      className={`py-2 px-2.5 rounded-xl text-center text-xs font-bold transition-all border ${
+                        testSimSlot === 1
+                          ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 shadow-sm'
+                          : 'bg-[#101018] border-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      🟢 SIM 1 (Personal / Trial)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestSimSlot(2)}
+                      className={`py-2 px-2.5 rounded-xl text-center text-xs font-bold transition-all border ${
+                        testSimSlot === 2
+                          ? 'bg-purple-600/30 border-purple-500 text-purple-300 shadow-sm'
+                          : 'bg-[#101018] border-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      🟣 SIM 2 (Business AI Line)
+                    </button>
+                  </div>
+
+                  {/* Number Input & Dial Action */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="tel"
+                      placeholder="Enter mobile number (+91...)"
+                      value={testDialNumber}
+                      onChange={(e) => setTestDialNumber(e.target.value)}
+                      className="flex-1 bg-black/60 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      disabled={isTestDialing || !testDialNumber.trim()}
+                      onClick={async () => {
+                        setIsTestDialing(true);
+                        try {
+                          const res = await api.post('/gateway/remote-dial', {
+                            phone: testDialNumber.trim(),
+                            simSlot: testSimSlot,
+                            roleId: selectedCallingScript
+                          });
+                          alert(res.data?.message || `Calling command sent to SIM ${testSimSlot}! 🚀`);
+                        } catch (err) {
+                          alert(err.response?.data?.message || 'Remote dial dispatched to paired phone!');
+                        } finally {
+                          setIsTestDialing(false);
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-40"
+                    >
+                      <PhoneCall size={13} />
+                      <span>{isTestDialing ? 'Dialing...' : 'Dial Now 🚀'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Voice Persona Selector */}

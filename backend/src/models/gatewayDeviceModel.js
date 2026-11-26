@@ -17,6 +17,7 @@ const gatewayDeviceSchema = new mongoose.Schema({
     contactId: String,
     phoneNumber: String,
     roleId: String,
+    simSlot: { type: Number, default: 1 },
     startedAt: Date,
     status: { type: String, enum: ['idle', 'dialing', 'connected', 'ended'], default: 'idle' }
   }

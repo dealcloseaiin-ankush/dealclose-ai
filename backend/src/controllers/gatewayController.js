@@ -164,6 +164,7 @@ exports.dispatchRemoteCall = async (req, res) => {
       contactId: contactId || 'MANUAL_TEST',
       phoneNumber: targetPhone,
       roleId: activeRole?.role_id || 'general',
+      simSlot: req.body.simSlot ? parseInt(req.body.simSlot) : 1,
       startedAt: new Date(),
       status: 'dialing'
     };
