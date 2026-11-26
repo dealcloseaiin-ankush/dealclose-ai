@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 // Fix for Express Rate Limit 'trust proxy' error on Render/Heroku
 app.set('trust proxy', 1);
 
-const port = process.env.PORT || 5000;
+const port = 5005;
 
 const server = http.createServer(app);
 
@@ -110,7 +110,7 @@ server.listen(port, '0.0.0.0', () => {
 });
 
 mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 5000 // 5 second timeout taaki app jaldi error throw kare aur hang na ho
+  serverSelectionTimeoutMS: 30000 // 30 second timeout taaki Atlas DNS / SSL handshake smooth ho sake
 }).then(async () => { // ✅ Make this async
   console.log('Connected to MongoDB');
   // ✅ NEW: Create Meta Reviewer account on startup if it doesn't exist.

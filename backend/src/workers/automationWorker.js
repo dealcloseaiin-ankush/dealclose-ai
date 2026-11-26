@@ -13,37 +13,34 @@ const Post = require('../models/postModel');
 const InstagramInsightSnapshot = require('../models/InstagramInsightSnapshot');
 const instagramService = require('../services/instagramService');
 
-// Redis connection (Supports Upstash Cloud Redis & Local)
-if (!process.env.REDIS_URL) {
-  console.warn('\n⚠️ [WARNING] REDIS_URL not found in .env! Trying to connect to local Redis (127.0.0.1:6379). Please add REDIS_URL to your backend/.env file.\n');
-}
+const isRedisAvailable = (Boolean(process.env.REDIS_URL) || process.env.ENABLE_LOCAL_REDIS === 'true') && process.env.DISABLE_REDIS_WORKER !== 'true';
 
-const connection = process.env.REDIS_URL 
-  ? new IORedis(process.env.REDIS_URL, { 
-      maxRetriesPerRequest: null,
-      retryStrategy(times) {
-        // Connection break hone par dheere-dheere retry karega, crash nahi hoga
-        return Math.min(times * 100, 3000); 
-      }
-    })
-  : new IORedis({ host: '127.0.0.1', port: 6379, maxRetriesPerRequest: null, lazyConnect: true });
+let connection = null;
+let automationQueue = null;
+let automationWorker = null;
 
-// 🔴 PREVENT CRASH: Agar Redis limit cross ho jaye toh server crash na ho
-if (connection && typeof connection.on === 'function') {
-  connection.on('error', (err) => {
-    console.error('⚠️ [Redis Error] Server bacha liya gaya hai:', err.message);
+if (isRedisAvailable) {
+  connection = process.env.REDIS_URL 
+    ? new IORedis(process.env.REDIS_URL, { 
+        maxRetriesPerRequest: null,
+        retryStrategy(times) {
+          return Math.min(times * 100, 3000); 
+        }
+      })
+    : new IORedis({ host: '127.0.0.1', port: 6379, maxRetriesPerRequest: null, lazyConnect: true });
+
+  if (connection && typeof connection.on === 'function') {
+    connection.on('error', (err) => {
+      console.error('⚠️ [Redis Error] Server bacha liya gaya hai:', err.message);
+    });
+  }
+
+  automationQueue = new Queue('automationQueue', { connection });
+  automationQueue.on('error', (err) => {
+    console.error('⚠️ [Queue Error]:', err.message);
   });
-}
 
-// Create the Queue
-const automationQueue = new Queue('automationQueue', { connection });
-
-automationQueue.on('error', (err) => {
-  console.error('⚠️ [Queue Error]:', err.message);
-});
-
-// Create the Worker that processes jobs
-const automationWorker = new Worker('automationQueue', async job => {
+  automationWorker = new Worker('automationQueue', async job => {
 
   if (job.name === 'publish_scheduled_post' || job.name === 'publish-post') {
     console.log("\n================== [WORKER: PUBLISH POST START] ==================");
@@ -492,59 +489,65 @@ const automationWorker = new Worker('automationQueue', async job => {
       }
     }
   }
-}, { 
-  connection,
-  settings: {
-    drainDelay: 60000,      // Jab queue khali ho, toh agla check 60 seconds baad kare
-    stalledInterval: 300000 // Stalled jobs ko har 5 minute me check kare
-  }
-});
+  }, { 
+    connection,
+    settings: {
+      drainDelay: 60000,      // Jab queue khali ho, toh agla check 60 seconds baad kare
+      stalledInterval: 300000 // Stalled jobs ko har 5 minute me check kare
+    }
+  });
 
-automationWorker.on('error', err => {
-  console.error('⚠️ [BullMQ Worker Error]:', err.message);
-});
+  automationWorker.on('error', err => {
+    console.error('⚠️ [BullMQ Worker Error]:', err.message);
+  });
 
-// 🚀 RECURRING CRON SCHEDULES WITH ASIA/KOLKATA TIMEZONE (Fixes 6-8 Hours Delay!)
-automationQueue.add('daily_auto_backup', {}, {
-  repeat: {
-    pattern: '0 10 * * *',
-    tz: 'Asia/Kolkata'
-  },
-  jobId: 'system_daily_backup'
-});
+  // 🚀 RECURRING CRON SCHEDULES WITH ASIA/KOLKATA TIMEZONE (Fixes 6-8 Hours Delay!)
+  const safeSchedule = (name, data, opts) => {
+    if (automationQueue && typeof automationQueue.add === 'function') {
+      automationQueue.add(name, data, opts).catch(err => {
+        console.warn(`⚠️ [BullMQ Cron Warning] ${name}:`, err.message);
+      });
+    }
+  };
 
-automationQueue.add('daily_token_refresh', {}, {
-  repeat: {
-    pattern: '0 2 * * *',
-    tz: 'Asia/Kolkata'
-  },
-  jobId: 'system_token_refresh'
-});
+  safeSchedule('daily_auto_backup', {}, {
+    repeat: { pattern: '0 10 * * *', tz: 'Asia/Kolkata' },
+    jobId: 'system_daily_backup'
+  });
 
-automationQueue.add('capture_instagram_insights', {}, {
-  repeat: { 
-    pattern: '10 0 * * *',
-    tz: 'Asia/Kolkata'
-  },
-  jobId: 'daily_instagram_insight_snapshot'
-});
+  safeSchedule('daily_token_refresh', {}, {
+    repeat: { pattern: '0 2 * * *', tz: 'Asia/Kolkata' },
+    jobId: 'system_token_refresh'
+  });
 
-// 09:00 AM IST Morning Briefing
-automationQueue.add('daily_crm_summary', {}, {
-  repeat: { 
-    pattern: '0 9 * * *',
-    tz: 'Asia/Kolkata'
-  },
-  jobId: 'daily_crm_summary_job'
-});
+  safeSchedule('capture_instagram_insights', {}, {
+    repeat: { pattern: '10 0 * * *', tz: 'Asia/Kolkata' },
+    jobId: 'daily_instagram_insight_snapshot'
+  });
 
-// 10:00 AM IST Auto-Pilot Social Post
-automationQueue.add('generate_social_post', {}, {
-  repeat: { 
-    pattern: '0 10 * * *',
-    tz: 'Asia/Kolkata'
-  },
-  jobId: 'generate_social_post_job'
-});
+  safeSchedule('daily_crm_summary', {}, {
+    repeat: { pattern: '0 9 * * *', tz: 'Asia/Kolkata' },
+    jobId: 'daily_crm_summary_job'
+  });
+
+  safeSchedule('generate_social_post', {}, {
+    repeat: { pattern: '0 10 * * *', tz: 'Asia/Kolkata' },
+    jobId: 'generate_social_post_job'
+  });
+} else {
+  // Graceful fallback stub when Redis is not available locally or disabled
+  console.log('ℹ️ [BullMQ Worker] Redis is not configured or disabled. In-memory queue stub active.');
+  automationQueue = {
+    add: async (name, data, opts) => {
+      return { id: `mock-${Date.now()}`, name, data };
+    },
+    on: () => {},
+    getRepeatableJobs: async () => [],
+    removeRepeatableByKey: async () => {}
+  };
+  automationWorker = {
+    on: () => {}
+  };
+}
 
 module.exports = { automationQueue, automationWorker };
