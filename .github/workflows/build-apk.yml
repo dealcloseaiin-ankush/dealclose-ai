@@ -43,35 +43,32 @@ jobs:
             exit 1
           fi
           mkdir -p ../dist-apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.6.0.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-sim-gateway.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dealclose-sim-gateway-apk
-          path: dist-apk/dealclose-sim-gateway.apk
+          name: dealclose-ai-apk
+          path: dist-apk/dealclose-ai-v1.6.0.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-apk
-          name: "DealClose AI v1.5.0 APK (Unified Mobile Business Suite & SIM Gateway)"
+          tag_name: v1.6.0-release
+          name: "DealClose AI v1.6.0 Official Android App (Complete Business UI)"
           body: |
-            ### 📱 DealClose AI Official Android App (v1.5.0)
-            Download `dealclose-sim-gateway.apk` below directly on your Android phone!
+            ### 📱 DealClose AI Official Android App (v1.6.0)
+            Download `dealclose-ai-v1.6.0.apk` below directly on your Android phone!
 
-            ✨ **What's New in v1.5.0:**
-            - **Complete Unified Mobile App UI**: Full MSME Business Suite (CRM, AI Video Studio, Khata/Ledger, WhatsApp & IG Automations, Loyalty passes, Google Reviews) directly in the app!
-            - **Seamless Background Cellular Calling**: SIM calling service runs silently in the background without blocking the user.
-            - **Official DealClose Brand Logo & Clean App Name**: Beautiful dark mode edge-to-edge UI.
-            - **Dual-SIM Smart Routing**: Switch between SIM 1 (Personal/Trial) and SIM 2 (Business AI) with 1 tap.
-
-            1. Install APK on your Android phone (Android 8.0+).
-            2. Select **SIM 2 (AI Dedicated)**.
-            3. Tap **Set as Default Phone App** and Allow.
-            4. Tap **Ignore Battery Optimizations** and Allow.
-            5. Enter the 6-digit code from DealClose AI Calls Hub and tap **Activate**.
-          files: dist-apk/dealclose-sim-gateway.apk
+            ✨ **What's New in v1.6.0:**
+            - **100% Real Business UI on Launch**: Instant access to CRM, AI Video Studio, Khata/Ledger, WhatsApp & IG Automations, Loyalty passes, Google Reviews!
+            - **Zero Startup Harassment**: No technical pairing screen and no forced permission dialogs on app open!
+            - **Seamless Cellular Calling**: AI Voice Calling runs silently in the background.
+            - **Official DealClose Brand Logo & Clean App Name**.
+          files: |
+            dist-apk/dealclose-ai-v1.6.0.apk
+            dist-apk/dealclose-sim-gateway.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
