@@ -43,47 +43,70 @@ exports.registerDevice = async (req, res) => {
   try {
     const { pairingCode, deviceId, deviceName, simPhoneNumber, simCarrier, batteryLevel, isDefaultDialer } = req.body;
 
-    if (!pairingCode || !deviceId) {
-      return res.status(400).json({ success: false, message: 'pairingCode and deviceId are required' });
+    if (!deviceId) {
+      return res.status(400).json({ success: false, message: 'deviceId is required' });
     }
 
     const cleanCode = (pairingCode || '').toString().trim().replace(/^DC-?/i, '');
-    let pending = await GatewayDevice.findOne({
-      $or: [
-        { pairingCode: (pairingCode || '').toString().trim() },
-        { pairingCode: `DC-${cleanCode}` },
-        { pairingCode: cleanCode }
-      ]
-    });
-    if (!pending) {
-      // Check if this device was already linked / registered recently
-      const existing = await GatewayDevice.findOne({ deviceId });
-      if (existing) {
-        existing.isOnline = true;
-        existing.lastPingAt = new Date();
-        if (batteryLevel) existing.batteryLevel = batteryLevel;
-        if (typeof isDefaultDialer !== 'undefined') existing.isDefaultDialer = Boolean(isDefaultDialer);
-        await existing.save();
-        return res.status(200).json({
-          success: true,
-          message: 'Android Phone successfully verified & connected!',
-          device: existing,
-          userId: existing.userId
-        });
+    let pending = null;
+    if (cleanCode) {
+      pending = await GatewayDevice.findOne({
+        $or: [
+          { pairingCode: (pairingCode || '').toString().trim() },
+          { pairingCode: `DC-${cleanCode}` },
+          { pairingCode: cleanCode }
+        ]
+      });
+    }
+
+    const targetUserId = pending?.userId;
+
+    // 1. Check if device is already in DB by deviceId
+    let existing = await GatewayDevice.findOne({ deviceId });
+
+    if (existing) {
+      // If a separate pending doc was created during pairing code generation, delete it
+      if (pending && String(pending._id) !== String(existing._id)) {
+        await GatewayDevice.findByIdAndDelete(pending._id).catch(() => {});
       }
+      if (targetUserId) {
+        existing.userId = targetUserId;
+      }
+      existing.deviceName = deviceName || existing.deviceName || 'Android SIM Gateway';
+      if (simPhoneNumber) existing.simPhoneNumber = simPhoneNumber;
+      if (simCarrier) existing.simCarrier = simCarrier;
+      if (typeof batteryLevel !== 'undefined') existing.batteryLevel = batteryLevel;
+      if (typeof isDefaultDialer !== 'undefined') existing.isDefaultDialer = Boolean(isDefaultDialer);
+      existing.isOnline = true;
+      existing.lastPingAt = new Date();
+      existing.pairingCode = cleanCode || existing.pairingCode || '';
+      await existing.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Android Phone successfully paired as SIM Gateway!',
+        device: existing,
+        userId: existing.userId
+      });
+    }
+
+    if (!pending) {
       return res.status(404).json({ success: false, message: 'Invalid or expired Pairing Code' });
     }
 
-    // Link device permanently to this user
+    // 2. Remove ANY other records matching (userId, deviceId) to avoid E11000 duplicate key error
+    await GatewayDevice.deleteMany({ userId: pending.userId, deviceId, _id: { $ne: pending._id } });
+
+    // 3. Link pending document
     pending.deviceId = deviceId;
     pending.deviceName = deviceName || 'Android SIM Gateway';
     pending.simPhoneNumber = simPhoneNumber || '';
     pending.simCarrier = simCarrier || 'Jio 4G';
-    pending.batteryLevel = batteryLevel || 100;
+    pending.batteryLevel = typeof batteryLevel !== 'undefined' ? batteryLevel : 100;
     pending.isDefaultDialer = Boolean(isDefaultDialer);
     pending.isOnline = true;
     pending.lastPingAt = new Date();
-    pending.pairingCode = cleanCode; // Retain code so native background service call also acknowledges instantly
+    pending.pairingCode = cleanCode;
 
     await pending.save();
 
@@ -753,8 +776,11 @@ exports.disconnectGatewayDevice = async (req, res) => {
     const userId = req.user?._id || req.user?.id;
     const { deviceId } = req.params;
 
-    const result = await GatewayDevice.findOneAndDelete({ userId, deviceId });
-    if (!result) return res.status(404).json({ success: false, message: 'Device not found' });
+    const query = { userId };
+    if (deviceId && deviceId !== 'all') {
+      query.deviceId = deviceId;
+    }
+    await GatewayDevice.deleteMany(query);
 
     res.status(200).json({
       success: true,
