@@ -37,7 +37,7 @@ object AudioBridgeManager {
 
     fun startAudioBridge(context: Context) {
         val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-        val activeHost = prefs.getString("active_server_url", "https://poser-sassy-subsidy.ngrok-free.dev") ?: "https://poser-sassy-subsidy.ngrok-free.dev"
+        val activeHost = prefs.getString("active_server_url", "https://dealcloseai.in") ?: "https://dealcloseai.in"
         val wsUrl = activeHost.replace("http://", "ws://").replace("https://", "wss://") + "/api/webhooks/mobile/stream"
         val serverUrl = prefs.getString("server_url", wsUrl) ?: wsUrl
 

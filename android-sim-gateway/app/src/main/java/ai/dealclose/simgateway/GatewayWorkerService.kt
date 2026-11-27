@@ -38,9 +38,8 @@ class GatewayWorkerService : Service() {
 
     // Multiple Candidate Server URLs for automatic network discovery
     private val candidateHosts = listOf(
-        "https://poser-sassy-subsidy.ngrok-free.dev",
-        "http://10.135.96.215:5000",
-        "https://dealcloseai.in"
+        "https://dealcloseai.in",
+        "https://dealclose-ai.onrender.com"
     )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -43,35 +43,35 @@ jobs:
             exit 1
           fi
           mkdir -p ../dist-apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.4.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.0.apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.6.0.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-sim-gateway.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: dealclose-ai-apk
-          path: dist-apk/dealclose-ai-v1.7.0.apk
+          path: dist-apk/dealclose-ai-v1.7.4.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.7.0-release
-          name: "DealClose AI v1.7.0 Luxury Android Edition (Solo Style + Smart Back Nav)"
+          tag_name: v1.7.4-release
+          name: "DealClose AI v1.7.4 Native InCall Screen & SIM Gateway"
           body: |
-            ### 📱 DealClose AI Luxury Android Edition (v1.7.0)
-            Download `dealclose-ai-v1.7.0.apk` below directly on your Android phone!
+            ### 📱 DealClose AI v1.7.4 Native InCall Screen & Telephony Gateway
+            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.4.apk` directly on your Android phone!
 
-            ✨ **What's New in v1.7.0 (Solo Luxury Experience):**
-            - 🛡️ **Smart Hardware Back Navigation**: Android hardware back button now smoothly navigates drawers, modals, threads and tabs backwards. No more accidental app closures! Double-tap back required to exit from home with native Toast.
-            - 🏪 **Instant Dukan / Business Onboarding Portal**: Stunning luxury Solo-style start screen with neon ambient aura, instant 10-second shop name & category launch, and 1-Click Guest access.
-            - 📳 **Physical Haptic Feedback**: Native vibration click feel on bottom tabs and primary buttons.
-            - 🖤 **Deep OLED Obsidian Theme (#060608)**: Edge-to-edge status bar & navigation bar blend, hidden scrollbars, and zero overscroll bounce.
-            - 📞 **Cellular Voice Calling & SIM Engine**: Silent background telephony service.
+            ✨ **What's Fixed in v1.7.4:**
+            - 📞 **Native InCall Screen UI**: Full-screen caller ID with Answer / Decline buttons. No more invisible background ringing!
+            - ⚡ **Auto-Answer Reliability**: Ring hote hi 1.2s me AI automatically call answer karega.
+            - 📶 **Dual-SIM Smart Separation**: Dedicated Business SIM vs Personal SIM support.
+            - 🎙️ **Take Over Button**: AI se live call apne haath me lene ka button.
+            - 🇮🇳 **Chhattisgarhi & Rural Dialect Support**: Gaon-dehat aur local Chhattisgarhi bolchal ka automatic support.
           files: |
+            dist-apk/dealclose-ai-v1.7.4.apk
             dist-apk/dealclose-ai-v1.7.0.apk
-            dist-apk/dealclose-ai-v1.6.0.apk
             dist-apk/dealclose-sim-gateway.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

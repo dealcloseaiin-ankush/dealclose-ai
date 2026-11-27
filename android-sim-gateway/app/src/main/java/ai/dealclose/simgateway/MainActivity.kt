@@ -12,6 +12,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.telecom.TelecomManager
+import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.WindowManager
@@ -107,12 +108,10 @@ class MainActivity : AppCompatActivity() {
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 super.onReceivedError(view, request, error)
                 loadingProgress.visibility = View.GONE
-                // If main production domain fails, fallback to ngrok tunnel
+                // If main production domain fails, fallback to render domain
                 val failingUrl = request?.url?.toString() ?: ""
-                if (failingUrl.contains("dealcloseai.in") && !failingUrl.contains("poser-sassy-subsidy")) {
-                    val headers = HashMap<String, String>()
-                    headers["ngrok-skip-browser-warning"] = "true"
-                    webViewApp.loadUrl("https://poser-sassy-subsidy.ngrok-free.dev/mobile", headers)
+                if (failingUrl.contains("dealcloseai.in") && !failingUrl.contains("dealclose-ai.onrender.com")) {
+                    webViewApp.loadUrl("https://dealclose-ai.onrender.com/mobile")
                 }
             }
         }
@@ -149,9 +148,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Load the DealClose Mobile App
-        val headers = HashMap<String, String>()
-        headers["ngrok-skip-browser-warning"] = "true"
-        webViewApp.loadUrl("https://dealcloseai.in/mobile", headers)
+        webViewApp.loadUrl("https://dealcloseai.in/mobile")
     }
 
     private fun setupSmartBackNavigation() {
