@@ -1,6 +1,7 @@
 package ai.dealclose.simgateway
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
@@ -43,20 +44,27 @@ object AudioBridgeManager {
 
         Log.d(TAG, "🌐 Connecting WebSocket Audio Stream to: $serverUrl")
 
-        // 1. Setup AudioTrack for AI Speech Playback
+        // 1. Setup AudioTrack for AI Speech Playback (Modern AudioAttributes)
         val minTrackBuf = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
             AUDIO_FORMAT
         )
-        audioTrack = AudioTrack(
-            AudioManager.STREAM_VOICE_CALL,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_OUT_MONO,
-            AUDIO_FORMAT,
-            minTrackBuf * 2,
-            AudioTrack.MODE_STREAM
-        )
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+        val audioFormat = AudioFormat.Builder()
+            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .setSampleRate(SAMPLE_RATE)
+            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+            .build()
+        audioTrack = AudioTrack.Builder()
+            .setAudioAttributes(audioAttributes)
+            .setAudioFormat(audioFormat)
+            .setBufferSizeInBytes(minTrackBuf * 4)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .build()
         audioTrack?.play()
 
         // 2. Setup AudioManager for In-Call Communications & Loud Speakerphone
@@ -64,10 +72,12 @@ object AudioBridgeManager {
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         audioManager.isSpeakerphoneOn = true // Loud speakerphone ensures caller & room hear AI voice clearly!
 
-        // Boost voice call volume to maximum
+        // Boost voice call and media volume to maximum
         try {
             val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
             audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVol, 0)
+            val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
         } catch (vErr: Throwable) {
             Log.w(TAG, "Volume set exception: ${vErr.message}")
         }
@@ -103,7 +113,15 @@ object AudioBridgeManager {
                         // Received AI Speech from Deepgram/Gemini
                         val base64Audio = json.optString("data")
                         val pcmBytes = Base64.decode(base64Audio, Base64.DEFAULT)
-                        audioTrack?.write(pcmBytes, 0, pcmBytes.size)
+                        // Strip 44-byte WAV RIFF header if present to ensure pure linear PCM
+                        val rawPCM = if (pcmBytes.size > 44 && pcmBytes[0] == 'R'.code.toByte() && pcmBytes[1] == 'I'.code.toByte() && pcmBytes[2] == 'F'.code.toByte() && pcmBytes[3] == 'F'.code.toByte()) {
+                            pcmBytes.copyOfRange(44, pcmBytes.size)
+                        } else {
+                            pcmBytes
+                        }
+                        Log.d(TAG, "🔊 [AudioTrack] Playing ${rawPCM.size} raw PCM bytes into call loudspeaker!")
+                        val written = audioTrack?.write(rawPCM, 0, rawPCM.size) ?: 0
+                        Log.d(TAG, "🔊 [AudioTrack] Bytes written successfully: $written")
                     } else if (event == "ai_response") {
                         Log.d(TAG, "🤖 [AI Spoke]: ${json.optString("text")}")
                     }

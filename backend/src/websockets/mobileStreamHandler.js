@@ -203,9 +203,15 @@ ${toneDirective}
       }
 
       const arrayBuffer = await ttsResponse.arrayBuffer();
-      const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+      let audioBuffer = Buffer.from(arrayBuffer);
+      // Strip 44-byte WAV RIFF header if present so app receives pure 16kHz linear16 PCM samples
+      if (audioBuffer.length > 44 && audioBuffer.slice(0, 4).toString('ascii') === 'RIFF') {
+        audioBuffer = audioBuffer.slice(44);
+      }
+      const base64Audio = audioBuffer.toString('base64');
       
       if (ws.readyState === WebSocket.OPEN) {
+        console.log(`🔊 [Audio Stream Out] Sent ${audioBuffer.length} raw PCM bytes to Android phone speaker!`);
         ws.send(JSON.stringify({ event: 'ai_response', text: aiText }));
         ws.send(JSON.stringify({ event: 'audio', data: base64Audio }));
       }

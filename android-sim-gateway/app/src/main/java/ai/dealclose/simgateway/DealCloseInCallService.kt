@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.telecom.InCallService
 import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
@@ -118,6 +119,12 @@ class DealCloseInCallService : InCallService() {
                         Log.d(TAG, "✅ State: Call CONNECTED / ACTIVE!")
                         dismissCallNotification()
                         if (isAiCall) {
+                            try {
+                                setAudioRoute(CallAudioState.ROUTE_SPEAKER)
+                                Log.d(TAG, "🔊 [Telecom] Successfully switched call to LOUDSPEAKER via setAudioRoute!")
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "setAudioRoute error: ${e.message}")
+                            }
                             Log.d(TAG, "🤖 Starting AI voice bridge for automated call ($handleStr)...")
                             AudioBridgeManager.startAudioBridge(applicationContext, handleStr)
                         } else {
