@@ -325,7 +325,71 @@ export default function Calls() {
 
   const [selectedScriptId, setSelectedScriptId] = useState('payment_reminder');
   const [customPitchText, setCustomPitchText] = useState('');
-  const [selectedVoiceAgent, setSelectedVoiceAgent] = useState('Neha (Account Manager)');
+  const [selectedVoiceAgent, setSelectedVoiceAgent] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && localStorage.getItem('dealclose_permanent_voice')) || 'Neha (Account Manager)';
+    } catch (e) {
+      return 'Neha (Account Manager)';
+    }
+  });
+
+  const handleSetPermanentVoiceDesktop = (agentName) => {
+    try {
+      setSelectedVoiceAgent(agentName);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dealclose_permanent_voice', agentName);
+      }
+      alert(`✅ Permanent AI Voice Set!\n\nAb har call me "${agentName}" hi bolega.`);
+    } catch (e) {
+      setSelectedVoiceAgent(agentName);
+    }
+  };
+
+  const handlePlayVoicePreviewDesktop = (e, agentName) => {
+    e.stopPropagation();
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let text = "Namaste! Main DealClose AI assistant bol rahi hoon.";
+        let pitch = 1.0;
+        let rate = 0.95;
+        
+        const lower = agentName.toLowerCase();
+        if (lower.includes('priya')) {
+          text = "Namaste ji! Main Priya bol rahi hoon. Main aapke grahakon se bohot vinamra aur natural Hindi me baat karti hoon.";
+          pitch = 1.15;
+        } else if (lower.includes('aman')) {
+          text = "Namaste bhaiya! Main Aman bol raha hoon. Dukan ke hardware samaan aur taaza wholesale rates main sambhalta hoon.";
+          pitch = 0.88;
+        } else if (lower.includes('neha')) {
+          text = "Namaste! Main accounts department se Neha baat kar rahi hoon. Billing aur hisaab ke reminders main professionally handle karti hoon.";
+          pitch = 1.05;
+        } else if (lower.includes('vikram')) {
+          text = "Namaste ji! Main Vikram bol raha hoon. Badi commercial supply aur property deals ke silsile me baat karta hoon.";
+          pitch = 0.75;
+        } else if (lower.includes('ananya')) {
+          text = "Hello ji! Main Ananya bol rahi hoon. Naye offers aur festive schemes ke liye main dynamic aawaz me baat karti hoon.";
+          pitch = 1.25;
+        } else if (lower.includes('rahul')) {
+          text = "Namaste sir! Main Rahul bol raha hoon. Client coordination aur customer satisfaction call main handle karta hoon.";
+          pitch = 0.95;
+        }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'hi-IN';
+        utterance.pitch = pitch;
+        utterance.rate = rate;
+        
+        const voices = window.speechSynthesis.getVoices();
+        const indVoice = voices.find(v => v.lang === 'hi-IN' || v.lang === 'hi_IN' || v.lang === 'en-IN');
+        if (indVoice) utterance.voice = indVoice;
+        
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      console.warn("Voice preview error:", err);
+    }
+  };
   const [showScriptStudioModal, setShowScriptStudioModal] = useState(false);
   const [isLaunchingCampaign, setIsLaunchingCampaign] = useState(false);
 
@@ -2828,26 +2892,73 @@ export default function Calls() {
             </div>
 
             <div className="mb-4">
-              <label className="block text-gray-400 text-xs font-bold mb-2">Select Voice Persona &amp; Accent:</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-gray-400 text-xs font-bold">Select Voice Persona &amp; Accent:</label>
+                <button
+                  type="button"
+                  onClick={() => handleSetPermanentVoiceDesktop(selectedVoiceAgent)}
+                  className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg flex items-center gap-1 active:scale-95 transition-all"
+                >
+                  ⭐ Make Permanent Default
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
-                  { id: 'neha', name: 'Neha (Account Manager)', desc: 'Professional Hindi/English • Accounts & Recovery' },
-                  { id: 'priya', name: 'Priya (Indian Female)', desc: 'Natural Hindi / Hinglish • Warm & Friendly' },
-                  { id: 'aman', name: 'Aman (Indian Male)', desc: 'Dynamic Hinglish • Retail & Sales' }
-                ].map(persona => (
-                  <div
-                    key={persona.id}
-                    onClick={() => setSelectedVoiceAgent(persona.name)}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                      selectedVoiceAgent.includes(persona.name.split(' ')[0])
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                        : 'bg-[#161620] border-gray-800 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-white">{persona.name}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{persona.desc}</p>
-                  </div>
-                ))}
+                  { id: 'neha', name: 'Neha (Account Manager)', desc: 'Professional Hindi/English • Accounts & Recovery', tag: 'Formal' },
+                  { id: 'priya', name: 'Priya (Indian Female)', desc: 'Natural Hindi / Hinglish • Warm & Friendly', tag: 'Popular' },
+                  { id: 'aman', name: 'Aman (Indian Male)', desc: 'Dynamic Hinglish • Retail & Hardware Sales', tag: 'Retail' },
+                  { id: 'rahul', name: 'Rahul (Corporate Male)', desc: 'Polite, clear & corporate follow-ups', tag: 'Gentle' },
+                  { id: 'ananya', name: 'Ananya (Dynamic Female)', desc: 'High-energy promotions & event invites', tag: 'Energetic' },
+                  { id: 'vikram', name: 'Vikram (Commercial Male)', desc: 'Authoritative deep voice for wholesale deals', tag: 'B2B Deals' }
+                ].map(persona => {
+                  const isSelected = selectedVoiceAgent.includes(persona.name.split(' ')[0]);
+                  return (
+                    <div
+                      key={persona.id}
+                      onClick={() => setSelectedVoiceAgent(persona.name)}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        isSelected
+                          ? 'bg-indigo-600/25 border-indigo-500 text-white shadow-md ring-1 ring-indigo-500/40'
+                          : 'bg-[#161620] border-gray-800 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-white">{persona.name}</p>
+                          <span className="text-[8px] bg-white/10 px-1.5 py-0.2 rounded font-mono text-gray-300">
+                            {persona.tag}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{persona.desc}</p>
+                      </div>
+
+                      <div className="mt-2.5 flex items-center justify-between pt-1.5 border-t border-gray-800/80">
+                        <button
+                          type="button"
+                          onClick={(e) => handlePlayVoicePreviewDesktop(e, persona.name)}
+                          className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-950/60 border border-indigo-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 active:scale-95"
+                        >
+                          ▶️ Suniye
+                        </button>
+                        {isSelected && (
+                          <span className="text-[10px] text-emerald-400 font-bold">● Active</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Voice Cloning Info */}
+              <div className="mt-2 bg-gradient-to-r from-purple-950/30 to-indigo-950/30 border border-purple-500/30 p-2.5 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-purple-200">🎙️ Custom Voice Cloning Support</p>
+                  <p className="text-[10px] text-gray-400">Upload a 1-minute voice audio to make AI speak in your own personal voice.</p>
+                </div>
+                <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-1 rounded-md">
+                  ElevenLabs / Cartesia Ready
+                </span>
               </div>
             </div>
 

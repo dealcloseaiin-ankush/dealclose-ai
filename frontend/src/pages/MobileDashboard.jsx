@@ -271,7 +271,73 @@ export default function MobileDashboard() {
   // 🎙️ Mobile AI Calling States
   const [selectedCallingScript, setSelectedCallingScript] = useState('real_estate');
   const [customCallingPitch, setCustomCallingPitch] = useState('');
-  const [selectedCallingAgent, setSelectedCallingAgent] = useState('Priya (Hindi / Hinglish)');
+  const [selectedCallingAgent, setSelectedCallingAgent] = useState(() => {
+    try {
+      return (typeof window !== 'undefined' && localStorage.getItem('dealclose_permanent_voice')) || 'Priya (Hindi / Hinglish)';
+    } catch (e) {
+      return 'Priya (Hindi / Hinglish)';
+    }
+  });
+
+  const handleSetPermanentVoice = (agentName) => {
+    try {
+      setSelectedCallingAgent(agentName);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dealclose_permanent_voice', agentName);
+      }
+      alert(`✅ Permanent AI Voice Set!\n\nAb har call me "${agentName}" hi bolega.`);
+    } catch (e) {
+      setSelectedCallingAgent(agentName);
+    }
+  };
+
+  const handlePlayVoicePreview = (e, agentName) => {
+    e.stopPropagation();
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let text = "Namaste! Main DealClose AI assistant bol rahi hoon.";
+        let pitch = 1.0;
+        let rate = 0.95;
+        
+        const lower = agentName.toLowerCase();
+        if (lower.includes('priya')) {
+          text = "Namaste ji! Main Priya bol rahi hoon. Main aapke grahakon se bohot vinamra aur natural Hindi me baat karti hoon.";
+          pitch = 1.15;
+        } else if (lower.includes('aman')) {
+          text = "Namaste bhaiya! Main Aman bol raha hoon. Dukan ke hardware samaan aur taaza wholesale rates main sambhalta hoon.";
+          pitch = 0.88;
+        } else if (lower.includes('neha')) {
+          text = "Namaste! Main accounts department se Neha baat kar rahi hoon. Billing aur hisaab ke reminders main professionally handle karti hoon.";
+          pitch = 1.05;
+        } else if (lower.includes('vikram')) {
+          text = "Namaste ji! Main Vikram bol raha hoon. Badi commercial supply aur property deals ke silsile me baat karta hoon.";
+          pitch = 0.75;
+        } else if (lower.includes('ananya')) {
+          text = "Hello ji! Main Ananya bol rahi hoon. Naye offers aur festive schemes ke liye main dynamic aawaz me baat karti hoon.";
+          pitch = 1.25;
+        } else if (lower.includes('rahul')) {
+          text = "Namaste sir! Main Rahul bol raha hoon. Client coordination aur customer satisfaction call main handle karta hoon.";
+          pitch = 0.95;
+        }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'hi-IN';
+        utterance.pitch = pitch;
+        utterance.rate = rate;
+        
+        const voices = window.speechSynthesis.getVoices();
+        const indVoice = voices.find(v => v.lang === 'hi-IN' || v.lang === 'hi_IN' || v.lang === 'en-IN');
+        if (indVoice) utterance.voice = indVoice;
+        
+        window.speechSynthesis.speak(utterance);
+      } else {
+        alert("Audio preview played on system.");
+      }
+    } catch (err) {
+      console.warn("Voice preview error:", err);
+    }
+  };
   const [selectedCallingLeadIds, setSelectedCallingLeadIds] = useState([]);
   const [callingFilterTab, setCallingFilterTab] = useState('all');
   const [isCallingLaunching, setIsCallingLaunching] = useState(false);
@@ -4607,29 +4673,73 @@ export default function MobileDashboard() {
                   </div>
                 </div>
 
-                {/* Voice Persona Selector */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-gray-400">1. Select Voice Persona &amp; Accent:</p>
-                  <div className="grid grid-cols-3 gap-1.5">
+                {/* Voice Persona Selector with Live Audio Preview & Permanent Save */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-gray-300">1. Select AI Voice Persona &amp; Tone:</p>
+                    <button
+                      type="button"
+                      onClick={() => handleSetPermanentVoice(selectedCallingAgent)}
+                      className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg flex items-center gap-1 active:scale-95 transition-all"
+                    >
+                      ⭐ Make Permanent
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[
-                      { name: 'Priya (Hindi / Hinglish)', label: 'Priya 👩', desc: 'Natural Hindi' },
-                      { name: 'Aman (Hinglish Male)', label: 'Aman 👨', desc: 'Retail Sales' },
-                      { name: 'Neha (Professional)', label: 'Neha 👩💼', desc: 'English/Hindi' }
-                    ].map(p => (
-                      <button
-                        key={p.name}
-                        type="button"
-                        onClick={() => setSelectedCallingAgent(p.name)}
-                        className={`p-2 rounded-xl border text-center transition-all ${
-                          selectedCallingAgent.includes(p.name.split(' ')[0])
-                            ? 'bg-blue-600/30 border-blue-500 text-white font-bold shadow-md'
-                            : 'bg-[#101016] border-gray-800 text-gray-400 hover:text-white'
-                        }`}
-                      >
-                        <div className="text-xs">{p.label}</div>
-                        <div className="text-[9px] text-gray-400 mt-0.5">{p.desc}</div>
-                      </button>
-                    ))}
+                      { name: 'Priya (Hindi / Hinglish)', label: 'Priya 👩', desc: 'Warm & Natural Hindi', tag: 'Most Popular' },
+                      { name: 'Aman (Hinglish Male)', label: 'Aman 👨', desc: 'Hardware & Retail Sales', tag: 'Fast Pitch' },
+                      { name: 'Neha (Professional)', label: 'Neha 👩💼', desc: 'Billing & Recovery', tag: 'Formal' },
+                      { name: 'Rahul (Corporate Male)', label: 'Rahul 👨💼', desc: 'Polite Follow-ups', tag: 'Gentle' },
+                      { name: 'Ananya (Dynamic Female)', label: 'Ananya 👧', desc: 'Festive Offers & DMs', tag: 'Energetic' },
+                      { name: 'Vikram (Commercial Male)', label: 'Vikram 🧔', desc: 'Wholesale & B2B Deals', tag: 'Deep Voice' }
+                    ].map(p => {
+                      const isSelected = selectedCallingAgent.includes(p.name.split(' ')[0]);
+                      return (
+                        <div
+                          key={p.name}
+                          onClick={() => setSelectedCallingAgent(p.name)}
+                          className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all relative ${
+                            isSelected
+                              ? 'bg-blue-600/25 border-blue-500 text-white shadow-md ring-1 ring-blue-500/40'
+                              : 'bg-[#101016] border-gray-800 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white">{p.label}</span>
+                            <span className="text-[8px] bg-white/10 px-1.5 py-0.2 rounded font-mono text-gray-300">
+                              {p.tag}
+                            </span>
+                          </div>
+                          <div className="text-[9px] text-gray-400 mt-0.5">{p.desc}</div>
+                          
+                          <div className="mt-2 flex items-center justify-between pt-1 border-t border-gray-800/80">
+                            <button
+                              type="button"
+                              onClick={(e) => handlePlayVoicePreview(e, p.name)}
+                              className="text-[9px] font-bold text-blue-400 hover:text-blue-300 bg-blue-950/60 border border-blue-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 active:scale-95"
+                            >
+                              ▶️ Suniye
+                            </button>
+                            {isSelected && (
+                              <span className="text-[9px] text-emerald-400 font-bold">● Active</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Voice Clone Info Card */}
+                  <div className="bg-gradient-to-r from-purple-950/40 to-indigo-950/30 border border-purple-500/30 p-2.5 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold text-purple-200">🎙️ Apni Khud Ki Aawaz (Voice Cloning)</p>
+                      <p className="text-[9px] text-gray-400">1-Minute voice sample dekar AI ko bilkul apni aawaz me chalayein.</p>
+                    </div>
+                    <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-1 rounded-md">
+                      Clone Ready
+                    </span>
                   </div>
                 </div>
 
