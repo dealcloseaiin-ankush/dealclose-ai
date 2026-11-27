@@ -6315,12 +6315,12 @@ export default function MobileDashboard() {
                 {/* 6. Full Web Calls CRM & Spare Phone Pairing Link */}
                 <div className="flex items-center justify-between pt-1">
                   <a
-                    href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases/tag/v1.7.4-release"
+                    href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases/download/v1.7.6-release/dealclose-sim-gateway.apk"
                     target="_blank"
                     rel="noreferrer"
                     className="text-[11px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1"
                   >
-                    <Download size={12} /> <span>Download Latest APK v1.7.4 (Fixed Calling Screen)</span>
+                    <Download size={12} /> <span>Download Latest APK v1.7.6 (Live AI Voice Bridge)</span>
                   </a>
                   <a
                     href="/calls?tab=sim_gateway"

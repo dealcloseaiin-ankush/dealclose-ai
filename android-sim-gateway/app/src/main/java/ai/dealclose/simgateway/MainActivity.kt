@@ -1,9 +1,11 @@
 package ai.dealclose.simgateway
 
+import android.Manifest
 import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -21,6 +23,8 @@ import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 /**
  * 🚀 DEALCLOSE AI - LUXURY NATIVE BUSINESS APPLICATION (v1.7.0)
@@ -69,6 +73,28 @@ class MainActivity : AppCompatActivity() {
 
         // 4. Smart In-App Hardware Back Button Handler
         setupSmartBackNavigation()
+
+        // 5. Check and Request Cellular & Audio Permissions for AI Voice Call Engine
+        checkAndRequestVoicePermissions()
+    }
+
+    private fun checkAndRequestVoicePermissions() {
+        val permissions = mutableListOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.READ_PHONE_STATE
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            permissions.add(Manifest.permission.ANSWER_PHONE_CALLS)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
+        }
     }
 
     private fun setupLuxuryWebView() {

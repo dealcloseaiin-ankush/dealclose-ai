@@ -118,8 +118,8 @@ class DealCloseInCallService : InCallService() {
                         Log.d(TAG, "✅ State: Call CONNECTED / ACTIVE!")
                         dismissCallNotification()
                         if (isAiCall) {
-                            Log.d(TAG, "🤖 Starting AI voice bridge for automated call...")
-                            AudioBridgeManager.startAudioBridge(applicationContext)
+                            Log.d(TAG, "🤖 Starting AI voice bridge for automated call ($handleStr)...")
+                            AudioBridgeManager.startAudioBridge(applicationContext, handleStr)
                         } else {
                             Log.d(TAG, "👤 Personal call active. AI audio bridge bypassed.")
                         }

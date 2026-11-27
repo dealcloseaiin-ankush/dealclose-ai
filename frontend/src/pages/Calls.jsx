@@ -1730,13 +1730,13 @@ export default function Calls() {
                 <Settings2 size={14} /> <span>🏪 Shop Address / Info</span>
               </button>
               <a
-                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases/tag/v1.7.4-release"
+                href="https://github.com/dealcloseaiin-ankush/dealclose-ai/releases/download/v1.7.6-release/dealclose-sim-gateway.apk"
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-2 bg-[#201c12] hover:bg-[#2c2616] text-amber-300 hover:text-amber-200 border border-amber-500/40 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
                 title="Download Companion APK for your Android phone"
               >
-                <Download size={14} /> <span>📥 Download Latest Phone APK v1.7.4</span>
+                <Download size={14} /> <span>📥 Download Latest Phone APK v1.7.6</span>
               </a>
               <button
                 onClick={handleGeneratePairingCode}

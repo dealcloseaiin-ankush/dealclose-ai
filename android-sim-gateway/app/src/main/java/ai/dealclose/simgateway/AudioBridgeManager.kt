@@ -35,11 +35,11 @@ object AudioBridgeManager {
     private var webSocket: WebSocket? = null
     private var audioTrack: AudioTrack? = null
 
-    fun startAudioBridge(context: Context) {
-        val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-        val activeHost = prefs.getString("active_server_url", "https://dealcloseai.in") ?: "https://dealcloseai.in"
-        val wsUrl = activeHost.replace("http://", "ws://").replace("https://", "wss://") + "/api/webhooks/mobile/stream"
-        val serverUrl = prefs.getString("server_url", wsUrl) ?: wsUrl
+    fun startAudioBridge(context: Context, callerPhone: String? = null) {
+        // CRITICAL FIX: The backend WebSocket server runs on Render (dealclose-ai.onrender.com).
+        // Vercel (dealcloseai.in) is a serverless proxy and terminates/404s WebSockets.
+        // Therefore, we MUST direct WebSocket streams directly to the Render backend!
+        val serverUrl = "wss://dealclose-ai.onrender.com/api/webhooks/mobile/stream"
 
         Log.d(TAG, "🌐 Connecting WebSocket Audio Stream to: $serverUrl")
 
@@ -54,15 +54,23 @@ object AudioBridgeManager {
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
             AUDIO_FORMAT,
-            minTrackBuf,
+            minTrackBuf * 2,
             AudioTrack.MODE_STREAM
         )
         audioTrack?.play()
 
-        // 2. Setup AudioManager for In-Call Communications
+        // 2. Setup AudioManager for In-Call Communications & Loud Speakerphone
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = false
+        audioManager.isSpeakerphoneOn = true // Loud speakerphone ensures caller & room hear AI voice clearly!
+
+        // Boost voice call volume to maximum
+        try {
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+            audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVol, 0)
+        } catch (vErr: Throwable) {
+            Log.w(TAG, "Volume set exception: ${vErr.message}")
+        }
 
         // 3. Connect to Backend WebSocket
         val client = OkHttpClient.Builder()
@@ -74,10 +82,13 @@ object AudioBridgeManager {
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.d(TAG, "✅ [WebSocket] Connected to DealClose Voice Server!")
-                // Send Start Event
+                // Send Start Event with Caller Number
                 val startMsg = JSONObject().apply {
                     put("event", "start")
                     put("timestamp", System.currentTimeMillis())
+                    if (!callerPhone.isNullOrBlank()) {
+                        put("phone", callerPhone)
+                    }
                 }
                 ws.send(startMsg.toString())
                 startMicStreaming()
@@ -110,16 +121,34 @@ object AudioBridgeManager {
     private fun startMicStreaming() {
         val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
         try {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                SAMPLE_RATE,
-                CHANNEL_CONFIG,
-                AUDIO_FORMAT,
-                minBuf * 2
-            )
+            // Attempt AudioSource.VOICE_COMMUNICATION first (best for acoustic echo cancellation)
+            var recordInstance: AudioRecord? = null
+            try {
+                recordInstance = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    minBuf * 2
+                )
+            } catch (initErr: Throwable) {
+                Log.w(TAG, "VOICE_COMMUNICATION init failed: ${initErr.message}. Trying AudioSource.MIC...")
+            }
 
+            if (recordInstance == null || recordInstance.state != AudioRecord.STATE_INITIALIZED) {
+                recordInstance = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    minBuf * 2
+                )
+            }
+
+            audioRecord = recordInstance
             audioRecord?.startRecording()
             isRecording = true
+            Log.d(TAG, "🎤 [Microphone] Audio streaming started successfully.")
 
             Thread {
                 val buffer = ByteArray(minBuf)
@@ -136,7 +165,9 @@ object AudioBridgeManager {
                 }
             }.start()
         } catch (e: SecurityException) {
-            Log.e(TAG, "Permission denied for AudioRecord", e)
+            Log.e(TAG, "Permission denied for AudioRecord (RECORD_AUDIO not granted)", e)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Unexpected error in AudioRecord start", e)
         }
     }
 
