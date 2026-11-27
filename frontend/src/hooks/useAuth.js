@@ -162,15 +162,23 @@ export const AuthProvider = ({ children }) => {
       });
       const token = data.token;
       const userData = data.user || data.data || data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
+      try {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
+      } catch (e) {
+        console.warn('Storage write error ignored:', e);
+      }
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
       setLoading(false);
       return data;
     } else {
-      localStorage.setItem('token', emailOrToken);
-      localStorage.setItem('user', JSON.stringify(passwordOrUserData));
+      try {
+        localStorage.setItem('token', emailOrToken);
+        localStorage.setItem('user', JSON.stringify(passwordOrUserData));
+      } catch (e) {
+        console.warn('Storage write error ignored:', e);
+      }
       api.defaults.headers.common['Authorization'] = `Bearer ${emailOrToken}`;
       setUser(passwordOrUserData);
       setLoading(false);

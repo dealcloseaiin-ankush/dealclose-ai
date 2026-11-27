@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
@@ -82,7 +84,7 @@
         <!-- 4. Background Remote Gateway Worker (Listens to Cloud Server Commands) -->
         <service
             android:name=".GatewayWorkerService"
-            android:foregroundServiceType="phoneCall"
+            android:foregroundServiceType="connectedDevice|dataSync"
             android:enabled="true"
             android:exported="false" />
 

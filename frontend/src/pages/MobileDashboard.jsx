@@ -431,9 +431,19 @@ export default function MobileDashboard() {
     setIsPairingDevice(true);
     try {
       const isNative = typeof window !== 'undefined' && Boolean(window.AndroidBridge);
-      const deviceId = isNative
-        ? `AndroidPhone_${Date.now()}`
-        : `WebBrowser_${Date.now()}`;
+      let deviceId = null;
+      if (isNative && window.AndroidBridge?.getDeviceId) {
+        try {
+          deviceId = window.AndroidBridge.getDeviceId();
+        } catch (e) {
+          console.warn('getDeviceId error:', e);
+        }
+      }
+      if (!deviceId) {
+        deviceId = isNative
+          ? `AndroidPhone_${Date.now()}`
+          : `WebBrowser_${Date.now()}`;
+      }
       
       const res = await api.post('/gateway/register', {
         pairingCode: code,
@@ -950,10 +960,16 @@ export default function MobileDashboard() {
         applyWorkspaceConfig(matchedWs.id, wsList, liveUser);
       }
 
-      // 2. Fetch Live Dashboard Metrics
-      const { data: dashRes } = await api.get(`/instagram/dashboard?workspaceId=${currentWsId}`).catch(() => ({ data: {} }));
-      if (dashRes?.stats) {
-        setLiveStats(dashRes.stats);
+      // 2. Concurrently fetch Dashboard Metrics, Contacts, Leads & Posts for lightning speed
+      const [dashRes, leadsRes, contactsRes, postsData] = await Promise.all([
+        api.get(`/instagram/dashboard?workspaceId=${currentWsId}`).catch(() => ({ data: {} })),
+        api.get(`/leads?workspaceId=${currentWsId}`).catch(() => ({ data: [] })),
+        api.get(`/contacts?workspaceId=${currentWsId}`).catch(() => ({ data: [] })),
+        api.get(`/posts?workspaceId=${currentWsId}`).catch(() => ({ data: [] }))
+      ]);
+
+      if (dashRes?.data?.stats) {
+        setLiveStats(dashRes.data.stats);
       }
 
       // 2.1 Fetch Live AI Channel Toggles (Kill Switches)
@@ -968,12 +984,7 @@ export default function MobileDashboard() {
         }
       }).catch(() => {});
 
-      // 3. Fetch Live Contacts + Leads for Active Workspace
-      const [leadsRes, contactsRes] = await Promise.all([
-        api.get(`/leads?workspaceId=${currentWsId}`).catch(() => ({ data: [] })),
-        api.get(`/contacts?workspaceId=${currentWsId}`).catch(() => ({ data: [] }))
-      ]);
-
+      // 3. Process Live Contacts + Leads for Active Workspace
       const rawLeads = Array.isArray(leadsRes.data) ? leadsRes.data : (leadsRes.data?.leads || leadsRes.data || []);
       const rawContacts = Array.isArray(contactsRes.data) ? contactsRes.data : (contactsRes.data?.contacts || contactsRes.data?.data || []);
 
@@ -1008,36 +1019,35 @@ export default function MobileDashboard() {
 
       setContacts(Object.values(combinedMap));
 
-      // 4. Fetch Live WhatsApp & Instagram Chats with Relative Timestamps
+      // 4. Fetch Live WhatsApp & Instagram Chats in background
       fetchChatsForWorkspace(currentWsId);
 
-      // 5. Fetch Real Live Instagram Posts with Photos & Videos from Meta Graph API
-      const { data: postsRes } = await api.get(`/instagram/posts?workspaceId=${currentWsId}`).catch(() => ({ data: {} }));
-      const postsArray = Array.isArray(postsRes?.posts) ? postsRes.posts : (Array.isArray(postsRes) ? postsRes : []);
-      
-      if (postsArray.length > 0) {
-        setLiveIgPosts(postsArray.map(p => ({
-          id: p.id || p._id,
-          title: p.caption ? p.caption.slice(0, 45) + (p.caption.length > 45 ? '...' : '') : 'Instagram Post',
-          caption: p.caption || '',
-          media_type: p.media_type || 'IMAGE',
-          media_url: p.media_url || '',
-          thumbnail_url: p.thumbnail_url || p.media_url || '',
-          permalink: p.permalink || '#',
-          commentsCount: p.comments_count || 0,
-          likesCount: p.like_count || 0,
-          keyword: p.automation?.triggerWord || p.triggerWord || 'LINK',
-          replyMessage: p.automation?.replyMessage || p.replyMessage || 'Check your DM! Details sent.',
-          publicReply: p.automation?.publicReply || p.publicReply || 'Check your DM! 📩',
-          fileUrl: p.automation?.fileUrl || p.fileUrl || '',
-          deliveryMode: p.automation?.deliveryMode || p.deliveryMode || 'instant_shortcut',
-          commentAiReplyEnabled: p.commentAiReplyEnabled !== false
-        })));
-      }
+      // 5. Fetch Real Live Instagram Posts in background (non-blocking)
+      api.get(`/instagram/posts?workspaceId=${currentWsId}`).then(({ data: postsRes }) => {
+        const postsArray = Array.isArray(postsRes?.posts) ? postsRes.posts : (Array.isArray(postsRes) ? postsRes : []);
+        if (postsArray.length > 0) {
+          setLiveIgPosts(postsArray.map(p => ({
+            id: p.id || p._id,
+            title: p.caption ? p.caption.slice(0, 45) + (p.caption.length > 45 ? '...' : '') : 'Instagram Post',
+            caption: p.caption || '',
+            media_type: p.media_type || 'IMAGE',
+            media_url: p.media_url || '',
+            thumbnail_url: p.thumbnail_url || p.media_url || '',
+            permalink: p.permalink || '#',
+            commentsCount: p.comments_count || 0,
+            likesCount: p.like_count || 0,
+            keyword: p.automation?.triggerWord || p.triggerWord || 'LINK',
+            replyMessage: p.automation?.replyMessage || p.replyMessage || 'Check your DM! Details sent.',
+            publicReply: p.automation?.publicReply || p.publicReply || 'Check your DM! 📩',
+            fileUrl: p.automation?.fileUrl || p.fileUrl || '',
+            deliveryMode: p.automation?.deliveryMode || p.deliveryMode || 'instant_shortcut',
+            commentAiReplyEnabled: p.commentAiReplyEnabled !== false
+          })));
+        }
+      }).catch(() => {});
 
-      // 5.5 Fetch Backend Scheduled Posts
-      const { data: postsData } = await api.get(`/posts?workspaceId=${currentWsId}`).catch(() => ({ data: [] }));
-      const loadedPosts = Array.isArray(postsData?.posts) ? postsData.posts : (Array.isArray(postsData) ? postsData : (postsData?.data || []));
+      // 5.5 Process Backend Scheduled Posts
+      const loadedPosts = Array.isArray(postsData?.data?.posts) ? postsData.data.posts : (Array.isArray(postsData?.data) ? postsData.data : (postsData?.data?.data || []));
       if (loadedPosts.length > 0) {
         setScheduledPosts(loadedPosts.map(p => ({
           id: p._id || p.id,
@@ -1496,12 +1506,12 @@ export default function MobileDashboard() {
     try {
       await login(loginEmail, loginPassword);
       setShowLoginModal(false);
-      await fetchLiveBackendData();
-      alert('Login Successful! Welcome to DealClose AI Mobile! 🚀');
-    } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
-    } finally {
       setIsLoggingIn(false);
+      fetchLiveBackendData();
+      toast.success('Login Successful! Welcome to DealClose AI Mobile! 🚀');
+    } catch (err) {
+      setIsLoggingIn(false);
+      toast.error(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
     }
   };
 
@@ -1512,12 +1522,13 @@ export default function MobileDashboard() {
     try {
       await login('ankush.bani@gmail.com', 'ak@7828289433');
       setShowLoginModal(false);
-      await fetchLiveBackendData();
-      alert('⚡ Instant Guest Access Granted! Welcome to DealClose AI!');
+      setIsLoggingIn(false);
+      fetchLiveBackendData();
+      toast.success('⚡ Instant Guest Access Granted! Welcome to DealClose AI!');
     } catch (err) {
       setShowLoginModal(false);
-    } finally {
       setIsLoggingIn(false);
+      toast.error('Guest access failed. Please try credentials.');
     }
   };
 

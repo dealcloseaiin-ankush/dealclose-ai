@@ -40,8 +40,8 @@ export default function Login() {
       }
       navigate(getPostLoginDestination());
     } catch (err) {
-      if (err.code === 'ERR_NETWORK' || err.message?.includes('network error')) {
-        setError('Network error. The server might be starting up. Please wait a moment and try again.');
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('network error') || err.code === 'ECONNABORTED') {
+        setError('Network timeout or server starting up. Please check your internet connection and try again.');
       } else if (err.message?.includes('Invalid login credentials')) {
         setError('Invalid email or password. Please check your credentials or click "Forgot / Set Password".');
       } else {
@@ -91,16 +91,25 @@ export default function Login() {
           <>
             <button 
               type="button" 
-              onClick={() => {
+              disabled={loading}
+              onClick={async () => {
+                setError('');
+                setLoading(true);
                 setEmail('ankush.bani@gmail.com');
                 setPassword('ak@7828289433');
-                login('ankush.bani@gmail.com', 'ak@7828289433')
-                  .then(() => navigate(getPostLoginDestination()))
-                  .catch(() => navigate(getPostLoginDestination()));
+                try {
+                  await login('ankush.bani@gmail.com', 'ak@7828289433');
+                  navigate(getPostLoginDestination());
+                } catch (guestErr) {
+                  console.warn('Guest login retry:', guestErr);
+                  navigate(getPostLoginDestination());
+                } finally {
+                  setLoading(false);
+                }
               }}
               className="w-full mb-3 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-black p-3 rounded-lg font-black hover:opacity-95 transition-all shadow-md"
             >
-              <span>⚡ 1-Click Instant Guest / Demo Access</span>
+              <span>{loading ? 'Logging in...' : '⚡ 1-Click Instant Guest / Demo Access'}</span>
             </button>
 
             <button type="button" onClick={handleGoogleLogin} className="w-full mb-6 flex items-center justify-center gap-3 bg-white text-black p-3 rounded-lg font-bold hover:bg-gray-200 transition-colors">

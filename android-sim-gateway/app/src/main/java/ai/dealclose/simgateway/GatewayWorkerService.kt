@@ -7,6 +7,7 @@ import android.app.Service
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
@@ -43,60 +44,90 @@ class GatewayWorkerService : Service() {
     )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        createNotificationChannel()
-        val notification = createForegroundNotification()
-        startForeground(101, notification)
-
-        val pairingCode = intent?.getStringExtra("pairing_code") ?: ""
-        if (pairingCode.isNotEmpty()) {
-            registerWithServer(pairingCode)
+        try {
+            createNotificationChannel()
+            val notification = createForegroundNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    101,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    101,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(101, notification)
+            }
+        } catch (fgsErr: Throwable) {
+            Log.e("GatewayWorker", "Safe catch: startForeground error: ${fgsErr.message}")
         }
 
-        startHeartbeatLoop()
+        try {
+            val pairingCode = intent?.getStringExtra("pairing_code") ?: ""
+            if (pairingCode.isNotEmpty()) {
+                registerWithServer(pairingCode)
+            }
+            startHeartbeatLoop()
+        } catch (e: Throwable) {
+            Log.e("GatewayWorker", "onStartCommand error: ${e.message}")
+        }
+
         return START_STICKY
     }
 
     private fun registerWithServer(code: String) {
         Thread {
-            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-
-            val body = JSONObject().apply {
-                put("pairingCode", code)
-                put("deviceId", Build.MODEL + "_" + SettingsSecureId(this@GatewayWorkerService))
-                put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL} (SIM Gateway)")
-                put("batteryLevel", batteryLevel)
-                put("isDefaultDialer", isDefaultDialer())
-            }
-
-            val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-
-            // Try each candidate URL until registration succeeds
-            for (host in candidateHosts) {
-                try {
-                    val url = "$host/api/gateway/register"
-                    Log.d("GatewayWorker", "Trying to register with server at: $url")
-
-                    val req = Request.Builder()
-                        .url(url)
-                        .post(body.toString().toRequestBody("application/json".toMediaType()))
-                        .build()
-
-                    val resp = client.newCall(req).execute()
-                    val respBody = resp.body?.string() ?: ""
-                    Log.d("GatewayWorker", "Server Response ($url): HTTP ${resp.code} => $respBody")
-
-                    if (resp.isSuccessful) {
-                        prefs.edit()
-                            .putString("active_server_url", host)
-                            .putBoolean("is_paired", true)
-                            .apply()
-                        Log.d("GatewayWorker", "✅ Successfully Registered with $host!")
-                        break
-                    }
-                } catch (e: Exception) {
-                    Log.w("GatewayWorker", "Failed to connect to $host: ${e.message}")
+            try {
+                val batteryManager = getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                val batteryLevel = try {
+                    batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
+                } catch (e: Throwable) {
+                    100
                 }
+
+                val body = JSONObject().apply {
+                    put("pairingCode", code)
+                    put("deviceId", Build.MODEL + "_" + SettingsSecureId(this@GatewayWorkerService))
+                    put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL} (SIM Gateway)")
+                    put("batteryLevel", batteryLevel)
+                    put("isDefaultDialer", isDefaultDialer())
+                }
+
+                val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+
+                // Try each candidate URL until registration succeeds
+                for (host in candidateHosts) {
+                    try {
+                        val url = "$host/api/gateway/register"
+                        Log.d("GatewayWorker", "Trying to register with server at: $url")
+
+                        val req = Request.Builder()
+                            .url(url)
+                            .post(body.toString().toRequestBody("application/json".toMediaType()))
+                            .build()
+
+                        val resp = client.newCall(req).execute()
+                        val respBody = resp.body?.string() ?: ""
+                        Log.d("GatewayWorker", "Server Response ($url): HTTP ${resp.code} => $respBody")
+
+                        if (resp.isSuccessful) {
+                            prefs.edit()
+                                .putString("active_server_url", host)
+                                .putBoolean("is_paired", true)
+                                .apply()
+                            Log.d("GatewayWorker", "✅ Successfully Registered with $host!")
+                            break
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("GatewayWorker", "Failed to connect to $host: ${e.message}")
+                    }
+                }
+            } catch (threadErr: Throwable) {
+                Log.e("GatewayWorker", "registerWithServer thread caught error: ${threadErr.message}")
             }
         }.start()
     }
@@ -135,12 +166,16 @@ class GatewayWorkerService : Service() {
     }
 
     private fun isDefaultDialer(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(RoleManager::class.java)
-            roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
-        } else {
-            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-            telecomManager.defaultDialerPackage == packageName
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val roleManager = getSystemService(RoleManager::class.java)
+                roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) ?: false
+            } else {
+                val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+                telecomManager?.defaultDialerPackage == packageName
+            }
+        } catch (e: Throwable) {
+            false
         }
     }
 

@@ -83,7 +83,7 @@ exports.registerDevice = async (req, res) => {
     pending.isDefaultDialer = Boolean(isDefaultDialer);
     pending.isOnline = true;
     pending.lastPingAt = new Date();
-    pending.pairingCode = ''; // Consume code
+    pending.pairingCode = cleanCode; // Retain code so native background service call also acknowledges instantly
 
     await pending.save();
 

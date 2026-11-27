@@ -230,6 +230,7 @@ exports.getRecentPosts = async (req, res) => {
     // Added more detailed logging for easier debugging in the future.
     console.log(`   - Login Type: ${loginType}, Using URL: ${url}`);
     const response = await axios.get(url, {
+      timeout: 5000,
       params: {
         // ✅ FIX: The fields are slightly different for the two domains.
         fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',

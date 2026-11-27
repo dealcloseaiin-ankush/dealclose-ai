@@ -124,6 +124,19 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                try {
+                    Toast.makeText(this@MainActivity, message ?: "", Toast.LENGTH_SHORT).show()
+                } catch (ignored: Throwable) {}
+                result?.confirm()
+                return true
+            }
+
+            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                result?.confirm()
+                return true
+            }
+
             // Support camera and gallery uploads for product studio & video polisher
             override fun onShowFileChooser(
                 webView: WebView?,
@@ -350,12 +363,34 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun getDeviceId(): String {
+            return try {
+                android.os.Build.MODEL + "_" + SettingsSecureId(context)
+            } catch (e: Throwable) {
+                "AndroidPhone_" + android.os.Build.MODEL
+            }
+        }
+
+        @JavascriptInterface
         fun getPairingCode(): String {
             return try {
                 val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
                 prefs.getString("pairing_code", "") ?: ""
             } catch (e: Throwable) {
                 ""
+            }
+        }
+    }
+
+    companion object {
+        fun SettingsSecureId(context: Context): String {
+            return try {
+                android.provider.Settings.Secure.getString(
+                    context.contentResolver,
+                    android.provider.Settings.Secure.ANDROID_ID
+                ) ?: "UNKNOWN_ID"
+            } catch (e: Throwable) {
+                "UNKNOWN_ID"
             }
         }
     }

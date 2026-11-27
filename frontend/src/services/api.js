@@ -8,6 +8,7 @@ const getApiBaseUrl = () => {
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
+  timeout: 15000,
 });
 
 // Request interceptor for API calls to attach JWT token
