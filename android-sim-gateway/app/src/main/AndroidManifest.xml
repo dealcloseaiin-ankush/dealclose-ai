@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"
@@ -67,7 +69,17 @@
             </intent-filter>
         </service>
 
-        <!-- 3. Background Remote Gateway Worker (Listens to Cloud Server Commands) -->
+        <!-- 3. 📞 DealClose Luxury In-Call Screen UI (Displays when incoming or active call) -->
+        <activity
+            android:name=".InCallActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <!-- 4. Background Remote Gateway Worker (Listens to Cloud Server Commands) -->
         <service
             android:name=".GatewayWorkerService"
             android:foregroundServiceType="phoneCall"

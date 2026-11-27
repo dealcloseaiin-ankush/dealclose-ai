@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         settings.loadWithOverviewMode = true
 
         // User Agent Identifier
-        settings.userAgentString = "${settings.userAgentString} DealCloseApp/1.7.0 (Android Native Luxury)"
+        settings.userAgentString = "${settings.userAgentString} DealCloseApp/1.7.4 (Android Native Luxury)"
 
         // Add Native JavaScript Bridge for Haptics & System Control
         webViewApp.addJavascriptInterface(AndroidNativeBridge(this, webViewApp), "AndroidBridge")
@@ -258,7 +258,7 @@ class MainActivity : AppCompatActivity() {
         fun isNativeApp(): Boolean = true
 
         @JavascriptInterface
-        fun getAppVersion(): String = "1.7.3"
+        fun getAppVersion(): String = "1.7.4"
 
         @JavascriptInterface
         fun requestDefaultDialerRole() {
