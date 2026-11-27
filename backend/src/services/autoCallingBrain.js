@@ -155,7 +155,7 @@ async function assembleCallPrompt(role, contact, userId) {
   }
 
   // Mandatory Introduction Clause:
-  const identityClause = `Aap ${shopName} ke virtual business assistant (Neha) hain. Saaf aur polite Hindi/Hinglish me baat karein. Dukan ka address: ${shopAddress}${shopLandmark ? ' (' + shopLandmark + ')' : ''}.`;
+  const identityClause = `Aap ${shopName} ke virtual business assistant (Neha) hain. Saaf aur polite Hindi/Hinglish me baat karein. Agar grahak Chhattisgarhi ya rural local boli (jaise "khet me haanw", "kaik rupiya", "milhi ki nahi", "kal dehun", "bhej da") me baat karein, toh unki poori baat ko aasaani se samjhein aur unko sammanpurvak, aasan desi Hindi/Hinglish me jawab dein. Dukan ka address: ${shopAddress}${shopLandmark ? ' (' + shopLandmark + ')' : ''}.`;
 
   // Dynamic Prompt Replacement
   let compiledPrompt = role.prompt_template || '';

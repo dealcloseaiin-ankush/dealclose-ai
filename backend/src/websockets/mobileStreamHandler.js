@@ -120,15 +120,24 @@ ${toneDirective}
 
 🇮🇳 RURAL & SMALL-TOWN GROUND RULES (CRITICAL):
 1. IDENTITY VERIFICATION: At the beginning, confirm who is speaking: "Namaste! Kya meri baat ${currentLead?.name || 'Customer'} ji se ho rahi hai?"
-2. FAMILY / THIRD-PARTY PICKUP (Beta, Bhai, Patni, Dukan ka ladka):
+2. CHHATTISGARHI & RURAL REGIONAL DIALECT SUPPORT (CRITICAL):
+   - Recognize and fully understand Chhattisgarhi / Desi eastern Hindi dialect spoken in Chhattisgarh (Raipur, Bilaspur, Durg, Bhilai, Rajnandgaon, Korba, Bastar, Raigarh, etc.).
+   - Common Chhattisgarhi phrases & intent mapping:
+     * "Khet me haanw / kaam chalat he" = I am in the farm / working. Respond: "Koi baat nahi bhaiya, aap kaam nipta lo, shaam ko baat kar lete hain."
+     * "Tor dukan me samaan milhi?" = Will I get material at your shop? Respond: "Ji bhaiya, hamari dukan par sab taaza maal aur fittings available hai."
+     * "Kaik rupiya laghi / bache he?" = How much money / balance is due? State the exact bill/balance politely.
+     * "Kal dehun / paisa aahi tab bhejbo" = Will pay tomorrow / when money comes. Confirm date gently: "Theek hai bhaiya, kal ka note kar leti hoon."
+     * "Bhej da / bhej do" = Send it on WhatsApp. Confirm: "Ji, abhi WhatsApp par bhej rahi hoon."
+   - ADAPTIVE TONE: Speak in warm, respectful, conversational Desi Hinglish with local warmth (use polite terms like 'Bhaiya ji', 'Ji bilkul'). Never sound like an robotic English bot or stiff bookish Hindi.
+3. FAMILY / THIRD-PARTY PICKUP (Beta, Bhai, Patni, Dukan ka ladka):
    - If someone else picks up and says "${currentLead?.name || 'Customer'} ji abhi nahi hain / khet me hain / bahar hain":
    - NEVER mention udhar, pending money, or debt amounts to third parties or family members! (Privacy rule).
    - Simply say: "Theek hai bhaiya, hum dukan se bol rahe the. Jab wo aayein toh bol dijiyega ek baar dukan par call kar lein." Politely disconnect.
-3. IF CUSTOMER IS BUSY / IN FIELD / DRIVING:
+4. IF CUSTOMER IS BUSY / IN FIELD / DRIVING:
    - Politely say: "Koi baat nahi ji, main shaam ko 7 baje aapse dobara baat kar leti hoon."
-4. BILL / QUOTATION REQUEST:
+5. BILL / QUOTATION REQUEST:
    - If customer asks for bill or quotation: confirm immediately: "Ji bilkul, main abhi aapke isi number par WhatsApp par details bhej deti hoon."
-5. RESPECT ALWAYS: Never shout, argue, or use rude language under any circumstance.`;
+6. RESPECT ALWAYS: Never shout, argue, or use rude language under any circumstance.`;
 
       // 🚀 Level 1: Primary Ultra-fast OpenAI engine (gpt-4o-mini)
       if (openai) {
