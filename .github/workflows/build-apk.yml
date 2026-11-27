@@ -50,6 +50,7 @@ jobs:
             exit 1
           fi
           mkdir -p ../dist-apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.9.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.8.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.7.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.6.apk
@@ -60,24 +61,26 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dealclose-ai-apk
-          path: dist-apk/dealclose-ai-v1.7.8.apk
+          path: dist-apk/dealclose-ai-v1.7.9.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.7.8-release
-          name: "DealClose AI v1.7.8 (Direct Loudspeaker & PCM Audio Engine)"
+          tag_name: v1.7.9-release
+          name: "DealClose AI v1.7.9 (Headset/Earphone Silent Audio + Ultra-Fast ASR Engine)"
           body: |
-            ### 📱 DealClose AI v1.7.8 (Crystal-Clear Cellular Voice Audio)
-            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.8.apk` directly on your Android phone!
+            ### 📱 DealClose AI v1.7.9 (Headset Silent Mode & Voice Recognition ASR)
+            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.9.apk` directly on your Android phone!
 
-            ✨ **What's New in v1.7.8:**
-            - 🔊 **Telecom Telecom setAudioRoute(ROUTE_SPEAKER)**: Explicitly commands Android Telecom system to route active call directly to loud speakerphone so both parties hear the conversation loudly.
-            - 🎵 **Pure Linear PCM AudioTrack**: Stripped 44-byte container headers and updated AudioTrack to modern AudioAttributes (USAGE_VOICE_COMMUNICATION) for zero audio dropouts.
-            - 🎨 **Stock Android Circular Dialer**: Authentic Android incoming call UI with circular Green (Answer) and Red (Decline) buttons.
+            ✨ **What's New in v1.7.9:**
+            - 🎧 **Silent Room Headset/Earpiece Audio**: Telecom route dynamically switches to `ROUTE_WIRED_HEADSET` / `ROUTE_BLUETOOTH` or `ROUTE_EARPIECE` so AI voice does NOT blast through the room's loudspeaker.
+            - 🎤 **VOICE_RECOGNITION AudioRecord Engine**: Bypasses Android 14 telephony noise suppression/echo cancellation that was muting customer voice during active cellular calls.
+            - ⚡ **Ultra-Fast Speech STT (300ms Endpointing)**: Deepgram Nova-2 configured with `endpointing=300ms` for instant end-of-speech detection without dead silence.
+            - 🚀 **Max Tokens & Low Latency LLM**: Tuned OpenAI gpt-4o-mini generation for snappy sub-300ms responses.
             - 🔑 **Consistent Keystore Signing**: Seamless updates without uninstalling!
           files: |
+            dist-apk/dealclose-ai-v1.7.9.apk
             dist-apk/dealclose-ai-v1.7.8.apk
             dist-apk/dealclose-ai-v1.7.7.apk
             dist-apk/dealclose-ai-v1.7.6.apk

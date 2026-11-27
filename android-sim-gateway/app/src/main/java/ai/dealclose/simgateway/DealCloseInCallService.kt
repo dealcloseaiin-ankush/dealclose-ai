@@ -120,8 +120,24 @@ class DealCloseInCallService : InCallService() {
                         dismissCallNotification()
                         if (isAiCall) {
                             try {
-                                setAudioRoute(CallAudioState.ROUTE_SPEAKER)
-                                Log.d(TAG, "🔊 [Telecom] Successfully switched call to LOUDSPEAKER via setAudioRoute!")
+                                val audioManager = getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                                val hasHeadset = audioManager?.isWiredHeadsetOn == true ||
+                                                 audioManager?.isBluetoothScoOn == true ||
+                                                 audioManager?.isBluetoothA2dpOn == true
+
+                                if (hasHeadset) {
+                                    Log.d(TAG, "🎧 [Telecom] Headset/Earphone connected. Audio routed to HEADSET (Room quiet).")
+                                    if (audioManager?.isBluetoothScoOn == true || audioManager?.isBluetoothA2dpOn == true) {
+                                        setAudioRoute(CallAudioState.ROUTE_BLUETOOTH)
+                                    } else {
+                                        setAudioRoute(CallAudioState.ROUTE_WIRED_HEADSET)
+                                    }
+                                } else {
+                                    // Route to EARPIECE so loudspeaker does NOT blast into the room!
+                                    // Caller hears AI in call, room stays completely silent.
+                                    setAudioRoute(CallAudioState.ROUTE_EARPIECE)
+                                    Log.d(TAG, "🔇 [Telecom] Audio routed to ROUTE_EARPIECE (Room quiet).")
+                                }
                             } catch (e: Throwable) {
                                 Log.e(TAG, "setAudioRoute error: ${e.message}")
                             }

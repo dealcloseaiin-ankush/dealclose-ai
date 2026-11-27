@@ -67,10 +67,10 @@ object AudioBridgeManager {
             .build()
         audioTrack?.play()
 
-        // 2. Setup AudioManager for In-Call Communications & Loud Speakerphone
+        // 2. Setup AudioManager for In-Call Communications (Keep room quiet)
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = true // Loud speakerphone ensures caller & room hear AI voice clearly!
+        audioManager.isSpeakerphoneOn = false // Default to false so loudspeaker does NOT blast into room!
 
         // Boost voice call and media volume to maximum
         try {
@@ -139,28 +139,31 @@ object AudioBridgeManager {
     private fun startMicStreaming() {
         val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
         try {
-            // Attempt AudioSource.VOICE_COMMUNICATION first (best for acoustic echo cancellation)
+            // Priority 1: AudioSource.VOICE_RECOGNITION
+            // Crucial fix: Bypasses Android telephony AEC & AGC that suppresses mic during live GSM calls!
             var recordInstance: AudioRecord? = null
-            try {
-                recordInstance = AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                    SAMPLE_RATE,
-                    CHANNEL_CONFIG,
-                    AUDIO_FORMAT,
-                    minBuf * 2
-                )
-            } catch (initErr: Throwable) {
-                Log.w(TAG, "VOICE_COMMUNICATION init failed: ${initErr.message}. Trying AudioSource.MIC...")
+            val sources = intArrayOf(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            )
+
+            for (src in sources) {
+                try {
+                    val r = AudioRecord(src, SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, minBuf * 2)
+                    if (r.state == AudioRecord.STATE_INITIALIZED) {
+                        recordInstance = r
+                        Log.d(TAG, "🎤 [Microphone] Successfully initialized AudioRecord with AudioSource: $src")
+                        break
+                    }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "AudioSource $src init failed: ${e.message}")
+                }
             }
 
             if (recordInstance == null || recordInstance.state != AudioRecord.STATE_INITIALIZED) {
-                recordInstance = AudioRecord(
-                    MediaRecorder.AudioSource.MIC,
-                    SAMPLE_RATE,
-                    CHANNEL_CONFIG,
-                    AUDIO_FORMAT,
-                    minBuf * 2
-                )
+                Log.e(TAG, "❌ Failed to initialize any AudioRecord source!")
+                return
             }
 
             audioRecord = recordInstance
@@ -170,15 +173,28 @@ object AudioBridgeManager {
 
             Thread {
                 val buffer = ByteArray(minBuf)
+                var packetCount = 0L
                 while (isRecording && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0) {
+                        packetCount++
                         val base64 = Base64.encodeToString(buffer, 0, read, Base64.NO_WRAP)
                         val audioMsg = JSONObject().apply {
                             put("event", "audio")
                             put("data", base64)
                         }
                         webSocket?.send(audioMsg.toString())
+
+                        // Periodically compute and log audio RMS amplitude to verify customer speech is entering mic
+                        if (packetCount % 50L == 0L) {
+                            var sum = 0L
+                            for (i in 0 until read step 2) {
+                                val sample = (buffer[i + 1].toInt() shl 8) or (buffer[i].toInt() and 0xFF)
+                                sum += sample * sample
+                            }
+                            val rms = Math.sqrt((sum / (read / 2)).toDouble())
+                            Log.d(TAG, "🎤 [Mic Stream] Sent $packetCount packets. Input RMS amplitude: $rms")
+                        }
                     }
                 }
             }.start()

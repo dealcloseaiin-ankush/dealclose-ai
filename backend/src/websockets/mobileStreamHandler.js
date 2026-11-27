@@ -4,8 +4,9 @@ const Call = require('../models/callModel');
 const WebSocket = require('ws'); // 🚀 RAW STT Connection
 const Lead = require('../models/leadModel');
 
-// 🚀 GLOBAL CACHE: Cache fallback audio to save resources
+// 🚀 GLOBAL CACHE: Cache fallback audio and instant initial greeting
 let cachedMobileFallbackAudio = null;
+let cachedInitialGreetingAudio = null;
 
 // 🌊 DEALCLOSE AI COST-EFFECTIVE CALLING MODELS CONFIGURATION
 const MODELS = {
@@ -46,29 +47,33 @@ module.exports = function (ws) {
 
   console.log(`📱 [Mobile Stream] New connection from Android App! Call ID: ${callSid}`);
 
-  // 2. Setup Raw STT Connection
+  // 2. Setup Raw STT Connection (Ultra-low latency: endpointing=300ms, Hindi+Hinglish support)
   let deepgramLive;
   try {
-    deepgramLive = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2&language=en-IN&smart_format=true&encoding=linear16&sample_rate=16000', {
+    deepgramLive = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2&language=hi&smart_format=true&encoding=linear16&sample_rate=16000&endpointing=300&interim_results=true', {
       headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}` }
     });
     
     deepgramLive.on('open', () => {
-      console.log(`✅ [Deepgram STT] Live Ears opened successfully.`);
+      console.log(`✅ [Deepgram STT] Live Ears opened successfully (endpointing=300ms, model=nova-2-hi).`);
     });
 
     deepgramLive.on('message', async (data) => {
       const response = JSON.parse(data);
       if (response.channel && response.channel.alternatives[0]) {
-        const transcript = response.channel.alternatives[0].transcript;
-        if (transcript && response.is_final) {
-          console.log(`👤 [Customer on Mobile]: ${transcript}`);
-          rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
-          conversationHistory.push({ role: "user", content: transcript });
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ event: 'transcript', text: transcript }));
+        const alt = response.channel.alternatives[0];
+        const transcript = alt.transcript ? alt.transcript.trim() : '';
+        if (transcript.length > 0) {
+          console.log(`🎤 [STT Realtime]: "${transcript}" (final: ${response.is_final}, speech_final: ${response.speech_final})`);
+          if (response.is_final || response.speech_final) {
+            console.log(`👤 [Customer on Mobile]: ${transcript}`);
+            rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
+            conversationHistory.push({ role: "user", content: transcript });
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ event: 'transcript', text: transcript }));
+            }
+            await processAIResponse();
           }
-          await processAIResponse();
         }
       }
     });
@@ -139,13 +144,15 @@ ${toneDirective}
    - If customer asks for bill or quotation: confirm immediately: "Ji bilkul, main abhi aapke isi number par WhatsApp par details bhej deti hoon."
 6. RESPECT ALWAYS: Never shout, argue, or use rude language under any circumstance.`;
 
-      // 🚀 Level 1: Primary Ultra-fast OpenAI engine (gpt-4o-mini)
+      // 🚀 Level 1: Primary Ultra-fast OpenAI engine (gpt-4o-mini with 60 max_tokens for 200ms latency)
       if (openai) {
         try {
-          console.log(`🧠 [AI] Processing via OpenAI engine: ${MODELS.OPENAI_MINI}...`);
+          console.log(`🧠 [AI] Processing via OpenAI engine: ${MODELS.OPENAI_MINI} (fast response)...`);
           const chatCompletion = await openai.chat.completions.create({
             model: MODELS.OPENAI_MINI,
-            messages: [{ role: "system", content: systemPromptText }, ...conversationHistory]
+            messages: [{ role: "system", content: systemPromptText }, ...conversationHistory],
+            max_tokens: 65,
+            temperature: 0.2
           });
           aiText = chatCompletion.choices[0].message.content;
           aiSuccess = true;
@@ -278,6 +285,9 @@ ${toneDirective}
         audioChunkCount++;
         if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) {
           deepgramLive.send(Buffer.from(msg.data, 'base64'));
+        }
+        if (audioChunkCount % 100 === 0) {
+          console.log(`📡 [Audio Stream In] Received ${audioChunkCount} microphone chunks from Android phone`);
         }
       } else if (msg.event === 'stop') {
         if (deepgramLive && deepgramLive.readyState === WebSocket.OPEN) {
