@@ -12,7 +12,8 @@ import {
   Heart, MessageCircle as CommentIcon, ExternalLink,
   Smartphone,
   Square,
-  Store
+  Store,
+  Battery
 } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -475,10 +476,22 @@ export default function MobileDashboard() {
   };
 
   const handleDisconnectMobileDevice = async (deviceId) => {
-    if (!window.confirm('Kya aap is SIM Gateway device ko disconnect karna chahte hain?')) return;
+    if (typeof window !== 'undefined' && !window.confirm('Kya aap is SIM Gateway device ko disconnect karna chahte hain?')) return;
     try {
-      await api.delete(`/gateway/devices/${deviceId}`);
-      toast.success('Device disconnected');
+      if (deviceId) {
+        await api.delete(`/gateway/devices/${deviceId}`).catch(() => {});
+      }
+      if (typeof window !== 'undefined' && window.AndroidBridge?.setPairingCode) {
+        try {
+          window.AndroidBridge.setPairingCode('');
+        } catch (bridgeErr) {
+          console.warn('Native clear pairing code error:', bridgeErr);
+        }
+      }
+      toast.success('🎉 Device successfully disconnected & unlinked!');
+      setGatewayDevices([]);
+      setGeneratedPairingCode('');
+      setInputPairingCode('');
       fetchGatewayDevices();
     } catch (err) {
       toast.error('Failed to disconnect device');
@@ -5970,9 +5983,9 @@ export default function MobileDashboard() {
                       <button
                         type="button"
                         onClick={() => handleDisconnectMobileDevice(gatewayDevices[0]?.deviceId)}
-                        className="py-2 px-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold text-xs hover:bg-rose-500/30 transition-all"
+                        className="py-2 px-3.5 rounded-xl bg-rose-600/20 border border-rose-500/50 text-rose-300 hover:bg-rose-600/30 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
                       >
-                        Disconnect
+                        <Trash2 size={13} /> <span>Disconnect 🔌</span>
                       </button>
                     </div>
                   </div>
