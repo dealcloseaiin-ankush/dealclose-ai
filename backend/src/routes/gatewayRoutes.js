@@ -10,6 +10,7 @@ const {
   disconnectGatewayDevice,
   getCallingRoles,
   saveCallingRole,
+  deleteCallingRole,
   getCallingContacts,
   importCallingContacts,
   updateCallingContact,
@@ -34,6 +35,7 @@ router.delete('/devices/:deviceId', protect, disconnectGatewayDevice); // Discon
 // 🎭 Role-based Calling Brain Routes
 router.get('/roles', protect, getCallingRoles);
 router.post('/roles', protect, saveCallingRole);
+router.delete('/roles/:roleId', protect, deleteCallingRole);
 
 // 👥 Contacts, Notes & Purchase Billing
 router.get('/contacts', protect, getCallingContacts);

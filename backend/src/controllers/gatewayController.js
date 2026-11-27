@@ -48,7 +48,7 @@ exports.registerDevice = async (req, res) => {
     }
 
     const cleanCode = (pairingCode || '').toString().trim().replace(/^DC-?/i, '');
-    const pending = await GatewayDevice.findOne({
+    let pending = await GatewayDevice.findOne({
       $or: [
         { pairingCode: (pairingCode || '').toString().trim() },
         { pairingCode: `DC-${cleanCode}` },
@@ -56,6 +56,21 @@ exports.registerDevice = async (req, res) => {
       ]
     });
     if (!pending) {
+      // Check if this device was already linked / registered recently
+      const existing = await GatewayDevice.findOne({ deviceId });
+      if (existing) {
+        existing.isOnline = true;
+        existing.lastPingAt = new Date();
+        if (batteryLevel) existing.batteryLevel = batteryLevel;
+        if (typeof isDefaultDialer !== 'undefined') existing.isDefaultDialer = Boolean(isDefaultDialer);
+        await existing.save();
+        return res.status(200).json({
+          success: true,
+          message: 'Android Phone successfully verified & connected!',
+          device: existing,
+          userId: existing.userId
+        });
+      }
       return res.status(404).json({ success: false, message: 'Invalid or expired Pairing Code' });
     }
 
@@ -193,12 +208,49 @@ exports.getCallingRoles = async (req, res) => {
 
     // Seed default roles if merchant has none
     if (!roles || roles.length === 0) {
-      const defaultRoles = [
+      const bName = req.user?.businessName || 'My Business';
+      const isProperty = /property|estate|hub|flat|plot|real/i.test(bName);
+
+      const defaultRoles = isProperty ? [
+        {
+          userId,
+          role_id: 'buyer',
+          role_name: 'Property Buyer (प्रॉपर्टी खरीदार)',
+          firm_name: bName,
+          goal: 'Budget aur preferred 2/3 BHK / Plot location check karein, site visit schedule karein',
+          offer: 'Special pre-launch spot booking discount + WhatsApp brochure',
+          default_frequency_days: 3,
+          call_window: { start: '10:00', end: '19:00' },
+          max_attempts: 3
+        },
+        {
+          userId,
+          role_id: 'seller',
+          role_name: 'Property Seller / Landlord (मालिक)',
+          firm_name: bName,
+          goal: 'Sell ya rent karne ke liye carpet area, demand price aur photos WhatsApp par mangwayein',
+          offer: 'Zero brokerage listing on verified buyers network',
+          default_frequency_days: 7,
+          call_window: { start: '10:30', end: '19:30' },
+          max_attempts: 3
+        },
+        {
+          userId,
+          role_id: 'site_visit',
+          role_name: 'Site Visit Follow-up (विजिट कन्फर्मेशन)',
+          firm_name: bName,
+          goal: 'Sample flat visit ke baad feedback lein aur token booking close karein',
+          offer: 'Free registry offer on weekend token advance',
+          default_frequency_days: 2,
+          call_window: { start: '11:00', end: '18:30' },
+          max_attempts: 4
+        }
+      ] : [
         {
           userId,
           role_id: 'plumber',
-          role_name: 'Plumber (प्लंबर)',
-          firm_name: req.user?.businessName || 'DealClose Building Materials',
+          role_name: 'Plumber (प्लंबर / कारीगर)',
+          firm_name: bName,
           goal: 'Check ongoing site plumbing requirements, take PVC pipe & fittings order',
           offer: 'Flat 5% Extra Cash Discount on full carton order this week',
           default_frequency_days: 7,
@@ -209,7 +261,7 @@ exports.getCallingRoles = async (req, res) => {
           userId,
           role_id: 'thekedar',
           role_name: 'Thekedar / Contractor (ठेकेदार)',
-          firm_name: req.user?.businessName || 'DealClose Building Materials',
+          firm_name: bName,
           goal: 'Check upcoming project foundation/finishing requirements, confirm bulk order delivery',
           offer: 'Priority same-day delivery + 15 days credit term on verified billing',
           default_frequency_days: 3,
@@ -219,8 +271,8 @@ exports.getCallingRoles = async (req, res) => {
         {
           userId,
           role_id: 'painter',
-          role_name: 'Painter (पेंटर / ठेकेदार)',
-          firm_name: req.user?.businessName || 'DealClose Building Materials',
+          role_name: 'Painter (पेंटर / कारीगर)',
+          firm_name: bName,
           goal: 'Check wall putty, primer, and emulsion requirements for festive season',
           offer: 'Buy 5 Buckets Emulsion, Get 1 Token Coupon Free',
           default_frequency_days: 7,
@@ -231,7 +283,7 @@ exports.getCallingRoles = async (req, res) => {
           userId,
           role_id: 'wholesale',
           role_name: 'Wholesale B2B Retailer (होलसेल/दुकानदार)',
-          firm_name: req.user?.businessName || 'DealClose Building Materials',
+          firm_name: bName,
           goal: 'Restock fast-moving hardware items, settle monthly account balance',
           offer: 'Zero freight charge on minimum order value of ₹25,000',
           default_frequency_days: 15,
@@ -276,6 +328,18 @@ exports.saveCallingRole = async (req, res) => {
     );
 
     res.status(200).json({ success: true, message: `Role ${role_name} saved!`, role });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteCallingRole = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const { roleId } = req.params;
+    await CallingRole.findOneAndDelete({ userId, role_id: roleId });
+    res.status(200).json({ success: true, message: 'Role deleted successfully!' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

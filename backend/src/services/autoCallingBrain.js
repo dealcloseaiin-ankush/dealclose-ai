@@ -84,8 +84,8 @@ async function assembleCallPrompt(role, contact, userId) {
   const User = require('../models/userModel');
   const user = await User.findById(userId).lean();
 
-  const shopName = user?.brandKit?.businessName || role.firm_name || 'DealClose Building Materials';
-  const shopAddress = user?.brandKit?.address || 'Near Main Market Road';
+  const shopName = user?.brandKit?.businessName || user?.businessName || role.firm_name || 'Aapki Firm';
+  const shopAddress = user?.brandKit?.address || user?.address || 'Main Road';
   const shopLandmark = user?.brandKit?.landmark || '';
   const shopMaps = user?.brandKit?.googleMapsUrl || '';
 
@@ -123,7 +123,7 @@ async function assembleCallPrompt(role, contact, userId) {
     segmentInstruction = `[TARGET: PAYMENT DUES / HISAB FOLLOW-UP]\nInka ${dueAmt > 0 ? '₹' + dueAmt.toLocaleString('en-IN') : 'hisaab'} balance pending hai. Izzat aur vinamrata se reminder dein: "Accounts se aapke pending balance ke silsile me call kiya hai. Kya main instant UPI link share kar doon taaki accounts clear ho jaye?"`;
   } else {
     // Regular
-    segmentInstruction = `[TARGET: REGULAR REPEAT BUYER]\nYe hamare regular ${role.role_name} hain. Aajkal kahan site chal rahi hai poohein, pipe/fitting/material ka requirement lein, aur scheme batayein.`;
+    segmentInstruction = `[TARGET: REGULAR REPEAT BUYER]\nYe hamare regular ${role.role_name} hain. Hal-chal aur kaam ya requirement ke baare me poohein, aur hamara offer (${role.offer}) batayein.`;
   }
 
   // 🧠 Customer Nature / Fixed Profile Note (Categorisation & Temperament)

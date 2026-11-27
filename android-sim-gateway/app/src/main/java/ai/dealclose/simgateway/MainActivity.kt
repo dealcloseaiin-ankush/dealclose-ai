@@ -188,20 +188,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun autoStartGatewayWorker() {
-        val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-        val savedCode = prefs.getString("pairing_code", "884219") ?: "884219"
-
-        val serviceIntent = Intent(this, GatewayWorkerService::class.java).apply {
-            putExtra("pairing_code", savedCode)
-        }
         try {
+            val prefs = getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+            val savedCode = prefs.getString("pairing_code", "") ?: ""
+
+            val serviceIntent = Intent(this, GatewayWorkerService::class.java).apply {
+                if (savedCode.isNotEmpty()) {
+                    putExtra("pairing_code", savedCode)
+                }
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
             } else {
                 startService(serviceIntent)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (e: Throwable) {
+            Log.e("MainActivity", "Failed to start GatewayWorkerService: ${e.message}")
         }
     }
 
@@ -256,7 +258,7 @@ class MainActivity : AppCompatActivity() {
         fun isNativeApp(): Boolean = true
 
         @JavascriptInterface
-        fun getAppVersion(): String = "1.7.2"
+        fun getAppVersion(): String = "1.7.3"
 
         @JavascriptInterface
         fun requestDefaultDialerRole() {
@@ -306,34 +308,58 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun setAiSimSlot(slot: Int) {
-            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-            prefs.edit().putInt("ai_sim_slot", slot).apply()
-            val label = when(slot) {
-                0 -> "SIM 1"
-                1 -> "SIM 2"
-                else -> "All Active SIMs / Single SIM"
+            runOnUiThread {
+                try {
+                    val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                    prefs.edit().putInt("ai_sim_slot", slot).apply()
+                    val label = when(slot) {
+                        0 -> "SIM 1"
+                        1 -> "SIM 2"
+                        else -> "All Active SIMs / Single SIM"
+                    }
+                    showToast("AI Dedicated Calling Slot set to: $label")
+                } catch (e: Throwable) {
+                    Log.e("AndroidBridge", "setAiSimSlot error: ${e.message}")
+                }
             }
-            showToast("AI Dedicated Calling Slot set to: $label")
         }
 
         @JavascriptInterface
         fun getAiSimSlot(): Int {
-            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-            return prefs.getInt("ai_sim_slot", -1)
+            return try {
+                val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                prefs.getInt("ai_sim_slot", -1)
+            } catch (e: Throwable) {
+                -1
+            }
         }
 
         @JavascriptInterface
         fun setPairingCode(code: String) {
-            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("pairing_code", code).apply()
-            autoStartGatewayWorker()
-            showToast("Pairing Code: $code linked! Connecting to AI Gateway...")
+            runOnUiThread {
+                try {
+                    val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                    prefs.edit().putString("pairing_code", code).apply()
+                    try {
+                        autoStartGatewayWorker()
+                    } catch (serviceErr: Throwable) {
+                        Log.e("AndroidBridge", "Could not start gateway service: ${serviceErr.message}")
+                    }
+                    showToast("Pairing Code: $code linked! ✅")
+                } catch (e: Throwable) {
+                    Log.e("AndroidBridge", "setPairingCode error: ${e.message}")
+                }
+            }
         }
 
         @JavascriptInterface
         fun getPairingCode(): String {
-            val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
-            return prefs.getString("pairing_code", "") ?: ""
+            return try {
+                val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                prefs.getString("pairing_code", "") ?: ""
+            } catch (e: Throwable) {
+                ""
+            }
         }
     }
 }

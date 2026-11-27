@@ -407,6 +407,72 @@ export default function Calls() {
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [isSavingBill, setIsSavingBill] = useState(false);
 
+  // 🎭 Calling Roles Management States
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleFormData, setRoleFormData] = useState({
+    role_id: '',
+    role_name: '',
+    goal: '',
+    offer: '',
+    default_frequency_days: 7
+  });
+  const [isSavingRole, setIsSavingRole] = useState(false);
+
+  const handleOpenNewRoleModal = () => {
+    setRoleFormData({
+      role_id: `role_${Date.now()}`,
+      role_name: '',
+      goal: '',
+      offer: '',
+      default_frequency_days: 7
+    });
+    setShowRoleModal(true);
+  };
+
+  const handleOpenEditRoleModal = (role) => {
+    setRoleFormData({
+      role_id: role.role_id,
+      role_name: role.role_name,
+      goal: role.goal || '',
+      offer: role.offer || '',
+      default_frequency_days: role.default_frequency_days || 7
+    });
+    setShowRoleModal(true);
+  };
+
+  const handleSaveRole = async (e) => {
+    e.preventDefault();
+    if (!roleFormData.role_name.trim()) {
+      toast.error('Role ka naam zaroori hai');
+      return;
+    }
+    setIsSavingRole(true);
+    try {
+      await api.post('/gateway/roles', {
+        ...roleFormData,
+        firm_name: workspaces.find(w => w._id === activeWorkspace)?.name || 'My Business'
+      });
+      toast.success(`Role "${roleFormData.role_name}" saved!`);
+      setShowRoleModal(false);
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save role');
+    } finally {
+      setIsSavingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleId, roleName) => {
+    if (!window.confirm(`Kya aap "${roleName}" role ko delete karna chahte hain?`)) return;
+    try {
+      await api.delete(`/gateway/roles/${roleId}`);
+      toast.success(`Role "${roleName}" deleted!`);
+      fetchGatewayData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete role');
+    }
+  };
+
   const [logModalLead, setLogModalLead] = useState(null);
   const [logFormData, setLogFormData] = useState({
     outcome: 'connected',
@@ -2049,10 +2115,17 @@ export default function Calls() {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Wrench size={15} className="text-indigo-400" /> Role-Based Calling Brain Prompts &amp; Windows
+                  <Wrench size={15} className="text-indigo-400" /> Role-Based Calling Brain Prompts &amp; Windows ({callingRoles.length})
                 </h3>
                 <p className="text-xs text-gray-400">Har role ke alag-alag business goals, offers, frequency aur allowed calling time.</p>
               </div>
+              <button
+                type="button"
+                onClick={handleOpenNewRoleModal}
+                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all"
+              >
+                <Plus size={14} /> <span>+ Naya Role Banayein</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2063,14 +2136,32 @@ export default function Calls() {
                       <h4 className="font-bold text-white text-sm">{r.role_name}</h4>
                       <p className="text-[11px] text-gray-400 mt-0.5">Firm: {r.firm_name}</p>
                     </div>
-                    <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-md text-[10px] font-mono">
-                      Cycle: Har {r.default_frequency_days} Din
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-md text-[10px] font-mono">
+                        Cycle: Har {r.default_frequency_days} Din
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditRoleModal(r)}
+                        className="p-1 text-gray-400 hover:text-white rounded-lg bg-black/40 hover:bg-gray-800 transition-colors"
+                        title="Edit Role"
+                      >
+                        <Edit3 size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRole(r.role_id, r.role_name)}
+                        className="p-1 text-rose-400 hover:text-rose-300 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                        title="Delete Role"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="bg-black/50 p-2.5 rounded-xl border border-gray-800/80 space-y-1 text-xs">
                     <p className="text-gray-300"><strong className="text-emerald-400">🎯 Goal:</strong> {r.goal}</p>
-                    <p className="text-gray-300"><strong className="text-amber-400">🎁 Offer:</strong> {r.offer}</p>
+                    {r.offer && <p className="text-gray-300"><strong className="text-amber-400">🎁 Offer:</strong> {r.offer}</p>}
                     <p className="text-gray-400 text-[11px]">
                       ⏰ <strong>Call Window:</strong> {r.call_window?.start || '10:00'} to {r.call_window?.end || '19:00'} (Max {r.max_attempts} retries)
                     </p>
@@ -2078,6 +2169,109 @@ export default function Calls() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🎭 CREATE / EDIT CALLING ROLE MODAL */}
+      {showRoleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="bg-[#111118] border border-gray-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setShowRoleModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white p-1 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center">
+                <Users size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  {roleFormData.role_id?.startsWith('role_') ? 'Naya Calling Role Banayein' : 'Role Update Karein'}
+                </h3>
+                <p className="text-xs text-gray-400">AI is role ke mutabik customized offer aur rate card bolegi</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveRole} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">
+                  Role Name (e.g. Plumber, Thekedar, Buyer, Painter, Electrician):
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Painter / Mistri (पेंटर)"
+                  value={roleFormData.role_name}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, role_name: e.target.value })}
+                  className="w-full bg-[#181824] border border-gray-700 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">
+                  🎯 Goal / AI ka Maksaad (Call me kya poochna hai):
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="e.g. Nayi site par putty aur emulsion ki zaroorat poocho aur token booking lo"
+                  value={roleFormData.goal}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, goal: e.target.value })}
+                  className="w-full bg-[#181824] border border-gray-700 text-white rounded-xl p-2.5 text-xs outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">
+                  🎁 Offer / Discount / Pitch (AI kya offer dega):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 5 bucket par 1 free token + same-day free delivery"
+                  value={roleFormData.offer}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, offer: e.target.value })}
+                  className="w-full bg-[#181824] border border-gray-700 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-bold mb-1">
+                  ⏰ Follow-up Cycle (Kitne din baad dobaara call karein):
+                </label>
+                <select
+                  value={roleFormData.default_frequency_days}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, default_frequency_days: Number(e.target.value) })}
+                  className="w-full bg-[#181824] border border-gray-700 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500"
+                >
+                  <option value={2}>Har 2 Din (Urgent Leads)</option>
+                  <option value={3}>Har 3 Din (Active Projects)</option>
+                  <option value={7}>Har 7 Din (Weekly Repeat Mistris)</option>
+                  <option value={15}>Har 15 Din (Fortnightly Regulars)</option>
+                  <option value={30}>Har 30 Din (Monthly Check-in)</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRoleModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 hover:text-white font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingRole}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-md disabled:opacity-50"
+                >
+                  {isSavingRole ? 'Saving...' : 'Save Role 💾'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
