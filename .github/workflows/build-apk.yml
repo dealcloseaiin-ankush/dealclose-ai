@@ -50,6 +50,7 @@ jobs:
             exit 1
           fi
           mkdir -p ../dist-apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.7.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.6.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.5.apk
           cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.4.apk
@@ -59,25 +60,25 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dealclose-ai-apk
-          path: dist-apk/dealclose-ai-v1.7.6.apk
+          path: dist-apk/dealclose-ai-v1.7.7.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.7.6-release
-          name: "DealClose AI v1.7.6 (Live AI Calling Voice Bridge & Loud Speaker Engine)"
+          tag_name: v1.7.7-release
+          name: "DealClose AI v1.7.7 (Stock Android Caller UI & Audio Bridge)"
           body: |
-            ### 📱 DealClose AI v1.7.6 (Production AI Voice Calling Release)
-            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.6.apk` directly on your Android phone!
+            ### 📱 DealClose AI v1.7.7 (Stock Android In-Call UI & Calling Engine)
+            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.7.apk` directly on your Android phone!
 
-            ✨ **What's New & Fixed in v1.7.6:**
-            - 🎙️ **Direct WebSocket Audio Pipeline**: Pointed audio stream directly to persistent Render voice node (`wss://dealclose-ai.onrender.com`), eliminating Vercel 404 connection dropouts.
+            ✨ **What's New in v1.7.7:**
+            - 🎨 **Stock Android Caller Screen**: Upgraded from rectangular buttons to authentic circular Floating Action Buttons (FABs) with familiar "Answer" (Green) and "Decline" (Red) controls.
+            - 👤 **Clear Personal vs AI Mode Separation**: When calling SIM 1, screen displays a native personal call UI with standard answer/reject. When calling SIM 2, AI takes over with the [🎙️ Take Over] option.
             - 🔊 **Auto Speakerphone & Max Volume**: Call connects on high-clarity speakerphone at maximum volume so customer hears AI speech with zero muffling.
-            - 🎤 **Runtime Audio Permissions**: Auto-prompts for `RECORD_AUDIO` and `READ_PHONE_STATE` on startup so Android 14 never blocks microphone input.
-            - 🤖 **Instant Greeting & Chhattisgarhi Support**: Speaks greeting immediately when call is answered and recognizes regional rural dialects.
             - 🔑 **Consistent Keystore Signing**: Seamless updates without uninstalling!
           files: |
+            dist-apk/dealclose-ai-v1.7.7.apk
             dist-apk/dealclose-ai-v1.7.6.apk
             dist-apk/dealclose-ai-v1.7.5.apk
             dist-apk/dealclose-ai-v1.7.4.apk

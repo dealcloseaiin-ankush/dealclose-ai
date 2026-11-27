@@ -4,16 +4,18 @@
     android:layout_height="match_parent"
     android:background="#07090E"
     android:keepScreenOn="true"
-    android:padding="24dp">
+    android:paddingStart="24dp"
+    android:paddingTop="36dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="40dp">
 
-    <!-- Top Bar: SIM Badge & Mode Indicator -->
+    <!-- Top Status Bar: SIM & Call Mode Indicators -->
     <LinearLayout
         android:id="@+id/topBarLayout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="32dp"
         android:gravity="center"
         android:orientation="vertical">
 
@@ -22,14 +24,14 @@
             android:id="@+id/tvSimBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#1E293B"
-            android:paddingStart="14dp"
+            android:background="@drawable/bg_pill_badge"
+            android:paddingStart="16dp"
             android:paddingTop="6dp"
-            android:paddingEnd="14dp"
+            android:paddingEnd="16dp"
             android:paddingBottom="6dp"
             android:text="📶 SIM 1 • Active"
             android:textColor="#38BDF8"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <!-- AI Mode Status Pill -->
@@ -38,18 +40,18 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="#064E3B"
+            android:background="@drawable/bg_pill_badge"
             android:paddingStart="14dp"
             android:paddingTop="5dp"
             android:paddingEnd="14dp"
             android:paddingBottom="5dp"
             android:text="🤖 DealClose AI Voice Agent"
             android:textColor="#34D399"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Caller Information Section (Center) -->
+    <!-- Caller Information Section (Centered) -->
     <LinearLayout
         android:id="@+id/callerSection"
         android:layout_width="match_parent"
@@ -58,17 +60,17 @@
         android:gravity="center"
         android:orientation="vertical">
 
-        <!-- Glowing Center Avatar Icon -->
+        <!-- Circular Contact Avatar with Glowing Ring (Stock Android Style) -->
         <TextView
             android:id="@+id/tvAvatarIcon"
-            android:layout_width="96dp"
-            android:layout_height="96dp"
-            android:background="#0F172A"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:background="@drawable/bg_avatar_circle"
             android:gravity="center"
-            android:text="📞"
-            android:textSize="44sp" />
+            android:text="👤"
+            android:textSize="40sp" />
 
-        <!-- Caller Name / Number -->
+        <!-- Caller Name -->
         <TextView
             android:id="@+id/tvCallerName"
             android:layout_width="wrap_content"
@@ -76,9 +78,10 @@
             android:layout_marginTop="20dp"
             android:text="Incoming Call..."
             android:textColor="#FFFFFF"
-            android:textSize="26sp"
+            android:textSize="28sp"
             android:textStyle="bold" />
 
+        <!-- Caller Phone Number -->
         <TextView
             android:id="@+id/tvCallerNumber"
             android:layout_width="wrap_content"
@@ -96,7 +99,7 @@
             android:layout_marginTop="16dp"
             android:text="Ringing..."
             android:textColor="#A7F3D0"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <!-- Live Subtitle / Note -->
@@ -104,81 +107,112 @@
             android:id="@+id/tvAiNote"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="10dp"
             android:gravity="center"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
             android:text="DealClose AI Neha is ready to answer..."
             android:textColor="#64748B"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Bottom Action Controls for Ringing State (Answer / Decline) -->
+    <!-- Bottom Action Controls: Ringing State (Circular Stock Android Buttons) -->
     <LinearLayout
         android:id="@+id/layoutRingingControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="40dp"
+        android:layout_marginBottom="24dp"
         android:gravity="center"
         android:orientation="horizontal"
         android:weightSum="2">
 
-        <!-- Decline Button -->
-        <Button
-            android:id="@+id/btnDeclineCall"
+        <!-- Decline Action Column -->
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="12dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:backgroundTint="#EF4444"
-            android:text="🔴 Decline"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <!-- Answer Button -->
-        <Button
-            android:id="@+id/btnAnswerCall"
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnDeclineCall"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/btn_circle_decline"
+                android:elevation="6dp"
+                android:gravity="center"
+                android:text="📵"
+                android:textColor="#FFFFFF"
+                android:textSize="28sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Decline"
+                android:textColor="#EF4444"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Answer Action Column -->
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginStart="12dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:backgroundTint="#10B981"
-            android:text="🟢 Answer"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnAnswerCall"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:background="@drawable/btn_circle_answer"
+                android:elevation="6dp"
+                android:gravity="center"
+                android:text="📞"
+                android:textColor="#FFFFFF"
+                android:textSize="28sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Answer"
+                android:textColor="#22C55E"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Bottom Action Controls for Active / Connected State -->
+    <!-- Bottom Action Controls: Active / Connected State -->
     <LinearLayout
         android:id="@+id/layoutActiveControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="36dp"
+        android:layout_marginBottom="24dp"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone">
 
-        <!-- Secondary Controls: Take Over / Speaker / Mute -->
+        <!-- Take Over Pill (AI Call Mode) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="24dp"
             android:gravity="center"
             android:orientation="horizontal">
 
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnTakeOver"
                 android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:backgroundTint="#3B82F6"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
+                android:background="@drawable/bg_takeover_pill"
+                android:elevation="4dp"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
                 android:text="🎙️ Khud Baat Karein (Take Over)"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
@@ -186,6 +220,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Circular Active Call Buttons (Speaker & End Call) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -193,30 +228,63 @@
             android:orientation="horizontal"
             android:weightSum="2">
 
-            <Button
-                android:id="@+id/btnSpeaker"
+            <!-- Speaker Toggle Column -->
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_marginEnd="8dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:backgroundTint="#1E293B"
-                android:text="🔊 Speaker Off"
-                android:textAllCaps="false"
-                android:textColor="#E2E8F0"
-                android:textSize="14sp" />
+                android:gravity="center"
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btnEndCall"
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnSpeaker"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:background="@drawable/btn_circle_action"
+                    android:elevation="4dp"
+                    android:gravity="center"
+                    android:text="🔊"
+                    android:textColor="#E2E8F0"
+                    android:textSize="24sp" />
+
+                <TextView
+                    android:id="@+id/tvSpeakerLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Speaker ON"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- End Call Column -->
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_marginStart="8dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:backgroundTint="#DC2626"
-                android:text="📵 End Call"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnEndCall"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:background="@drawable/btn_circle_decline"
+                    android:elevation="6dp"
+                    android:gravity="center"
+                    android:text="📵"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="End Call"
+                    android:textColor="#EF4444"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

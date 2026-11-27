@@ -38,10 +38,12 @@ class InCallActivity : AppCompatActivity() {
 
     private lateinit var tvSimBadge: TextView
     private lateinit var tvAiModePill: TextView
+    private lateinit var tvAvatarIcon: TextView
     private lateinit var tvCallerName: TextView
     private lateinit var tvCallerNumber: TextView
     private lateinit var tvCallStatus: TextView
     private lateinit var tvAiNote: TextView
+    private var tvSpeakerLabel: TextView? = null
 
     private lateinit var layoutRingingControls: LinearLayout
     private lateinit var layoutActiveControls: LinearLayout
@@ -117,10 +119,12 @@ class InCallActivity : AppCompatActivity() {
     private fun initViews() {
         tvSimBadge = findViewById(R.id.tvSimBadge)
         tvAiModePill = findViewById(R.id.tvAiModePill)
+        tvAvatarIcon = findViewById(R.id.tvAvatarIcon)
         tvCallerName = findViewById(R.id.tvCallerName)
         tvCallerNumber = findViewById(R.id.tvCallerNumber)
         tvCallStatus = findViewById(R.id.tvCallStatus)
         tvAiNote = findViewById(R.id.tvAiNote)
+        tvSpeakerLabel = findViewById(R.id.tvSpeakerLabel)
 
         layoutRingingControls = findViewById(R.id.layoutRingingControls)
         layoutActiveControls = findViewById(R.id.layoutActiveControls)
@@ -137,29 +141,29 @@ class InCallActivity : AppCompatActivity() {
         isAiCall = intent.getBooleanExtra("is_ai_call", true)
 
         tvCallerNumber.text = number
-        tvCallerName.text = if (isAiCall) "Customer Call" else "Personal Call"
+        tvCallerName.text = if (isAiCall) "Customer Calling" else "Personal Call"
 
-        // SIM Badge
+        // SIM Badge (Clean Android Dialing Style)
         if (simSlot >= 0) {
-            tvSimBadge.text = "📶 SIM ${simSlot + 1} • Active"
+            tvSimBadge.text = "📶 SIM ${simSlot + 1} • Cellular"
         } else {
-            tvSimBadge.text = "📶 Mobile Cellular Network"
+            tvSimBadge.text = "📶 Cellular Phone Call"
         }
 
-        // AI vs Personal Mode Pill
+        // AI vs Personal Mode UI Presentation
         if (isAiCall) {
+            tvAvatarIcon.text = "🤖"
             tvAiModePill.text = "🤖 DealClose AI Voice Agent"
-            tvAiModePill.setBackgroundColor(Color.parseColor("#064E3B"))
             tvAiModePill.setTextColor(Color.parseColor("#34D399"))
             tvCallStatus.text = "🔔 Incoming Call • AI Answering in 1s..."
-            tvAiNote.text = "AI Neha is preparing to greet the customer..."
+            tvAiNote.text = "AI Digital Counter Assistant is ready..."
             btnTakeOver.visibility = View.VISIBLE
         } else {
-            tvAiModePill.text = "👤 Personal Call"
-            tvAiModePill.setBackgroundColor(Color.parseColor("#1E293B"))
+            tvAvatarIcon.text = "👤"
+            tvAiModePill.text = "👤 Personal Call (Normal Mode)"
             tvAiModePill.setTextColor(Color.parseColor("#94A3B8"))
             tvCallStatus.text = "🔔 Incoming Personal Call"
-            tvAiNote.text = "Tap Answer to speak directly."
+            tvAiNote.text = "Tap Answer to talk directly."
             btnTakeOver.visibility = View.GONE
         }
     }
@@ -185,7 +189,6 @@ class InCallActivity : AppCompatActivity() {
             AudioBridgeManager.stopAudioBridge()
             isAiCall = false
             tvAiModePill.text = "👤 Personal Takeover Active"
-            tvAiModePill.setBackgroundColor(Color.parseColor("#1E3A8A"))
             tvAiModePill.setTextColor(Color.parseColor("#93C5FD"))
             tvAiNote.text = "AI Disconnected. Aap ab customer se live baat kar rahe hain."
             btnTakeOver.visibility = View.GONE
@@ -200,7 +203,8 @@ class InCallActivity : AppCompatActivity() {
         audioManager?.let { am ->
             isSpeakerOn = !isSpeakerOn
             am.isSpeakerphoneOn = isSpeakerOn
-            btnSpeaker.text = if (isSpeakerOn) "🔊 Speaker ON" else "🔈 Speaker OFF"
+            btnSpeaker.text = if (isSpeakerOn) "🔊" else "🔈"
+            tvSpeakerLabel?.text = if (isSpeakerOn) "Speaker ON" else "Speaker OFF"
         }
     }
 
