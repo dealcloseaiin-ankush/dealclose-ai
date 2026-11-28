@@ -133,10 +133,9 @@ class DealCloseInCallService : InCallService() {
                                         setAudioRoute(CallAudioState.ROUTE_WIRED_HEADSET)
                                     }
                                 } else {
-                                    // Route to EARPIECE so loudspeaker does NOT blast into the room!
-                                    // Caller hears AI in call, room stays completely silent.
-                                    setAudioRoute(CallAudioState.ROUTE_EARPIECE)
-                                    Log.d(TAG, "🔇 [Telecom] Audio routed to ROUTE_EARPIECE (Room quiet).")
+                                    // Acoustic Companion Mode: Route to Speakerphone with 65% volume guard
+                                    setAudioRoute(CallAudioState.ROUTE_SPEAKER)
+                                    Log.d(TAG, "📢 [Telecom] Audio routed to ROUTE_SPEAKER (Acoustic Companion Mode).")
                                 }
                             } catch (e: Throwable) {
                                 Log.e(TAG, "setAudioRoute error: ${e.message}")

@@ -90,6 +90,8 @@ const leadSchema = new Schema({
   overdueDays: { type: Number, default: 0 },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'partial'], default: 'pending' },
   isCallEnabled: { type: Boolean, default: true },
+  isDnc: { type: Boolean, default: false },
+  dncDate: { type: Date, default: null },
   accountingSoftware: { type: String, default: '' },
 
   // --- Call AI & Telephony 5-Bucket Tracking ---

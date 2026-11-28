@@ -50,10 +50,10 @@ jobs:
             exit 1
           fi
           mkdir -p ../dist-apk
-          cp app/build/outputs/apk/release/app-release.apk ../dist-apk/dealclose-ai-v1.7.9.apk
+          cp app/build/outputs/apk/release/app-release.apk ../dist-apk/dealclose-ai-v1.7.10.apk
           cp app/build/outputs/apk/release/app-release.apk ../dist-apk/dealclose-sim-gateway.apk
           if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
-            cp app/build/outputs/bundle/release/app-release.aab ../dist-apk/dealclose-ai-v1.7.9.aab
+            cp app/build/outputs/bundle/release/app-release.aab ../dist-apk/dealclose-ai-v1.7.10.aab
           fi
           if [ -f app/release.keystore ]; then
             cp app/release.keystore ../dist-apk/dealclose.keystore
@@ -63,27 +63,30 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dealclose-ai-apk
-          path: dist-apk/dealclose-ai-v1.7.9.apk
+          path: dist-apk/dealclose-ai-v1.7.10.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.7.9-release
-          name: "DealClose AI v1.7.9 (Headset/Earphone Silent Audio + Ultra-Fast ASR Engine)"
+          tag_name: v1.7.10-release
+          name: "DealClose AI v1.7.10 (Acoustic Half-Duplex, 350ms Tail Guard & Real Latency Measurement)"
           body: |
-            ### 📱 DealClose AI v1.7.9 (Headset Silent Mode & Voice Recognition ASR)
-            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.9.apk` directly on your Android phone!
+            ### 📱 DealClose AI v1.7.10 (Acoustic Companion Calling Engine)
+            Download `dealclose-sim-gateway.apk` or `dealclose-ai-v1.7.10.apk` directly on your Android phone!
 
-            ✨ **What's New in v1.7.9:**
-            - 🎧 **Silent Room Headset/Earpiece Audio**: Telecom route dynamically switches to `ROUTE_WIRED_HEADSET` / `ROUTE_BLUETOOTH` or `ROUTE_EARPIECE` so AI voice does NOT blast through the room's loudspeaker.
-            - 🎤 **VOICE_RECOGNITION AudioRecord Engine**: Bypasses Android 14 telephony noise suppression/echo cancellation that was muting customer voice during active cellular calls.
-            - ⚡ **Ultra-Fast Speech STT (300ms Endpointing)**: Deepgram Nova-2 configured with `endpointing=300ms` for instant end-of-speech detection without dead silence.
-            - 🚀 **Max Tokens & Low Latency LLM**: Tuned OpenAI gpt-4o-mini generation for snappy sub-300ms responses.
-            - 🔑 **Consistent Keystore Signing**: Seamless updates without uninstalling!
+            ✨ **What's New in v1.7.10:**
+            - 🛡️ **Acoustic Half-Duplex (350ms Tail Guard)**: Drops mic loop frames while AI speech is playing + 350ms tail guard to eliminate acoustic echo over loudspeaker.
+            - 🔍 **Fuzzy Echo Guard Filter**: Discards transcripts matching recent AI utterances to prevent infinite self-hearing loops.
+            - ⚡ **Sentence-Level Streaming LLM to TTS**: Deepgram Nova-2 (Hindi/Hinglish) + OpenAI streaming delivers first-byte audio before full response finishes.
+            - ⏱️ **1.5s Latency Fallback**: Automatically triggers natural filler ("Ji, ek second...") if LLM response exceeds 1500ms.
+            - 🚨 **Barge-in / Interrupt**: Instantly flushes audio buffer when customer speaks during playback.
+            - 🔊 **65% Volume Guard**: Prevents speakerphone distortion and mic saturation.
+            - 🛑 **Do-Not-Call (DNC) Auto-OptOut**: Automatically tags DNC, plays polite disclosure, and disconnects call.
+            - 🎤 **Audio Source Toggle**: Configurable `VOICE_COMMUNICATION` / `VOICE_RECOGNITION`.
           files: |
-            dist-apk/dealclose-ai-v1.7.9.apk
-            dist-apk/dealclose-ai-v1.7.9.aab
+            dist-apk/dealclose-ai-v1.7.10.apk
+            dist-apk/dealclose-ai-v1.7.10.aab
             dist-apk/dealclose-sim-gateway.apk
             dist-apk/dealclose.keystore
         env:

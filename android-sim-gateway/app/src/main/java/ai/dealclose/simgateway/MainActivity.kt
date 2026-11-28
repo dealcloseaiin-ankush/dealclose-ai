@@ -294,7 +294,7 @@ class MainActivity : AppCompatActivity() {
         fun isNativeApp(): Boolean = true
 
         @JavascriptInterface
-        fun getAppVersion(): String = "1.7.4"
+        fun getAppVersion(): String = "1.7.10"
 
         @JavascriptInterface
         fun requestDefaultDialerRole() {
@@ -367,6 +367,31 @@ class MainActivity : AppCompatActivity() {
                 prefs.getInt("ai_sim_slot", -1)
             } catch (e: Throwable) {
                 -1
+            }
+        }
+
+        @JavascriptInterface
+        fun setAudioSource(source: String) {
+            runOnUiThread {
+                try {
+                    val cleanSource = if (source.equals("VOICE_RECOGNITION", ignoreCase = true)) "VOICE_RECOGNITION" else "VOICE_COMMUNICATION"
+                    val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                    prefs.edit().putString("audio_source_type", cleanSource).apply()
+                    showToast("Audio Source set to: $cleanSource ✅")
+                    Log.i("AndroidBridge", "Audio source preference updated to: $cleanSource")
+                } catch (e: Throwable) {
+                    Log.e("AndroidBridge", "setAudioSource error: ${e.message}")
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun getAudioSource(): String {
+            return try {
+                val prefs = context.getSharedPreferences("DealClosePrefs", Context.MODE_PRIVATE)
+                prefs.getString("audio_source_type", "VOICE_COMMUNICATION") ?: "VOICE_COMMUNICATION"
+            } catch (e: Throwable) {
+                "VOICE_COMMUNICATION"
             }
         }
 

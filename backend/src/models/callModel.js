@@ -46,6 +46,18 @@ const callSchema = new Schema({
     text: { type: String },
     time: { type: Date, default: Date.now }
   }],
+  latencyStats: {
+    greetingDelayMs: { type: Number },
+    avgTurnaroundMs: { type: Number },
+    worstTurnaroundMs: { type: Number },
+    totalTurns: { type: Number },
+    turns: [{
+      turn: { type: Number },
+      llmFirstTokenMs: { type: Number },
+      ttsFirstByteMs: { type: Number },
+      turnaroundMs: { type: Number }
+    }]
+  },
   expiresAt: { type: Date }
 }, { timestamps: true });
 
