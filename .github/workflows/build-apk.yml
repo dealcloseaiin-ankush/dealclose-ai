@@ -55,6 +55,9 @@ jobs:
           if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
             cp app/build/outputs/bundle/release/app-release.aab ../dist-apk/dealclose-ai-v1.7.9.aab
           fi
+          if [ -f app/release.keystore ]; then
+            cp app/release.keystore ../dist-apk/dealclose.keystore
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -82,5 +85,6 @@ jobs:
             dist-apk/dealclose-ai-v1.7.9.apk
             dist-apk/dealclose-ai-v1.7.9.aab
             dist-apk/dealclose-sim-gateway.apk
+            dist-apk/dealclose.keystore
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
