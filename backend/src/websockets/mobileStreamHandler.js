@@ -4,9 +4,37 @@ const Call = require('../models/callModel');
 const WebSocket = require('ws'); // 🚀 RAW STT Connection
 const Lead = require('../models/leadModel');
 
-// 🚀 GLOBAL CACHE: Cache fallback audio and instant initial greeting
+// 🚀 GLOBAL CACHE: Cache fallback audio and instant ethical AI greeting
 let cachedMobileFallbackAudio = null;
 let cachedInitialGreetingAudio = null;
+const ETHICAL_AI_GREETING = "Namaste! Main DealClose AI Assistant bol raha hoon. Boliye, main aapki kya madad kar sakta hoon?";
+
+async function getPreCachedGreeting() {
+  if (cachedInitialGreetingAudio) return cachedInitialGreetingAudio;
+  try {
+    const ttsResponse = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=linear16&sample_rate=16000', {
+      method: 'POST',
+      headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: ETHICAL_AI_GREETING })
+    });
+    if (ttsResponse.ok) {
+      let buf = Buffer.from(await ttsResponse.arrayBuffer());
+      if (buf.length > 44 && buf.slice(0, 4).toString('ascii') === 'RIFF') {
+        buf = buf.slice(44);
+      }
+      cachedInitialGreetingAudio = buf.toString('base64');
+      console.log(`⚡ [Instant Greeting] Pre-cached (${buf.length} bytes PCM) for instant pickup playback!`);
+      return cachedInitialGreetingAudio;
+    }
+  } catch (e) {
+    console.warn("Pre-cache greeting error:", e.message);
+  }
+  return null;
+}
+// Pre-warm immediately on module load
+if (process.env.DEEPGRAM_API_KEY) {
+  getPreCachedGreeting();
+}
 
 // 🌊 DEALCLOSE AI COST-EFFECTIVE CALLING MODELS CONFIGURATION
 const MODELS = {
@@ -26,6 +54,8 @@ module.exports = function (ws) {
   let activeWorkspaceId = 'main';
   let activeCallGoal = null;
   let currentLead = null;
+  let lastAiUtterance = "";
+  let aiSpeakingUntil = 0;
   
   // 1. Initialize APIs Safely
   console.log(`\n================== [AI CALLING DEBUG] ==================`);
@@ -65,6 +95,23 @@ module.exports = function (ws) {
         const transcript = alt.transcript ? alt.transcript.trim() : '';
         if (transcript.length > 0) {
           console.log(`🎤 [STT Realtime]: "${transcript}" (final: ${response.is_final}, speech_final: ${response.speech_final})`);
+
+          // 🛡️ ACOUSTIC ECHO GUARD: Suppress mic feedback while AI is speaking over loudspeaker
+          const now = Date.now();
+          if (now < aiSpeakingUntil) {
+            console.log(`🚫 [Echo Guard] Ignored mic bleed while AI is speaking (speech ends in ${aiSpeakingUntil - now}ms): "${transcript}"`);
+            return;
+          }
+
+          // Check if transcript is an acoustic echo of AI's recent words
+          if (lastAiUtterance && transcript.length > 6) {
+            const firstWords = lastAiUtterance.slice(0, 20).toLowerCase();
+            if (transcript.toLowerCase().includes(firstWords)) {
+              console.log(`🚫 [Echo Guard] Suppressed self-echo of previous AI speech: "${transcript}"`);
+              return;
+            }
+          }
+
           if (response.is_final || response.speech_final) {
             console.log(`👤 [Customer on Mobile]: ${transcript}`);
             rawTranscript.push({ speaker: 'Customer', text: transcript, time: new Date() });
@@ -218,7 +265,9 @@ ${toneDirective}
       const base64Audio = audioBuffer.toString('base64');
       
       if (ws.readyState === WebSocket.OPEN) {
-        console.log(`🔊 [Audio Stream Out] Sent ${audioBuffer.length} raw PCM bytes to Android phone speaker!`);
+        lastAiUtterance = aiText;
+        aiSpeakingUntil = Date.now() + Math.round(audioBuffer.length / 32) + 500;
+        console.log(`🔊 [Audio Stream Out] Sent ${audioBuffer.length} raw PCM bytes to Android phone speaker! (Echo guard active for ${Math.round(audioBuffer.length / 32) + 500}ms)`);
         ws.send(JSON.stringify({ event: 'ai_response', text: aiText }));
         ws.send(JSON.stringify({ event: 'audio', data: base64Audio }));
       }
@@ -262,6 +311,26 @@ ${toneDirective}
         if (msg.workspaceId) activeWorkspaceId = msg.workspaceId;
         if (msg.callGoal) activeCallGoal = msg.callGoal;
         
+        // Immediate Instant Pre-cached Ethical Greeting playback
+        getPreCachedGreeting().then(greetingAudio => {
+          if (greetingAudio && ws.readyState === WebSocket.OPEN) {
+            console.log(`⚡ [Instant Greeting] Sent ethical AI greeting immediately on call pickup!`);
+            lastAiUtterance = ETHICAL_AI_GREETING;
+            conversationHistory.push({ role: 'assistant', content: ETHICAL_AI_GREETING });
+            rawTranscript.push({ speaker: 'AI', text: ETHICAL_AI_GREETING, time: new Date() });
+            
+            const audioBytes = Buffer.from(greetingAudio, 'base64').length;
+            aiSpeakingUntil = Date.now() + Math.round(audioBytes / 32) + 500;
+            
+            ws.send(JSON.stringify({ event: 'ai_response', text: ETHICAL_AI_GREETING }));
+            ws.send(JSON.stringify({ event: 'audio', data: greetingAudio }));
+          } else {
+            processAIResponse();
+          }
+        }).catch(() => {
+          processAIResponse();
+        });
+
         if (activeLeadId || activePhone) {
           const query = activeLeadId ? { _id: activeLeadId } : { phoneNumber: { $regex: new RegExp(activePhone.replace(/\D/g, '').slice(-10) + '$') } };
           Lead.findOneAndUpdate(query, {
@@ -272,13 +341,9 @@ ${toneDirective}
               currentLead = foundLead;
               console.log(`👤 [Customer Context Loaded]: ${foundLead.name || 'Unknown'} | Attempts: ${foundLead.callAttempts} | Dues: ₹${foundLead.dueAmount || 0}`);
             }
-            processAIResponse(); // First greeting trigger
           }).catch(err => {
             console.warn('Lead lookup non-fatal error:', err.message);
-            processAIResponse();
           });
-        } else {
-          processAIResponse(); // First greeting trigger
         }
 
       } else if (msg.event === 'audio') {
