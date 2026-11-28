@@ -15,22 +15,28 @@ android {
         versionName "1.7.9"
     }
 
+    signingConfigs {
+        release {
+            if (file("release.keystore").exists()) {
+                storeFile file("release.keystore")
+                storePassword "dealclose2026"
+                keyAlias "dealclose"
+                keyPassword "dealclose2026"
+            }
+        }
+    }
+
     buildTypes {
         release {
             if (file("release.keystore").exists()) {
-                signingConfig signingConfigs.create("release") {
-                    storeFile file("release.keystore")
-                    storePassword "dealclose2026"
-                    keyAlias "dealclose"
-                    keyPassword "dealclose2026"
-                }
+                signingConfig signingConfigs.release
             }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             if (file("release.keystore").exists()) {
-                signingConfig signingConfigs.findByName("release")
+                signingConfig signingConfigs.release
             }
         }
     }

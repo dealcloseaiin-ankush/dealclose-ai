@@ -39,23 +39,22 @@ jobs:
             keytool -genkey -v -keystore release.keystore -alias dealclose -keyalg RSA -keysize 2048 -validity 10000 -storepass dealclose2026 -keypass dealclose2026 -dname "CN=DealClose AI, OU=Engineering, O=DealClose, L=Raipur, ST=Chhattisgarh, C=IN"
           fi
 
-      - name: Build Debug APK with Gradle
+      - name: Build Release APK and AAB with Gradle
         working-directory: ./android-sim-gateway
         run: |
           set -o pipefail
-          gradle assembleDebug 2>&1 | tee ../gradle-build.log || true
-          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
+          gradle assembleRelease bundleRelease 2>&1 | tee ../gradle-build.log || true
+          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
             echo "::error title=Kotlin Compilation Errors::$(grep -E '^e: ' ../gradle-build.log | tr '\n' ' ')"
             grep -E "^e: " ../gradle-build.log || tail -n 60 ../gradle-build.log
             exit 1
           fi
           mkdir -p ../dist-apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.9.apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.8.apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.7.apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.6.apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-ai-v1.7.5.apk
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-apk/dealclose-sim-gateway.apk
+          cp app/build/outputs/apk/release/app-release.apk ../dist-apk/dealclose-ai-v1.7.9.apk
+          cp app/build/outputs/apk/release/app-release.apk ../dist-apk/dealclose-sim-gateway.apk
+          if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
+            cp app/build/outputs/bundle/release/app-release.aab ../dist-apk/dealclose-ai-v1.7.9.aab
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -81,10 +80,7 @@ jobs:
             - 🔑 **Consistent Keystore Signing**: Seamless updates without uninstalling!
           files: |
             dist-apk/dealclose-ai-v1.7.9.apk
-            dist-apk/dealclose-ai-v1.7.8.apk
-            dist-apk/dealclose-ai-v1.7.7.apk
-            dist-apk/dealclose-ai-v1.7.6.apk
-            dist-apk/dealclose-ai-v1.7.5.apk
+            dist-apk/dealclose-ai-v1.7.9.aab
             dist-apk/dealclose-sim-gateway.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
